@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Production Schedule</title>
+<style>
+  :root{
+    --navy:#152238;
+    --navy-2:#1e3050;
+    --steel:#3d5570;
+    --steel-line:#c8d0da;
+    --paper:#f3f1ea;
+    --paper-2:#ffffff;
+    --ink:#1c2128;
+    --ink-soft:#5a6472;
+    --rust:#c1531f;
+    --rust-2:#a8451a;
+    --amber:#d3922e;
+    --good:#3f7a4e;
+    --shadow: 0 1px 2px rgba(21,34,56,.08), 0 4px 14px rgba(21,34,56,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .titlebar{
+    background: linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 100%);
+    color:#eef1f5;
+    padding: 22px clamp(16px,4vw,40px) 0;
+    border-bottom: 4px solid var(--rust);
+  }
+  .titlebar-inner{
+    max-width:1400px; margin:0 auto;
+    display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    padding-bottom: 18px;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:38px; height:38px; flex:none;
+    border:2px solid var(--rust);
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Courier New", monospace; font-weight:700; font-size:15px; color:var(--rust);
+  }
+  h1{
+    font-size: clamp(20px,2.6vw,27px);
+    margin:0; letter-spacing:.2px; font-weight:700;
+  }
+  .subtitle{
+    font-size:12.5px; color:#aeb9c8; margin-top:3px; letter-spacing:.4px; text-transform:uppercase;
+  }
+  .titlebar-stats{
+    display:flex; gap:22px; font-family:"Courier New", monospace;
+  }
+  .stat{text-align:right;}
+  .stat .n{font-size:22px; font-weight:700; color:#fff; line-height:1;}
+  .stat .l{font-size:10px; color:#9db0c6; letter-spacing:.6px; text-transform:uppercase; margin-top:3px;}
+
+  .tabbar{
+    max-width:1400px; margin:0 auto; display:flex; gap:4px;
+    padding: 0 clamp(16px,4vw,40px);
+  }
+  .tab-btn{
+    background:transparent; border:none; color:#aeb9c8; padding:11px 18px 13px;
+    font-size:13.5px; font-weight:700; letter-spacing:.3px; cursor:pointer;
+    border-bottom:3px solid transparent; display:flex; align-items:center; gap:7px;
+  }
+  .tab-btn:hover{color:#eef1f5;}
+  .tab-btn.active{color:#fff; border-bottom-color:var(--rust);}
+  .tab-badge{
+    background:rgba(255,255,255,.12); border-radius:20px; padding:1px 7px; font-size:10.5px; font-family:"Courier New",monospace;
+  }
+
+  .wrap{max-width:1400px; margin:0 auto; padding: 22px clamp(16px,4vw,40px) 60px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .toolbar{
+    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .search{
+    flex:1 1 240px; position:relative;
+  }
+  .search input{
+    width:100%; padding:10px 12px 10px 34px; border:1px solid var(--steel-line);
+    border-radius:var(--radius); font-size:14px; background:var(--paper-2); color:var(--ink);
+  }
+  .search svg{position:absolute; left:10px; top:50%; transform:translateY(-50%); opacity:.45;}
+  select.filter{
+    padding:10px 30px 10px 12px; border:1px solid var(--steel-line); border-radius:var(--radius);
+    background:var(--paper-2); font-size:14px; color:var(--ink); cursor:pointer;
+  }
+  .btn{
+    padding:10px 16px; border-radius:var(--radius); border:1px solid transparent;
+    font-size:13.5px; font-weight:600; cursor:pointer; letter-spacing:.2px;
+    display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
+  }
+  .btn-primary{background:var(--rust); color:#fff;}
+  .btn-primary:hover{background:var(--rust-2);}
+  .btn-ghost{background:transparent; color:var(--navy); border-color:var(--steel-line);}
+  .btn-ghost:hover{background:#e9e5da;}
+  .btn-sm{padding:6px 10px; font-size:12px;}
+  .btn-link{
+    background:#eaf1ec; color:var(--good); border:1px solid #bcdcc4;
+    padding:5px 9px; border-radius:20px; font-size:11.5px; font-weight:700;
+    cursor:pointer; display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
+  }
+  .btn-link:hover{background:#dcefe1;}
+  .btn-link svg{flex:none;}
+
+  .btn-link.files-btn{
+    background:#eaf0fa; color:#2f5fa8; border-color:#c3d6f2;
+  }
+  .btn-link.files-btn:hover{background:#dbe8f8;}
+  .icon-btn.files-btn-empty{color:#a7afba;}
+  .icon-btn.files-btn-empty:hover{background:#e9e5da; color:var(--navy);}
+
+  table{width:100%; border-collapse:collapse; background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); overflow:hidden;}
+  thead th{
+    text-align:left; font-size:11px; letter-spacing:.5px; text-transform:uppercase;
+    color:#dfe6ee; background:var(--navy); padding:12px 10px; font-weight:600; cursor:pointer; user-select:none;
+    white-space:nowrap;
+  }
+  thead th:hover{background:var(--navy-2);}
+  thead th.sorted::after{content:" ▾"; color:var(--rust);}
+  thead th.sorted.asc::after{content:" ▴"; color:var(--rust);}
+  tbody td{
+    padding:11px 10px; border-bottom:1px solid #ece8dd; font-size:13.5px; vertical-align:middle;
+  }
+  tbody tr:hover{background:#faf8f2;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.flash{animation: flash 1.6s ease;}
+  @keyframes flash{
+    0%{background:#fdeee3;} 100%{background:transparent;}
+  }
+  .tag{
+    display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;
+    letter-spacing:.3px; color:#fff;
+  }
+  .mono{font-family:"Courier New", monospace;}
+  .muted{color:var(--ink-soft);}
+  .settle-cell{font-weight:700; color:var(--navy);}
+  .settle-soon{color:var(--rust); }
+  .row-actions{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+  .icon-btn{
+    border:none; background:transparent; cursor:pointer; padding:5px; border-radius:3px; color:var(--ink-soft);
+    display:inline-flex;
+  }
+  .icon-btn:hover{background:#e9e5da; color:var(--navy);}
+  .empty{padding:50px 20px; text-align:center; color:var(--ink-soft);}
+
+  .progress-wrap{display:flex; align-items:center; gap:8px; min-width:120px;}
+  .progress-bar{flex:1; height:6px; background:#e7e2d5; border-radius:4px; overflow:hidden;}
+  .progress-fill{height:100%; background:var(--good); border-radius:4px;}
+  .progress-fill.partial{background:var(--amber);}
+  .progress-fill.none{background:#cbc5b4;}
+  .progress-label{font-size:11px; font-family:"Courier New",monospace; color:var(--ink-soft); white-space:nowrap;}
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(21,34,56,.55); display:none;
+    align-items:flex-start; justify-content:center; padding: 5vh 16px; z-index:50; overflow-y:auto;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--paper-2); width:100%; max-width:640px; border-radius:var(--radius);
+    box-shadow:0 20px 60px rgba(0,0,0,.3); border-top:4px solid var(--rust);
+  }
+  .modal.wide{max-width:760px;}
+  .modal-head{padding:20px 24px 14px; border-bottom:1px solid #ece8dd; display:flex; justify-content:space-between; align-items:center;}
+  .modal-head h2{margin:0; font-size:18px;}
+  .modal-close{border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:20px; line-height:1;}
+  .modal-body{padding:22px 24px;}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:14px 16px;}
+  .grid .full{grid-column:1 / -1;}
+  label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  input[type=text], input[type=tel], input[type=number], input[type=date], select{
+    width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius);
+    font-size:14px; color:var(--ink); background:#fff; font-family:inherit;
+  }
+  input:focus, select:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .helper{font-size:11px; color:var(--ink-soft); margin-top:4px;}
+  .modal-foot{padding:16px 24px 22px; display:flex; justify-content:space-between; align-items:center; gap:10px;}
+  .date-linked{font-size:11px; color:var(--good); display:flex; align-items:center; gap:4px; margin-top:4px;}
+
+  .checklist{
+    display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin-top:6px;
+  }
+  .check-item{
+    display:flex; align-items:center; gap:9px; border:1px solid var(--steel-line); border-radius:var(--radius);
+    padding:8px 10px; background:#fbfaf6;
+  }
+  .check-item input[type=checkbox]{width:16px; height:16px; flex:none; accent-color: var(--rust); cursor:pointer;}
+  .check-item label{margin:0; text-transform:none; font-weight:600; font-size:13px; color:var(--ink); letter-spacing:0; flex:1; cursor:pointer;}
+  .check-item input[type=text]{
+    width:70px; padding:4px 6px; font-size:11.5px; border:1px solid var(--steel-line); border-radius:2px; flex:none;
+  }
+  .schedule-link-banner{
+    background:#eaf1ec; border:1px solid #bcdcc4; border-radius:var(--radius); padding:9px 12px;
+    font-size:12.5px; color:var(--good); display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;
+  }
+
+  .completed-toggle{
+    display:flex; align-items:center; gap:8px; margin-top:22px; padding:10px 14px;
+    background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius);
+    font-size:13px; font-weight:700; color:var(--navy); cursor:pointer; width:100%; text-align:left;
+    letter-spacing:.2px;
+  }
+  .completed-toggle:hover{background:#f7f5ee;}
+  .completed-toggle svg{transition:transform .15s ease;}
+  .completed-toggle.open svg{transform:rotate(90deg);}
+  #completedSection{margin-top:10px;}
+  #completedSection table{opacity:.9;}
+  #completedSection tbody td{color:var(--ink-soft);}
+  #completedSection .tag{opacity:.75;}
+  .complete-badge{
+    display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:var(--good);
+  }
+
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+
+  /* Auth / setup gate */
+  .auth-gate{
+    position:fixed; inset:0; background:var(--paper); z-index:200;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .auth-gate.hidden{display:none;}
+  .auth-card{
+    width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius);
+    box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;
+  }
+  .auth-card .brand{margin-bottom:22px;}
+  .auth-card h2{margin:0 0 6px; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-error{
+    background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px;
+    padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;
+  }
+  .auth-error.show{display:block;}
+  .auth-card .btn-primary{width:100%; justify-content:center; padding:11px;}
+  .setup-steps{
+    background:#faf8f2; border:1px solid var(--steel-line); border-radius:var(--radius);
+    padding:14px 16px; font-size:12.5px; color:var(--ink-soft); line-height:1.7; margin-top:4px;
+  }
+  .setup-steps code{background:#ece8dd; padding:1px 5px; border-radius:2px; font-size:11.5px;}
+
+  .sync-badge{
+    display:flex; align-items:center; gap:6px; font-size:11.5px; color:#9db0c6; font-family:"Courier New",monospace;
+  }
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.saving{background:var(--amber); animation:pulse 1s ease infinite;}
+  .sync-dot.offline{background:var(--rust);}
+  @keyframes pulse{0%,100%{opacity:1} 50%{opacity:.4}}
+  .signout-btn{
+    background:transparent; border:1px solid rgba(255,255,255,.25); color:#dfe6ee;
+    padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;
+  }
+  .signout-btn:hover{background:rgba(255,255,255,.1);}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+
+  .app-shell.locked{display:none;}
+
+  @media (max-width: 760px){
+    .grid, .checklist{grid-template-columns:1fr;}
+    table thead{display:none;}
+    table, tbody, tr, td{display:block; width:100%;}
+    tbody tr{border-bottom:6px solid var(--paper); padding:10px 4px;}
+    tbody td{border-bottom:none; padding:4px 10px; display:flex; justify-content:space-between; gap:10px;}
+    tbody td::before{content:attr(data-label); font-weight:700; color:var(--ink-soft); font-size:11px; text-transform:uppercase;}
+    .row-actions{justify-content:flex-end;}
+  }
+  @media print{
+    .toolbar, .btn, .row-actions, footer, .tabbar{display:none !important;}
+    .titlebar{background:#fff; color:#000; border-bottom:2px solid #000;}
+    .titlebar-stats .n, .stat .l{color:#000;}
+    body{background:#fff;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== AUTH / SETUP GATE ===================== -->
+<div class="auth-gate" id="setupGate" style="display:none;">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark">JS</div>
+      <div><h2 style="margin:0;">Setup needed</h2></div>
+    </div>
+    <p>This tool needs to be connected to a shared Firebase project before your team can use it. Whoever set this up should follow <code>SETUP_GUIDE.md</code> and paste the project config into the <code>firebaseConfig</code> block near the top of this file's script.</p>
+    <div class="setup-steps">
+      1. Create a free project at <code>console.firebase.google.com</code><br>
+      2. Add a Web App, copy the config object<br>
+      3. Enable Firestore Database<br>
+      4. Enable Authentication → Email/Password<br>
+      5. Add a user for each teammate<br>
+      6. Paste the config into this file, replacing the placeholder values<br>
+      7. Re-upload the file to GitHub
+    </div>
+  </div>
+</div>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark">JS</div>
+      <div>
+        <h2 style="margin:0;">Job Production Schedule</h2>
+      </div>
+    </div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="auth-error" id="loginError"></div>
+    <div class="auth-field">
+      <label for="loginEmail">Email</label>
+      <input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+
+<div class="titlebar">
+  <div class="titlebar-inner">
+    <div class="brand">
+      <div class="brand-mark" id="brandMark">JS</div>
+      <div>
+        <h1 id="mainTitle">Job Production Schedule</h1>
+        <div class="subtitle" id="yearLabel">Production Schedule</div>
+      </div>
+    </div>
+    <div class="titlebar-stats" id="scheduleStats">
+      <div class="stat"><div class="n" id="statYTD">0</div><div class="l">YTD Settled</div></div>
+      <div class="stat"><div class="n" id="statUpcoming">0</div><div class="l">Next 30 Days</div></div>
+      <div class="stat"><div class="n" id="statTotal">0</div><div class="l">Total Jobs</div></div>
+    </div>
+    <div class="titlebar-stats" id="ordersStats" style="display:none;">
+      <div class="stat"><div class="n" id="statOrdersTotal">0</div><div class="l">Total Orders</div></div>
+      <div class="stat"><div class="n" id="statOrdersDone">0</div><div class="l">Fully Ordered</div></div>
+      <div class="stat"><div class="n" id="statOrdersPending">0</div><div class="l">Items Pending</div></div>
+    </div>
+    <div class="titlebar-account">
+      <div class="sync-badge" id="syncBadge">
+        <span class="sync-dot" id="syncDot"></span>
+        <span id="syncLabel">Synced</span>
+      </div>
+      <span id="currentUserEmail" style="font-size:11.5px; color:#9db0c6;"></span>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="schedule">Production Schedule <span class="tab-badge" id="tabBadgeSchedule">0</span></button>
+    <button class="tab-btn" data-tab="orders">Material Orders <span class="tab-badge" id="tabBadgeOrders">0</span></button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ===================== SCHEDULE PANEL ===================== -->
+  <div class="panel active" id="panel-schedule">
+    <div class="toolbar">
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchBox" placeholder="Search client, lot, model, address…">
+      </div>
+      <select class="filter" id="communityFilter">
+        <option value="">All Communities</option>
+      </select>
+      <select class="filter" id="draftsmanFilter">
+        <option value="">All Draftsmen</option>
+      </select>
+      <button class="btn btn-ghost" id="exportBtn">Export CSV</button>
+      <button class="btn btn-primary" id="addBtn">+ Add Job</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr id="headerRow">
+          <th data-key="ytd">YTD</th>
+          <th data-key="community">Community</th>
+          <th data-key="lot">Lot</th>
+          <th data-key="model">Model</th>
+          <th data-key="client">Client</th>
+          <th data-key="address">Address</th>
+          <th data-key="draftsman">Draft</th>
+          <th data-key="fndn">Fndn.</th>
+          <th data-key="walk">Walk</th>
+          <th data-key="move">Move</th>
+          <th data-key="settle" class="sorted asc">Settle</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="empty" id="emptyState" style="display:none;">No jobs match your search.</div>
+  </div>
+
+  <!-- ===================== ORDERS PANEL ===================== -->
+  <div class="panel" id="panel-orders">
+    <div class="toolbar">
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="ordersSearchBox" placeholder="Search name, lot, address…">
+      </div>
+      <select class="filter" id="ordersCommunityFilter">
+        <option value="">All Communities</option>
+      </select>
+      <button class="btn btn-ghost" id="ordersExportBtn">Export CSV</button>
+      <button class="btn btn-primary" id="ordersAddBtn">+ Add Order</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr id="ordersHeaderRow">
+          <th data-key="community">Community</th>
+          <th data-key="lot">Lot</th>
+          <th data-key="name">Name</th>
+          <th data-key="address">Address</th>
+          <th data-key="walkthru" class="sorted asc">Walk-Thru</th>
+          <th>Items Ordered</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="ordersTableBody"></tbody>
+    </table>
+    <div class="empty" id="ordersEmptyState" style="display:none;">No orders match your search.</div>
+
+    <button class="completed-toggle" id="completedToggle">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" id="completedChevron"><path d="M9 6l6 6-6 6"/></svg>
+      Completed Orders <span class="tab-badge" id="completedBadge">0</span>
+    </button>
+    <div id="completedSection" style="display:none;">
+      <table>
+        <thead>
+          <tr id="completedHeaderRow">
+            <th data-key="community">Community</th>
+            <th data-key="lot">Lot</th>
+            <th data-key="name">Name</th>
+            <th data-key="address">Address</th>
+            <th data-key="walkthru" class="sorted asc">Walk-Thru</th>
+            <th>Items Ordered</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="completedTableBody"></tbody>
+      </table>
+      <div class="empty" id="completedEmptyState" style="display:none;">No completed orders yet.</div>
+    </div>
+  </div>
+
+  <footer>Data is stored in your team's shared Firebase project and syncs across everyone signed in. Use Export CSV any time for a local backup.</footer>
+</div>
+
+<!-- Job Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Add Job</h2>
+      <button class="modal-close" id="closeModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid">
+        <div>
+          <label for="f_ytd">YTD #</label>
+          <input type="number" id="f_ytd" placeholder="e.g. 27">
+        </div>
+        <div>
+          <label for="f_community">Community</label>
+          <select id="f_community">
+            <option value="AP">AP</option>
+            <option value="MM">MM</option>
+            <option value="ML">ML</option>
+            <option value="CL">CL</option>
+            <option value="OS">OS</option>
+            <option value="__other">Other…</option>
+          </select>
+          <input type="text" id="f_community_other" placeholder="Enter community code" style="margin-top:8px; display:none;">
+        </div>
+        <div>
+          <label for="f_lot">Lot #</label>
+          <input type="text" id="f_lot" placeholder="e.g. 150">
+        </div>
+        <div>
+          <label for="f_model">Model</label>
+          <input type="text" id="f_model" placeholder="e.g. Stanford B">
+        </div>
+        <div class="full">
+          <label for="f_client">Client</label>
+          <input type="text" id="f_client" placeholder="e.g. John and Tina Kelsey">
+        </div>
+        <div class="full">
+          <label for="f_address">Address</label>
+          <input type="text" id="f_address" placeholder="e.g. 1020 Stanford Dr">
+        </div>
+        <div class="full">
+          <label for="f_files">OneDrive Folder Link</label>
+          <input type="text" id="f_files" placeholder="Paste the shareable link to this lot's OneDrive folder">
+          <div class="helper">Right-click the folder in OneDrive → Share → Copy link, then paste it here.</div>
+        </div>
+        <div>
+          <label for="f_phone">Phone</label>
+          <input type="tel" id="f_phone" placeholder="717-555-0100">
+        </div>
+        <div>
+          <label for="f_draftsman">Draftsman</label>
+          <select id="f_draftsman">
+            <option value="">—</option>
+            <option value="D">D</option>
+            <option value="J">J</option>
+            <option value="__other">Other…</option>
+          </select>
+          <input type="text" id="f_draftsman_other" placeholder="Initials" style="margin-top:8px; display:none;">
+        </div>
+        <div>
+          <label for="f_fndn">Foundation Date</label>
+          <input type="date" id="f_fndn">
+        </div>
+        <div>
+          <label for="f_settle">Settle Date</label>
+          <input type="date" id="f_settle">
+          <div class="helper">Set this first — Walk and Move suggest automatically.</div>
+        </div>
+        <div>
+          <label for="f_walk">Walk Date</label>
+          <input type="date" id="f_walk">
+          <div class="date-linked" id="walkLinked" style="display:none;">✓ Settle − 5 days</div>
+        </div>
+        <div>
+          <label for="f_move">Move Date</label>
+          <input type="date" id="f_move">
+          <div class="date-linked" id="moveLinked" style="display:none;">✓ Settle − 3 days</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="deleteBtn" style="display:none; color:#a8451a; border-color:#e3b5a0;">Delete Job</button>
+      <div style="flex:1;"></div>
+      <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn">Save Job</button>
+    </div>
+  </div>
+</div>
+
+<!-- Order Modal -->
+<div class="overlay" id="ordersOverlay">
+  <div class="modal wide">
+    <div class="modal-head">
+      <h2 id="ordersModalTitle">Add Order</h2>
+      <button class="modal-close" id="ordersCloseModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="schedule-link-banner" id="scheduleLinkBanner" style="display:none;">
+        <span id="scheduleLinkText"></span>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-link" id="bannerOpenFilesBtn" style="display:none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            Open Files
+          </button>
+          <button class="btn-link" id="jumpToScheduleBtn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+            View in Schedule
+          </button>
+        </div>
+      </div>
+      <div class="grid">
+        <div>
+          <label for="o_community">Community</label>
+          <select id="o_community">
+            <option value="AP">AP</option>
+            <option value="MM">MM</option>
+            <option value="ML">ML</option>
+            <option value="CL">CL</option>
+            <option value="OS">OS</option>
+            <option value="ET">ET</option>
+            <option value="NG">NG</option>
+            <option value="__other">Other…</option>
+          </select>
+          <input type="text" id="o_community_other" placeholder="Enter community code" style="margin-top:8px; display:none;">
+        </div>
+        <div>
+          <label for="o_lot">Lot #</label>
+          <input type="text" id="o_lot" placeholder="e.g. 151">
+        </div>
+        <div class="full">
+          <label for="o_name">Name</label>
+          <input type="text" id="o_name" placeholder="e.g. Kleinfelter">
+        </div>
+        <div class="full">
+          <label for="o_address">Address</label>
+          <input type="text" id="o_address" placeholder="e.g. 1022 Stanford Drive">
+        </div>
+        <div>
+          <label for="o_walkthru">Walk-Thru Date</label>
+          <input type="date" id="o_walkthru">
+        </div>
+      </div>
+      <div style="margin-top:18px;">
+        <label style="margin-bottom:9px;">Materials Checklist <span class="helper" style="text-transform:none; display:inline;">— check when ordered, add vendor code if needed</span></label>
+        <div class="checklist" id="checklistContainer"></div>
+      </div>
+      <div class="check-item" style="margin-top:16px; background:#fbfaf6;">
+        <input type="checkbox" id="o_completed">
+        <label for="o_completed">Order complete — move to Completed Orders</label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="ordersDeleteBtn" style="display:none; color:#a8451a; border-color:#e3b5a0;">Delete Order</button>
+      <div style="flex:1;"></div>
+      <button class="btn btn-ghost" id="ordersCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="ordersSaveBtn">Save Order</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /#appShell -->
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+
+<script>
+/* ============================================================
+   FIREBASE CONFIG — paste your project's config below.
+   Get this from: Firebase Console → Project settings → General → Your apps → Web app
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+const FIREBASE_CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
+
+const CANON_ITEMS = ["Windows","Lumber","Siding","Steps","Garage","Locks","Shower","Track","Roof","Gas","Electric","UGI Ditch","Electric Ditch","Other","Order Placed"];
+
+const SCHEDULE_SEED = [{"ytd":1,"community":"AP","lot":"150","model":"Grant B","client":"John and Tina Kelsey","address":"1020 Stanford Dr","phone":"717-269-5272","plan":"","draftsman":"D","fndn":"","walk":"2025-01-15","move":"2025-01-17","settle":"2025-01-20"},{"ytd":2,"community":"AP","lot":"217","model":"Alden 2.1","client":"Bob and Jackie Chicchi","address":"1055 Percy Lane","phone":"717-961-6089","plan":"","draftsman":"D","fndn":"","walk":"2025-01-21","move":"2025-01-23","settle":"2025-01-26"},{"ytd":3,"community":"AP","lot":"224","model":"Alden 2.1","client":"Bob and Sharon Griffiths","address":"1004 Stanford Dr","phone":"717-454-7721","plan":"","draftsman":"","fndn":"","walk":"2025-02-11","move":"2025-02-13","settle":"2025-02-17"},{"ytd":4,"community":"MM","lot":"70","model":"Sherman","client":"William and Sharon Kline","address":"49 Clover Dr","phone":"717-866-2257","plan":"","draftsman":"D","fndn":"","walk":"2025-02-08","move":"2025-02-10","settle":"2025-02-13"},{"ytd":5,"community":"AP","lot":"104","model":"Stanford B","client":"Brian and Cricket Karli","address":"1094 Alden Way","phone":"678-982-6627","plan":"","draftsman":"J","fndn":"","walk":"2025-02-25","move":"2025-02-27","settle":"2025-03-02"},{"ytd":6,"community":"AP","lot":"411","model":"Vermillion","client":"BOB and Barb Henry","address":"1212 Mosaic Dr","phone":"215-208-5989","plan":"","draftsman":"J","fndn":"","walk":"2026-02-23","move":"2026-02-23","settle":"2026-03-02"},{"ytd":7,"community":"AP","lot":"103","model":"Stanford B","client":"Charles and Marie Waltman","address":"1096 Alden Way","phone":"610-906-4003","plan":"","draftsman":"J","fndn":"","walk":"2026-04-01","move":"2026-04-03","settle":"2026-04-06"},{"ytd":8,"community":"ML","lot":"115","model":"Custom","client":"Nancy Kreider","address":"115 Maple Lane","phone":"717-507-1156","plan":"","draftsman":"D","fndn":"","walk":"2026-04-12","move":"2026-04-15","settle":"2026-04-17"},{"ytd":9,"community":"MM","lot":"62","model":"Montgomery C","client":"Bryan and Elise Nelligan","address":"33 Clover Dr","phone":"484-987-9842","plan":"","draftsman":"D","fndn":"","walk":"2026-05-06","move":"2026-05-08","settle":"2026-05-08"},{"ytd":10,"community":"ML","lot":"121","model":"Custom","client":"Louis and Sharon Hurst","address":"121 Maple Lane","phone":"717-629-5788","plan":"","draftsman":"D","fndn":"","walk":"2026-05-06","move":"2026-05-08","settle":"2026-05-11"},{"ytd":11,"community":"AP","lot":"219","model":"Stanford B","client":"Tom and Nancy Doyle","address":"1059 Percy Lane","phone":"631-384-8699","plan":"","draftsman":"J","fndn":"","walk":"2026-05-13","move":"2026-05-15","settle":"2026-05-18"},{"ytd":12,"community":"AP","lot":"151","model":"Coleman","client":"Clayton Kleinfelter","address":"1022 Stanford Dr","phone":"717-664-1215","plan":"","draftsman":"J","fndn":"","walk":"2026-06-17","move":"2026-06-19","settle":"2026-06-22"},{"ytd":13,"community":"AP","lot":"424","model":"Bainbridge","client":"Marc and Jeanette Campanale","address":"1017 Riverstone Circle","phone":"","plan":"","draftsman":"D","fndn":"","walk":"2026-07-08","move":"2026-07-10","settle":"2026-07-13"},{"ytd":14,"community":"CL","lot":"109","model":"Rivet","client":"Lonnie","address":"412 Cannon Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-06-25","move":"2026-06-25","settle":"2026-06-30"},{"ytd":15,"community":"OS","lot":"1265","model":"Remodel","client":"Lorraine and Chris","address":"1265 Girl Scout rd","phone":"717-468-3046","plan":"","draftsman":"J","fndn":"","walk":"2026-07-23","move":"2026-07-24","settle":"2026-07-27"},{"ytd":16,"community":"OS","lot":"238","model":"Avonlea","client":"Kendra Heck","address":"238 S Lancaster Ave","phone":"717-383-3192","plan":"","draftsman":"D","fndn":"","walk":"2026-07-02","move":"2026-07-05","settle":"2026-07-15"},{"ytd":17,"community":"MM","lot":"49","model":"Stanford A","client":"John and Whitney","address":"40 Clover Dr","phone":"508-654-8821","plan":"","draftsman":"J","fndn":"","walk":"2026-07-15","move":"2026-07-15","settle":"2026-07-15"},{"ytd":"","community":"AP","lot":"220","model":"Tiffany","client":"Model Home","address":"1012 Stanford Dr","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-07-08","move":"2026-07-10","settle":"2026-07-13"},{"ytd":18,"community":"AP","lot":"154","model":"Stanford B","client":"James Struck","address":"1028 Stanford Dr","phone":"717-201-4782","plan":"","draftsman":"D","fndn":"","walk":"2026-07-15","move":"2026-07-17","settle":"2026-07-20"},{"ytd":19,"community":"ML","lot":"117","model":"Saber","client":"Nate Lowrie","address":"117 Maple Ln","phone":"717-269-2605","plan":"","draftsman":"J","fndn":"","walk":"2026-07-19","move":"2026-07-21","settle":"2026-07-24"},{"ytd":20,"community":"CL","lot":"1","model":"Anvil","client":"Darren and Connie Johnson","address":"401 Cannon way","phone":"484-515-9319","plan":"","draftsman":"J","fndn":"","walk":"2026-07-22","move":"2026-07-24","settle":"2026-07-27"},{"ytd":21,"community":"CL","lot":"7","model":"Artisan","client":"Nate and Lindsay","address":"419 Cannon Way","phone":"717-228-8421","plan":"","draftsman":"J","fndn":"","walk":"2026-07-26","move":"2026-07-28","settle":"2026-07-31"},{"ytd":22,"community":"AP","lot":"425","model":"Coleman 2.1","client":"Jeff and Joanie Firestone","address":"1015 Riverstone circle","phone":"717-507-6099","plan":"","draftsman":"J","fndn":"","walk":"2026-08-19","move":"2026-08-21","settle":"2026-08-24"},{"ytd":23,"community":"AP","lot":"222","model":"Bainbridge","client":"Amy  Sales","address":"1008 Stanford dr","phone":"610-703-7813","plan":"","draftsman":"J","fndn":"","walk":"2026-09-01","move":"2026-09-03","settle":"2026-09-04"},{"ytd":"","community":"AP","lot":"67","model":"Sonora","client":"Model home","address":"1117 Alden Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-10-07","move":"2026-10-09","settle":"2026-10-12"},{"ytd":24,"community":"CL","lot":"5","model":"Saber","client":"John and Lori Mattia","address":"415 Cannon Way","phone":"484-467-0754","plan":"","draftsman":"J","fndn":"","walk":"2026-10-14","move":"2026-10-16","settle":"2026-10-19"},{"ytd":"","community":"CL","lot":"113","model":"Rexmont","client":"Model Home","address":"404 Cannon way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-10-21","move":"2026-10-23","settle":"2026-10-26"},{"ytd":25,"community":"AP","lot":"70","model":"Custom","client":"Ammon and Barbara Morgan","address":"1123 Alden Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-11-18","move":"2026-11-20","settle":"2026-11-23"},{"ytd":26,"community":"AP","lot":"71","model":"Tiffany","client":"Joann and Walter Rupp","address":"1125 Alden Way","phone":"570-466-9292","plan":"","draftsman":"J","fndn":"","walk":"2026-11-25","move":"2026-11-27","settle":"2026-11-30"},{"ytd":"","community":"CL","lot":"102","model":"Rivet","client":"MODEL HOME","address":"105 Charcoal Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-11-25","move":"2026-11-27","settle":"2026-11-30"},{"ytd":"","community":"CL","lot":"98","model":"Artisan","client":"Model Home","address":"Cannon Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-12-02","move":"2026-12-04","settle":"2026-12-07"}];
+const ORDERS_SEED = [{"id":"2021-27","source":"2021","community":"ET","lot":"265","name":"SNYDER","address":"1450 FIELDSTONE","walkthru":"2023-08-09","items":{"Windows":"X ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-28","source":"2021","community":"AP","lot":"152","name":"JONES","address":"1024 STANFORD DRIVE","walkthru":"2023-08-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-29","source":"2021","community":"AP","lot":"418","name":"MARTIN","address":"1234 MOSAIC DRIVE","walkthru":"2023-08-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-30","source":"2021","community":"AP","lot":"414","name":"SWINGHOLM","address":"1220 MOSAIC DRIVE","walkthru":"2023-08-22","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-31","source":"2021","community":"ET","lot":"268","name":"SYMONDS","address":"1458 FIELDSTONE DRIVE","walkthru":"2023-08-23","items":{"Windows":"X ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-32","source":"2021","community":"ET","lot":"267","name":"VASQUEZ","address":"1456 FIELDSTONE DRIVE","walkthru":"2023-09-15","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-33","source":"2021","community":"AP","lot":"142","name":"DILLNER","address":"1054 PERCY LANE","walkthru":"2023-09-22","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-34","source":"2021","community":"ET","lot":"292","name":"KRULOCK","address":"1410 BARRINGTON DRIVE","walkthru":"2023-10-18","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-35","source":"2021","community":"ET","lot":"269","name":"PRICE","address":"1460 FIELDSTONE DRIVE","walkthru":"2024-03-06","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-36","source":"2021","community":"MM","lot":"66","name":"PEARCE","address":"53 CLOVER DRIVE","walkthru":"2024-03-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-37","source":"2021","community":"MM","lot":"41","name":"QUINONESS","address":"56 CLOVER DRIVE","walkthru":"2024-08-14","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-38","source":"2021","community":"MM","lot":"50","name":"NELLGAN","address":"38 CLOVER DRIVE","walkthru":"2024-08-21","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-39","source":"2021","community":"AP","lot":"192","name":"GRAHAM","address":"1013 STANFORD DRIVE","walkthru":"2024-08-21","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-40","source":"2021","community":"MM","lot":"42","name":"MUTCHLER","address":"54 CLOVER DRIVE","walkthru":"2024-08-28","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-41","source":"2021","community":"AP","lot":"417","name":"SHANFELDER","address":"1230 MOSAIC DRIVE","walkthru":"2024-09-04","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-42","source":"2021","community":"MM","lot":"57","name":"LAVOIE","address":"22 CLOVER DRIVE","walkthru":"2024-09-10","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-43","source":"2021","community":"OS","lot":"121","name":"SPEC","address":"1330 JILL ANN DR","walkthru":"2024-09-11","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-44","source":"2021","community":"ET","lot":"264","name":"GROFF","address":"1448 FIELDSTONE DR","walkthru":"2024-10-01","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-45","source":"2021","community":"AP","lot":"182","name":"BROWN","address":"1033 STANFORD","walkthru":"2024-09-24","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-46","source":"2021","community":"MM","lot":"43","name":"ALBRIGHT","address":"52 CLOVER DR","walkthru":"2024-10-09","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-47","source":"2021","community":"ET","lot":"263","name":"CHEN","address":"1446 FIELDSTONE","walkthru":"2024-10-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-48","source":"2021","community":"AP","lot":"196","name":"BOYCE","address":"1005 STANFORD","walkthru":"2024-10-16","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-49","source":"2021","community":"AP","lot":"141","name":"SOWIZRAL","address":"1052 PERCY LANE","walkthru":"2024-10-23","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-50","source":"2021","community":"AP","lot":"382","name":"SHEPPARD","address":"1242 MOSAIC DRIVE","walkthru":"2024-11-13","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-51","source":"2021","community":"OS","lot":"3320","name":"CROSS","address":"3320 PROSPECT RD YORK","walkthru":"2024-11-08","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-52","source":"2021","community":"AP","lot":"151","name":"KELEINFELTER","address":"1022 STANFORD DRIVE","walkthru":"2026-06-17","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-53","source":"2021","community":"AP","lot":"424","name":"STAY AND PLAY","address":"1017 RIVERSTONE CIRCLE","walkthru":"2026-06-17","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-54","source":"2021","community":"AP","lot":"220","name":"MARTINEZ","address":"1012 STANFORD DRIVE","walkthru":"2026-07-01","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-55","source":"2021","community":"AP","lot":"154","name":"STRUCK","address":"1028 STANFORD DRIVE","walkthru":"2026-07-15","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-56","source":"2021","community":"ML","lot":"117","name":"LOWRIE","address":"117 MAPLE LANE","walkthru":"2026-07-22","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":"X"},"completed":true},{"id":"2021-57","source":"2021","community":"AP","lot":"425","name":"FIRESTONE","address":"1015 RIVERSTONE","walkthru":"2026-08-19","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-58","source":"2021","community":"OS","lot":"","name":"Girl scout rd","address":"1265 Girl scout rd","walkthru":"2026-07-24","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-59","source":"2021","community":"AP","lot":"222","name":"SALES","address":"1008 STANFORD","walkthru":"2026-08-26","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-60","source":"2021","community":"OS","lot":"238","name":"","address":"LANCASTER AVE","walkthru":"2026-08-13","items":{"Windows":"X","Lumber":"","Siding":"","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-61","source":"2021","community":"CL","lot":"5","name":"MATTIA","address":"415 CANNON WAY","walkthru":"2026-10-14","items":{"Windows":"ABC","Lumber":"","Siding":"","Steps":"","Garage":"X","Locks":"","Shower":"","Track":"","Roof":"","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-62","source":"2021","community":"AP","lot":"67","name":"MODEL","address":"1117 ALDEN WAY","walkthru":"2026-10-07","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-63","source":"2021","community":"CL","lot":"113","name":"MODEL","address":"404 CANNON WAY","walkthru":"2026-10-21","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-3","source":"2022","community":"NG","lot":"23","name":"BROUSSARD","address":"1009 PARKWOOD CT","walkthru":"2022-01-05","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-4","source":"2022","community":"ET","lot":"283","name":"DAUBER","address":"1423 BARRINGTON DR","walkthru":"2021-01-11","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-5","source":"2022","community":"ET","lot":"324","name":"ROHRER","address":"1416 HEATERWOOD DR","walkthru":"2021-01-18","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-6","source":"2022","community":"AP","lot":"153","name":"MATTHEW","address":"1026 STANFORD DR","walkthru":"2021-01-19","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-7","source":"2022","community":"AP","lot":"179","name":"TEETER","address":"1039 STANFORD DR","walkthru":"2021-01-25","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-8","source":"2022","community":"ET","lot":"290","name":"JOSE & MEDINA","address":"1406 BARRINGTON DR","walkthru":"2021-02-01","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-9","source":"2022","community":"ET","lot":"294","name":"PATTEN","address":"1415 BARRINGTON DR","walkthru":"2021-02-02","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-10","source":"2022","community":"ET","lot":"299","name":"NATHAN & DANIEL","address":"1426 BARRINGTON DR","walkthru":"2021-02-08","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-11","source":"2022","community":"AP","lot":"68","name":"JEFF & LINDA","address":"1119 ALDEN WAY","walkthru":"2021-02-15","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-12","source":"2022","community":"ET","lot":"275","name":"PETE & GABBY","address":"BARRINGTON DR","walkthru":"2021-02-16","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-13","source":"2022","community":"MM","lot":"89","name":"KULP","address":"14 CLOVER DR","walkthru":"2021-02-22","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-14","source":"2022","community":"AP","lot":"120","name":"DUNLAP","address":"1010 PERCY LANE","walkthru":"2021-03-01","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false}];
+
+const COMMUNITY_COLORS = {
+  AP:'#3d5570', MM:'#5a7247', ML:'#8a5a3a', CL:'#6a4c93', OS:'#c1531f', ET:'#2f7d8c', NG:'#8c6b2f'
+};
+function communityColor(c){
+  if(COMMUNITY_COLORS[c]) return COMMUNITY_COLORS[c];
+  let h=0; for(const ch of c) h = (h*31 + ch.charCodeAt(0))>>>0;
+  return `hsl(${h%360} 40% 38%)`;
+}
+function normKey(community, lot){
+  return (community||'').trim().toUpperCase() + '::' + (lot||'').toString().trim();
+}
+
+/* ============================================================
+   FIREBASE INIT + AUTH GATE
+   ============================================================ */
+let db = null;
+let jobsCol = null;
+let ordersCol = null;
+let seededThisSession = false;
+
+function setSyncStatus(state){
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  dot.className = 'sync-dot' + (state==='saving' ? ' saving' : state==='offline' ? ' offline' : '');
+  label.textContent = state==='saving' ? 'Saving…' : state==='offline' ? 'Offline' : 'Synced';
+}
+
+function showSetupGate(){
+  document.getElementById('setupGate').style.display = 'flex';
+  document.getElementById('loginGate').classList.add('hidden');
+  document.getElementById('appShell').classList.add('locked');
+}
+function showLoginGate(){
+  document.getElementById('setupGate').style.display = 'none';
+  document.getElementById('loginGate').classList.remove('hidden');
+  document.getElementById('appShell').classList.add('locked');
+}
+function showApp(user){
+  document.getElementById('setupGate').style.display = 'none';
+  document.getElementById('loginGate').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('locked');
+  document.getElementById('currentUserEmail').textContent = user.email || '';
+}
+
+document.getElementById('loginSubmitBtn').addEventListener('click', doLogin);
+document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errBox = document.getElementById('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){
+    errBox.textContent = 'Enter both an email and a password.';
+    errBox.classList.add('show');
+    return;
+  }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found'
+      ? 'Email or password is incorrect.'
+      : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show');
+  });
+}
+document.getElementById('signOutBtn').addEventListener('click', ()=>{
+  firebase.auth().signOut();
+});
+
+if(!FIREBASE_CONFIGURED){
+  showSetupGate();
+} else {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  jobsCol = db.collection('jobs');
+  ordersCol = db.collection('orders');
+
+  firebase.auth().onAuthStateChanged(user=>{
+    if(user){
+      showApp(user);
+      if(!seededThisSession){
+        seededThisSession = true;
+        seedIfEmpty();
+      }
+      attachListeners();
+    } else {
+      showLoginGate();
+    }
+  });
+
+  window.addEventListener('online', ()=>setSyncStatus('idle'));
+  window.addEventListener('offline', ()=>setSyncStatus('offline'));
+}
+
+async function seedIfEmpty(){
+  try{
+    const jobsSnap = await jobsCol.limit(1).get();
+    if(jobsSnap.empty){
+      const batch = db.batch();
+      SCHEDULE_SEED.forEach((j,i)=>{
+        batch.set(jobsCol.doc('seed-'+i), j);
+      });
+      await batch.commit();
+    }
+  } catch(e){ console.error('Schedule seed failed', e); }
+  try{
+    const ordersSnap = await ordersCol.limit(1).get();
+    if(ordersSnap.empty){
+      const batch = db.batch();
+      ORDERS_SEED.forEach(o=>{
+        const {id, ...rest} = o;
+        batch.set(ordersCol.doc(id), rest);
+      });
+      await batch.commit();
+    }
+  } catch(e){ console.error('Orders seed failed', e); }
+}
+
+function attachListeners(){
+  jobsCol.onSnapshot(snapshot=>{
+    jobs = snapshot.docs.map(d=>({ id: d.id, ...d.data() }));
+    renderSchedule();
+    renderOrders();
+    setSyncStatus('idle');
+  }, err=>{ console.error('jobs listener error', err); setSyncStatus('offline'); });
+
+  ordersCol.onSnapshot(snapshot=>{
+    orders = snapshot.docs.map(d=>({ id: d.id, ...d.data() }));
+    renderSchedule();
+    renderOrders();
+    setSyncStatus('idle');
+  }, err=>{ console.error('orders listener error', err); setSyncStatus('offline'); });
+}
+
+async function writeJob(id, data){
+  setSyncStatus('saving');
+  try{ await jobsCol.doc(id).set(data); }
+  catch(e){ console.error(e); alert('Could not save — check your connection and try again.'); }
+}
+async function deleteJobDoc(id){
+  setSyncStatus('saving');
+  try{ await jobsCol.doc(id).delete(); }
+  catch(e){ console.error(e); alert('Could not delete — check your connection and try again.'); }
+}
+async function writeOrder(id, data){
+  setSyncStatus('saving');
+  try{ await ordersCol.doc(id).set(data); }
+  catch(e){ console.error(e); alert('Could not save — check your connection and try again.'); }
+}
+async function deleteOrderDoc(id){
+  setSyncStatus('saving');
+  try{ await ordersCol.doc(id).delete(); }
+  catch(e){ console.error(e); alert('Could not delete — check your connection and try again.'); }
+}
+async function updateOrderDoc(id, patch){
+  setSyncStatus('saving');
+  try{ await ordersCol.doc(id).update(patch); }
+  catch(e){ console.error(e); alert('Could not save — check your connection and try again.'); }
+}
+
+/* ============================================================
+   SCHEDULE DATA + LOGIC
+   ============================================================ */
+let jobs = [];
+let editingJobId = null;
+let sortKey = 'settle';
+let sortDir = 'asc';
+
+function fmtDate(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${m}/${d}/${y.slice(2)}`;
+}
+function daysFromToday(iso){
+  if(!iso) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dt = new Date(iso+'T00:00:00');
+  return Math.round((dt-today)/86400000);
+}
+function addDays(iso, n){
+  const dt = new Date(iso+'T00:00:00');
+  dt.setDate(dt.getDate()+n);
+  return dt.toISOString().slice(0,10);
+}
+function uniqueSorted(arr){ return [...new Set(arr.filter(Boolean))].sort(); }
+
+function orderKeysSet(){
+  return new Set(orders.map(o=>normKey(o.community, o.lot)));
+}
+
+function populateScheduleFilters(){
+  const commSel = document.getElementById('communityFilter');
+  const draftSel = document.getElementById('draftsmanFilter');
+  const curComm = commSel.value, curDraft = draftSel.value;
+  const comms = uniqueSorted(jobs.map(j=>j.community));
+  const drafts = uniqueSorted(jobs.map(j=>j.draftsman));
+  commSel.innerHTML = '<option value="">All Communities</option>' + comms.map(c=>`<option value="${c}">${c}</option>`).join('');
+  draftSel.innerHTML = '<option value="">All Draftsmen</option>' + drafts.map(d=>`<option value="${d}">${d}</option>`).join('');
+  commSel.value = curComm; draftSel.value = curDraft;
+}
+
+function renderSchedule(){
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  const community = document.getElementById('communityFilter').value;
+  const draftsman = document.getElementById('draftsmanFilter').value;
+
+  let rows = jobs.filter(j=>{
+    if(community && j.community!==community) return false;
+    if(draftsman && j.draftsman!==draftsman) return false;
+    if(q){
+      const hay = [j.client, j.address, j.model, j.lot, j.community, j.phone].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a,b)=>{
+    let av = a[sortKey], bv = b[sortKey];
+    if(sortKey==='ytd'){ av = av===''?Infinity:Number(av); bv = bv===''?Infinity:Number(bv); }
+    if(av===undefined||av===null) av='';
+    if(bv===undefined||bv===null) bv='';
+    if(av<bv) return sortDir==='asc'? -1: 1;
+    if(av>bv) return sortDir==='asc'? 1: -1;
+    return 0;
+  });
+
+  const oKeys = orderKeysSet();
+  const tbody = document.getElementById('tableBody');
+  const empty = document.getElementById('emptyState');
+  if(rows.length===0){
+    tbody.innerHTML=''; empty.style.display='block';
+  } else {
+    empty.style.display='none';
+    tbody.innerHTML = rows.map(j=>{
+      const soon = daysFromToday(j.settle);
+      const soonClass = (soon!==null && soon>=0 && soon<=14) ? 'settle-soon' : '';
+      const key = normKey(j.community, j.lot);
+      const hasOrder = j.lot && oKeys.has(key);
+      const jumpBtn = hasOrder ? `<button class="btn-link jump-to-order" data-key="${key}" title="View material order for this lot">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+          Order</button>` : '';
+      const filesBtn = j.filesUrl
+        ? `<button class="btn-link files-btn" data-id="${j.id}" title="Open this lot's OneDrive folder">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            Files</button>`
+        : `<button class="icon-btn files-btn-empty" data-id="${j.id}" title="Add OneDrive folder link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><line x1="12" y1="10" x2="12" y2="15"/><line x1="9.5" y1="12.5" x2="14.5" y2="12.5"/></svg>
+          </button>`;
+      return `<tr data-id="${j.id}">
+        <td data-label="YTD" class="mono">${j.ytd||''}</td>
+        <td data-label="Community"><span class="tag" style="background:${communityColor(j.community)}">${j.community||'—'}</span></td>
+        <td data-label="Lot" class="mono">${j.lot||''}</td>
+        <td data-label="Model">${j.model||''}</td>
+        <td data-label="Client">${j.client||''}</td>
+        <td data-label="Address" class="muted">${j.address||''}</td>
+        <td data-label="Draft" class="mono">${j.draftsman||'—'}</td>
+        <td data-label="Fndn." class="mono muted">${fmtDate(j.fndn)}</td>
+        <td data-label="Walk" class="mono muted">${fmtDate(j.walk)}</td>
+        <td data-label="Move" class="mono muted">${fmtDate(j.move)}</td>
+        <td data-label="Settle" class="mono settle-cell ${soonClass}">${fmtDate(j.settle)}</td>
+        <td data-label="">
+          <div class="row-actions">
+            ${jumpBtn}
+            ${filesBtn}
+            <button class="icon-btn edit-btn" title="Edit" data-id="${j.id}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('statTotal').textContent = jobs.length;
+  document.getElementById('statYTD').textContent = jobs.filter(j=>j.ytd!=='' && j.ytd!=null).length;
+  document.getElementById('statUpcoming').textContent = jobs.filter(j=>{
+    const d = daysFromToday(j.settle);
+    return d!==null && d>=0 && d<=30;
+  }).length;
+  document.getElementById('tabBadgeSchedule').textContent = jobs.length;
+
+  document.querySelectorAll('#headerRow th[data-key]').forEach(th=>{
+    th.classList.toggle('sorted', th.dataset.key===sortKey);
+    th.classList.toggle('asc', th.dataset.key===sortKey && sortDir==='asc');
+  });
+
+  populateScheduleFilters();
+}
+
+document.getElementById('headerRow').addEventListener('click', e=>{
+  const th = e.target.closest('th[data-key]');
+  if(!th) return;
+  const key = th.dataset.key;
+  if(sortKey===key){ sortDir = sortDir==='asc'?'desc':'asc'; }
+  else { sortKey = key; sortDir='asc'; }
+  renderSchedule();
+});
+document.getElementById('searchBox').addEventListener('input', renderSchedule);
+document.getElementById('communityFilter').addEventListener('change', renderSchedule);
+document.getElementById('draftsmanFilter').addEventListener('change', renderSchedule);
+
+document.getElementById('tableBody').addEventListener('click', e=>{
+  const jumpBtn = e.target.closest('.jump-to-order');
+  if(jumpBtn){ jumpToOrder(jumpBtn.dataset.key); return; }
+  const filesBtn = e.target.closest('.files-btn');
+  if(filesBtn){ openFilesLink(filesBtn.dataset.id); return; }
+  const filesEmptyBtn = e.target.closest('.files-btn-empty');
+  if(filesEmptyBtn){ openJobModal(filesEmptyBtn.dataset.id, true); return; }
+  const btn = e.target.closest('.edit-btn');
+  if(btn){ openJobModal(btn.dataset.id); }
+});
+
+function isSafeUrl(url){
+  return /^https?:\/\//i.test((url||'').trim());
+}
+function openFilesLink(jobId){
+  const job = jobs.find(j=>j.id===jobId);
+  if(!job || !isSafeUrl(job.filesUrl)) return;
+  window.open(job.filesUrl.trim(), '_blank', 'noopener');
+}
+
+/* ---- Job modal ---- */
+const overlay = document.getElementById('overlay');
+const modalTitle = document.getElementById('modalTitle');
+const deleteBtn = document.getElementById('deleteBtn');
+
+function openJobModal(id, focusFiles){
+  editingJobId = id || null;
+  const job = id ? jobs.find(j=>j.id===id) : null;
+  modalTitle.textContent = job ? `Edit Job — Lot ${job.lot||''}` : 'Add Job';
+  deleteBtn.style.display = job ? 'inline-flex' : 'none';
+
+  const setSelectOrOther = (selId, otherId, value, knownList)=>{
+    const sel = document.getElementById(selId);
+    const other = document.getElementById(otherId);
+    if(value && !knownList.includes(value)){
+      sel.value = '__other'; other.style.display='block'; other.value = value;
+    } else {
+      sel.value = value || (selId==='f_draftsman' ? '' : 'AP');
+      other.style.display='none'; other.value='';
+    }
+  };
+
+  document.getElementById('f_ytd').value = job ? (job.ytd ?? '') : '';
+  setSelectOrOther('f_community','f_community_other', job? job.community : 'AP', ['AP','MM','ML','CL','OS']);
+  document.getElementById('f_lot').value = job ? job.lot||'' : '';
+  document.getElementById('f_model').value = job ? job.model||'' : '';
+  document.getElementById('f_client').value = job ? job.client||'' : '';
+  document.getElementById('f_address').value = job ? job.address||'' : '';
+  document.getElementById('f_files').value = job ? job.filesUrl||'' : '';
+  document.getElementById('f_phone').value = job ? job.phone||'' : '';
+  setSelectOrOther('f_draftsman','f_draftsman_other', job? job.draftsman : '', ['D','J','']);
+  document.getElementById('f_fndn').value = job ? job.fndn||'' : '';
+  document.getElementById('f_settle').value = job ? job.settle||'' : '';
+  document.getElementById('f_walk').value = job ? job.walk||'' : '';
+  document.getElementById('f_move').value = job ? job.move||'' : '';
+  document.getElementById('walkLinked').style.display='none';
+  document.getElementById('moveLinked').style.display='none';
+
+  overlay.classList.add('show');
+  if(focusFiles){
+    setTimeout(()=>{
+      const filesInput = document.getElementById('f_files');
+      filesInput.focus();
+      filesInput.select();
+    }, 60);
+  }
+}
+function closeJobModal(){ overlay.classList.remove('show'); editingJobId = null; }
+
+document.getElementById('addBtn').addEventListener('click', ()=>openJobModal(null));
+document.getElementById('closeModal').addEventListener('click', closeJobModal);
+document.getElementById('cancelBtn').addEventListener('click', closeJobModal);
+overlay.addEventListener('click', e=>{ if(e.target===overlay) closeJobModal(); });
+
+document.getElementById('f_community').addEventListener('change', e=>{
+  document.getElementById('f_community_other').style.display = e.target.value==='__other' ? 'block' : 'none';
+});
+document.getElementById('f_draftsman').addEventListener('change', e=>{
+  document.getElementById('f_draftsman_other').style.display = e.target.value==='__other' ? 'block' : 'none';
+});
+document.getElementById('f_settle').addEventListener('change', e=>{
+  const settle = e.target.value;
+  if(!settle) return;
+  const walkField = document.getElementById('f_walk');
+  const moveField = document.getElementById('f_move');
+  if(!walkField.value){ walkField.value = addDays(settle,-5); document.getElementById('walkLinked').style.display='flex'; }
+  if(!moveField.value){ moveField.value = addDays(settle,-3); document.getElementById('moveLinked').style.display='flex'; }
+});
+document.getElementById('f_walk').addEventListener('input', ()=> document.getElementById('walkLinked').style.display='none');
+document.getElementById('f_move').addEventListener('input', ()=> document.getElementById('moveLinked').style.display='none');
+
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  const communitySel = document.getElementById('f_community').value;
+  const community = communitySel==='__other' ? document.getElementById('f_community_other').value.trim().toUpperCase() : communitySel;
+  const draftSel = document.getElementById('f_draftsman').value;
+  const draftsman = draftSel==='__other' ? document.getElementById('f_draftsman_other').value.trim().toUpperCase() : draftSel;
+
+  const data = {
+    ytd: document.getElementById('f_ytd').value,
+    community,
+    lot: document.getElementById('f_lot').value.trim(),
+    model: document.getElementById('f_model').value.trim(),
+    client: document.getElementById('f_client').value.trim(),
+    address: document.getElementById('f_address').value.trim(),
+    filesUrl: document.getElementById('f_files').value.trim(),
+    phone: document.getElementById('f_phone').value.trim(),
+    plan: '',
+    draftsman,
+    fndn: document.getElementById('f_fndn').value,
+    walk: document.getElementById('f_walk').value,
+    move: document.getElementById('f_move').value,
+    settle: document.getElementById('f_settle').value,
+  };
+  if(!data.client && !data.lot && !data.model){
+    alert('Enter at least a client name, lot #, or model before saving.');
+    return;
+  }
+  const id = editingJobId || jobsCol.doc().id;
+  closeJobModal();
+  writeJob(id, data);
+});
+deleteBtn.addEventListener('click', ()=>{
+  if(!editingJobId) return;
+  if(confirm('Delete this job from the schedule? This cannot be undone.')){
+    const id = editingJobId;
+    closeJobModal();
+    deleteJobDoc(id);
+  }
+});
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const headers = ['YTD','Community','Lot','Model','Client','Address','Phone','Draftsman','Foundation','Walk','Move','Settle','OneDrive Folder'];
+  const rows = jobs.slice().sort((a,b)=> (a.settle||'').localeCompare(b.settle||'')).map(j=>[
+    j.ytd, j.community, j.lot, j.model, j.client, j.address, j.phone, j.draftsman, j.fndn, j.walk, j.move, j.settle, j.filesUrl
+  ]);
+  downloadCSV('job_production_schedule.csv', headers, rows);
+});
+
+/* ============================================================
+   ORDERS DATA + LOGIC
+   ============================================================ */
+let orders = [];
+let editingOrderId = null;
+let ordersSortKey = 'walkthru';
+let ordersSortDir = 'asc';
+let pendingJumpKey = null;
+
+function jobKeysSet(){
+  return new Set(jobs.filter(j=>j.lot).map(j=>normKey(j.community, j.lot)));
+}
+
+function orderProgress(o){
+  const vals = Object.values(o.items||{});
+  const total = vals.length;
+  const done = vals.filter(v=>v && v.toString().trim()!=='').length;
+  return {done, total};
+}
+
+function populateOrdersFilters(){
+  const sel = document.getElementById('ordersCommunityFilter');
+  const cur = sel.value;
+  const comms = uniqueSorted(orders.map(o=>o.community));
+  sel.innerHTML = '<option value="">All Communities</option>' + comms.map(c=>`<option value="${c}">${c}</option>`).join('');
+  sel.value = cur;
+}
+
+function buildOrderRow(o, jKeys, isCompleted){
+  const {done,total} = orderProgress(o);
+  const pct = total? Math.round((done/total)*100) : 0;
+  const fillClass = done===0 ? 'none' : (done===total ? '' : 'partial');
+  const key = normKey(o.community, o.lot);
+  const inSchedule = o.lot && jKeys.has(key);
+  const jumpBtn = inSchedule ? `<button class="btn-link jump-to-job" data-key="${key}" title="View this job in the Production Schedule">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      Schedule</button>` : '';
+  const matchedJob = inSchedule ? jobs.find(j=>j.lot && normKey(j.community,j.lot)===key) : null;
+  const filesBtn = (matchedJob && matchedJob.filesUrl)
+    ? `<button class="btn-link files-btn" data-job-id="${matchedJob.id}" title="Open this lot's OneDrive folder">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Files</button>`
+    : '';
+  const completeBtn = isCompleted
+    ? `<button class="icon-btn mark-incomplete-btn" title="Move back to active orders" data-id="${o.id}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 3v6h6"/></svg>
+      </button>`
+    : `<button class="icon-btn mark-complete-btn" title="Mark complete — moves to Completed Orders" data-id="${o.id}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+      </button>`;
+  return `<tr data-id="${o.id}" data-key="${key}">
+    <td data-label="Community"><span class="tag" style="background:${communityColor(o.community)}">${o.community||'—'}</span></td>
+    <td data-label="Lot" class="mono">${o.lot||''}</td>
+    <td data-label="Name">${o.name||''}</td>
+    <td data-label="Address" class="muted">${o.address||''}</td>
+    <td data-label="Walk-Thru" class="mono muted">${fmtDate(o.walkthru)}</td>
+    <td data-label="Items Ordered">
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill ${fillClass}" style="width:${pct}%"></div></div>
+        <div class="progress-label">${done}/${total}</div>
+      </div>
+    </td>
+    <td data-label="">
+      <div class="row-actions">
+        ${jumpBtn}
+        ${filesBtn}
+        ${completeBtn}
+        <button class="icon-btn orders-edit-btn" title="Edit" data-id="${o.id}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function renderOrders(){
+  const q = document.getElementById('ordersSearchBox').value.trim().toLowerCase();
+  const community = document.getElementById('ordersCommunityFilter').value;
+
+  let rows = orders.filter(o=>{
+    if(community && o.community!==community) return false;
+    if(q){
+      const hay = [o.name, o.address, o.lot, o.community].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a,b)=>{
+    let av = a[ordersSortKey]||'', bv = b[ordersSortKey]||'';
+    if(ordersSortKey==='lot'){ av = av===''?Infinity:Number(av); bv = bv===''?Infinity:Number(bv); }
+    if(av<bv) return ordersSortDir==='asc'? -1: 1;
+    if(av>bv) return ordersSortDir==='asc'? 1: -1;
+    return 0;
+  });
+
+  const activeRows = rows.filter(o=>!o.completed);
+  const completedRows = rows.filter(o=>o.completed);
+
+  const jKeys = jobKeysSet();
+  const tbody = document.getElementById('ordersTableBody');
+  const empty = document.getElementById('ordersEmptyState');
+  if(activeRows.length===0){
+    tbody.innerHTML=''; empty.style.display='block';
+  } else {
+    empty.style.display='none';
+    tbody.innerHTML = activeRows.map(o=>buildOrderRow(o, jKeys, false)).join('');
+  }
+
+  const ctbody = document.getElementById('completedTableBody');
+  const cempty = document.getElementById('completedEmptyState');
+  if(completedRows.length===0){
+    ctbody.innerHTML=''; cempty.style.display='block';
+  } else {
+    cempty.style.display='none';
+    ctbody.innerHTML = completedRows.map(o=>buildOrderRow(o, jKeys, true)).join('');
+  }
+  document.getElementById('completedBadge').textContent = completedRows.length;
+
+  document.getElementById('statOrdersTotal').textContent = orders.length;
+  document.getElementById('statOrdersDone').textContent = orders.filter(o=>o.completed).length;
+  document.getElementById('statOrdersPending').textContent = orders.filter(o=>!o.completed).reduce((sum,o)=>{
+    const {done,total} = orderProgress(o); return sum + (total-done);
+  },0);
+  document.getElementById('tabBadgeOrders').textContent = activeRows.length;
+
+  document.querySelectorAll('#ordersHeaderRow th[data-key], #completedHeaderRow th[data-key]').forEach(th=>{
+    th.classList.toggle('sorted', th.dataset.key===ordersSortKey);
+    th.classList.toggle('asc', th.dataset.key===ordersSortKey && ordersSortDir==='asc');
+  });
+
+  populateOrdersFilters();
+
+  if(pendingJumpKey){
+    let row = tbody.querySelector(`tr[data-key="${cssEscape(pendingJumpKey)}"]`);
+    if(!row){
+      // it may live in the completed section — open it so the row is visible
+      row = ctbody.querySelector(`tr[data-key="${cssEscape(pendingJumpKey)}"]`);
+      if(row) openCompletedSection();
+    }
+    if(row){
+      row.scrollIntoView({behavior:'smooth', block:'center'});
+      row.classList.add('flash');
+      setTimeout(()=>row.classList.remove('flash'), 1700);
+    }
+    pendingJumpKey = null;
+  }
+}
+function cssEscape(s){ return s; } // safe as-is inside a quoted attribute selector
+
+function openCompletedSection(){
+  document.getElementById('completedSection').style.display = 'block';
+  document.getElementById('completedToggle').classList.add('open');
+}
+function toggleCompletedSection(){
+  const sec = document.getElementById('completedSection');
+  const open = sec.style.display !== 'none';
+  sec.style.display = open ? 'none' : 'block';
+  document.getElementById('completedToggle').classList.toggle('open', !open);
+}
+document.getElementById('completedToggle').addEventListener('click', toggleCompletedSection);
+
+function setOrderCompleted(id, completed){
+  updateOrderDoc(id, {completed});
+}
+
+document.getElementById('ordersHeaderRow').addEventListener('click', e=>{
+  const th = e.target.closest('th[data-key]');
+  if(!th) return;
+  const key = th.dataset.key;
+  if(ordersSortKey===key){ ordersSortDir = ordersSortDir==='asc'?'desc':'asc'; }
+  else { ordersSortKey = key; ordersSortDir='asc'; }
+  renderOrders();
+});
+document.getElementById('completedHeaderRow').addEventListener('click', e=>{
+  const th = e.target.closest('th[data-key]');
+  if(!th) return;
+  const key = th.dataset.key;
+  if(ordersSortKey===key){ ordersSortDir = ordersSortDir==='asc'?'desc':'asc'; }
+  else { ordersSortKey = key; ordersSortDir='asc'; }
+  renderOrders();
+});
+document.getElementById('ordersSearchBox').addEventListener('input', renderOrders);
+document.getElementById('ordersCommunityFilter').addEventListener('change', renderOrders);
+
+document.getElementById('ordersTableBody').addEventListener('click', e=>{
+  const jumpBtn = e.target.closest('.jump-to-job');
+  if(jumpBtn){ jumpToJob(jumpBtn.dataset.key); return; }
+  const filesBtn = e.target.closest('.files-btn');
+  if(filesBtn){ openFilesLink(filesBtn.dataset.jobId); return; }
+  const completeBtn = e.target.closest('.mark-complete-btn');
+  if(completeBtn){ setOrderCompleted(completeBtn.dataset.id, true); return; }
+  const btn = e.target.closest('.orders-edit-btn');
+  if(btn){ openOrderModal(btn.dataset.id); }
+});
+document.getElementById('completedTableBody').addEventListener('click', e=>{
+  const jumpBtn = e.target.closest('.jump-to-job');
+  if(jumpBtn){ jumpToJob(jumpBtn.dataset.key); return; }
+  const filesBtn = e.target.closest('.files-btn');
+  if(filesBtn){ openFilesLink(filesBtn.dataset.jobId); return; }
+  const incompleteBtn = e.target.closest('.mark-incomplete-btn');
+  if(incompleteBtn){ setOrderCompleted(incompleteBtn.dataset.id, false); return; }
+  const btn = e.target.closest('.orders-edit-btn');
+  if(btn){ openOrderModal(btn.dataset.id); }
+});
+
+/* ---- Order modal ---- */
+const ordersOverlay = document.getElementById('ordersOverlay');
+const ordersModalTitle = document.getElementById('ordersModalTitle');
+const ordersDeleteBtn = document.getElementById('ordersDeleteBtn');
+const checklistContainer = document.getElementById('checklistContainer');
+
+function buildChecklist(items){
+  checklistContainer.innerHTML = CANON_ITEMS.map(name=>{
+    const raw = (items && items[name]) || '';
+    const checked = raw.trim() !== '';
+    const note = raw.replace(/^X\s*/i,'').trim();
+    const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
+    return `<div class="check-item">
+      <input type="checkbox" id="chk_${safeName}" data-item="${name}" ${checked?'checked':''}>
+      <label for="chk_${safeName}">${name}</label>
+      <input type="text" id="note_${safeName}" data-item-note="${name}" placeholder="vendor" value="${note.replace(/"/g,'&quot;')}">
+    </div>`;
+  }).join('');
+}
+function readChecklist(){
+  const items = {};
+  CANON_ITEMS.forEach(name=>{
+    const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
+    const checked = document.getElementById('chk_'+safeName).checked;
+    const note = document.getElementById('note_'+safeName).value.trim();
+    if(!checked){ items[name] = ''; }
+    else { items[name] = note ? `X ${note}` : 'X'; }
+  });
+  return items;
+}
+
+function openOrderModal(id, prefillKey){
+  editingOrderId = id || null;
+  const order = id ? orders.find(o=>o.id===id) : null;
+  ordersModalTitle.textContent = order ? `Edit Order — Lot ${order.lot||''}` : 'Add Order';
+  ordersDeleteBtn.style.display = order ? 'inline-flex' : 'none';
+
+  const setSelectOrOther = (selId, otherId, value, knownList)=>{
+    const sel = document.getElementById(selId);
+    const other = document.getElementById(otherId);
+    if(value && !knownList.includes(value)){
+      sel.value = '__other'; other.style.display='block'; other.value = value;
+    } else {
+      sel.value = value || 'AP';
+      other.style.display='none'; other.value='';
+    }
+  };
+
+  let community = order ? order.community : 'AP';
+  let lot = order ? order.lot : '';
+  if(!order && prefillKey){
+    const [c,l] = prefillKey.split('::');
+    community = c; lot = l;
+  }
+
+  setSelectOrOther('o_community','o_community_other', community, ['AP','MM','ML','CL','OS','ET','NG']);
+  document.getElementById('o_lot').value = lot||'';
+  document.getElementById('o_name').value = order ? order.name||'' : '';
+  document.getElementById('o_address').value = order ? order.address||'' : '';
+  document.getElementById('o_walkthru').value = order ? order.walkthru||'' : '';
+  document.getElementById('o_completed').checked = order ? !!order.completed : false;
+  buildChecklist(order ? order.items : {});
+
+  // if this order matches a scheduled job, show banner linking back
+  const key = normKey(community, lot);
+  const matchedJob = jobs.find(j=>j.lot && normKey(j.community,j.lot)===key);
+  const banner = document.getElementById('scheduleLinkBanner');
+  const bannerFilesBtn = document.getElementById('bannerOpenFilesBtn');
+  if(matchedJob){
+    document.getElementById('scheduleLinkText').textContent = `Matches schedule: ${matchedJob.client||matchedJob.model||'Lot '+matchedJob.lot} — Settle ${fmtDate(matchedJob.settle)}`;
+    document.getElementById('jumpToScheduleBtn').dataset.key = key;
+    if(matchedJob.filesUrl){
+      bannerFilesBtn.dataset.jobId = matchedJob.id;
+      bannerFilesBtn.style.display = 'inline-flex';
+    } else {
+      bannerFilesBtn.style.display = 'none';
+    }
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  ordersOverlay.classList.add('show');
+}
+function closeOrderModal(){ ordersOverlay.classList.remove('show'); editingOrderId = null; }
+
+document.getElementById('ordersAddBtn').addEventListener('click', ()=>openOrderModal(null));
+document.getElementById('ordersCloseModal').addEventListener('click', closeOrderModal);
+document.getElementById('ordersCancelBtn').addEventListener('click', closeOrderModal);
+ordersOverlay.addEventListener('click', e=>{ if(e.target===ordersOverlay) closeOrderModal(); });
+document.getElementById('o_community').addEventListener('change', e=>{
+  document.getElementById('o_community_other').style.display = e.target.value==='__other' ? 'block' : 'none';
+});
+document.getElementById('jumpToScheduleBtn').addEventListener('click', e=>{
+  const key = e.currentTarget.dataset.key;
+  closeOrderModal();
+  jumpToJob(key);
+});
+document.getElementById('bannerOpenFilesBtn').addEventListener('click', e=>{
+  openFilesLink(e.currentTarget.dataset.jobId);
+});
+
+document.getElementById('ordersSaveBtn').addEventListener('click', ()=>{
+  const communitySel = document.getElementById('o_community').value;
+  const community = communitySel==='__other' ? document.getElementById('o_community_other').value.trim().toUpperCase() : communitySel;
+
+  const data = {
+    community,
+    lot: document.getElementById('o_lot').value.trim(),
+    name: document.getElementById('o_name').value.trim(),
+    address: document.getElementById('o_address').value.trim(),
+    walkthru: document.getElementById('o_walkthru').value,
+    items: readChecklist(),
+    completed: document.getElementById('o_completed').checked,
+    source: editingOrderId ? (orders.find(o=>o.id===editingOrderId)?.source || 'manual') : 'manual',
+  };
+  if(!data.name && !data.lot){
+    alert('Enter at least a name or lot # before saving.');
+    return;
+  }
+  const id = editingOrderId || ordersCol.doc().id;
+  closeOrderModal();
+  writeOrder(id, data);
+});
+ordersDeleteBtn.addEventListener('click', ()=>{
+  if(!editingOrderId) return;
+  if(confirm('Delete this order? This cannot be undone.')){
+    const id = editingOrderId;
+    closeOrderModal();
+    deleteOrderDoc(id);
+  }
+});
+
+document.getElementById('ordersExportBtn').addEventListener('click', ()=>{
+  const headers = ['Community','Lot','Name','Address','Walk-Thru', ...CANON_ITEMS];
+  const rows = orders.slice().sort((a,b)=> (a.walkthru||'').localeCompare(b.walkthru||'')).map(o=>[
+    o.community, o.lot, o.name, o.address, o.walkthru, ...CANON_ITEMS.map(k=>o.items && o.items[k] || '')
+  ]);
+  downloadCSV('material_orders.csv', headers, rows);
+});
+
+function downloadCSV(filename, headers, rows){
+  const csv = [headers, ...rows].map(r=>
+    r.map(v=>{
+      v = (v===undefined||v===null) ? '' : String(v);
+      return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+    }).join(',')
+  ).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   CROSS-LINKING BETWEEN TABS
+   ============================================================ */
+function jumpToOrder(key){
+  const existing = orders.find(o=>o.lot && normKey(o.community,o.lot)===key);
+  switchTab('orders');
+  if(existing){
+    document.getElementById('ordersSearchBox').value = '';
+    document.getElementById('ordersCommunityFilter').value = '';
+    pendingJumpKey = key;
+    renderOrders();
+  }
+}
+function jumpToJob(key){
+  const existing = jobs.find(j=>j.lot && normKey(j.community,j.lot)===key);
+  switchTab('schedule');
+  if(existing){
+    document.getElementById('searchBox').value = '';
+    document.getElementById('communityFilter').value = '';
+    document.getElementById('draftsmanFilter').value = '';
+    renderSchedule();
+    setTimeout(()=>{
+      const row = document.querySelector(`#tableBody tr[data-id="${existing.id}"]`);
+      if(row){
+        row.scrollIntoView({behavior:'smooth', block:'center'});
+        row.classList.add('flash');
+        setTimeout(()=>row.classList.remove('flash'), 1700);
+      }
+    }, 30);
+  }
+}
+
+/* ============================================================
+   TAB SWITCHING
+   ============================================================ */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.getElementById('panel-schedule').classList.toggle('active', name==='schedule');
+  document.getElementById('panel-orders').classList.toggle('active', name==='orders');
+  document.getElementById('scheduleStats').style.display = name==='schedule' ? 'flex' : 'none';
+  document.getElementById('ordersStats').style.display = name==='orders' ? 'flex' : 'none';
+  document.getElementById('yearLabel').textContent = name==='schedule' ? 'Production Schedule' : 'Material Orders';
+}
+document.querySelectorAll('.tab-btn').forEach(b=>{
+  b.addEventListener('click', ()=>switchTab(b.dataset.tab));
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+renderSchedule();
+renderOrders();
+</script>
+</body>
+</html>
