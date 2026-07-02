@@ -470,6 +470,19 @@
       <button class="modal-close" id="closeModal">&times;</button>
     </div>
     <div class="modal-body">
+      <div class="schedule-link-banner" id="jobOrderLinkBanner" style="display:none;">
+        <span id="jobOrderLinkText"></span>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-link" id="jobViewOrderBtn" style="display:none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+            View Order
+          </button>
+          <button class="btn-link" id="jobAddOrderBtn" style="display:none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
+            Add to Material Orders
+          </button>
+        </div>
+      </div>
       <div class="grid">
         <div>
           <label for="f_ytd">YTD #</label>
@@ -1010,6 +1023,29 @@ function openJobModal(id, focusFiles){
   document.getElementById('walkLinked').style.display='none';
   document.getElementById('moveLinked').style.display='none';
 
+  // show a banner linking to (or offering to create) a matching material order
+  const banner = document.getElementById('jobOrderLinkBanner');
+  const viewOrderBtn = document.getElementById('jobViewOrderBtn');
+  const addOrderBtn = document.getElementById('jobAddOrderBtn');
+  if(job && job.lot){
+    const key = normKey(job.community, job.lot);
+    const matchedOrder = orders.find(o=>o.lot && normKey(o.community,o.lot)===key);
+    if(matchedOrder){
+      const {done,total} = orderProgress(matchedOrder);
+      document.getElementById('jobOrderLinkText').textContent = `Matches material order: ${matchedOrder.name||'Lot '+matchedOrder.lot} — ${done}/${total} items ordered`;
+      viewOrderBtn.dataset.key = key;
+      viewOrderBtn.style.display = 'inline-flex';
+      addOrderBtn.style.display = 'none';
+    } else {
+      document.getElementById('jobOrderLinkText').textContent = `No material order started for this lot yet.`;
+      viewOrderBtn.style.display = 'none';
+      addOrderBtn.style.display = 'inline-flex';
+    }
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+
   overlay.classList.add('show');
   if(focusFiles){
     setTimeout(()=>{
@@ -1025,6 +1061,24 @@ document.getElementById('addBtn').addEventListener('click', ()=>openJobModal(nul
 document.getElementById('closeModal').addEventListener('click', closeJobModal);
 document.getElementById('cancelBtn').addEventListener('click', closeJobModal);
 overlay.addEventListener('click', e=>{ if(e.target===overlay) closeJobModal(); });
+document.getElementById('jobViewOrderBtn').addEventListener('click', e=>{
+  const key = e.currentTarget.dataset.key;
+  closeJobModal();
+  jumpToOrder(key);
+});
+document.getElementById('jobAddOrderBtn').addEventListener('click', ()=>{
+  const prefill = {
+    community: document.getElementById('f_community').value === '__other'
+      ? document.getElementById('f_community_other').value.trim().toUpperCase()
+      : document.getElementById('f_community').value,
+    lot: document.getElementById('f_lot').value.trim(),
+    name: document.getElementById('f_client').value.trim(),
+    address: document.getElementById('f_address').value.trim(),
+  };
+  closeJobModal();
+  switchTab('orders');
+  openOrderModal(null, prefill);
+});
 
 document.getElementById('f_community').addEventListener('change', e=>{
   document.getElementById('f_community_other').style.display = e.target.value==='__other' ? 'block' : 'none';
@@ -1340,7 +1394,7 @@ function readChecklist(){
   return items;
 }
 
-function openOrderModal(id, prefillKey){
+function openOrderModal(id, prefill){
   editingOrderId = id || null;
   const order = id ? orders.find(o=>o.id===id) : null;
   ordersModalTitle.textContent = order ? `Edit Order — Lot ${order.lot||''}` : 'Add Order';
@@ -1359,15 +1413,19 @@ function openOrderModal(id, prefillKey){
 
   let community = order ? order.community : 'AP';
   let lot = order ? order.lot : '';
-  if(!order && prefillKey){
-    const [c,l] = prefillKey.split('::');
-    community = c; lot = l;
+  let name = order ? order.name||'' : '';
+  let address = order ? order.address||'' : '';
+  if(!order && prefill){
+    community = prefill.community || community;
+    lot = prefill.lot || lot;
+    name = prefill.name || name;
+    address = prefill.address || address;
   }
 
   setSelectOrOther('o_community','o_community_other', community, ['AP','MM','ML','CL','OS','ET','NG']);
   document.getElementById('o_lot').value = lot||'';
-  document.getElementById('o_name').value = order ? order.name||'' : '';
-  document.getElementById('o_address').value = order ? order.address||'' : '';
+  document.getElementById('o_name').value = name;
+  document.getElementById('o_address').value = address;
   document.getElementById('o_walkthru').value = order ? order.walkthru||'' : '';
   document.getElementById('o_completed').checked = order ? !!order.completed : false;
   buildChecklist(order ? order.items : {});
