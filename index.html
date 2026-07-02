@@ -134,6 +134,7 @@
     padding:11px 10px; border-bottom:1px solid #ece8dd; font-size:13.5px; vertical-align:middle;
   }
   tbody tr:hover{background:#faf8f2;}
+  #tableBody tr, #ordersTableBody tr, #completedTableBody tr{cursor:pointer;}
   tbody tr:last-child td{border-bottom:none;}
   tbody tr.flash{animation: flash 1.6s ease;}
   @keyframes flash{
@@ -198,8 +199,8 @@
   }
   .check-item input[type=checkbox]{width:16px; height:16px; flex:none; accent-color: var(--rust); cursor:pointer;}
   .check-item label{margin:0; text-transform:none; font-weight:600; font-size:13px; color:var(--ink); letter-spacing:0; flex:1; cursor:pointer;}
-  .check-item input[type=text]{
-    width:70px; padding:4px 6px; font-size:11.5px; border:1px solid var(--steel-line); border-radius:2px; flex:none;
+  .check-item input[type=date]{
+    width:132px; padding:4px 6px; font-size:11.5px; border:1px solid var(--steel-line); border-radius:2px; flex:none; color:var(--ink-soft);
   }
   .schedule-link-banner{
     background:#eaf1ec; border:1px solid #bcdcc4; border-radius:var(--radius); padding:9px 12px;
@@ -605,7 +606,7 @@
         </div>
       </div>
       <div style="margin-top:18px;">
-        <label style="margin-bottom:9px;">Materials Checklist <span class="helper" style="text-transform:none; display:inline;">— check when ordered, add vendor code if needed</span></label>
+        <label style="margin-bottom:9px;">Materials Checklist <span class="helper" style="text-transform:none; display:inline;">— check when ordered, optionally log the date</span></label>
         <div class="checklist" id="checklistContainer"></div>
       </div>
       <div class="check-item" style="margin-top:16px; background:#fbfaf6;">
@@ -957,7 +958,9 @@ document.getElementById('tableBody').addEventListener('click', e=>{
   const filesEmptyBtn = e.target.closest('.files-btn-empty');
   if(filesEmptyBtn){ openJobModal(filesEmptyBtn.dataset.id, true); return; }
   const btn = e.target.closest('.edit-btn');
-  if(btn){ openJobModal(btn.dataset.id); }
+  if(btn){ openJobModal(btn.dataset.id); return; }
+  const row = e.target.closest('tr[data-id]');
+  if(row){ openJobModal(row.dataset.id); }
 });
 
 function isSafeUrl(url){
@@ -1280,7 +1283,9 @@ document.getElementById('ordersTableBody').addEventListener('click', e=>{
   const completeBtn = e.target.closest('.mark-complete-btn');
   if(completeBtn){ setOrderCompleted(completeBtn.dataset.id, true); return; }
   const btn = e.target.closest('.orders-edit-btn');
-  if(btn){ openOrderModal(btn.dataset.id); }
+  if(btn){ openOrderModal(btn.dataset.id); return; }
+  const row = e.target.closest('tr[data-id]');
+  if(row){ openOrderModal(row.dataset.id); }
 });
 document.getElementById('completedTableBody').addEventListener('click', e=>{
   const jumpBtn = e.target.closest('.jump-to-job');
@@ -1290,7 +1295,9 @@ document.getElementById('completedTableBody').addEventListener('click', e=>{
   const incompleteBtn = e.target.closest('.mark-incomplete-btn');
   if(incompleteBtn){ setOrderCompleted(incompleteBtn.dataset.id, false); return; }
   const btn = e.target.closest('.orders-edit-btn');
-  if(btn){ openOrderModal(btn.dataset.id); }
+  if(btn){ openOrderModal(btn.dataset.id); return; }
+  const row = e.target.closest('tr[data-id]');
+  if(row){ openOrderModal(row.dataset.id); }
 });
 
 /* ---- Order modal ---- */
@@ -1304,22 +1311,31 @@ function buildChecklist(items){
     const raw = (items && items[name]) || '';
     const checked = raw.trim() !== '';
     const note = raw.replace(/^X\s*/i,'').trim();
+    const dateVal = /^\d{4}-\d{2}-\d{2}$/.test(note) ? note : '';
     const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
     return `<div class="check-item">
       <input type="checkbox" id="chk_${safeName}" data-item="${name}" ${checked?'checked':''}>
       <label for="chk_${safeName}">${name}</label>
-      <input type="text" id="note_${safeName}" data-item-note="${name}" placeholder="vendor" value="${note.replace(/"/g,'&quot;')}">
+      <input type="date" id="note_${safeName}" data-item-date="${name}" value="${dateVal}">
     </div>`;
   }).join('');
 }
+checklistContainer.addEventListener('change', e=>{
+  const dateInput = e.target.closest('input[type=date]');
+  if(dateInput && dateInput.value){
+    const safeName = dateInput.id.replace('note_','');
+    const chk = document.getElementById('chk_'+safeName);
+    if(chk) chk.checked = true;
+  }
+});
 function readChecklist(){
   const items = {};
   CANON_ITEMS.forEach(name=>{
     const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
     const checked = document.getElementById('chk_'+safeName).checked;
-    const note = document.getElementById('note_'+safeName).value.trim();
+    const dateVal = document.getElementById('note_'+safeName).value;
     if(!checked){ items[name] = ''; }
-    else { items[name] = note ? `X ${note}` : 'X'; }
+    else { items[name] = dateVal ? `X ${dateVal}` : 'X'; }
   });
   return items;
 }
