@@ -373,6 +373,8 @@
   <div class="tabbar">
     <button class="tab-btn active" data-tab="schedule">Production Schedule <span class="tab-badge" id="tabBadgeSchedule">0</span></button>
     <button class="tab-btn" data-tab="orders">Material Orders <span class="tab-badge" id="tabBadgeOrders">0</span></button>
+    <button class="tab-btn" data-tab="opendates">Open Dates <span class="tab-badge" id="tabBadgeOpenDates">0</span></button>
+    <button class="tab-btn" data-tab="lots">Available Lots <span class="tab-badge" id="tabBadgeLots">0</span></button>
   </div>
 </div>
 
@@ -468,6 +470,72 @@
       </table>
       <div class="empty" id="completedEmptyState" style="display:none;">No completed orders yet.</div>
     </div>
+  </div>
+
+  <!-- ===================== OPEN DATES PANEL ===================== -->
+  <div class="panel" id="panel-opendates">
+    <div class="schedule-link-banner" id="buildingBannerOnDates" style="display:none; background:#fbeee0; border-color:#eccba2; color:var(--amber);">
+      <span id="buildingBannerOnDatesText"></span>
+      <button class="btn-link" id="clearBuildingFromDates" style="background:#fff; color:var(--amber); border-color:#eccba2;">Clear</button>
+    </div>
+    <div class="toolbar">
+      <div style="flex:1; font-size:13px; color:var(--ink-soft); display:flex; align-items:center; gap:8px;">
+        <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:400; font-size:13px; color:var(--ink-soft); margin:0; cursor:pointer;">
+          <input type="checkbox" id="showPastSlots" style="width:15px; height:15px; accent-color:var(--rust); cursor:pointer;">
+          Show past dates too
+        </label>
+      </div>
+      <button class="btn btn-primary" id="addSlotBtn">+ Add Open Date</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr id="slotsHeaderRow">
+          <th data-key="settle" class="sorted asc">Settle</th>
+          <th data-key="walk">Walk</th>
+          <th data-key="move">Move</th>
+          <th data-key="fndn">Fndn.</th>
+          <th data-key="draftsman">Draftsman</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="slotsTableBody"></tbody>
+    </table>
+    <div class="empty" id="slotsEmptyState" style="display:none;">No open dates — every upcoming production slot is booked.</div>
+  </div>
+
+  <!-- ===================== AVAILABLE LOTS PANEL ===================== -->
+  <div class="panel" id="panel-lots">
+    <div class="schedule-link-banner" id="buildingBannerOnLots" style="display:none; background:#fbeee0; border-color:#eccba2; color:var(--amber);">
+      <span id="buildingBannerOnLotsText"></span>
+      <button class="btn-link" id="clearBuildingFromLots" style="background:#fff; color:var(--amber); border-color:#eccba2;">Clear</button>
+    </div>
+    <div class="toolbar">
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="lotsSearchBox" placeholder="Search lot, address…">
+      </div>
+      <select class="filter" id="lotsCommunityFilter">
+        <option value="">All Communities</option>
+      </select>
+      <button class="btn btn-primary" id="addLotBtn">+ Add Lot</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr id="lotsHeaderRow">
+          <th data-key="community" class="sorted asc">Community</th>
+          <th data-key="lot">Lot</th>
+          <th data-key="address">Address</th>
+          <th data-key="garageType">Foundation / Garage</th>
+          <th data-key="premium">Premium</th>
+          <th data-key="acreage">Acreage</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="lotsTableBody"></tbody>
+    </table>
+    <div class="empty" id="lotsEmptyState" style="display:none;">No available lots match your search.</div>
   </div>
 
   <footer>Data is stored in your team's shared Firebase project and syncs across everyone signed in. Use Export CSV any time for a local backup.</footer>
@@ -647,6 +715,107 @@
   </div>
 </div>
 
+<!-- Open Date (Slot) Modal -->
+<div class="overlay" id="slotOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="slotModalTitle">Add Open Date</h2>
+      <button class="modal-close" id="slotCloseModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid">
+        <div>
+          <label for="s_settle">Settle Date</label>
+          <input type="date" id="s_settle">
+          <div class="helper">Set this first — Walk and Move suggest automatically.</div>
+        </div>
+        <div>
+          <label for="s_draftsman">Draftsman</label>
+          <select id="s_draftsman">
+            <option value="">—</option>
+            <option value="D">D</option>
+            <option value="J">J</option>
+            <option value="__other">Other…</option>
+          </select>
+          <input type="text" id="s_draftsman_other" placeholder="Initials" style="margin-top:8px; display:none;">
+        </div>
+        <div>
+          <label for="s_walk">Walk Date</label>
+          <input type="date" id="s_walk">
+          <div class="date-linked" id="s_walkLinked" style="display:none;">✓ Settle − 5 days</div>
+        </div>
+        <div>
+          <label for="s_move">Move Date</label>
+          <input type="date" id="s_move">
+          <div class="date-linked" id="s_moveLinked" style="display:none;">✓ Settle − 3 days</div>
+        </div>
+        <div>
+          <label for="s_fndn">Foundation Date</label>
+          <input type="date" id="s_fndn">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="slotDeleteBtn" style="display:none; color:#a8451a; border-color:#e3b5a0;">Delete</button>
+      <div style="flex:1;"></div>
+      <button class="btn btn-ghost" id="slotCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="slotSaveBtn">Save Open Date</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lot Modal -->
+<div class="overlay" id="lotOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="lotModalTitle">Add Lot</h2>
+      <button class="modal-close" id="lotCloseModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid">
+        <div>
+          <label for="l_community">Community</label>
+          <select id="l_community">
+            <option value="AP">AP</option>
+            <option value="MM">MM</option>
+            <option value="ML">ML</option>
+            <option value="CL">CL</option>
+            <option value="OS">OS</option>
+            <option value="__other">Other…</option>
+          </select>
+          <input type="text" id="l_community_other" placeholder="Enter community code" style="margin-top:8px; display:none;">
+        </div>
+        <div>
+          <label for="l_lot">Lot #</label>
+          <input type="text" id="l_lot" placeholder="e.g. 69">
+        </div>
+        <div class="full">
+          <label for="l_address">Address</label>
+          <input type="text" id="l_address" placeholder="e.g. 1121 Alden Way">
+        </div>
+        <div class="full">
+          <label for="l_garageType">Foundation / Garage Type</label>
+          <input type="text" id="l_garageType" placeholder="e.g. Walk-Out Basement R">
+        </div>
+        <div>
+          <label for="l_premium">Homesite Premium</label>
+          <input type="text" id="l_premium" placeholder="e.g. 5000">
+        </div>
+        <div>
+          <label for="l_acreage">Acreage</label>
+          <input type="text" id="l_acreage" placeholder="e.g. 0.52">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="lotDeleteBtn" style="display:none; color:#a8451a; border-color:#e3b5a0;">Delete</button>
+      <div style="flex:1;"></div>
+      <button class="btn btn-ghost" id="lotCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="lotSaveBtn">Save Lot</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /#appShell -->
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -673,6 +842,8 @@ const CANON_ITEMS = ["Windows","Lumber","Siding","Steps","Garage","Locks","Showe
 
 const SCHEDULE_SEED = [{"ytd":1,"community":"AP","lot":"150","model":"Grant B","client":"John and Tina Kelsey","address":"1020 Stanford Dr","phone":"717-269-5272","plan":"","draftsman":"D","fndn":"","walk":"2025-01-15","move":"2025-01-17","settle":"2025-01-20"},{"ytd":2,"community":"AP","lot":"217","model":"Alden 2.1","client":"Bob and Jackie Chicchi","address":"1055 Percy Lane","phone":"717-961-6089","plan":"","draftsman":"D","fndn":"","walk":"2025-01-21","move":"2025-01-23","settle":"2025-01-26"},{"ytd":3,"community":"AP","lot":"224","model":"Alden 2.1","client":"Bob and Sharon Griffiths","address":"1004 Stanford Dr","phone":"717-454-7721","plan":"","draftsman":"","fndn":"","walk":"2025-02-11","move":"2025-02-13","settle":"2025-02-17"},{"ytd":4,"community":"MM","lot":"70","model":"Sherman","client":"William and Sharon Kline","address":"49 Clover Dr","phone":"717-866-2257","plan":"","draftsman":"D","fndn":"","walk":"2025-02-08","move":"2025-02-10","settle":"2025-02-13"},{"ytd":5,"community":"AP","lot":"104","model":"Stanford B","client":"Brian and Cricket Karli","address":"1094 Alden Way","phone":"678-982-6627","plan":"","draftsman":"J","fndn":"","walk":"2025-02-25","move":"2025-02-27","settle":"2025-03-02"},{"ytd":6,"community":"AP","lot":"411","model":"Vermillion","client":"BOB and Barb Henry","address":"1212 Mosaic Dr","phone":"215-208-5989","plan":"","draftsman":"J","fndn":"","walk":"2026-02-23","move":"2026-02-23","settle":"2026-03-02"},{"ytd":7,"community":"AP","lot":"103","model":"Stanford B","client":"Charles and Marie Waltman","address":"1096 Alden Way","phone":"610-906-4003","plan":"","draftsman":"J","fndn":"","walk":"2026-04-01","move":"2026-04-03","settle":"2026-04-06"},{"ytd":8,"community":"ML","lot":"115","model":"Custom","client":"Nancy Kreider","address":"115 Maple Lane","phone":"717-507-1156","plan":"","draftsman":"D","fndn":"","walk":"2026-04-12","move":"2026-04-15","settle":"2026-04-17"},{"ytd":9,"community":"MM","lot":"62","model":"Montgomery C","client":"Bryan and Elise Nelligan","address":"33 Clover Dr","phone":"484-987-9842","plan":"","draftsman":"D","fndn":"","walk":"2026-05-06","move":"2026-05-08","settle":"2026-05-08"},{"ytd":10,"community":"ML","lot":"121","model":"Custom","client":"Louis and Sharon Hurst","address":"121 Maple Lane","phone":"717-629-5788","plan":"","draftsman":"D","fndn":"","walk":"2026-05-06","move":"2026-05-08","settle":"2026-05-11"},{"ytd":11,"community":"AP","lot":"219","model":"Stanford B","client":"Tom and Nancy Doyle","address":"1059 Percy Lane","phone":"631-384-8699","plan":"","draftsman":"J","fndn":"","walk":"2026-05-13","move":"2026-05-15","settle":"2026-05-18"},{"ytd":12,"community":"AP","lot":"151","model":"Coleman","client":"Clayton Kleinfelter","address":"1022 Stanford Dr","phone":"717-664-1215","plan":"","draftsman":"J","fndn":"","walk":"2026-06-17","move":"2026-06-19","settle":"2026-06-22"},{"ytd":13,"community":"AP","lot":"424","model":"Bainbridge","client":"Marc and Jeanette Campanale","address":"1017 Riverstone Circle","phone":"","plan":"","draftsman":"D","fndn":"","walk":"2026-07-08","move":"2026-07-10","settle":"2026-07-13"},{"ytd":14,"community":"CL","lot":"109","model":"Rivet","client":"Lonnie","address":"412 Cannon Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-06-25","move":"2026-06-25","settle":"2026-06-30"},{"ytd":15,"community":"OS","lot":"1265","model":"Remodel","client":"Lorraine and Chris","address":"1265 Girl Scout rd","phone":"717-468-3046","plan":"","draftsman":"J","fndn":"","walk":"2026-07-23","move":"2026-07-24","settle":"2026-07-27"},{"ytd":16,"community":"OS","lot":"238","model":"Avonlea","client":"Kendra Heck","address":"238 S Lancaster Ave","phone":"717-383-3192","plan":"","draftsman":"D","fndn":"","walk":"2026-07-02","move":"2026-07-05","settle":"2026-07-15"},{"ytd":17,"community":"MM","lot":"49","model":"Stanford A","client":"John and Whitney","address":"40 Clover Dr","phone":"508-654-8821","plan":"","draftsman":"J","fndn":"","walk":"2026-07-15","move":"2026-07-15","settle":"2026-07-15"},{"ytd":"","community":"AP","lot":"220","model":"Tiffany","client":"Model Home","address":"1012 Stanford Dr","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-07-08","move":"2026-07-10","settle":"2026-07-13"},{"ytd":18,"community":"AP","lot":"154","model":"Stanford B","client":"James Struck","address":"1028 Stanford Dr","phone":"717-201-4782","plan":"","draftsman":"D","fndn":"","walk":"2026-07-15","move":"2026-07-17","settle":"2026-07-20"},{"ytd":19,"community":"ML","lot":"117","model":"Saber","client":"Nate Lowrie","address":"117 Maple Ln","phone":"717-269-2605","plan":"","draftsman":"J","fndn":"","walk":"2026-07-19","move":"2026-07-21","settle":"2026-07-24"},{"ytd":20,"community":"CL","lot":"1","model":"Anvil","client":"Darren and Connie Johnson","address":"401 Cannon way","phone":"484-515-9319","plan":"","draftsman":"J","fndn":"","walk":"2026-07-22","move":"2026-07-24","settle":"2026-07-27"},{"ytd":21,"community":"CL","lot":"7","model":"Artisan","client":"Nate and Lindsay","address":"419 Cannon Way","phone":"717-228-8421","plan":"","draftsman":"J","fndn":"","walk":"2026-07-26","move":"2026-07-28","settle":"2026-07-31"},{"ytd":22,"community":"AP","lot":"425","model":"Coleman 2.1","client":"Jeff and Joanie Firestone","address":"1015 Riverstone circle","phone":"717-507-6099","plan":"","draftsman":"J","fndn":"","walk":"2026-08-19","move":"2026-08-21","settle":"2026-08-24"},{"ytd":23,"community":"AP","lot":"222","model":"Bainbridge","client":"Amy  Sales","address":"1008 Stanford dr","phone":"610-703-7813","plan":"","draftsman":"J","fndn":"","walk":"2026-09-01","move":"2026-09-03","settle":"2026-09-04"},{"ytd":"","community":"AP","lot":"67","model":"Sonora","client":"Model home","address":"1117 Alden Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-10-07","move":"2026-10-09","settle":"2026-10-12"},{"ytd":24,"community":"CL","lot":"5","model":"Saber","client":"John and Lori Mattia","address":"415 Cannon Way","phone":"484-467-0754","plan":"","draftsman":"J","fndn":"","walk":"2026-10-14","move":"2026-10-16","settle":"2026-10-19"},{"ytd":"","community":"CL","lot":"113","model":"Rexmont","client":"Model Home","address":"404 Cannon way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-10-21","move":"2026-10-23","settle":"2026-10-26"},{"ytd":25,"community":"AP","lot":"70","model":"Custom","client":"Ammon and Barbara Morgan","address":"1123 Alden Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-11-18","move":"2026-11-20","settle":"2026-11-23"},{"ytd":26,"community":"AP","lot":"71","model":"Tiffany","client":"Joann and Walter Rupp","address":"1125 Alden Way","phone":"570-466-9292","plan":"","draftsman":"J","fndn":"","walk":"2026-11-25","move":"2026-11-27","settle":"2026-11-30"},{"ytd":"","community":"CL","lot":"102","model":"Rivet","client":"MODEL HOME","address":"105 Charcoal Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-11-25","move":"2026-11-27","settle":"2026-11-30"},{"ytd":"","community":"CL","lot":"98","model":"Artisan","client":"Model Home","address":"Cannon Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-12-02","move":"2026-12-04","settle":"2026-12-07"}];
 const ORDERS_SEED = [{"id":"2021-27","source":"2021","community":"ET","lot":"265","name":"SNYDER","address":"1450 FIELDSTONE","walkthru":"2023-08-09","items":{"Windows":"X ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-28","source":"2021","community":"AP","lot":"152","name":"JONES","address":"1024 STANFORD DRIVE","walkthru":"2023-08-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-29","source":"2021","community":"AP","lot":"418","name":"MARTIN","address":"1234 MOSAIC DRIVE","walkthru":"2023-08-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-30","source":"2021","community":"AP","lot":"414","name":"SWINGHOLM","address":"1220 MOSAIC DRIVE","walkthru":"2023-08-22","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-31","source":"2021","community":"ET","lot":"268","name":"SYMONDS","address":"1458 FIELDSTONE DRIVE","walkthru":"2023-08-23","items":{"Windows":"X ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-32","source":"2021","community":"ET","lot":"267","name":"VASQUEZ","address":"1456 FIELDSTONE DRIVE","walkthru":"2023-09-15","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-33","source":"2021","community":"AP","lot":"142","name":"DILLNER","address":"1054 PERCY LANE","walkthru":"2023-09-22","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-34","source":"2021","community":"ET","lot":"292","name":"KRULOCK","address":"1410 BARRINGTON DRIVE","walkthru":"2023-10-18","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-35","source":"2021","community":"ET","lot":"269","name":"PRICE","address":"1460 FIELDSTONE DRIVE","walkthru":"2024-03-06","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-36","source":"2021","community":"MM","lot":"66","name":"PEARCE","address":"53 CLOVER DRIVE","walkthru":"2024-03-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-37","source":"2021","community":"MM","lot":"41","name":"QUINONESS","address":"56 CLOVER DRIVE","walkthru":"2024-08-14","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-38","source":"2021","community":"MM","lot":"50","name":"NELLGAN","address":"38 CLOVER DRIVE","walkthru":"2024-08-21","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-39","source":"2021","community":"AP","lot":"192","name":"GRAHAM","address":"1013 STANFORD DRIVE","walkthru":"2024-08-21","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-40","source":"2021","community":"MM","lot":"42","name":"MUTCHLER","address":"54 CLOVER DRIVE","walkthru":"2024-08-28","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-41","source":"2021","community":"AP","lot":"417","name":"SHANFELDER","address":"1230 MOSAIC DRIVE","walkthru":"2024-09-04","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-42","source":"2021","community":"MM","lot":"57","name":"LAVOIE","address":"22 CLOVER DRIVE","walkthru":"2024-09-10","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-43","source":"2021","community":"OS","lot":"121","name":"SPEC","address":"1330 JILL ANN DR","walkthru":"2024-09-11","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-44","source":"2021","community":"ET","lot":"264","name":"GROFF","address":"1448 FIELDSTONE DR","walkthru":"2024-10-01","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-45","source":"2021","community":"AP","lot":"182","name":"BROWN","address":"1033 STANFORD","walkthru":"2024-09-24","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-46","source":"2021","community":"MM","lot":"43","name":"ALBRIGHT","address":"52 CLOVER DR","walkthru":"2024-10-09","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-47","source":"2021","community":"ET","lot":"263","name":"CHEN","address":"1446 FIELDSTONE","walkthru":"2024-10-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-48","source":"2021","community":"AP","lot":"196","name":"BOYCE","address":"1005 STANFORD","walkthru":"2024-10-16","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-49","source":"2021","community":"AP","lot":"141","name":"SOWIZRAL","address":"1052 PERCY LANE","walkthru":"2024-10-23","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-50","source":"2021","community":"AP","lot":"382","name":"SHEPPARD","address":"1242 MOSAIC DRIVE","walkthru":"2024-11-13","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-51","source":"2021","community":"OS","lot":"3320","name":"CROSS","address":"3320 PROSPECT RD YORK","walkthru":"2024-11-08","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-52","source":"2021","community":"AP","lot":"151","name":"KELEINFELTER","address":"1022 STANFORD DRIVE","walkthru":"2026-06-17","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-53","source":"2021","community":"AP","lot":"424","name":"STAY AND PLAY","address":"1017 RIVERSTONE CIRCLE","walkthru":"2026-06-17","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-54","source":"2021","community":"AP","lot":"220","name":"MARTINEZ","address":"1012 STANFORD DRIVE","walkthru":"2026-07-01","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-55","source":"2021","community":"AP","lot":"154","name":"STRUCK","address":"1028 STANFORD DRIVE","walkthru":"2026-07-15","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-56","source":"2021","community":"ML","lot":"117","name":"LOWRIE","address":"117 MAPLE LANE","walkthru":"2026-07-22","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":"X"},"completed":true},{"id":"2021-57","source":"2021","community":"AP","lot":"425","name":"FIRESTONE","address":"1015 RIVERSTONE","walkthru":"2026-08-19","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-58","source":"2021","community":"OS","lot":"","name":"Girl scout rd","address":"1265 Girl scout rd","walkthru":"2026-07-24","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-59","source":"2021","community":"AP","lot":"222","name":"SALES","address":"1008 STANFORD","walkthru":"2026-08-26","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-60","source":"2021","community":"OS","lot":"238","name":"","address":"LANCASTER AVE","walkthru":"2026-08-13","items":{"Windows":"X","Lumber":"","Siding":"","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-61","source":"2021","community":"CL","lot":"5","name":"MATTIA","address":"415 CANNON WAY","walkthru":"2026-10-14","items":{"Windows":"ABC","Lumber":"","Siding":"","Steps":"","Garage":"X","Locks":"","Shower":"","Track":"","Roof":"","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-62","source":"2021","community":"AP","lot":"67","name":"MODEL","address":"1117 ALDEN WAY","walkthru":"2026-10-07","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-63","source":"2021","community":"CL","lot":"113","name":"MODEL","address":"404 CANNON WAY","walkthru":"2026-10-21","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-3","source":"2022","community":"NG","lot":"23","name":"BROUSSARD","address":"1009 PARKWOOD CT","walkthru":"2022-01-05","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-4","source":"2022","community":"ET","lot":"283","name":"DAUBER","address":"1423 BARRINGTON DR","walkthru":"2021-01-11","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-5","source":"2022","community":"ET","lot":"324","name":"ROHRER","address":"1416 HEATERWOOD DR","walkthru":"2021-01-18","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-6","source":"2022","community":"AP","lot":"153","name":"MATTHEW","address":"1026 STANFORD DR","walkthru":"2021-01-19","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-7","source":"2022","community":"AP","lot":"179","name":"TEETER","address":"1039 STANFORD DR","walkthru":"2021-01-25","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-8","source":"2022","community":"ET","lot":"290","name":"JOSE & MEDINA","address":"1406 BARRINGTON DR","walkthru":"2021-02-01","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-9","source":"2022","community":"ET","lot":"294","name":"PATTEN","address":"1415 BARRINGTON DR","walkthru":"2021-02-02","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-10","source":"2022","community":"ET","lot":"299","name":"NATHAN & DANIEL","address":"1426 BARRINGTON DR","walkthru":"2021-02-08","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-11","source":"2022","community":"AP","lot":"68","name":"JEFF & LINDA","address":"1119 ALDEN WAY","walkthru":"2021-02-15","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-12","source":"2022","community":"ET","lot":"275","name":"PETE & GABBY","address":"BARRINGTON DR","walkthru":"2021-02-16","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-13","source":"2022","community":"MM","lot":"89","name":"KULP","address":"14 CLOVER DR","walkthru":"2021-02-22","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-14","source":"2022","community":"AP","lot":"120","name":"DUNLAP","address":"1010 PERCY LANE","walkthru":"2021-03-01","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false}];
+const OPENSLOTS_SEED = [{"fndn":"","walk":"2025-01-21","move":"2025-01-23","settle":"2025-01-26","draftsman":"J"},{"fndn":"","walk":"2025-01-28","move":"2025-01-30","settle":"2025-02-02","draftsman":""},{"fndn":"","walk":"2025-02-04","move":"2025-02-06","settle":"2025-02-09","draftsman":""},{"fndn":"","walk":"2025-02-18","move":"2025-02-20","settle":"2025-02-23","draftsman":""},{"fndn":"","walk":"2025-02-18","move":"2025-02-20","settle":"2025-02-23","draftsman":""},{"fndn":"","walk":"2025-03-04","move":"2025-03-06","settle":"2025-03-09","draftsman":""},{"fndn":"","walk":"2025-03-11","move":"2025-03-13","settle":"2025-03-16","draftsman":""},{"fndn":"","walk":"2025-03-18","move":"2025-03-20","settle":"2025-03-23","draftsman":""},{"fndn":"","walk":"2025-03-25","move":"2025-03-27","settle":"2025-03-30","draftsman":""},{"fndn":"","walk":"2025-04-01","move":"2025-04-03","settle":"2025-04-06","draftsman":""},{"fndn":"","walk":"2025-04-08","move":"2025-04-10","settle":"2025-04-13","draftsman":""},{"fndn":"","walk":"2025-04-15","move":"2025-04-17","settle":"2025-04-20","draftsman":""},{"fndn":"","walk":"2025-04-22","move":"2025-04-24","settle":"2025-04-27","draftsman":""},{"fndn":"","walk":"2025-04-29","move":"2025-05-01","settle":"2025-05-04","draftsman":""},{"fndn":"","walk":"2025-05-06","move":"2025-05-08","settle":"2025-05-11","draftsman":""},{"fndn":"","walk":"2025-05-13","move":"2025-05-15","settle":"2025-05-18","draftsman":""},{"fndn":"","walk":"2025-05-20","move":"2025-05-22","settle":"2025-05-25","draftsman":""},{"fndn":"","walk":"2025-05-27","move":"2025-05-29","settle":"2025-06-01","draftsman":""},{"fndn":"","walk":"2025-06-03","move":"2025-06-05","settle":"2025-06-08","draftsman":""},{"fndn":"","walk":"2025-06-10","move":"2025-06-12","settle":"2025-06-15","draftsman":""},{"fndn":"","walk":"2025-06-17","move":"2025-06-19","settle":"2025-06-22","draftsman":""},{"fndn":"","walk":"2025-06-24","move":"2025-06-26","settle":"2025-06-29","draftsman":""},{"fndn":"","walk":"2025-07-01","move":"2025-07-03","settle":"2025-07-06","draftsman":""},{"fndn":"","walk":"2025-07-08","move":"2025-07-10","settle":"2025-07-13","draftsman":""},{"fndn":"","walk":"2025-07-15","move":"2025-07-17","settle":"2025-07-20","draftsman":""},{"fndn":"","walk":"2025-07-22","move":"2025-07-24","settle":"2025-07-27","draftsman":""},{"fndn":"","walk":"2025-07-29","move":"2025-07-31","settle":"2025-08-03","draftsman":""},{"fndn":"","walk":"2025-08-05","move":"2025-08-07","settle":"2025-08-10","draftsman":""},{"fndn":"","walk":"2025-08-12","move":"2025-08-14","settle":"2025-08-17","draftsman":""},{"fndn":"","walk":"2025-08-19","move":"2025-08-21","settle":"2025-08-24","draftsman":""},{"fndn":"","walk":"2025-08-26","move":"2025-08-28","settle":"2025-08-31","draftsman":""},{"fndn":"","walk":"2025-09-02","move":"2025-09-04","settle":"2025-09-07","draftsman":""},{"fndn":"","walk":"2025-09-09","move":"2025-09-11","settle":"2025-09-14","draftsman":""},{"fndn":"","walk":"2025-09-16","move":"2025-09-18","settle":"2025-09-21","draftsman":""},{"fndn":"","walk":"2025-09-23","move":"2025-09-25","settle":"2025-09-28","draftsman":""},{"fndn":"","walk":"2025-09-30","move":"2025-10-02","settle":"2025-10-05","draftsman":""},{"fndn":"","walk":"2025-10-07","move":"2025-10-09","settle":"2025-10-12","draftsman":""},{"fndn":"","walk":"2025-10-14","move":"2025-10-16","settle":"2025-10-19","draftsman":""},{"fndn":"","walk":"2025-10-21","move":"2025-10-23","settle":"2025-10-26","draftsman":""},{"fndn":"","walk":"2026-03-18","move":"2026-03-20","settle":"2026-03-23","draftsman":""},{"fndn":"","walk":"2026-03-25","move":"2026-03-27","settle":"2026-03-30","draftsman":""},{"fndn":"","walk":"2025-11-11","move":"2025-11-13","settle":"2025-11-16","draftsman":""},{"fndn":"","walk":"2025-11-18","move":"2025-11-20","settle":"2025-11-23","draftsman":""},{"fndn":"","walk":"2025-11-25","move":"2025-11-27","settle":"2025-11-30","draftsman":""},{"fndn":"","walk":"2026-04-01","move":"2026-04-01","settle":"2026-04-03","draftsman":""},{"fndn":"","walk":"2026-04-08","move":"2026-04-10","settle":"2026-04-13","draftsman":""},{"fndn":"","walk":"2026-04-22","move":"2026-04-24","settle":"2026-04-27","draftsman":""},{"fndn":"","walk":"2026-04-22","move":"2026-04-24","settle":"2026-04-27","draftsman":""},{"fndn":"","walk":"2026-05-13","move":"2026-05-15","settle":"2026-05-18","draftsman":"J"},{"fndn":"","walk":"2026-05-20","move":"2026-05-22","settle":"2026-05-25","draftsman":""},{"fndn":"","walk":"2026-05-20","move":"2026-05-22","settle":"2026-05-25","draftsman":""},{"fndn":"","walk":"2026-05-27","move":"2026-05-29","settle":"2026-06-01","draftsman":""},{"fndn":"","walk":"2026-06-03","move":"2026-06-05","settle":"2026-06-08","draftsman":""},{"fndn":"","walk":"2026-06-17","move":"2026-06-19","settle":"2026-06-22","draftsman":""},{"fndn":"","walk":"2026-06-17","move":"2026-06-19","settle":"2026-06-22","draftsman":""},{"fndn":"","walk":"2026-07-29","move":"2026-07-31","settle":"2026-08-03","draftsman":""},{"fndn":"","walk":"2026-08-05","move":"2026-08-07","settle":"2026-08-10","draftsman":""},{"fndn":"","walk":"2026-08-12","move":"2026-08-14","settle":"2026-08-17","draftsman":""},{"fndn":"","walk":"2026-08-12","move":"2026-08-14","settle":"2026-08-17","draftsman":""},{"fndn":"","walk":"2026-08-26","move":"2026-08-28","settle":"2026-08-31","draftsman":""},{"fndn":"","walk":"2026-09-02","move":"2026-09-04","settle":"2026-09-07","draftsman":""},{"fndn":"","walk":"2026-09-09","move":"2026-09-11","settle":"2026-09-14","draftsman":""},{"fndn":"","walk":"2026-09-09","move":"2026-09-11","settle":"2026-09-14","draftsman":""},{"fndn":"","walk":"2026-09-16","move":"2026-09-18","settle":"2026-09-21","draftsman":""},{"fndn":"","walk":"2026-09-23","move":"2026-09-25","settle":"2026-09-28","draftsman":""},{"fndn":"","walk":"2026-09-30","move":"2026-10-02","settle":"2026-10-05","draftsman":""},{"fndn":"","walk":"2026-09-30","move":"2026-10-02","settle":"2026-10-05","draftsman":""},{"fndn":"","walk":"2026-10-14","move":"2026-10-16","settle":"2026-10-19","draftsman":""},{"fndn":"","walk":"2026-10-28","move":"2026-10-30","settle":"2026-11-02","draftsman":""},{"fndn":"","walk":"2026-10-28","move":"2026-10-30","settle":"2026-11-02","draftsman":""},{"fndn":"","walk":"2026-11-04","move":"2026-11-06","settle":"2026-11-09","draftsman":""},{"fndn":"","walk":"2026-11-11","move":"2026-11-13","settle":"2026-11-16","draftsman":""},{"fndn":"","walk":"2026-11-11","move":"2026-11-16","settle":"2026-11-16","draftsman":""},{"fndn":"","walk":"2026-12-09","move":"2026-12-11","settle":"2026-12-14","draftsman":""},{"fndn":"","walk":"2026-12-09","move":"2026-12-11","settle":"2026-12-14","draftsman":""},{"fndn":"","walk":"2026-12-16","move":"2026-12-18","settle":"2026-12-21","draftsman":""},{"fndn":"","walk":"2026-12-23","move":"2026-12-25","settle":"2026-12-28","draftsman":""},{"fndn":"","walk":"2026-12-23","move":"2026-12-25","settle":"2026-12-28","draftsman":""}];
+const AVAILABLE_LOTS_SEED = [{"community":"AP","lot":"69","address":"1121 Alden Way","garageType":"Walk-Out Basement  R","premium":"2000","acreage":"","facing":"","envelope":""},{"community":"AP","lot":"422","address":"1021 Riverstone Circle","garageType":"Slab or Basement R - 10k Deck Req'd","premium":"3900","acreage":"","facing":"","envelope":""},{"community":"AP","lot":"423","address":"1019 Riverstone Circle","garageType":"Walk-Out Basement  R","premium":"3900","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"33","address":"72 Clover Drive","garageType":"Walk-Out Basement  L","premium":"6000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"35","address":"68 Clover Drive","garageType":"Walk-Out Basement  L","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"36","address":"66  Clover Drive","garageType":"Walk-Out Basement  L","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"37","address":"64 Clover Drive","garageType":"Walk-Out Basement  L","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"38","address":"62 Clover Drive","garageType":"Walk-Out Basement  L","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"39","address":"60 Clover Drive","garageType":"Walk-Out Basement  L","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"40","address":"58 Clover Drive","garageType":"Walk-Out Basement  L","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"44","address":"50 Clover Drive","garageType":"Walk-Out Basement  L","premium":"6000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"45","address":"48 Clover Drive","garageType":"Walk-Out Basement  L","premium":"6000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"52","address":"34 Clover Drive","garageType":"Walk-Out Basement  R","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"53","address":"32 Clover Drive","garageType":"Walk-Out Basement  R","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"54","address":"28 Clover Drive","garageType":"Walk-Out Basement  R","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"55","address":"26 Clover Drive","garageType":"Walk-Out Basement  L","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"56","address":"24 Clover Drive","garageType":"Walk-Out Basement  R","premium":"20000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"59","address":"27 Clover Drive","garageType":"Slab L","premium":"5000","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"63","address":"37 Clover Drive","garageType":"Slab L","premium":"0","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"65","address":"49 Clover Drive","garageType":"Slab R","premium":"0","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"67","address":"57 Clover Drive","garageType":"Daylight Basement R","premium":"0","acreage":"","facing":"","envelope":""},{"community":"MM","lot":"69","address":"61 Clover Drive","garageType":"Walk-Out Basement  R","premium":"0","acreage":"","facing":"","envelope":""},{"community":"CL","lot":"4","address":"409 Cannon Way","garageType":"Slab or Basement R","premium":"30000","acreage":"2.16","facing":"E","envelope":"60W x 60D"},{"community":"CL","lot":"10","address":"101 Cliff Court","garageType":"Walk Out Req'd R","premium":"10000","acreage":"0.36","facing":"S","envelope":"80W x 60D"},{"community":"CL","lot":"11","address":"103 Cliff Court","garageType":"Walk Out Req'd R","premium":"70000","acreage":"3.65","facing":"S","envelope":"60W x 50D"},{"community":"CL","lot":"15","address":"113 Cliff Court","garageType":"Walk Out Req'd R","premium":"40000","acreage":"1.78","facing":"SW","envelope":"60W x 50D"},{"community":"CL","lot":"16","address":"115 Cliff Court","garageType":"Walk Out Req'd L","premium":"20000","acreage":"0.5","facing":"S","envelope":"75W x 50D"},{"community":"CL","lot":"19","address":"112 Cliff Court","garageType":"Slab or Basement R","premium":"15000","acreage":"0.35","facing":"NE","envelope":"80W x 50D"},{"community":"CL","lot":"23","address":"104 Cliff Court","garageType":"Slab or Basement L/ R","premium":"20000","acreage":"0.5","facing":"N","envelope":"80W x 50D"},{"community":"CL","lot":"24","address":"427 Cannon Way","garageType":"Walk Out Rt Corner L","premium":"20000","acreage":"0.37","facing":"SE","envelope":"60W x 50D"},{"community":"CL","lot":"25","address":"429 Cannon Way","garageType":"Walk Out Req'd L","premium":"25000","acreage":"0.35","facing":"SE","envelope":"80W x 60D"},{"community":"CL","lot":"28","address":"435 Cannon Way","garageType":"Walk Out Req'd L","premium":"20000","acreage":"0.39","facing":"SE","envelope":"80W x 60D"},{"community":"CL","lot":"92","address":"434 Cannon Way","garageType":"Walk Out Req'd R","premium":"10000","acreage":"0.35","facing":"NW","envelope":"80W x 50D"},{"community":"CL","lot":"93","address":"432 Cannon Way","garageType":"Daylight Req'd  R","premium":"10000","acreage":"0.42","facing":"NW","envelope":"75W x 55D"},{"community":"CL","lot":"96","address":"426 Cannon Way","garageType":"Daylight Req'd  R","premium":"10000","acreage":"0.58","facing":"NW","envelope":"75W x 55D"},{"community":"CL","lot":"97","address":"424 Cannon Way","garageType":"Daylight Req'd  R","premium":"10000","acreage":"0.64","facing":"NW","envelope":"75W x 55D"},{"community":"CL","lot":"100","address":"101 Charcoal Way","garageType":"Daylight Req'd L","premium":"15000","acreage":"0.54","facing":"N","envelope":"50W x 60D"},{"community":"CL","lot":"101","address":"103 Charcoal Way","garageType":"Daylight Req'd L","premium":"15000","acreage":"0.61","facing":"N","envelope":"75W x 55D"},{"community":"CL","lot":"110","address":"410 Cannon Way","garageType":"Slab or Basement L","premium":"5000","acreage":"0.64","facing":"NW","envelope":"75W x 50D"},{"community":"CL","lot":"111","address":"408 Cannon Way","garageType":"Slab or Basement L      Step Up","premium":"","acreage":"0.58","facing":"NW","envelope":"75W x 40D"},{"community":"CL","lot":"116","address":"311 Iron Valley Dr","garageType":"Walk Out Req'd L","premium":"10000","acreage":"0.55","facing":"SE","envelope":"75W x 50D"},{"community":"ML","lot":"113","address":"113 Maple Lane","garageType":"Walk-Out Basement R","premium":"250000","acreage":"0.52","facing":"","envelope":""},{"community":"ML","lot":"111","address":"111 Maple Lane","garageType":"Walk-Out Basement R","premium":"250000","acreage":"0.51","facing":"","envelope":""},{"community":"ML","lot":"109","address":"109 Maple Lane","garageType":"Walk-Out Basement R","premium":"250000","acreage":"0.46","facing":"","envelope":""},{"community":"ML","lot":"107","address":"107 Maple Lane","garageType":"Walk-Out Basement R","premium":"250000","acreage":"0.54","facing":"","envelope":""},{"community":"ML","lot":"105","address":"105 Maple Lane","garageType":"Walk-Out Basement R","premium":"250000","acreage":"0.46","facing":"","envelope":""}];
 
 const COMMUNITY_COLORS = {
   AP:'#3d5570', MM:'#5a7247', ML:'#8a5a3a', CL:'#6a4c93', OS:'#c1531f', ET:'#2f7d8c', NG:'#8c6b2f'
@@ -699,6 +870,16 @@ let ordersSortDir = 'asc';
 let pendingJumpKey = null;
 let collapsedYears = new Set();
 let yearGroupsInitialized = false;
+let openSlots = [];
+let editingSlotId = null;
+let bookingFromSlotId = null;
+let slotsSortKey = 'settle';
+let slotsSortDir = 'asc';
+let availableLots = [];
+let editingLotId = null;
+let selectedLotForBuild = null;
+let lotsSortKey = 'community';
+let lotsSortDir = 'asc';
 
 /* ============================================================
    FIREBASE INIT + AUTH GATE
@@ -706,6 +887,8 @@ let yearGroupsInitialized = false;
 let db = null;
 let jobsCol = null;
 let ordersCol = null;
+let openSlotsCol = null;
+let lotsCol = null;
 let seededThisSession = false;
 
 function setSyncStatus(state){
@@ -763,6 +946,8 @@ if(!FIREBASE_CONFIGURED){
   db = firebase.firestore();
   jobsCol = db.collection('jobs');
   ordersCol = db.collection('orders');
+  openSlotsCol = db.collection('open-slots');
+  lotsCol = db.collection('available-lots');
 
   firebase.auth().onAuthStateChanged(user=>{
     if(user){
@@ -803,6 +988,26 @@ async function seedIfEmpty(){
       await batch.commit();
     }
   } catch(e){ console.error('Orders seed failed', e); }
+  try{
+    const slotsSnap = await openSlotsCol.limit(1).get();
+    if(slotsSnap.empty){
+      const batch = db.batch();
+      OPENSLOTS_SEED.forEach((s,i)=>{
+        batch.set(openSlotsCol.doc('slot-'+i), s);
+      });
+      await batch.commit();
+    }
+  } catch(e){ console.error('Open dates seed failed', e); }
+  try{
+    const lotsSnap = await lotsCol.limit(1).get();
+    if(lotsSnap.empty){
+      const batch = db.batch();
+      AVAILABLE_LOTS_SEED.forEach((l,i)=>{
+        batch.set(lotsCol.doc('lot-'+i), l);
+      });
+      await batch.commit();
+    }
+  } catch(e){ console.error('Available lots seed failed', e); }
 }
 
 function attachListeners(){
@@ -819,6 +1024,19 @@ function attachListeners(){
     renderOrders();
     setSyncStatus('idle');
   }, err=>{ console.error('orders listener error', err); setSyncStatus('offline'); });
+
+  openSlotsCol.onSnapshot(snapshot=>{
+    openSlots = snapshot.docs.map(d=>({ id: d.id, ...d.data() }));
+    renderOpenDates();
+    setSyncStatus('idle');
+  }, err=>{ console.error('open-slots listener error', err); setSyncStatus('offline'); });
+
+  lotsCol.onSnapshot(snapshot=>{
+    availableLots = snapshot.docs.map(d=>({ id: d.id, ...d.data() }));
+    renderLots();
+    renderOpenDates(); // banner text may depend on selectedLotForBuild info staying in sync
+    setSyncStatus('idle');
+  }, err=>{ console.error('available-lots listener error', err); setSyncStatus('offline'); });
 }
 
 async function writeJob(id, data){
@@ -830,6 +1048,26 @@ async function deleteJobDoc(id){
   setSyncStatus('saving');
   try{ await jobsCol.doc(id).delete(); }
   catch(e){ console.error(e); alert('Could not delete — check your connection and try again.'); }
+}
+async function writeSlot(id, data){
+  setSyncStatus('saving');
+  try{ await openSlotsCol.doc(id).set(data); }
+  catch(e){ console.error(e); alert('Could not save — check your connection and try again.'); }
+}
+async function deleteSlotDoc(id){
+  setSyncStatus('saving');
+  try{ await openSlotsCol.doc(id).delete(); }
+  catch(e){ console.error(e); /* don't alert here — this often runs silently after booking a job */ }
+}
+async function writeLot(id, data){
+  setSyncStatus('saving');
+  try{ await lotsCol.doc(id).set(data); }
+  catch(e){ console.error(e); alert('Could not save — check your connection and try again.'); }
+}
+async function deleteLotDoc(id){
+  setSyncStatus('saving');
+  try{ await lotsCol.doc(id).delete(); }
+  catch(e){ console.error(e); /* don't alert here — this often runs silently after booking a job */ }
 }
 async function writeOrder(id, data){
   setSyncStatus('saving');
@@ -1068,10 +1306,14 @@ const overlay = document.getElementById('overlay');
 const modalTitle = document.getElementById('modalTitle');
 const deleteBtn = document.getElementById('deleteBtn');
 
-function openJobModal(id, focusFiles){
+function openJobModal(id, focusFiles, prefillSlot){
   editingJobId = id || null;
   const job = id ? jobs.find(j=>j.id===id) : null;
-  modalTitle.textContent = job ? `Edit Job — Lot ${job.lot||''}` : 'Add Job';
+  const lot = !job ? selectedLotForBuild : null;
+  const titleBits = [];
+  if(prefillSlot) titleBits.push('Open Date');
+  if(lot) titleBits.push('Lot ' + lot.lot);
+  modalTitle.textContent = job ? `Edit Job — Lot ${job.lot||''}` : (titleBits.length ? 'Book ' + titleBits.join(' + ') : 'Add Job');
   deleteBtn.style.display = job ? 'inline-flex' : 'none';
 
   const setSelectOrOther = (selId, otherId, value, knownList)=>{
@@ -1086,18 +1328,19 @@ function openJobModal(id, focusFiles){
   };
 
   document.getElementById('f_ytd').value = job ? (job.ytd ?? '') : '';
-  setSelectOrOther('f_community','f_community_other', job? job.community : 'AP', ['AP','MM','ML','CL','OS']);
-  document.getElementById('f_lot').value = job ? job.lot||'' : '';
+  setSelectOrOther('f_community','f_community_other', job ? job.community : (lot ? lot.community : 'AP'), ['AP','MM','ML','CL','OS']);
+  document.getElementById('f_lot').value = job ? job.lot||'' : (lot ? lot.lot||'' : '');
   document.getElementById('f_model').value = job ? job.model||'' : '';
   document.getElementById('f_client').value = job ? job.client||'' : '';
-  document.getElementById('f_address').value = job ? job.address||'' : '';
+  document.getElementById('f_address').value = job ? job.address||'' : (lot ? lot.address||'' : '');
   document.getElementById('f_files').value = job ? job.filesUrl||'' : '';
   document.getElementById('f_phone').value = job ? job.phone||'' : '';
-  setSelectOrOther('f_draftsman','f_draftsman_other', job? job.draftsman : '', ['D','J','']);
-  document.getElementById('f_fndn').value = job ? job.fndn||'' : '';
-  document.getElementById('f_settle').value = job ? job.settle||'' : '';
-  document.getElementById('f_walk').value = job ? job.walk||'' : '';
-  document.getElementById('f_move').value = job ? job.move||'' : '';
+  const draftsmanValue = job ? job.draftsman : (prefillSlot ? prefillSlot.draftsman : '');
+  setSelectOrOther('f_draftsman','f_draftsman_other', draftsmanValue, ['D','J','']);
+  document.getElementById('f_fndn').value = job ? job.fndn||'' : (prefillSlot ? prefillSlot.fndn||'' : '');
+  document.getElementById('f_settle').value = job ? job.settle||'' : (prefillSlot ? prefillSlot.settle||'' : '');
+  document.getElementById('f_walk').value = job ? job.walk||'' : (prefillSlot ? prefillSlot.walk||'' : '');
+  document.getElementById('f_move').value = job ? job.move||'' : (prefillSlot ? prefillSlot.move||'' : '');
   document.getElementById('walkLinked').style.display='none';
   document.getElementById('moveLinked').style.display='none';
 
@@ -1133,7 +1376,7 @@ function openJobModal(id, focusFiles){
     }, 60);
   }
 }
-function closeJobModal(){ overlay.classList.remove('show'); editingJobId = null; }
+function closeJobModal(){ overlay.classList.remove('show'); editingJobId = null; bookingFromSlotId = null; }
 
 document.getElementById('addBtn').addEventListener('click', ()=>openJobModal(null));
 document.getElementById('closeModal').addEventListener('click', closeJobModal);
@@ -1202,8 +1445,12 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
     return;
   }
   const id = editingJobId || jobsCol.doc().id;
+  const slotIdToRemove = bookingFromSlotId;
+  const lotIdToRemove = selectedLotForBuild ? selectedLotForBuild.id : null;
   closeJobModal();
   writeJob(id, data);
+  if(slotIdToRemove) deleteSlotDoc(slotIdToRemove);
+  if(lotIdToRemove){ deleteLotDoc(lotIdToRemove); clearSelectedLot(); }
 });
 deleteBtn.addEventListener('click', ()=>{
   if(!editingJobId) return;
@@ -1631,13 +1878,356 @@ function jumpToJob(key){
 /* ============================================================
    TAB SWITCHING
    ============================================================ */
+/* ============================================================
+   OPEN DATES
+   ============================================================ */
+function renderOpenDates(){
+  const showPast = document.getElementById('showPastSlots').checked;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayIso = today.toISOString().slice(0,10);
+
+  let rows = openSlots.filter(s=>{
+    if(showPast) return true;
+    return !s.settle || s.settle >= todayIso;
+  });
+
+  rows.sort((a,b)=>{
+    let av = a[slotsSortKey]||'', bv = b[slotsSortKey]||'';
+    if(av<bv) return slotsSortDir==='asc'? -1: 1;
+    if(av>bv) return slotsSortDir==='asc'? 1: -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('slotsTableBody');
+  const empty = document.getElementById('slotsEmptyState');
+  if(rows.length===0){
+    tbody.innerHTML=''; empty.style.display='block';
+  } else {
+    empty.style.display='none';
+    tbody.innerHTML = rows.map(s=>{
+      const isPast = s.settle && s.settle < todayIso;
+      return `<tr data-id="${s.id}" ${isPast?'style="opacity:.6;"':''}>
+        <td data-label="Settle" class="mono settle-cell">${fmtDate(s.settle)}</td>
+        <td data-label="Walk" class="mono muted">${fmtDate(s.walk)}</td>
+        <td data-label="Move" class="mono muted">${fmtDate(s.move)}</td>
+        <td data-label="Fndn." class="mono muted">${fmtDate(s.fndn)}</td>
+        <td data-label="Draftsman" class="mono">${s.draftsman||'—'}</td>
+        <td data-label="">
+          <div class="row-actions">
+            <button class="btn-link book-slot-btn" data-id="${s.id}" title="Create a job using this open date">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
+              Book This Slot</button>
+            <button class="icon-btn edit-slot-btn" title="Edit" data-id="${s.id}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('tabBadgeOpenDates').textContent = rows.length;
+  updateBuildingBanners();
+}
+
+document.getElementById('showPastSlots').addEventListener('change', renderOpenDates);
+
+document.getElementById('slotsHeaderRow').addEventListener('click', e=>{
+  const th = e.target.closest('th[data-key]');
+  if(!th) return;
+  const key = th.dataset.key;
+  if(slotsSortKey===key){ slotsSortDir = slotsSortDir==='asc'?'desc':'asc'; }
+  else { slotsSortKey = key; slotsSortDir='asc'; }
+  document.querySelectorAll('#slotsHeaderRow th[data-key]').forEach(t=>{
+    t.classList.toggle('sorted', t.dataset.key===slotsSortKey);
+    t.classList.toggle('asc', t.dataset.key===slotsSortKey && slotsSortDir==='asc');
+  });
+  renderOpenDates();
+});
+
+document.getElementById('slotsTableBody').addEventListener('click', e=>{
+  const bookBtn = e.target.closest('.book-slot-btn');
+  if(bookBtn){
+    bookSlot(bookBtn.dataset.id);
+    return;
+  }
+  const editBtn = e.target.closest('.edit-slot-btn');
+  if(editBtn){ openSlotModal(editBtn.dataset.id); }
+});
+
+function bookSlot(slotId){
+  const slot = openSlots.find(s=>s.id===slotId);
+  if(!slot) return;
+  bookingFromSlotId = slotId;
+  openJobModal(null, false, slot);
+}
+
+document.getElementById('addSlotBtn').addEventListener('click', ()=>openSlotModal(null));
+
+const slotOverlay = document.getElementById('slotOverlay');
+function openSlotModal(id){
+  editingSlotId = id || null;
+  const slot = id ? openSlots.find(s=>s.id===id) : null;
+  document.getElementById('slotModalTitle').textContent = slot ? 'Edit Open Date' : 'Add Open Date';
+  document.getElementById('slotDeleteBtn').style.display = slot ? 'inline-flex' : 'none';
+
+  const draftValue = slot ? slot.draftsman||'' : '';
+  const sel = document.getElementById('s_draftsman');
+  const other = document.getElementById('s_draftsman_other');
+  if(draftValue && !['D','J',''].includes(draftValue)){
+    sel.value = '__other'; other.style.display='block'; other.value = draftValue;
+  } else {
+    sel.value = draftValue; other.style.display='none'; other.value='';
+  }
+
+  document.getElementById('s_settle').value = slot ? slot.settle||'' : '';
+  document.getElementById('s_walk').value = slot ? slot.walk||'' : '';
+  document.getElementById('s_move').value = slot ? slot.move||'' : '';
+  document.getElementById('s_fndn').value = slot ? slot.fndn||'' : '';
+  document.getElementById('s_walkLinked').style.display='none';
+  document.getElementById('s_moveLinked').style.display='none';
+
+  slotOverlay.classList.add('show');
+}
+function closeSlotModal(){ slotOverlay.classList.remove('show'); editingSlotId = null; }
+document.getElementById('slotCloseModal').addEventListener('click', closeSlotModal);
+document.getElementById('slotCancelBtn').addEventListener('click', closeSlotModal);
+slotOverlay.addEventListener('click', e=>{ if(e.target===slotOverlay) closeSlotModal(); });
+
+document.getElementById('s_draftsman').addEventListener('change', e=>{
+  document.getElementById('s_draftsman_other').style.display = e.target.value==='__other' ? 'block' : 'none';
+});
+document.getElementById('s_settle').addEventListener('change', e=>{
+  const settle = e.target.value;
+  if(!settle) return;
+  const walkField = document.getElementById('s_walk');
+  const moveField = document.getElementById('s_move');
+  if(!walkField.value){ walkField.value = addDays(settle,-5); document.getElementById('s_walkLinked').style.display='flex'; }
+  if(!moveField.value){ moveField.value = addDays(settle,-3); document.getElementById('s_moveLinked').style.display='flex'; }
+});
+document.getElementById('s_walk').addEventListener('input', ()=> document.getElementById('s_walkLinked').style.display='none');
+document.getElementById('s_move').addEventListener('input', ()=> document.getElementById('s_moveLinked').style.display='none');
+
+document.getElementById('slotSaveBtn').addEventListener('click', ()=>{
+  const draftSel = document.getElementById('s_draftsman').value;
+  const draftsman = draftSel==='__other' ? document.getElementById('s_draftsman_other').value.trim().toUpperCase() : draftSel;
+  const data = {
+    settle: document.getElementById('s_settle').value,
+    walk: document.getElementById('s_walk').value,
+    move: document.getElementById('s_move').value,
+    fndn: document.getElementById('s_fndn').value,
+    draftsman,
+  };
+  if(!data.settle){
+    alert('Enter at least a settle date before saving.');
+    return;
+  }
+  const id = editingSlotId || openSlotsCol.doc().id;
+  closeSlotModal();
+  writeSlot(id, data);
+});
+document.getElementById('slotDeleteBtn').addEventListener('click', ()=>{
+  if(!editingSlotId) return;
+  if(confirm('Delete this open date? This cannot be undone.')){
+    const id = editingSlotId;
+    closeSlotModal();
+    deleteSlotDoc(id);
+  }
+});
+
+/* ============================================================
+   AVAILABLE LOTS
+   ============================================================ */
+function renderLots(){
+  const q = document.getElementById('lotsSearchBox').value.trim().toLowerCase();
+  const community = document.getElementById('lotsCommunityFilter').value;
+
+  let rows = availableLots.filter(l=>{
+    if(community && l.community!==community) return false;
+    if(q){
+      const hay = [l.lot, l.address, l.community].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a,b)=>{
+    let av = a[lotsSortKey]||'', bv = b[lotsSortKey]||'';
+    if(lotsSortKey==='lot'){ av = av===''?Infinity:Number(av); bv = bv===''?Infinity:Number(bv); }
+    if(av<bv) return lotsSortDir==='asc'? -1: 1;
+    if(av>bv) return lotsSortDir==='asc'? 1: -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('lotsTableBody');
+  const empty = document.getElementById('lotsEmptyState');
+  if(rows.length===0){
+    tbody.innerHTML=''; empty.style.display='block';
+  } else {
+    empty.style.display='none';
+    tbody.innerHTML = rows.map(l=>{
+      const isSelected = selectedLotForBuild && selectedLotForBuild.id===l.id;
+      return `<tr data-id="${l.id}" ${isSelected?'style="background:#fbeee0;"':''}>
+        <td data-label="Community"><span class="tag" style="background:${communityColor(l.community)}">${l.community||'—'}</span></td>
+        <td data-label="Lot" class="mono">${l.lot||''}</td>
+        <td data-label="Address">${l.address||''}</td>
+        <td data-label="Foundation / Garage" class="muted">${l.garageType||''}</td>
+        <td data-label="Premium" class="mono muted">${l.premium?('$'+l.premium):''}</td>
+        <td data-label="Acreage" class="mono muted">${l.acreage||''}</td>
+        <td data-label="">
+          <div class="row-actions">
+            <button class="btn-link build-lot-btn" data-id="${l.id}" title="Select this lot, then pick an open date to schedule it">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+              ${isSelected ? 'Selected' : 'Build This Lot'}</button>
+            <button class="icon-btn edit-lot-btn" title="Edit" data-id="${l.id}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('tabBadgeLots').textContent = availableLots.length;
+  populateLotsFilters();
+  updateBuildingBanners();
+}
+
+function populateLotsFilters(){
+  const sel = document.getElementById('lotsCommunityFilter');
+  const cur = sel.value;
+  const comms = [...new Set(availableLots.map(l=>l.community))].filter(Boolean).sort();
+  sel.innerHTML = '<option value="">All Communities</option>' + comms.map(c=>`<option value="${c}">${c}</option>`).join('');
+  sel.value = cur;
+}
+
+document.getElementById('lotsSearchBox').addEventListener('input', renderLots);
+document.getElementById('lotsCommunityFilter').addEventListener('change', renderLots);
+document.getElementById('lotsHeaderRow').addEventListener('click', e=>{
+  const th = e.target.closest('th[data-key]');
+  if(!th) return;
+  const key = th.dataset.key;
+  if(lotsSortKey===key){ lotsSortDir = lotsSortDir==='asc'?'desc':'asc'; }
+  else { lotsSortKey = key; lotsSortDir='asc'; }
+  document.querySelectorAll('#lotsHeaderRow th[data-key]').forEach(t=>{
+    t.classList.toggle('sorted', t.dataset.key===lotsSortKey);
+    t.classList.toggle('asc', t.dataset.key===lotsSortKey && lotsSortDir==='asc');
+  });
+  renderLots();
+});
+
+document.getElementById('lotsTableBody').addEventListener('click', e=>{
+  const buildBtn = e.target.closest('.build-lot-btn');
+  if(buildBtn){ selectLotForBuild(buildBtn.dataset.id); return; }
+  const editBtn = e.target.closest('.edit-lot-btn');
+  if(editBtn){ openLotModal(editBtn.dataset.id); }
+});
+
+function selectLotForBuild(lotId){
+  const lot = availableLots.find(l=>l.id===lotId);
+  if(!lot) return;
+  selectedLotForBuild = lot;
+  renderLots();
+  switchTab('opendates');
+  updateBuildingBanners();
+}
+
+function clearSelectedLot(){
+  selectedLotForBuild = null;
+  renderLots();
+  updateBuildingBanners();
+}
+document.getElementById('clearBuildingFromLots').addEventListener('click', clearSelectedLot);
+document.getElementById('clearBuildingFromDates').addEventListener('click', clearSelectedLot);
+
+function updateBuildingBanners(){
+  const onLots = document.getElementById('buildingBannerOnLots');
+  const onDates = document.getElementById('buildingBannerOnDates');
+  if(selectedLotForBuild){
+    const text = `Building: ${selectedLotForBuild.community} Lot ${selectedLotForBuild.lot} — ${selectedLotForBuild.address}`;
+    document.getElementById('buildingBannerOnLotsText').textContent = text + '. Switch to Open Dates to pick a production slot.';
+    document.getElementById('buildingBannerOnDatesText').textContent = text + '. Pick a date below to schedule it.';
+    onLots.style.display = 'flex';
+    onDates.style.display = 'flex';
+  } else {
+    onLots.style.display = 'none';
+    onDates.style.display = 'none';
+  }
+}
+
+document.getElementById('addLotBtn').addEventListener('click', ()=>openLotModal(null));
+
+const lotOverlay = document.getElementById('lotOverlay');
+function openLotModal(id){
+  editingLotId = id || null;
+  const lot = id ? availableLots.find(l=>l.id===id) : null;
+  document.getElementById('lotModalTitle').textContent = lot ? `Edit Lot ${lot.lot||''}` : 'Add Lot';
+  document.getElementById('lotDeleteBtn').style.display = lot ? 'inline-flex' : 'none';
+
+  const sel = document.getElementById('l_community');
+  const other = document.getElementById('l_community_other');
+  const communityValue = lot ? lot.community : 'AP';
+  if(communityValue && !['AP','MM','ML','CL','OS'].includes(communityValue)){
+    sel.value = '__other'; other.style.display='block'; other.value = communityValue;
+  } else {
+    sel.value = communityValue || 'AP'; other.style.display='none'; other.value='';
+  }
+
+  document.getElementById('l_lot').value = lot ? lot.lot||'' : '';
+  document.getElementById('l_address').value = lot ? lot.address||'' : '';
+  document.getElementById('l_garageType').value = lot ? lot.garageType||'' : '';
+  document.getElementById('l_premium').value = lot ? lot.premium||'' : '';
+  document.getElementById('l_acreage').value = lot ? lot.acreage||'' : '';
+
+  lotOverlay.classList.add('show');
+}
+function closeLotModal(){ lotOverlay.classList.remove('show'); editingLotId = null; }
+document.getElementById('lotCloseModal').addEventListener('click', closeLotModal);
+document.getElementById('lotCancelBtn').addEventListener('click', closeLotModal);
+lotOverlay.addEventListener('click', e=>{ if(e.target===lotOverlay) closeLotModal(); });
+document.getElementById('l_community').addEventListener('change', e=>{
+  document.getElementById('l_community_other').style.display = e.target.value==='__other' ? 'block' : 'none';
+});
+
+document.getElementById('lotSaveBtn').addEventListener('click', ()=>{
+  const communitySel = document.getElementById('l_community').value;
+  const community = communitySel==='__other' ? document.getElementById('l_community_other').value.trim().toUpperCase() : communitySel;
+  const data = {
+    community,
+    lot: document.getElementById('l_lot').value.trim(),
+    address: document.getElementById('l_address').value.trim(),
+    garageType: document.getElementById('l_garageType').value.trim(),
+    premium: document.getElementById('l_premium').value.trim(),
+    acreage: document.getElementById('l_acreage').value.trim(),
+  };
+  if(!data.lot && !data.address){
+    alert('Enter at least a lot # or address before saving.');
+    return;
+  }
+  const id = editingLotId || lotsCol.doc().id;
+  closeLotModal();
+  writeLot(id, data);
+});
+document.getElementById('lotDeleteBtn').addEventListener('click', ()=>{
+  if(!editingLotId) return;
+  if(confirm('Delete this lot from the available list? This cannot be undone.')){
+    const id = editingLotId;
+    if(selectedLotForBuild && selectedLotForBuild.id===id) clearSelectedLot();
+    closeLotModal();
+    deleteLotDoc(id);
+  }
+});
+
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
   document.getElementById('panel-schedule').classList.toggle('active', name==='schedule');
   document.getElementById('panel-orders').classList.toggle('active', name==='orders');
+  document.getElementById('panel-opendates').classList.toggle('active', name==='opendates');
+  document.getElementById('panel-lots').classList.toggle('active', name==='lots');
   document.getElementById('scheduleStats').style.display = name==='schedule' ? 'flex' : 'none';
   document.getElementById('ordersStats').style.display = name==='orders' ? 'flex' : 'none';
-  document.getElementById('yearLabel').textContent = name==='schedule' ? 'Production Schedule' : 'Material Orders';
+  const labels = {schedule:'Production Schedule', orders:'Material Orders', opendates:'Open Dates', lots:'Available Lots'};
+  document.getElementById('yearLabel').textContent = labels[name] || '';
 }
 document.querySelectorAll('.tab-btn').forEach(b=>{
   b.addEventListener('click', ()=>switchTab(b.dataset.tab));
@@ -1648,6 +2238,8 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
    ============================================================ */
 renderSchedule();
 renderOrders();
+renderOpenDates();
+renderLots();
 </script>
 </body>
 </html>
