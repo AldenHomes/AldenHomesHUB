@@ -207,16 +207,20 @@
         </div>
       </a>
 
-      <div class="tile disabled" id="serviceTile">
+      <a class="tile" id="serviceTile" href="service.html">
         <div class="tile-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.77z"/></svg>
         </div>
         <div>
           <h3 class="tile-title">Service Center</h3>
-          <p class="tile-desc">Customer service requests, no login required for homeowners.</p>
+          <p class="tile-desc">Customer service requests — no login required for homeowners.</p>
         </div>
-        <span class="tile-badge">Coming Soon</span>
-      </div>
+        <div class="tile-stats" id="serviceTileStats">
+          <div class="tile-stat"><div class="n" id="tileStatNew">—</div><div class="l">New</div></div>
+          <div class="tile-stat"><div class="n" id="tileStatInProgress">—</div><div class="l">In Progress</div></div>
+          <div class="tile-stat"><div class="n" id="tileStatServiceTotal">—</div><div class="l">Total</div></div>
+        </div>
+      </a>
     </div>
 
     <footer>Alden Homes internal tools — data syncs live across your team.</footer>
@@ -294,6 +298,7 @@ if(!FIREBASE_CONFIGURED){
     if(user){
       showApp(user);
       attachScheduleStatsListener(db);
+      attachServiceStatsListener(db);
     } else {
       showLoginGate();
     }
@@ -321,6 +326,16 @@ function attachScheduleStatsListener(db){
     }).length;
     setSyncStatus('idle');
   }, err=>{ console.error('jobs listener error', err); setSyncStatus('offline'); });
+}
+
+function attachServiceStatsListener(db){
+  db.collection('service-requests').onSnapshot(snapshot=>{
+    const reqs = snapshot.docs.map(d=>d.data());
+    document.getElementById('tileStatServiceTotal').textContent = reqs.length;
+    document.getElementById('tileStatNew').textContent = reqs.filter(r=>(r.status||'new')==='new').length;
+    document.getElementById('tileStatInProgress').textContent = reqs.filter(r=>r.status==='in-progress').length;
+    setSyncStatus('idle');
+  }, err=>{ console.error('service-requests listener error', err); setSyncStatus('offline'); });
 }
 </script>
 </body>
