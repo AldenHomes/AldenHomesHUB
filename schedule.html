@@ -220,6 +220,17 @@
   #completedSection table{opacity:.9;}
   #completedSection tbody td{color:var(--ink-soft);}
   #completedSection .tag{opacity:.75;}
+
+  tr.year-group-header{cursor:pointer;}
+  tr.year-group-header:hover .year-group-bar{background:#efece2;}
+  tr.year-group-header td{padding:0; border-bottom:1px solid #ece8dd;}
+  .year-group-bar{
+    display:flex; align-items:center; gap:10px; padding:11px 14px;
+    background:#f7f5ee; font-weight:700; font-size:13.5px; color:var(--navy); letter-spacing:.2px;
+  }
+  .year-chevron{transition:transform .15s ease; flex:none; color:var(--ink-soft);}
+  .year-group-bar.open .year-chevron{transform:rotate(90deg);}
+  .year-group-bar .year-label{flex:none;}
   .complete-badge{
     display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:var(--good);
   }
@@ -686,6 +697,8 @@ let editingOrderId = null;
 let ordersSortKey = 'walkthru';
 let ordersSortDir = 'asc';
 let pendingJumpKey = null;
+let collapsedYears = new Set();
+let yearGroupsInitialized = false;
 
 /* ============================================================
    FIREBASE INIT + AUTH GATE
@@ -871,10 +884,67 @@ function populateScheduleFilters(){
   commSel.value = curComm; draftSel.value = curDraft;
 }
 
+function buildJobRow(j, oKeys){
+  const soon = daysFromToday(j.settle);
+  const soonClass = (soon!==null && soon>=0 && soon<=14) ? 'settle-soon' : '';
+  const key = normKey(j.community, j.lot);
+  const hasOrder = j.lot && oKeys.has(key);
+  const jumpBtn = hasOrder ? `<button class="btn-link jump-to-order" data-key="${key}" title="View material order for this lot">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      Order</button>` : '';
+  const filesBtn = j.filesUrl
+    ? `<button class="btn-link files-btn" data-id="${j.id}" title="Open this lot's OneDrive folder">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Files</button>`
+    : `<button class="icon-btn files-btn-empty" data-id="${j.id}" title="Add OneDrive folder link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><line x1="12" y1="10" x2="12" y2="15"/><line x1="9.5" y1="12.5" x2="14.5" y2="12.5"/></svg>
+      </button>`;
+  return `<tr data-id="${j.id}">
+    <td data-label="YTD" class="mono">${j.ytd||''}</td>
+    <td data-label="Community"><span class="tag" style="background:${communityColor(j.community)}">${j.community||'—'}</span></td>
+    <td data-label="Lot" class="mono">${j.lot||''}</td>
+    <td data-label="Model">${j.model||''}</td>
+    <td data-label="Client">${j.client||''}</td>
+    <td data-label="Address" class="muted">${j.address||''}</td>
+    <td data-label="Draft" class="mono">${j.draftsman||'—'}</td>
+    <td data-label="Fndn." class="mono muted">${fmtDate(j.fndn)}</td>
+    <td data-label="Walk" class="mono muted">${fmtDate(j.walk)}</td>
+    <td data-label="Move" class="mono muted">${fmtDate(j.move)}</td>
+    <td data-label="Settle" class="mono settle-cell ${soonClass}">${fmtDate(j.settle)}</td>
+    <td data-label="">
+      <div class="row-actions">
+        ${jumpBtn}
+        ${filesBtn}
+        <button class="icon-btn edit-btn" title="Edit" data-id="${j.id}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function yearKeyFor(j){
+  return j.settle ? j.settle.slice(0,4) : 'unscheduled';
+}
+
+function buildYearHeaderRow(yearKey, count, collapsed){
+  const label = yearKey === 'unscheduled' ? 'Not Yet Scheduled' : yearKey;
+  return `<tr class="year-group-header" data-year="${yearKey}">
+    <td colspan="12">
+      <div class="year-group-bar ${collapsed?'':'open'}">
+        <svg class="year-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 6l6 6-6 6"/></svg>
+        <span class="year-label">${label}</span>
+        <span class="tab-badge">${count}</span>
+      </div>
+    </td>
+  </tr>`;
+}
+
 function renderSchedule(){
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
   const community = document.getElementById('communityFilter').value;
   const draftsman = document.getElementById('draftsmanFilter').value;
+  const searchActive = !!(q || community || draftsman);
 
   let rows = jobs.filter(j=>{
     if(community && j.community!==community) return false;
@@ -896,6 +966,16 @@ function renderSchedule(){
     return 0;
   });
 
+  // Default collapse state, set once: only the current year (and anything
+  // unscheduled) starts open — everything else starts collapsed. After that,
+  // whatever the person clicks sticks, even as new data streams in.
+  if(!yearGroupsInitialized && jobs.length){
+    yearGroupsInitialized = true;
+    const thisYear = String(new Date().getFullYear());
+    const allYears = new Set(jobs.map(yearKeyFor));
+    allYears.forEach(y=>{ if(y !== thisYear && y !== 'unscheduled') collapsedYears.add(y); });
+  }
+
   const oKeys = orderKeysSet();
   const tbody = document.getElementById('tableBody');
   const empty = document.getElementById('emptyState');
@@ -903,43 +983,26 @@ function renderSchedule(){
     tbody.innerHTML=''; empty.style.display='block';
   } else {
     empty.style.display='none';
-    tbody.innerHTML = rows.map(j=>{
-      const soon = daysFromToday(j.settle);
-      const soonClass = (soon!==null && soon>=0 && soon<=14) ? 'settle-soon' : '';
-      const key = normKey(j.community, j.lot);
-      const hasOrder = j.lot && oKeys.has(key);
-      const jumpBtn = hasOrder ? `<button class="btn-link jump-to-order" data-key="${key}" title="View material order for this lot">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
-          Order</button>` : '';
-      const filesBtn = j.filesUrl
-        ? `<button class="btn-link files-btn" data-id="${j.id}" title="Open this lot's OneDrive folder">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-            Files</button>`
-        : `<button class="icon-btn files-btn-empty" data-id="${j.id}" title="Add OneDrive folder link">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><line x1="12" y1="10" x2="12" y2="15"/><line x1="9.5" y1="12.5" x2="14.5" y2="12.5"/></svg>
-          </button>`;
-      return `<tr data-id="${j.id}">
-        <td data-label="YTD" class="mono">${j.ytd||''}</td>
-        <td data-label="Community"><span class="tag" style="background:${communityColor(j.community)}">${j.community||'—'}</span></td>
-        <td data-label="Lot" class="mono">${j.lot||''}</td>
-        <td data-label="Model">${j.model||''}</td>
-        <td data-label="Client">${j.client||''}</td>
-        <td data-label="Address" class="muted">${j.address||''}</td>
-        <td data-label="Draft" class="mono">${j.draftsman||'—'}</td>
-        <td data-label="Fndn." class="mono muted">${fmtDate(j.fndn)}</td>
-        <td data-label="Walk" class="mono muted">${fmtDate(j.walk)}</td>
-        <td data-label="Move" class="mono muted">${fmtDate(j.move)}</td>
-        <td data-label="Settle" class="mono settle-cell ${soonClass}">${fmtDate(j.settle)}</td>
-        <td data-label="">
-          <div class="row-actions">
-            ${jumpBtn}
-            ${filesBtn}
-            <button class="icon-btn edit-btn" title="Edit" data-id="${j.id}">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-            </button>
-          </div>
-        </td>
-      </tr>`;
+
+    const groups = {};
+    const order = [];
+    rows.forEach(j=>{
+      const y = yearKeyFor(j);
+      if(!groups[y]){ groups[y] = []; order.push(y); }
+      groups[y].push(j);
+    });
+    order.sort((a,b)=>{
+      if(a==='unscheduled') return -1;
+      if(b==='unscheduled') return 1;
+      return b.localeCompare(a); // newest year first
+    });
+
+    tbody.innerHTML = order.map(y=>{
+      const groupRows = groups[y];
+      const collapsed = !searchActive && collapsedYears.has(y);
+      const header = buildYearHeaderRow(y, groupRows.length, collapsed);
+      const body = collapsed ? '' : groupRows.map(j=>buildJobRow(j, oKeys)).join('');
+      return header + body;
     }).join('');
   }
 
@@ -972,6 +1035,13 @@ document.getElementById('communityFilter').addEventListener('change', renderSche
 document.getElementById('draftsmanFilter').addEventListener('change', renderSchedule);
 
 document.getElementById('tableBody').addEventListener('click', e=>{
+  const yearHeader = e.target.closest('.year-group-header');
+  if(yearHeader){
+    const y = yearHeader.dataset.year;
+    if(collapsedYears.has(y)) collapsedYears.delete(y); else collapsedYears.add(y);
+    renderSchedule();
+    return;
+  }
   const jumpBtn = e.target.closest('.jump-to-order');
   if(jumpBtn){ jumpToOrder(jumpBtn.dataset.key); return; }
   const filesBtn = e.target.closest('.files-btn');
