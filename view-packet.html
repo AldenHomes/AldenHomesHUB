@@ -24,13 +24,38 @@
   .packet-info{flex:1;}
   .packet-info h2{margin:0 0 4px; font-size:17px; color:var(--navy);}
   .packet-info p{margin:0; font-size:12.5px; color:var(--ink-soft);}
+  .btn-row{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;}
   .view-btn{
     display:inline-flex; align-items:center; gap:8px; background:var(--navy); color:#fff; text-decoration:none;
-    padding:11px 20px; border-radius:var(--radius); font-size:14px; font-weight:700; margin-top:16px;
+    padding:11px 20px; border-radius:var(--radius); font-size:14px; font-weight:700; border:none; cursor:pointer;
   }
   .view-btn:hover{background:#33363a;}
+  .download-btn{
+    display:inline-flex; align-items:center; gap:8px; background:transparent; color:var(--navy); text-decoration:none;
+    padding:11px 16px; border-radius:var(--radius); font-size:13.5px; font-weight:600; border:1px solid var(--steel-line);
+  }
+  .download-btn:hover{background:#f3f1ea;}
   .loading, .error-state{text-align:center; padding:60px 20px; color:var(--ink-soft);}
   footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:20px;}
+
+  .catalog-overlay{position:fixed; inset:0; background:rgba(20,20,22,.94); z-index:500; display:none; flex-direction:column;}
+  .catalog-overlay.show{display:flex;}
+  .catalog-topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 18px; color:#eee; flex:none;}
+  .catalog-topbar h3{margin:0; font-size:14px; font-weight:600; opacity:.9;}
+  .catalog-close{background:none; border:none; color:#fff; font-size:26px; cursor:pointer; line-height:1; padding:4px 8px;}
+  .catalog-stage{flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:pan-y;}
+  .catalog-stage canvas{max-width:92vw; max-height:78vh; box-shadow:0 10px 40px rgba(0,0,0,.5); background:#fff; border-radius:2px;}
+  .catalog-nav-btn{
+    position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.12); border:none; color:#fff;
+    width:48px; height:48px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .catalog-nav-btn:hover{background:rgba(255,255,255,.22);}
+  .catalog-nav-btn.prev{left:14px;}
+  .catalog-nav-btn.next{right:14px;}
+  .catalog-nav-btn:disabled{opacity:.25; cursor:default;}
+  .catalog-bottombar{display:flex; align-items:center; justify-content:center; gap:14px; padding:14px; color:#eee; font-size:13px; flex:none;}
+  .catalog-loading{color:#eee; font-size:14px;}
+  .catalog-page-input{width:46px; text-align:center; border-radius:3px; border:1px solid #666; background:#2b2c2e; color:#fff; padding:4px; font-size:13px;}
 </style>
 </head>
 <body>
@@ -48,8 +73,30 @@
   <footer>Alden Homes — Handcrafted Homes &amp; Communities</footer>
 </div>
 
+<div class="catalog-overlay" id="catalogOverlay">
+  <div class="catalog-topbar">
+    <h3 id="catalogTitle">Sales Packet</h3>
+    <button class="catalog-close" id="catalogClose">&times;</button>
+  </div>
+  <div class="catalog-stage" id="catalogStage">
+    <div class="catalog-loading" id="catalogLoading">Loading catalog…</div>
+    <canvas id="catalogCanvas" style="display:none;"></canvas>
+    <button class="catalog-nav-btn prev" id="catalogPrev" title="Previous page">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <button class="catalog-nav-btn next" id="catalogNext" title="Next page">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  </div>
+  <div class="catalog-bottombar" id="catalogBottombar" style="display:none;">
+    <input type="text" class="catalog-page-input" id="catalogPageInput" value="1">
+    <span>/ <span id="catalogPageCount">—</span></span>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -63,6 +110,10 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 
 const params = new URLSearchParams(window.location.search);
 const devId = params.get('dev');
@@ -79,10 +130,13 @@ function renderPacketCard(p){
           <p>PDF sales packet</p>
         </div>
       </div>
-      <a class="view-btn" href="${p.fileUrl}" target="_blank" rel="noopener">
-        View Sales Packet
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
-      </a>
+      <div class="btn-row">
+        <button class="view-btn open-catalog-btn" data-url="${p.fileUrl}" data-name="${(p.name||'Sales Packet').replace(/"/g,'&quot;')}">
+          Open Catalog
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 014 4 4 4 0 014-4h6v14h-6a4 4 0 00-4 4 4 4 0 00-4-4H2z"/></svg>
+        </button>
+        <a class="download-btn" href="${p.fileUrl}" target="_blank" rel="noopener">Download PDF</a>
+      </div>
     </div>`;
 }
 
@@ -121,6 +175,124 @@ async function load(){
   }
 }
 load();
+
+let pdfDoc = null;
+let currentPage = 1;
+let rendering = false;
+let renderQueued = null;
+
+document.getElementById('packetList').addEventListener('click', e=>{
+  const btn = e.target.closest('.open-catalog-btn');
+  if(btn) openCatalog(btn.dataset.url, btn.dataset.name);
+});
+
+async function openCatalog(url, name){
+  const overlay = document.getElementById('catalogOverlay');
+  const canvas = document.getElementById('catalogCanvas');
+  const loadingEl = document.getElementById('catalogLoading');
+  const bottombar = document.getElementById('catalogBottombar');
+
+  document.getElementById('catalogTitle').textContent = name;
+  overlay.classList.add('show');
+  canvas.style.display = 'none';
+  bottombar.style.display = 'none';
+  loadingEl.style.display = 'block';
+  loadingEl.textContent = 'Loading catalog…';
+
+  if(!window.pdfjsLib){
+    loadingEl.textContent = "Couldn't load the catalog viewer — opening the PDF directly instead.";
+    setTimeout(()=>{ window.open(url, '_blank'); closeCatalog(); }, 1200);
+    return;
+  }
+
+  try{
+    const task = pdfjsLib.getDocument(url);
+    pdfDoc = await task.promise;
+    currentPage = 1;
+    document.getElementById('catalogPageCount').textContent = pdfDoc.numPages;
+    document.getElementById('catalogPageInput').value = 1;
+    loadingEl.style.display = 'none';
+    canvas.style.display = 'block';
+    bottombar.style.display = 'flex';
+    renderPage(currentPage);
+  } catch(err){
+    console.error(err);
+    loadingEl.textContent = "Couldn't load the catalog viewer — opening the PDF directly instead.";
+    setTimeout(()=>{ window.open(url, '_blank'); closeCatalog(); }, 1200);
+  }
+}
+
+function renderPage(num){
+  if(!pdfDoc) return;
+  if(rendering){ renderQueued = num; return; }
+  rendering = true;
+  pdfDoc.getPage(num).then(page=>{
+    const canvas = document.getElementById('catalogCanvas');
+    const ctx = canvas.getContext('2d');
+    const containerH = document.getElementById('catalogStage').clientHeight * 0.78;
+    const containerW = document.getElementById('catalogStage').clientWidth * 0.92;
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(containerW / baseViewport.width, containerH / baseViewport.height) * (window.devicePixelRatio || 1);
+    const viewport = page.getViewport({ scale });
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width = (viewport.width / (window.devicePixelRatio||1)) + 'px';
+    canvas.style.height = (viewport.height / (window.devicePixelRatio||1)) + 'px';
+    page.render({ canvasContext: ctx, viewport }).promise.then(()=>{
+      rendering = false;
+      document.getElementById('catalogPageInput').value = num;
+      updateNavButtons();
+      if(renderQueued !== null){
+        const q = renderQueued; renderQueued = null;
+        renderPage(q);
+      }
+    });
+  });
+}
+
+function updateNavButtons(){
+  document.getElementById('catalogPrev').disabled = currentPage <= 1;
+  document.getElementById('catalogNext').disabled = !pdfDoc || currentPage >= pdfDoc.numPages;
+}
+
+function goToPage(num){
+  if(!pdfDoc) return;
+  num = Math.max(1, Math.min(pdfDoc.numPages, num));
+  currentPage = num;
+  renderPage(num);
+}
+
+document.getElementById('catalogPrev').addEventListener('click', ()=>goToPage(currentPage-1));
+document.getElementById('catalogNext').addEventListener('click', ()=>goToPage(currentPage+1));
+document.getElementById('catalogPageInput').addEventListener('change', e=>{
+  const n = parseInt(e.target.value, 10);
+  if(!isNaN(n)) goToPage(n);
+});
+
+function closeCatalog(){
+  document.getElementById('catalogOverlay').classList.remove('show');
+  pdfDoc = null;
+}
+document.getElementById('catalogClose').addEventListener('click', closeCatalog);
+
+document.addEventListener('keydown', e=>{
+  if(!document.getElementById('catalogOverlay').classList.contains('show')) return;
+  if(e.key === 'ArrowLeft') goToPage(currentPage-1);
+  if(e.key === 'ArrowRight') goToPage(currentPage+1);
+  if(e.key === 'Escape') closeCatalog();
+});
+
+let touchStartX = null;
+const stage = document.getElementById('catalogStage');
+stage.addEventListener('touchstart', e=>{ touchStartX = e.changedTouches[0].clientX; }, {passive:true});
+stage.addEventListener('touchend', e=>{
+  if(touchStartX === null) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if(Math.abs(dx) > 50){ dx < 0 ? goToPage(currentPage+1) : goToPage(currentPage-1); }
+  touchStartX = null;
+}, {passive:true});
+
+window.addEventListener('resize', ()=>{ if(pdfDoc) renderPage(currentPage); });
 </script>
 </body>
 </html>
