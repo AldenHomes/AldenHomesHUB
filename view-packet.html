@@ -44,7 +44,8 @@
   .catalog-topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 18px; color:#eee; flex:none;}
   .catalog-topbar h3{margin:0; font-size:14px; font-weight:600; opacity:.9;}
   .catalog-close{background:none; border:none; color:#fff; font-size:26px; cursor:pointer; line-height:1; padding:4px 8px;}
-  .catalog-stage{flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:pan-y;}
+  .catalog-stage{flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:pan-y; min-width:0; min-height:0; width:100%;}
+  .catalog-stage canvas{display:block; min-width:0; min-height:0;}
   .catalog-stage canvas{max-width:92vw; max-height:78vh; box-shadow:0 10px 40px rgba(0,0,0,.5); background:#fff; border-radius:2px;}
   .catalog-nav-btn{
     position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.12); border:none; color:#fff;
@@ -65,9 +66,9 @@
   .catalog-overlay.inline-mode.show{display:flex;}
   .catalog-overlay.inline-mode .catalog-topbar{display:none;}
   .catalog-overlay.inline-mode .catalog-stage{
-    height:min(72vh, 640px); background:#f0efe9;
+    height:min(72vh, 640px); background:#f0efe9; flex:none;
   }
-  .catalog-overlay.inline-mode .catalog-stage canvas{box-shadow:0 4px 18px rgba(30,32,34,.18);}
+  .catalog-overlay.inline-mode .catalog-stage canvas{box-shadow:0 4px 18px rgba(30,32,34,.18); cursor:pointer;}
   .catalog-overlay.inline-mode .catalog-nav-btn{
     background:rgba(30,32,34,.55); width:42px; height:42px;
   }
@@ -76,6 +77,27 @@
     color:var(--ink-soft); background:var(--paper-2); border-top:1px solid #ece8dd; font-size:14px;
   }
   .catalog-overlay.inline-mode .catalog-loading{color:var(--ink-soft); font-size:16px;}
+
+  /* On phones, break out of the page's side padding and take up most of the
+     screen height — otherwise it reads as a small window rather than the main event. */
+  @media (max-width:640px){
+    .catalog-overlay.inline-mode{
+      margin-left:-20px; margin-right:-20px; border-radius:0; box-shadow:none;
+    }
+    .catalog-overlay.inline-mode .catalog-stage{
+      height:min(85vh, 820px); background:#e7e5db;
+    }
+    .catalog-overlay.inline-mode .catalog-stage canvas{max-width:97vw; max-height:82vh;}
+    .catalog-overlay.inline-mode .catalog-nav-btn{width:48px; height:48px;}
+    .catalog-overlay.inline-mode .catalog-bottombar{padding:16px 14px;}
+  }
+  .fullscreen-hint{
+    position:absolute; right:12px; bottom:12px; background:rgba(30,32,34,.72); color:#fff; border:none;
+    padding:9px 14px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:7px;
+    z-index:2;
+  }
+  .fullscreen-hint:hover{background:rgba(30,32,34,.88);}
+  .catalog-overlay:not(.inline-mode) .fullscreen-hint{display:none;}
 </style>
 </head>
 <body>
@@ -104,6 +126,10 @@
       </button>
       <button class="catalog-nav-btn next" id="catalogNext" title="Next page">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <button class="fullscreen-hint" id="fullscreenHint" title="View full screen">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M3 16v3a2 2 0 002 2h3"/></svg>
+        View Full Screen
       </button>
     </div>
     <div class="catalog-bottombar" id="catalogBottombar" style="display:none;">
@@ -223,6 +249,7 @@ let pdfDoc = null;
 let currentPage = 1;
 let rendering = false;
 let renderQueued = null;
+let wasInlineBeforeFullscreen = false;
 
 document.getElementById('packetList').addEventListener('click', e=>{
   const btn = e.target.closest('.open-catalog-btn');
@@ -279,13 +306,21 @@ function renderPage(num){
   if(!pdfDoc) return;
   if(rendering){ renderQueued = num; return; }
   rendering = true;
+  const canvas = document.getElementById('catalogCanvas');
+  // Shrink the canvas back to a neutral size first, so its own previous
+  // rendered size can never influence how we measure the container below.
+  canvas.width = 2; canvas.height = 2;
+  canvas.style.width = ''; canvas.style.height = '';
+
   pdfDoc.getPage(num).then(page=>{
-    const canvas = document.getElementById('catalogCanvas');
     const ctx = canvas.getContext('2d');
-    const containerH = document.getElementById('catalogStage').clientHeight * 0.78;
-    const containerW = document.getElementById('catalogStage').clientWidth * 0.92;
+    const stage = document.getElementById('catalogStage');
+    const rect = stage.getBoundingClientRect();
+    const containerH = rect.height * 0.92;
+    const containerW = rect.width * 0.92;
     const baseViewport = page.getViewport({ scale: 1 });
-    const scale = Math.min(containerW / baseViewport.width, containerH / baseViewport.height) * (window.devicePixelRatio || 1);
+    let scale = Math.min(containerW / baseViewport.width, containerH / baseViewport.height) * (window.devicePixelRatio || 1);
+    scale = Math.max(0.5, Math.min(scale, 8)); // safety clamp — never let a measurement glitch shrink or blow this up
     const viewport = page.getViewport({ scale });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
@@ -318,8 +353,26 @@ function goToPage(num){
 document.getElementById('catalogPrev').addEventListener('click', ()=>goToPage(currentPage-1));
 document.getElementById('catalogNext').addEventListener('click', ()=>goToPage(currentPage+1));
 
+function enterFullscreenFromInline(){
+  const overlay = document.getElementById('catalogOverlay');
+  if(!overlay.classList.contains('inline-mode')) return;
+  wasInlineBeforeFullscreen = true;
+  overlay.classList.remove('inline-mode');
+  renderPage(currentPage);
+}
+document.getElementById('fullscreenHint').addEventListener('click', enterFullscreenFromInline);
+document.getElementById('catalogCanvas').addEventListener('click', ()=>{
+  if(document.getElementById('catalogOverlay').classList.contains('inline-mode')) enterFullscreenFromInline();
+});
+
 function closeCatalog(){
-  document.getElementById('catalogOverlay').classList.remove('show');
+  const overlay = document.getElementById('catalogOverlay');
+  if(wasInlineBeforeFullscreen){
+    overlay.classList.add('inline-mode');
+    renderPage(currentPage);
+    return;
+  }
+  overlay.classList.remove('show');
   pdfDoc = null;
 }
 document.getElementById('catalogClose').addEventListener('click', closeCatalog);
