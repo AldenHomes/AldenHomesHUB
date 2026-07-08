@@ -255,7 +255,11 @@ async function openCatalog(url, name){
   }
 
   try{
-    const task = pdfjsLib.getDocument(url);
+    const task = pdfjsLib.getDocument({
+      url: url,
+      disableRange: true,
+      disableStream: true,
+    });
     pdfDoc = await task.promise;
     currentPage = 1;
     document.getElementById('catalogPageCount').textContent = pdfDoc.numPages;
@@ -265,7 +269,7 @@ async function openCatalog(url, name){
     bottombar.style.display = 'flex';
     renderPage(currentPage);
   } catch(err){
-    console.error(err);
+    console.error('PDF load failed:', err.name, err.message, err);
     loadingEl.textContent = "Couldn't load the catalog viewer — opening the PDF directly instead.";
     setTimeout(()=>{ window.open(url, '_blank'); closeCatalog(); }, 1200);
   }
