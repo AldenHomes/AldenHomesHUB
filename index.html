@@ -221,6 +221,19 @@
           <div class="tile-stat"><div class="n" id="tileStatServiceTotal">—</div><div class="l">Total</div></div>
         </div>
       </a>
+
+      <a class="tile" id="packetsTile" href="packets.html">
+        <div class="tile-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+        </div>
+        <div>
+          <h3 class="tile-title">Sales Packets</h3>
+          <p class="tile-desc">Upload community marketing PDFs and share links or QR codes.</p>
+        </div>
+        <div class="tile-stats" id="packetsTileStats">
+          <div class="tile-stat"><div class="n" id="tileStatPackets">—</div><div class="l">Packets</div></div>
+        </div>
+      </a>
     </div>
 
     <footer>Alden Homes internal tools — data syncs live across your team.</footer>
@@ -299,6 +312,7 @@ if(!FIREBASE_CONFIGURED){
       showApp(user);
       attachScheduleStatsListener(db);
       attachServiceStatsListener(db);
+      attachPacketsStatsListener(db);
     } else {
       showLoginGate();
     }
@@ -336,6 +350,13 @@ function attachServiceStatsListener(db){
     document.getElementById('tileStatInProgress').textContent = reqs.filter(r=>r.status==='in-progress').length;
     setSyncStatus('idle');
   }, err=>{ console.error('service-requests listener error', err); setSyncStatus('offline'); });
+}
+
+function attachPacketsStatsListener(db){
+  db.collection('sales-packets').onSnapshot(snapshot=>{
+    document.getElementById('tileStatPackets').textContent = snapshot.size;
+    setSyncStatus('idle');
+  }, err=>{ console.error('sales-packets listener error', err); setSyncStatus('offline'); });
 }
 </script>
 </body>
