@@ -56,6 +56,26 @@
   .catalog-nav-btn:disabled{opacity:.25; cursor:default;}
   .catalog-bottombar{display:flex; align-items:center; justify-content:center; gap:14px; padding:14px; color:#eee; font-size:13px; flex:none;}
   .catalog-loading{color:#eee; font-size:14px;}
+
+  /* Inline mode: the same viewer, embedded directly in the page instead of a dark full-screen modal */
+  .catalog-overlay.inline-mode{
+    position:static; inset:auto; background:transparent; z-index:auto; display:none;
+    background:var(--paper-2); border-radius:10px; box-shadow:var(--shadow); overflow:hidden; margin-bottom:16px;
+  }
+  .catalog-overlay.inline-mode.show{display:flex;}
+  .catalog-overlay.inline-mode .catalog-topbar{display:none;}
+  .catalog-overlay.inline-mode .catalog-stage{
+    height:min(72vh, 640px); background:#f0efe9;
+  }
+  .catalog-overlay.inline-mode .catalog-stage canvas{box-shadow:0 4px 18px rgba(30,32,34,.18);}
+  .catalog-overlay.inline-mode .catalog-nav-btn{
+    background:rgba(30,32,34,.55); width:42px; height:42px;
+  }
+  .catalog-overlay.inline-mode .catalog-nav-btn:hover{background:rgba(30,32,34,.75);}
+  .catalog-overlay.inline-mode .catalog-bottombar{
+    color:var(--ink-soft); background:var(--paper-2); border-top:1px solid #ece8dd; font-size:14px;
+  }
+  .catalog-overlay.inline-mode .catalog-loading{color:var(--ink-soft); font-size:16px;}
 </style>
 </head>
 <body>
@@ -70,32 +90,35 @@
   <div class="loading" id="loadingState">Just a moment…</div>
   <div class="error-state" id="errorState" style="display:none;">We couldn't find that page. Please double check the link, or give your Alden Homes representative a call — they'll be happy to help.</div>
   <div id="packetList"></div>
-  <footer>Alden Homes — Handcrafted Homes &amp; Communities</footer>
-</div>
 
-<div class="catalog-overlay" id="catalogOverlay">
-  <div class="catalog-topbar">
-    <h3 id="catalogTitle">Sales Packet</h3>
-    <button class="catalog-close" id="catalogClose">&times;</button>
+  <div class="catalog-overlay" id="catalogOverlay">
+    <div class="catalog-topbar">
+      <h3 id="catalogTitle">Sales Packet</h3>
+      <button class="catalog-close" id="catalogClose">&times;</button>
+    </div>
+    <div class="catalog-stage" id="catalogStage">
+      <div class="catalog-loading" id="catalogLoading">Loading catalog…</div>
+      <canvas id="catalogCanvas" style="display:none;"></canvas>
+      <button class="catalog-nav-btn prev" id="catalogPrev" title="Previous page">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="catalog-nav-btn next" id="catalogNext" title="Next page">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+    </div>
+    <div class="catalog-bottombar" id="catalogBottombar" style="display:none;">
+      Page <span id="catalogPageCurrent">1</span> of <span id="catalogPageCount">—</span>
+    </div>
   </div>
-  <div class="catalog-stage" id="catalogStage">
-    <div class="catalog-loading" id="catalogLoading">Loading catalog…</div>
-    <canvas id="catalogCanvas" style="display:none;"></canvas>
-    <button class="catalog-nav-btn prev" id="catalogPrev" title="Previous page">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <button class="catalog-nav-btn next" id="catalogNext" title="Next page">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-  </div>
-  <div class="catalog-bottombar" id="catalogBottombar" style="display:none;">
-    Page <span id="catalogPageCurrent">1</span> of <span id="catalogPageCount">—</span>
-  </div>
+
+  <div id="downloadRow" style="display:none; text-align:center; margin-bottom:16px;"></div>
+
+  <footer>Alden Homes — Handcrafted Homes &amp; Communities</footer>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -111,7 +134,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 if(window.pdfjsLib){
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';
 }
 
 const params = new URLSearchParams(window.location.search);
@@ -140,10 +163,24 @@ function renderPacketCard(p){
     </div>`;
 }
 
+function renderPacketHeader(p){
+  return `
+    <div class="card" style="padding:28px 30px 22px;">
+      <div class="packet-row" style="gap:10px;">
+        <div class="packet-icon">${PACKET_ICON}</div>
+        <div class="packet-info">
+          <h2>${p.name || 'Sales Packet'}</h2>
+          <p>Take a look at homes, floor plans, and pricing for this community.</p>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function load(){
   const loading = document.getElementById('loadingState');
   const errorState = document.getElementById('errorState');
   const list = document.getElementById('packetList');
+  const downloadRow = document.getElementById('downloadRow');
 
   if(!devId){
     loading.style.display = 'none';
@@ -166,7 +203,13 @@ async function load(){
       if(!doc.exists){ errorState.style.display = 'block'; return; }
       const p = doc.data();
       document.getElementById('pageTitle').textContent = p.name || 'Sales Packet';
-      list.innerHTML = renderPacketCard(p);
+      list.innerHTML = renderPacketHeader(p);
+
+      // Show the catalog embedded right on the page — no click needed.
+      document.getElementById('catalogOverlay').classList.add('inline-mode');
+      downloadRow.innerHTML = `<button class="download-btn download-link-btn" data-url="${p.fileUrl}">Prefer a PDF you can save or print? Download it here.</button>`;
+      downloadRow.style.display = 'block';
+      openCatalog(p.fileUrl, p.name);
     }
   } catch(err){
     console.error(err);
@@ -184,6 +227,10 @@ let renderQueued = null;
 document.getElementById('packetList').addEventListener('click', e=>{
   const btn = e.target.closest('.open-catalog-btn');
   if(btn) openCatalog(btn.dataset.url, btn.dataset.name);
+  const dlBtn = e.target.closest('.download-link-btn');
+  if(dlBtn) window.open(dlBtn.dataset.url, '_blank');
+});
+document.getElementById('downloadRow').addEventListener('click', e=>{
   const dlBtn = e.target.closest('.download-link-btn');
   if(dlBtn) window.open(dlBtn.dataset.url, '_blank');
 });
@@ -277,7 +324,7 @@ document.addEventListener('keydown', e=>{
   if(!document.getElementById('catalogOverlay').classList.contains('show')) return;
   if(e.key === 'ArrowLeft') goToPage(currentPage-1);
   if(e.key === 'ArrowRight') goToPage(currentPage+1);
-  if(e.key === 'Escape') closeCatalog();
+  if(e.key === 'Escape' && !document.getElementById('catalogOverlay').classList.contains('inline-mode')) closeCatalog();
 });
 
 let touchStartX = null;
