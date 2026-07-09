@@ -228,10 +228,60 @@
   </div>
 </div>
 
+<!-- Manage Pages Modal -->
+<div class="overlay" id="pagesOverlay">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-head">
+      <h2 id="pagesModalTitle">Manage Pages</h2>
+      <button class="modal-close" id="pagesCloseModal">&times;</button>
+    </div>
+    <div class="modal-body" style="text-align:left;">
+      <p id="pagesCountLine" style="font-size:13.5px; color:var(--ink-soft); margin:0 0 20px;">Loading page count…</p>
+
+      <div style="border:1px solid var(--steel-line); border-radius:var(--radius); padding:16px; margin-bottom:14px;">
+        <h4 style="margin:0 0 10px; font-size:13.5px; color:var(--navy);">Replace pages</h4>
+        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+          <div><label>From page</label><input type="text" id="replaceFrom" style="width:70px;"></div>
+          <div><label>To page</label><input type="text" id="replaceTo" style="width:70px;"></div>
+          <div style="flex:1; min-width:160px;">
+            <label>New PDF (replaces those pages)</label>
+            <input type="file" id="replaceFile" accept="application/pdf" style="width:100%; font-size:12px;">
+          </div>
+        </div>
+        <button class="btn btn-primary" id="replaceBtn" style="margin-top:12px;">Replace Pages</button>
+      </div>
+
+      <div style="border:1px solid var(--steel-line); border-radius:var(--radius); padding:16px; margin-bottom:14px;">
+        <h4 style="margin:0 0 10px; font-size:13.5px; color:var(--navy);">Insert new pages</h4>
+        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+          <div><label>After page #</label><input type="text" id="insertAfter" style="width:70px;"></div>
+          <div style="flex:1; min-width:160px;">
+            <label>PDF to insert</label>
+            <input type="file" id="insertFile" accept="application/pdf" style="width:100%; font-size:12px;">
+          </div>
+        </div>
+        <button class="btn btn-primary" id="insertBtn" style="margin-top:12px;">Insert Pages</button>
+      </div>
+
+      <div style="border:1px solid var(--steel-line); border-radius:var(--radius); padding:16px;">
+        <h4 style="margin:0 0 10px; font-size:13.5px; color:var(--navy);">Remove pages</h4>
+        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+          <div><label>From page</label><input type="text" id="removeFrom" style="width:70px;"></div>
+          <div><label>To page</label><input type="text" id="removeTo" style="width:70px;"></div>
+        </div>
+        <button class="btn btn-ghost" id="removeBtn" style="margin-top:12px; color:#a8451a; border-color:#e3b5a0;">Remove Pages</button>
+      </div>
+
+      <p id="pagesStatus" style="font-size:13px; color:var(--ink-soft); margin:16px 0 0; min-height:18px;"></p>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -362,6 +412,10 @@ function render(){
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="21"/><line x1="21" y1="14" x2="21" y2="21"/><line x1="14" y1="17.5" x2="21" y2="17.5"/></svg>
             QR
           </button>
+          <button class="btn-link pages-btn" data-id="${p.id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+            Manage Pages
+          </button>
           <button class="icon-btn edit-btn" data-id="${p.id}" title="Edit / Replace">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
           </button>
@@ -377,6 +431,8 @@ document.getElementById('packetGrid').addEventListener('click', e=>{
   if(copyBtn){ copyLink(publicUrl(copyBtn.dataset.id)); return; }
   const qrBtn = e.target.closest('.qr-btn');
   if(qrBtn){ openQr(publicUrl(qrBtn.dataset.id), packets.find(p=>p.id===qrBtn.dataset.id)?.name); return; }
+  const pagesBtn = e.target.closest('.pages-btn');
+  if(pagesBtn){ openPagesModal(pagesBtn.dataset.id); return; }
   const editBtn = e.target.closest('.edit-btn');
   if(editBtn){ openPacketModal(editBtn.dataset.id); }
 });
@@ -406,6 +462,184 @@ document.getElementById('qrCopyBtn').addEventListener('click', ()=>{
   const original = btn.textContent;
   btn.textContent = 'Copied!';
   setTimeout(()=>{ btn.textContent = original; }, 1500);
+});
+
+/* ---- Manage Pages modal (uses pdf-lib to splice pages client-side) ---- */
+const pagesOverlay = document.getElementById('pagesOverlay');
+let pagesEditingId = null;
+let pagesCurrentDoc = null; // cached PDFLib.PDFDocument of the currently-loaded packet
+
+function setPagesStatus(msg, isError){
+  const el = document.getElementById('pagesStatus');
+  el.textContent = msg || '';
+  el.style.color = isError ? '#a8451a' : 'var(--ink-soft)';
+}
+
+function clearPagesInputs(){
+  ['replaceFrom','replaceTo','insertAfter','removeFrom','removeTo'].forEach(id=>{ document.getElementById(id).value=''; });
+  ['replaceFile','insertFile'].forEach(id=>{ document.getElementById(id).value=''; });
+}
+
+async function openPagesModal(id){
+  pagesEditingId = id;
+  const p = packets.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('pagesModalTitle').textContent = `Manage Pages — ${p.name||''}`;
+  document.getElementById('pagesCountLine').textContent = 'Loading page count…';
+  clearPagesInputs();
+  setPagesStatus('');
+  pagesCurrentDoc = null;
+  pagesOverlay.classList.add('show');
+
+  if(!window.PDFLib){
+    document.getElementById('pagesCountLine').textContent = "Couldn't load the page-editing tool — check your internet connection and try again.";
+    setPagesStatus('');
+    return;
+  }
+
+  try{
+    const bytes = await fetch(p.fileUrl).then(r=>r.arrayBuffer());
+    const doc = await PDFLib.PDFDocument.load(bytes);
+    pagesCurrentDoc = doc;
+    document.getElementById('pagesCountLine').textContent = `This packet currently has ${doc.getPageCount()} pages.`;
+  } catch(err){
+    console.error(err);
+    document.getElementById('pagesCountLine').textContent = "Couldn't load this PDF to check its page count, but you can still try an edit below.";
+  }
+}
+function closePagesModal(){ pagesOverlay.classList.remove('show'); pagesEditingId = null; pagesCurrentDoc = null; }
+document.getElementById('pagesCloseModal').addEventListener('click', closePagesModal);
+pagesOverlay.addEventListener('click', e=>{ if(e.target===pagesOverlay) closePagesModal(); });
+
+async function loadExistingDoc(){
+  if(!window.PDFLib) throw new Error('PDFLib not loaded');
+  if(pagesCurrentDoc) return pagesCurrentDoc;
+  const p = packets.find(x=>x.id===pagesEditingId);
+  const bytes = await fetch(p.fileUrl).then(r=>r.arrayBuffer());
+  return await PDFLib.PDFDocument.load(bytes);
+}
+
+async function saveSplicedDoc(newDoc){
+  const p = packets.find(x=>x.id===pagesEditingId);
+  const bytes = await newDoc.save();
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const ref = storage.ref().child(`sales-packets/${p.id}/${p.fileName || 'packet.pdf'}`);
+  await ref.put(blob);
+  const freshUrl = await ref.getDownloadURL();
+  await packetsCol.doc(p.id).update({ fileUrl: freshUrl, uploadedAt: new Date().toISOString() });
+}
+
+function parsePageNum(val, max, min){
+  min = min === undefined ? 1 : min;
+  const n = parseInt(val, 10);
+  if(isNaN(n) || n < min || (max && n > max)) return null;
+  return n;
+}
+
+document.getElementById('replaceBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('replaceBtn');
+  try{
+    const existing = await loadExistingDoc();
+    const total = existing.getPageCount();
+    const from = parsePageNum(document.getElementById('replaceFrom').value, total);
+    const to = parsePageNum(document.getElementById('replaceTo').value, total);
+    const file = document.getElementById('replaceFile').files[0];
+    if(!from || !to || from > to){ setPagesStatus('Enter a valid page range (e.g., From 5, To 5).', true); return; }
+    if(!file){ setPagesStatus('Choose a replacement PDF file.', true); return; }
+
+    btn.disabled = true; setPagesStatus('Working…');
+    const newFileBytes = await file.arrayBuffer();
+    const newFileDoc = await PDFLib.PDFDocument.load(newFileBytes);
+
+    const result = await PDFLib.PDFDocument.create();
+    const beforeIdx = Array.from({length: from-1}, (_,i)=>i);
+    const afterIdx = Array.from({length: total-to}, (_,i)=>to+i);
+    const insertIdx = newFileDoc.getPageIndices();
+
+    const beforePages = await result.copyPages(existing, beforeIdx);
+    beforePages.forEach(pg=>result.addPage(pg));
+    const insertPages = await result.copyPages(newFileDoc, insertIdx);
+    insertPages.forEach(pg=>result.addPage(pg));
+    const afterPages = await result.copyPages(existing, afterIdx);
+    afterPages.forEach(pg=>result.addPage(pg));
+
+    await saveSplicedDoc(result);
+    setPagesStatus(`Done — pages ${from}–${to} replaced. New total: ${result.getPageCount()} pages.`);
+    pagesCurrentDoc = result;
+    document.getElementById('pagesCountLine').textContent = `This packet currently has ${result.getPageCount()} pages.`;
+    clearPagesInputs();
+  } catch(err){
+    console.error(err);
+    setPagesStatus('Something went wrong — check your connection and try again.', true);
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('insertBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('insertBtn');
+  try{
+    const existing = await loadExistingDoc();
+    const total = existing.getPageCount();
+    const after = parsePageNum(document.getElementById('insertAfter').value, total, 0);
+    const file = document.getElementById('insertFile').files[0];
+    if(after === null){ setPagesStatus('Enter a valid page number to insert after (0 = insert at the very start).', true); return; }
+    if(!file){ setPagesStatus('Choose a PDF file to insert.', true); return; }
+
+    btn.disabled = true; setPagesStatus('Working…');
+    const newFileBytes = await file.arrayBuffer();
+    const newFileDoc = await PDFLib.PDFDocument.load(newFileBytes);
+
+    const result = await PDFLib.PDFDocument.create();
+    const beforeIdx = Array.from({length: after}, (_,i)=>i);
+    const afterIdx = Array.from({length: total-after}, (_,i)=>after+i);
+    const insertIdx = newFileDoc.getPageIndices();
+
+    const beforePages = await result.copyPages(existing, beforeIdx);
+    beforePages.forEach(pg=>result.addPage(pg));
+    const insertPages = await result.copyPages(newFileDoc, insertIdx);
+    insertPages.forEach(pg=>result.addPage(pg));
+    const afterPages = await result.copyPages(existing, afterIdx);
+    afterPages.forEach(pg=>result.addPage(pg));
+
+    await saveSplicedDoc(result);
+    setPagesStatus(`Done — inserted ${insertIdx.length} page(s) after page ${after}. New total: ${result.getPageCount()} pages.`);
+    pagesCurrentDoc = result;
+    document.getElementById('pagesCountLine').textContent = `This packet currently has ${result.getPageCount()} pages.`;
+    clearPagesInputs();
+  } catch(err){
+    console.error(err);
+    setPagesStatus('Something went wrong — check your connection and try again.', true);
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('removeBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('removeBtn');
+  try{
+    const existing = await loadExistingDoc();
+    const total = existing.getPageCount();
+    const from = parsePageNum(document.getElementById('removeFrom').value, total);
+    const to = parsePageNum(document.getElementById('removeTo').value, total);
+    if(!from || !to || from > to){ setPagesStatus('Enter a valid page range to remove.', true); return; }
+    if(to - from + 1 >= total){ setPagesStatus("Can't remove every page — a packet needs at least one page left.", true); return; }
+    if(!confirm(`Remove pages ${from}–${to}? This cannot be undone.`)) return;
+
+    btn.disabled = true; setPagesStatus('Working…');
+    const result = await PDFLib.PDFDocument.create();
+    const keepIdx = Array.from({length: total}, (_,i)=>i).filter(i => i < from-1 || i > to-1);
+    const keepPages = await result.copyPages(existing, keepIdx);
+    keepPages.forEach(pg=>result.addPage(pg));
+
+    await saveSplicedDoc(result);
+    setPagesStatus(`Done — pages ${from}–${to} removed. New total: ${result.getPageCount()} pages.`);
+    pagesCurrentDoc = result;
+    document.getElementById('pagesCountLine').textContent = `This packet currently has ${result.getPageCount()} pages.`;
+    clearPagesInputs();
+  } catch(err){
+    console.error(err);
+    setPagesStatus('Something went wrong — check your connection and try again.', true);
+  }
+  btn.disabled = false;
 });
 
 /* ---- Add/Edit packet modal ---- */
