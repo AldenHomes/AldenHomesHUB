@@ -44,7 +44,7 @@
   .catalog-topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 18px; color:#eee; flex:none;}
   .catalog-topbar h3{margin:0; font-size:14px; font-weight:600; opacity:.9;}
   .catalog-close{background:none; border:none; color:#fff; font-size:26px; cursor:pointer; line-height:1; padding:4px 8px;}
-  .catalog-stage{flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:none; min-width:0; min-height:0; width:100%;}
+  .catalog-stage{flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:pan-y; min-width:0; min-height:0; width:100%;}
   .catalog-stage canvas{display:block; min-width:0; min-height:0;}
   .catalog-stage canvas{max-width:92vw; max-height:78vh; box-shadow:0 10px 40px rgba(0,0,0,.5); background:#fff; border-radius:2px;}
   .catalog-nav-btn{
@@ -390,6 +390,7 @@ document.addEventListener('keydown', e=>{
    ============================================================ */
 const stage = document.getElementById('catalogStage');
 let zoomScale = 1;
+let mouseDragStart = null;
 let panX = 0, panY = 0;
 const MIN_ZOOM = 1, MAX_ZOOM = 4;
 
@@ -414,6 +415,7 @@ function applyZoomTransform(){
 
 function resetZoom(){
   zoomScale = 1; panX = 0; panY = 0;
+  mouseDragStart = null;
   applyZoomTransform();
 }
 
@@ -487,6 +489,44 @@ stage.addEventListener('touchend', e=>{
 });
 
 stage.addEventListener('dblclick', e=>{ toggleZoomAtPoint(e.clientX, e.clientY); });
+
+// Desktop: Ctrl+scroll (or trackpad pinch, which browsers report as ctrlKey wheel events) to zoom.
+// Plain scrolling is left alone so it still scrolls the page normally.
+stage.addEventListener('wheel', e=>{
+  if(!e.ctrlKey) return;
+  e.preventDefault();
+  const oldScale = zoomScale;
+  zoomScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomScale - e.deltaY * 0.01));
+  if(zoomScale !== oldScale){
+    const stageRect = stage.getBoundingClientRect();
+    const offsetX = e.clientX - (stageRect.left + stageRect.width/2);
+    const offsetY = e.clientY - (stageRect.top + stageRect.height/2);
+    const ratio = zoomScale / oldScale;
+    panX = offsetX - (offsetX - panX) * ratio;
+    panY = offsetY - (offsetY - panY) * ratio;
+    applyZoomTransform();
+  }
+}, {passive:false});
+
+// Desktop: click-and-drag to pan once zoomed in.
+stage.addEventListener('mousedown', e=>{
+  if(zoomScale <= 1.02) return;
+  mouseDragStart = { x: e.clientX, y: e.clientY, panX, panY };
+  document.getElementById('catalogCanvas').style.cursor = 'grabbing';
+  e.preventDefault();
+});
+document.addEventListener('mousemove', e=>{
+  if(!mouseDragStart) return;
+  panX = mouseDragStart.panX + (e.clientX - mouseDragStart.x);
+  panY = mouseDragStart.panY + (e.clientY - mouseDragStart.y);
+  applyZoomTransform();
+});
+document.addEventListener('mouseup', ()=>{
+  if(!mouseDragStart) return;
+  mouseDragStart = null;
+  const canvas = document.getElementById('catalogCanvas');
+  canvas.style.cursor = zoomScale > 1.02 ? 'grab' : '';
+});
 
 window.addEventListener('resize', ()=>{ if(pdfDoc){ resetZoom(); renderPage(currentPage); } });
 </script>
