@@ -236,7 +236,19 @@
       <button class="modal-close" id="pagesCloseModal">&times;</button>
     </div>
     <div class="modal-body" style="text-align:left;">
-      <p id="pagesCountLine" style="font-size:13.5px; color:var(--ink-soft); margin:0 0 20px;">Loading page count…</p>
+      <p id="pagesCountLine" style="font-size:13.5px; color:var(--ink-soft); margin:0 0 12px;">Loading page count…</p>
+
+      <div id="thumbGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(78px,1fr)); gap:8px; max-height:280px; overflow-y:auto; padding:10px; background:#faf8f2; border:1px solid var(--steel-line); border-radius:var(--radius); margin-bottom:20px;"></div>
+      <p id="thumbHint" style="font-size:12px; color:var(--ink-soft); margin:-14px 0 20px; display:none;">Click a page above to fill in its number below.</p>
+
+      <style>
+        .page-thumb{cursor:pointer; text-align:center; border:2px solid transparent; border-radius:3px; padding:2px; transition:border-color .1s;}
+        .page-thumb:hover{border-color:var(--rust);}
+        .page-thumb img{width:100%; display:block; border:1px solid var(--steel-line); border-radius:2px; background:#fff;}
+        .page-thumb .num{font-size:10.5px; color:var(--ink-soft); margin-top:3px; font-family:"Courier New",monospace;}
+        .page-thumb.selected{border-color:var(--navy);}
+        .page-thumb.selected .num{color:var(--navy); font-weight:700;}
+      </style>
 
       <div style="border:1px solid var(--steel-line); border-radius:var(--radius); padding:16px; margin-bottom:14px;">
         <h4 style="margin:0 0 10px; font-size:13.5px; color:var(--navy);">Replace pages</h4>
@@ -282,6 +294,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -294,6 +310,9 @@ const firebaseConfig = {
   measurementId: "G-RT6T7EEBL0"
 };
 const FIREBASE_CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';
+}
 
 /* State declared up front — safe even if the auth callback fires synchronously. */
 let packets = [];
@@ -353,6 +372,9 @@ if(!FIREBASE_CONFIGURED){
   db = firebase.firestore();
   storage = firebase.storage();
   packetsCol = db.collection('sales-packets');
+  if(window.pdfjsLib){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';
+  }
 
   firebase.auth().onAuthStateChanged(user=>{
     if(user){
@@ -480,12 +502,18 @@ function clearPagesInputs(){
   ['replaceFile','insertFile'].forEach(id=>{ document.getElementById(id).value=''; });
 }
 
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';
+}
+
 async function openPagesModal(id){
   pagesEditingId = id;
   const p = packets.find(x=>x.id===id);
   if(!p) return;
   document.getElementById('pagesModalTitle').textContent = `Manage Pages — ${p.name||''}`;
   document.getElementById('pagesCountLine').textContent = 'Loading page count…';
+  document.getElementById('thumbGrid').innerHTML = '';
+  document.getElementById('thumbHint').style.display = 'none';
   clearPagesInputs();
   setPagesStatus('');
   pagesCurrentDoc = null;
@@ -497,16 +525,70 @@ async function openPagesModal(id){
     return;
   }
 
+  let bytes, bytesForThumbs;
   try{
-    const bytes = await fetch(p.fileUrl).then(r=>r.arrayBuffer());
+    bytes = await fetch(p.fileUrl).then(r=>r.arrayBuffer());
+    bytesForThumbs = bytes.slice(0); // independent copy, in case PDFLib detaches/consumes the original
     const doc = await PDFLib.PDFDocument.load(bytes);
     pagesCurrentDoc = doc;
     document.getElementById('pagesCountLine').textContent = `This packet currently has ${doc.getPageCount()} pages.`;
   } catch(err){
     console.error(err);
     document.getElementById('pagesCountLine').textContent = "Couldn't load this PDF to check its page count, but you can still try an edit below.";
+    return;
+  }
+
+  if(window.pdfjsLib){
+    renderPageThumbnails(bytesForThumbs).catch(err=>{
+      console.error('Thumbnail rendering failed', err);
+      document.getElementById('thumbGrid').innerHTML = '<div style="grid-column:1/-1; font-size:12.5px; color:var(--ink-soft); padding:8px;">Couldn\'t load page previews, but you can still enter page numbers manually below.</div>';
+    });
+  } else {
+    document.getElementById('thumbGrid').innerHTML = '<div style="grid-column:1/-1; font-size:12.5px; color:var(--ink-soft); padding:8px;">Page previews aren\'t available right now — you can still enter page numbers manually below.</div>';
   }
 }
+
+async function renderPageThumbnails(bytes){
+  const grid = document.getElementById('thumbGrid');
+  grid.innerHTML = '<div style="grid-column:1/-1; font-size:12.5px; color:var(--ink-soft); padding:8px;">Loading page previews…</div>';
+  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+  grid.innerHTML = '';
+  document.getElementById('thumbHint').style.display = 'block';
+
+  for(let i=1; i<=pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 1 });
+    const scale = 120 / viewport.width;
+    const scaledViewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = scaledViewport.width;
+    canvas.height = scaledViewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'page-thumb';
+    wrap.dataset.pageNum = i;
+    const img = document.createElement('img');
+    img.src = canvas.toDataURL('image/jpeg', 0.7);
+    const num = document.createElement('div');
+    num.className = 'num';
+    num.textContent = `Page ${i}`;
+    wrap.appendChild(img);
+    wrap.appendChild(num);
+    grid.appendChild(wrap);
+  }
+}
+
+document.getElementById('thumbGrid').addEventListener('click', e=>{
+  const thumb = e.target.closest('.page-thumb');
+  if(!thumb) return;
+  const num = thumb.dataset.pageNum;
+  document.querySelectorAll('.page-thumb').forEach(t=>t.classList.remove('selected'));
+  thumb.classList.add('selected');
+  ['replaceFrom','replaceTo','removeFrom','removeTo','insertAfter'].forEach(id=>{
+    document.getElementById(id).value = num;
+  });
+});
 function closePagesModal(){ pagesOverlay.classList.remove('show'); pagesEditingId = null; pagesCurrentDoc = null; }
 document.getElementById('pagesCloseModal').addEventListener('click', closePagesModal);
 pagesOverlay.addEventListener('click', e=>{ if(e.target===pagesOverlay) closePagesModal(); });
