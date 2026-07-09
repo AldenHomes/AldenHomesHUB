@@ -44,7 +44,7 @@
   .catalog-topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 18px; color:#eee; flex:none;}
   .catalog-topbar h3{margin:0; font-size:14px; font-weight:600; opacity:.9;}
   .catalog-close{background:none; border:none; color:#fff; font-size:26px; cursor:pointer; line-height:1; padding:4px 8px;}
-  .catalog-stage{flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:pan-y; min-width:0; min-height:0; width:100%;}
+  .catalog-stage{flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; touch-action:none; min-width:0; min-height:0; width:100%;}
   .catalog-stage canvas{display:block; min-width:0; min-height:0;}
   .catalog-stage canvas{max-width:92vw; max-height:78vh; box-shadow:0 10px 40px rgba(0,0,0,.5); background:#fff; border-radius:2px;}
   .catalog-nav-btn{
@@ -347,6 +347,7 @@ function goToPage(num){
   if(!pdfDoc) return;
   num = Math.max(1, Math.min(pdfDoc.numPages, num));
   currentPage = num;
+  resetZoom();
   renderPage(num);
 }
 
@@ -384,17 +385,110 @@ document.addEventListener('keydown', e=>{
   if(e.key === 'Escape' && !document.getElementById('catalogOverlay').classList.contains('inline-mode')) closeCatalog();
 });
 
-let touchStartX = null;
+/* ============================================================
+   PINCH-TO-ZOOM, PAN & SWIPE (touch) + DOUBLE-CLICK ZOOM (desktop)
+   ============================================================ */
 const stage = document.getElementById('catalogStage');
-stage.addEventListener('touchstart', e=>{ touchStartX = e.changedTouches[0].clientX; }, {passive:true});
-stage.addEventListener('touchend', e=>{
-  if(touchStartX === null) return;
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  if(Math.abs(dx) > 50){ dx < 0 ? goToPage(currentPage+1) : goToPage(currentPage-1); }
-  touchStartX = null;
-}, {passive:true});
+let zoomScale = 1;
+let panX = 0, panY = 0;
+const MIN_ZOOM = 1, MAX_ZOOM = 4;
 
-window.addEventListener('resize', ()=>{ if(pdfDoc) renderPage(currentPage); });
+function clampPan(){
+  const canvas = document.getElementById('catalogCanvas');
+  const stageRect = stage.getBoundingClientRect();
+  const scaledW = canvas.offsetWidth * zoomScale;
+  const scaledH = canvas.offsetHeight * zoomScale;
+  const maxPanX = Math.max(0, (scaledW - stageRect.width) / 2);
+  const maxPanY = Math.max(0, (scaledH - stageRect.height) / 2);
+  panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+  panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+}
+
+function applyZoomTransform(){
+  const canvas = document.getElementById('catalogCanvas');
+  clampPan();
+  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+  canvas.style.transformOrigin = 'center center';
+  canvas.style.cursor = zoomScale > 1.02 ? 'grab' : '';
+}
+
+function resetZoom(){
+  zoomScale = 1; panX = 0; panY = 0;
+  applyZoomTransform();
+}
+
+function dist(t1, t2){ return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
+
+function toggleZoomAtPoint(clientX, clientY){
+  if(zoomScale > 1.02){
+    resetZoom();
+  } else {
+    zoomScale = 2.2;
+    const stageRect = stage.getBoundingClientRect();
+    const offsetX = clientX - (stageRect.left + stageRect.width/2);
+    const offsetY = clientY - (stageRect.top + stageRect.height/2);
+    panX = -offsetX * 0.6;
+    panY = -offsetY * 0.6;
+    applyZoomTransform();
+  }
+}
+
+let touchStartX = null;
+let gestureStartDist = 0, gestureStartScale = 1;
+let panStart = null;
+let lastTapTime = 0;
+
+stage.addEventListener('touchstart', e=>{
+  if(e.touches.length === 2){
+    gestureStartDist = dist(e.touches[0], e.touches[1]);
+    gestureStartScale = zoomScale;
+    touchStartX = null;
+    panStart = null;
+  } else if(e.touches.length === 1){
+    if(zoomScale > 1.02){
+      panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, panX, panY };
+    } else {
+      touchStartX = e.touches[0].clientX;
+    }
+    const now = Date.now();
+    if(now - lastTapTime < 320){
+      toggleZoomAtPoint(e.touches[0].clientX, e.touches[0].clientY);
+      lastTapTime = 0;
+    } else {
+      lastTapTime = now;
+    }
+  }
+});
+
+stage.addEventListener('touchmove', e=>{
+  if(e.touches.length === 2 && gestureStartDist > 0){
+    e.preventDefault();
+    const newDist = dist(e.touches[0], e.touches[1]);
+    zoomScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, gestureStartScale * (newDist / gestureStartDist)));
+    applyZoomTransform();
+  } else if(e.touches.length === 1 && panStart){
+    e.preventDefault();
+    panX = panStart.panX + (e.touches[0].clientX - panStart.x);
+    panY = panStart.panY + (e.touches[0].clientY - panStart.y);
+    applyZoomTransform();
+  }
+}, {passive:false});
+
+stage.addEventListener('touchend', e=>{
+  if(e.touches.length === 0){
+    if(touchStartX !== null && zoomScale <= 1.02){
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if(Math.abs(dx) > 50){ dx < 0 ? goToPage(currentPage+1) : goToPage(currentPage-1); }
+    }
+    touchStartX = null;
+    panStart = null;
+    gestureStartDist = 0;
+  }
+});
+
+stage.addEventListener('dblclick', e=>{ toggleZoomAtPoint(e.clientX, e.clientY); });
+
+window.addEventListener('resize', ()=>{ if(pdfDoc){ resetZoom(); renderPage(currentPage); } });
 </script>
 </body>
 </html>
