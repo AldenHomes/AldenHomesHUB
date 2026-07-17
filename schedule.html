@@ -433,6 +433,7 @@
         <option value="">All Communities</option>
       </select>
       <button class="btn btn-ghost" id="ordersExportBtn">Export CSV</button>
+      <button class="btn btn-ghost" id="editChecklistBtn">Edit Checklist</button>
       <button class="btn btn-primary" id="ordersAddBtn">+ Add Order</button>
     </div>
 
@@ -819,6 +820,28 @@
   </div>
 </div>
 
+<!-- Edit Checklist Items Modal -->
+<div class="overlay" id="checklistEditOverlay">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-head">
+      <h2>Edit Material Checklist</h2>
+      <button class="modal-close" id="checklistEditClose">&times;</button>
+    </div>
+    <div class="modal-body" style="text-align:left;">
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 16px;">These items appear on every material order's checklist. Removing one here won't erase any dates already saved on existing orders — it just stops showing that item going forward.</p>
+      <div id="checklistItemsList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;"></div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="newChecklistItem" placeholder="e.g. Insulation" style="flex:1;">
+        <button class="btn btn-ghost" id="addChecklistItemBtn">+ Add</button>
+      </div>
+      <p id="checklistEditError" style="font-size:12.5px; color:#a8451a; margin:10px 0 0; display:none;"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="checklistEditCancel">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Lot Map Viewer -->
 <div class="overlay" id="mapViewerOverlay" style="background:rgba(20,20,20,.85);">
   <div class="modal" style="max-width:1100px; max-height:92vh; display:flex; flex-direction:column;">
@@ -871,7 +894,7 @@ const firebaseConfig = {
 };
 const FIREBASE_CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
 
-const CANON_ITEMS = ["Windows","Lumber","Siding","Steps","Garage","Locks","Shower","Track","Roof","Gas","Electric","UGI Ditch","Electric Ditch","Other","Order Placed"];
+const DEFAULT_CHECKLIST_ITEMS = ["Windows","Lumber","Siding","Steps","Garage","Locks","Shower","Track","Roof","Gas","Electric","UGI Ditch","Electric Ditch","Other","Order Placed"];
 
 const SCHEDULE_SEED = [{"ytd":1,"community":"AP","lot":"150","model":"Grant B","client":"John and Tina Kelsey","address":"1020 Stanford Dr","phone":"717-269-5272","plan":"","draftsman":"D","fndn":"","walk":"2025-01-15","move":"2025-01-17","settle":"2025-01-20"},{"ytd":2,"community":"AP","lot":"217","model":"Alden 2.1","client":"Bob and Jackie Chicchi","address":"1055 Percy Lane","phone":"717-961-6089","plan":"","draftsman":"D","fndn":"","walk":"2025-01-21","move":"2025-01-23","settle":"2025-01-26"},{"ytd":3,"community":"AP","lot":"224","model":"Alden 2.1","client":"Bob and Sharon Griffiths","address":"1004 Stanford Dr","phone":"717-454-7721","plan":"","draftsman":"","fndn":"","walk":"2025-02-11","move":"2025-02-13","settle":"2025-02-17"},{"ytd":4,"community":"MM","lot":"70","model":"Sherman","client":"William and Sharon Kline","address":"49 Clover Dr","phone":"717-866-2257","plan":"","draftsman":"D","fndn":"","walk":"2025-02-08","move":"2025-02-10","settle":"2025-02-13"},{"ytd":5,"community":"AP","lot":"104","model":"Stanford B","client":"Brian and Cricket Karli","address":"1094 Alden Way","phone":"678-982-6627","plan":"","draftsman":"J","fndn":"","walk":"2025-02-25","move":"2025-02-27","settle":"2025-03-02"},{"ytd":6,"community":"AP","lot":"411","model":"Vermillion","client":"BOB and Barb Henry","address":"1212 Mosaic Dr","phone":"215-208-5989","plan":"","draftsman":"J","fndn":"","walk":"2026-02-23","move":"2026-02-23","settle":"2026-03-02"},{"ytd":7,"community":"AP","lot":"103","model":"Stanford B","client":"Charles and Marie Waltman","address":"1096 Alden Way","phone":"610-906-4003","plan":"","draftsman":"J","fndn":"","walk":"2026-04-01","move":"2026-04-03","settle":"2026-04-06"},{"ytd":8,"community":"ML","lot":"115","model":"Custom","client":"Nancy Kreider","address":"115 Maple Lane","phone":"717-507-1156","plan":"","draftsman":"D","fndn":"","walk":"2026-04-12","move":"2026-04-15","settle":"2026-04-17"},{"ytd":9,"community":"MM","lot":"62","model":"Montgomery C","client":"Bryan and Elise Nelligan","address":"33 Clover Dr","phone":"484-987-9842","plan":"","draftsman":"D","fndn":"","walk":"2026-05-06","move":"2026-05-08","settle":"2026-05-08"},{"ytd":10,"community":"ML","lot":"121","model":"Custom","client":"Louis and Sharon Hurst","address":"121 Maple Lane","phone":"717-629-5788","plan":"","draftsman":"D","fndn":"","walk":"2026-05-06","move":"2026-05-08","settle":"2026-05-11"},{"ytd":11,"community":"AP","lot":"219","model":"Stanford B","client":"Tom and Nancy Doyle","address":"1059 Percy Lane","phone":"631-384-8699","plan":"","draftsman":"J","fndn":"","walk":"2026-05-13","move":"2026-05-15","settle":"2026-05-18"},{"ytd":12,"community":"AP","lot":"151","model":"Coleman","client":"Clayton Kleinfelter","address":"1022 Stanford Dr","phone":"717-664-1215","plan":"","draftsman":"J","fndn":"","walk":"2026-06-17","move":"2026-06-19","settle":"2026-06-22"},{"ytd":13,"community":"AP","lot":"424","model":"Bainbridge","client":"Marc and Jeanette Campanale","address":"1017 Riverstone Circle","phone":"","plan":"","draftsman":"D","fndn":"","walk":"2026-07-08","move":"2026-07-10","settle":"2026-07-13"},{"ytd":14,"community":"CL","lot":"109","model":"Rivet","client":"Lonnie","address":"412 Cannon Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-06-25","move":"2026-06-25","settle":"2026-06-30"},{"ytd":15,"community":"OS","lot":"1265","model":"Remodel","client":"Lorraine and Chris","address":"1265 Girl Scout rd","phone":"717-468-3046","plan":"","draftsman":"J","fndn":"","walk":"2026-07-23","move":"2026-07-24","settle":"2026-07-27"},{"ytd":16,"community":"OS","lot":"238","model":"Avonlea","client":"Kendra Heck","address":"238 S Lancaster Ave","phone":"717-383-3192","plan":"","draftsman":"D","fndn":"","walk":"2026-07-02","move":"2026-07-05","settle":"2026-07-15"},{"ytd":17,"community":"MM","lot":"49","model":"Stanford A","client":"John and Whitney","address":"40 Clover Dr","phone":"508-654-8821","plan":"","draftsman":"J","fndn":"","walk":"2026-07-15","move":"2026-07-15","settle":"2026-07-15"},{"ytd":"","community":"AP","lot":"220","model":"Tiffany","client":"Model Home","address":"1012 Stanford Dr","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-07-08","move":"2026-07-10","settle":"2026-07-13"},{"ytd":18,"community":"AP","lot":"154","model":"Stanford B","client":"James Struck","address":"1028 Stanford Dr","phone":"717-201-4782","plan":"","draftsman":"D","fndn":"","walk":"2026-07-15","move":"2026-07-17","settle":"2026-07-20"},{"ytd":19,"community":"ML","lot":"117","model":"Saber","client":"Nate Lowrie","address":"117 Maple Ln","phone":"717-269-2605","plan":"","draftsman":"J","fndn":"","walk":"2026-07-19","move":"2026-07-21","settle":"2026-07-24"},{"ytd":20,"community":"CL","lot":"1","model":"Anvil","client":"Darren and Connie Johnson","address":"401 Cannon way","phone":"484-515-9319","plan":"","draftsman":"J","fndn":"","walk":"2026-07-22","move":"2026-07-24","settle":"2026-07-27"},{"ytd":21,"community":"CL","lot":"7","model":"Artisan","client":"Nate and Lindsay","address":"419 Cannon Way","phone":"717-228-8421","plan":"","draftsman":"J","fndn":"","walk":"2026-07-26","move":"2026-07-28","settle":"2026-07-31"},{"ytd":22,"community":"AP","lot":"425","model":"Coleman 2.1","client":"Jeff and Joanie Firestone","address":"1015 Riverstone circle","phone":"717-507-6099","plan":"","draftsman":"J","fndn":"","walk":"2026-08-19","move":"2026-08-21","settle":"2026-08-24"},{"ytd":23,"community":"AP","lot":"222","model":"Bainbridge","client":"Amy  Sales","address":"1008 Stanford dr","phone":"610-703-7813","plan":"","draftsman":"J","fndn":"","walk":"2026-09-01","move":"2026-09-03","settle":"2026-09-04"},{"ytd":"","community":"AP","lot":"67","model":"Sonora","client":"Model home","address":"1117 Alden Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-10-07","move":"2026-10-09","settle":"2026-10-12"},{"ytd":24,"community":"CL","lot":"5","model":"Saber","client":"John and Lori Mattia","address":"415 Cannon Way","phone":"484-467-0754","plan":"","draftsman":"J","fndn":"","walk":"2026-10-14","move":"2026-10-16","settle":"2026-10-19"},{"ytd":"","community":"CL","lot":"113","model":"Rexmont","client":"Model Home","address":"404 Cannon way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-10-21","move":"2026-10-23","settle":"2026-10-26"},{"ytd":25,"community":"AP","lot":"70","model":"Custom","client":"Ammon and Barbara Morgan","address":"1123 Alden Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-11-18","move":"2026-11-20","settle":"2026-11-23"},{"ytd":26,"community":"AP","lot":"71","model":"Tiffany","client":"Joann and Walter Rupp","address":"1125 Alden Way","phone":"570-466-9292","plan":"","draftsman":"J","fndn":"","walk":"2026-11-25","move":"2026-11-27","settle":"2026-11-30"},{"ytd":"","community":"CL","lot":"102","model":"Rivet","client":"MODEL HOME","address":"105 Charcoal Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-11-25","move":"2026-11-27","settle":"2026-11-30"},{"ytd":"","community":"CL","lot":"98","model":"Artisan","client":"Model Home","address":"Cannon Way","phone":"","plan":"","draftsman":"J","fndn":"","walk":"2026-12-02","move":"2026-12-04","settle":"2026-12-07"}];
 const ORDERS_SEED = [{"id":"2021-27","source":"2021","community":"ET","lot":"265","name":"SNYDER","address":"1450 FIELDSTONE","walkthru":"2023-08-09","items":{"Windows":"X ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-28","source":"2021","community":"AP","lot":"152","name":"JONES","address":"1024 STANFORD DRIVE","walkthru":"2023-08-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-29","source":"2021","community":"AP","lot":"418","name":"MARTIN","address":"1234 MOSAIC DRIVE","walkthru":"2023-08-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-30","source":"2021","community":"AP","lot":"414","name":"SWINGHOLM","address":"1220 MOSAIC DRIVE","walkthru":"2023-08-22","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-31","source":"2021","community":"ET","lot":"268","name":"SYMONDS","address":"1458 FIELDSTONE DRIVE","walkthru":"2023-08-23","items":{"Windows":"X ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-32","source":"2021","community":"ET","lot":"267","name":"VASQUEZ","address":"1456 FIELDSTONE DRIVE","walkthru":"2023-09-15","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-33","source":"2021","community":"AP","lot":"142","name":"DILLNER","address":"1054 PERCY LANE","walkthru":"2023-09-22","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-34","source":"2021","community":"ET","lot":"292","name":"KRULOCK","address":"1410 BARRINGTON DRIVE","walkthru":"2023-10-18","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-35","source":"2021","community":"ET","lot":"269","name":"PRICE","address":"1460 FIELDSTONE DRIVE","walkthru":"2024-03-06","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-36","source":"2021","community":"MM","lot":"66","name":"PEARCE","address":"53 CLOVER DRIVE","walkthru":"2024-03-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-37","source":"2021","community":"MM","lot":"41","name":"QUINONESS","address":"56 CLOVER DRIVE","walkthru":"2024-08-14","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-38","source":"2021","community":"MM","lot":"50","name":"NELLGAN","address":"38 CLOVER DRIVE","walkthru":"2024-08-21","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-39","source":"2021","community":"AP","lot":"192","name":"GRAHAM","address":"1013 STANFORD DRIVE","walkthru":"2024-08-21","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-40","source":"2021","community":"MM","lot":"42","name":"MUTCHLER","address":"54 CLOVER DRIVE","walkthru":"2024-08-28","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-41","source":"2021","community":"AP","lot":"417","name":"SHANFELDER","address":"1230 MOSAIC DRIVE","walkthru":"2024-09-04","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-42","source":"2021","community":"MM","lot":"57","name":"LAVOIE","address":"22 CLOVER DRIVE","walkthru":"2024-09-10","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-43","source":"2021","community":"OS","lot":"121","name":"SPEC","address":"1330 JILL ANN DR","walkthru":"2024-09-11","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-44","source":"2021","community":"ET","lot":"264","name":"GROFF","address":"1448 FIELDSTONE DR","walkthru":"2024-10-01","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-45","source":"2021","community":"AP","lot":"182","name":"BROWN","address":"1033 STANFORD","walkthru":"2024-09-24","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-46","source":"2021","community":"MM","lot":"43","name":"ALBRIGHT","address":"52 CLOVER DR","walkthru":"2024-10-09","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-47","source":"2021","community":"ET","lot":"263","name":"CHEN","address":"1446 FIELDSTONE","walkthru":"2024-10-15","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-48","source":"2021","community":"AP","lot":"196","name":"BOYCE","address":"1005 STANFORD","walkthru":"2024-10-16","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-49","source":"2021","community":"AP","lot":"141","name":"SOWIZRAL","address":"1052 PERCY LANE","walkthru":"2024-10-23","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-50","source":"2021","community":"AP","lot":"382","name":"SHEPPARD","address":"1242 MOSAIC DRIVE","walkthru":"2024-11-13","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-51","source":"2021","community":"OS","lot":"3320","name":"CROSS","address":"3320 PROSPECT RD YORK","walkthru":"2024-11-08","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"X","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"X","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":""},"completed":false},{"id":"2021-52","source":"2021","community":"AP","lot":"151","name":"KELEINFELTER","address":"1022 STANFORD DRIVE","walkthru":"2026-06-17","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-53","source":"2021","community":"AP","lot":"424","name":"STAY AND PLAY","address":"1017 RIVERSTONE CIRCLE","walkthru":"2026-06-17","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-54","source":"2021","community":"AP","lot":"220","name":"MARTINEZ","address":"1012 STANFORD DRIVE","walkthru":"2026-07-01","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-55","source":"2021","community":"AP","lot":"154","name":"STRUCK","address":"1028 STANFORD DRIVE","walkthru":"2026-07-15","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"X","Order Placed":"X"},"completed":true},{"id":"2021-56","source":"2021","community":"ML","lot":"117","name":"LOWRIE","address":"117 MAPLE LANE","walkthru":"2026-07-22","items":{"Windows":"ABC X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":"X"},"completed":true},{"id":"2021-57","source":"2021","community":"AP","lot":"425","name":"FIRESTONE","address":"1015 RIVERSTONE","walkthru":"2026-08-19","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-58","source":"2021","community":"OS","lot":"","name":"Girl scout rd","address":"1265 Girl scout rd","walkthru":"2026-07-24","items":{"Windows":"X","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-59","source":"2021","community":"AP","lot":"222","name":"SALES","address":"1008 STANFORD","walkthru":"2026-08-26","items":{"Windows":"ABC","Lumber":"","Siding":"X","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-60","source":"2021","community":"OS","lot":"238","name":"","address":"LANCASTER AVE","walkthru":"2026-08-13","items":{"Windows":"X","Lumber":"","Siding":"","Steps":"X","Garage":"X","Locks":"","Shower":"X","Track":"X","Roof":"X","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-61","source":"2021","community":"CL","lot":"5","name":"MATTIA","address":"415 CANNON WAY","walkthru":"2026-10-14","items":{"Windows":"ABC","Lumber":"","Siding":"","Steps":"","Garage":"X","Locks":"","Shower":"","Track":"","Roof":"","Gas":"X","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-62","source":"2021","community":"AP","lot":"67","name":"MODEL","address":"1117 ALDEN WAY","walkthru":"2026-10-07","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2021-63","source":"2021","community":"CL","lot":"113","name":"MODEL","address":"404 CANNON WAY","walkthru":"2026-10-21","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-3","source":"2022","community":"NG","lot":"23","name":"BROUSSARD","address":"1009 PARKWOOD CT","walkthru":"2022-01-05","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-4","source":"2022","community":"ET","lot":"283","name":"DAUBER","address":"1423 BARRINGTON DR","walkthru":"2021-01-11","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-5","source":"2022","community":"ET","lot":"324","name":"ROHRER","address":"1416 HEATERWOOD DR","walkthru":"2021-01-18","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-6","source":"2022","community":"AP","lot":"153","name":"MATTHEW","address":"1026 STANFORD DR","walkthru":"2021-01-19","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-7","source":"2022","community":"AP","lot":"179","name":"TEETER","address":"1039 STANFORD DR","walkthru":"2021-01-25","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-8","source":"2022","community":"ET","lot":"290","name":"JOSE & MEDINA","address":"1406 BARRINGTON DR","walkthru":"2021-02-01","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-9","source":"2022","community":"ET","lot":"294","name":"PATTEN","address":"1415 BARRINGTON DR","walkthru":"2021-02-02","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-10","source":"2022","community":"ET","lot":"299","name":"NATHAN & DANIEL","address":"1426 BARRINGTON DR","walkthru":"2021-02-08","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-11","source":"2022","community":"AP","lot":"68","name":"JEFF & LINDA","address":"1119 ALDEN WAY","walkthru":"2021-02-15","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-12","source":"2022","community":"ET","lot":"275","name":"PETE & GABBY","address":"BARRINGTON DR","walkthru":"2021-02-16","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-13","source":"2022","community":"MM","lot":"89","name":"KULP","address":"14 CLOVER DR","walkthru":"2021-02-22","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false},{"id":"2022-14","source":"2022","community":"AP","lot":"120","name":"DUNLAP","address":"1010 PERCY LANE","walkthru":"2021-03-01","items":{"Windows":"","Lumber":"","Siding":"","Steps":"","Garage":"","Locks":"","Shower":"","Track":"","Roof":"","Gas":"","Electric":"","UGI Ditch":"","Electric Ditch":"","Other":"","Order Placed":""},"completed":false}];
@@ -898,6 +921,7 @@ function normKey(community, lot){
 
 /* State — declared up front so they're always safe to reference, even if
    the auth callback below fires synchronously (e.g. an already-persisted session). */
+let CHECKLIST_ITEMS = [...DEFAULT_CHECKLIST_ITEMS];
 let jobs = [];
 let orders = [];
 let editingJobId = null;
@@ -929,6 +953,7 @@ let jobsCol = null;
 let ordersCol = null;
 let openSlotsCol = null;
 let lotsCol = null;
+let settingsCol = null;
 let seededThisSession = false;
 
 function setSyncStatus(state){
@@ -988,6 +1013,7 @@ if(!FIREBASE_CONFIGURED){
   ordersCol = db.collection('orders');
   openSlotsCol = db.collection('open-slots');
   lotsCol = db.collection('available-lots');
+  settingsCol = db.collection('settings');
 
   firebase.auth().onAuthStateChanged(user=>{
     if(user){
@@ -1048,6 +1074,12 @@ async function seedIfEmpty(){
       await batch.commit();
     }
   } catch(e){ console.error('Available lots seed failed', e); }
+  try{
+    const settingsDoc = await settingsCol.doc('checklist').get();
+    if(!settingsDoc.exists){
+      await settingsCol.doc('checklist').set({ items: DEFAULT_CHECKLIST_ITEMS });
+    }
+  } catch(e){ console.error('Checklist settings seed failed', e); }
 }
 
 function attachListeners(){
@@ -1078,6 +1110,19 @@ function attachListeners(){
     renderOpenDates(); // banner text may depend on selectedLotForBuild info staying in sync
     setSyncStatus('idle');
   }, err=>{ console.error('available-lots listener error', err); setSyncStatus('offline'); });
+
+  settingsCol.doc('checklist').onSnapshot(doc=>{
+    if(doc.exists && Array.isArray(doc.data().items) && doc.data().items.length){
+      CHECKLIST_ITEMS = doc.data().items;
+    }
+    renderOrders();
+    renderChecklistEditor();
+    const ordersOverlayEl = document.getElementById('ordersOverlay');
+    if(ordersOverlayEl && ordersOverlayEl.classList.contains('show')){
+      buildChecklist(editingOrderId ? (orders.find(o=>o.id===editingOrderId)||{}).items : {});
+    }
+    setSyncStatus('idle');
+  }, err=>{ console.error('checklist settings listener error', err); setSyncStatus('offline'); });
 }
 
 async function writeJob(id, data){
@@ -1519,9 +1564,11 @@ function jobKeysSet(){
 }
 
 function orderProgress(o){
-  const vals = Object.values(o.items||{});
-  const total = vals.length;
-  const done = vals.filter(v=>v && v.toString().trim()!=='').length;
+  const total = CHECKLIST_ITEMS.length;
+  const done = CHECKLIST_ITEMS.filter(name => {
+    const v = o.items && o.items[name];
+    return v && v.toString().trim() !== '';
+  }).length;
   return {done, total};
 }
 
@@ -1722,7 +1769,7 @@ const ordersDeleteBtn = document.getElementById('ordersDeleteBtn');
 const checklistContainer = document.getElementById('checklistContainer');
 
 function buildChecklist(items){
-  checklistContainer.innerHTML = CANON_ITEMS.map(name=>{
+  checklistContainer.innerHTML = CHECKLIST_ITEMS.map(name=>{
     const raw = (items && items[name]) || '';
     const checked = raw.trim() !== '';
     const note = raw.replace(/^X\s*/i,'').trim();
@@ -1745,7 +1792,7 @@ checklistContainer.addEventListener('change', e=>{
 });
 function readChecklist(){
   const items = {};
-  CANON_ITEMS.forEach(name=>{
+  CHECKLIST_ITEMS.forEach(name=>{
     const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
     const checked = document.getElementById('chk_'+safeName).checked;
     const dateVal = document.getElementById('note_'+safeName).value;
@@ -1754,6 +1801,86 @@ function readChecklist(){
   });
   return items;
 }
+
+/* ============================================================
+   EDIT CHECKLIST ITEMS
+   ============================================================ */
+const checklistEditOverlay = document.getElementById('checklistEditOverlay');
+
+function renderChecklistEditor(){
+  const list = document.getElementById('checklistItemsList');
+  if(!list) return;
+  list.innerHTML = CHECKLIST_ITEMS.map((name, i)=>`
+    <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--paper); border:1px solid var(--steel-line); border-radius:var(--radius);">
+      <span style="flex:1; font-size:13.5px;">${name}</span>
+      <button class="icon-btn remove-checklist-item" data-index="${i}" title="Remove" style="color:#a8451a;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function openChecklistEditModal(){
+  renderChecklistEditor();
+  document.getElementById('checklistEditError').style.display = 'none';
+  document.getElementById('newChecklistItem').value = '';
+  checklistEditOverlay.classList.add('show');
+}
+function closeChecklistEditModal(){ checklistEditOverlay.classList.remove('show'); }
+document.getElementById('editChecklistBtn').addEventListener('click', openChecklistEditModal);
+document.getElementById('checklistEditClose').addEventListener('click', closeChecklistEditModal);
+document.getElementById('checklistEditCancel').addEventListener('click', closeChecklistEditModal);
+checklistEditOverlay.addEventListener('click', e=>{ if(e.target===checklistEditOverlay) closeChecklistEditModal(); });
+
+function setChecklistEditError(msg){
+  const el = document.getElementById('checklistEditError');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function saveChecklistItems(newList){
+  setSyncStatus('saving');
+  try{
+    await settingsCol.doc('checklist').set({ items: newList });
+    CHECKLIST_ITEMS = newList;
+    renderChecklistEditor();
+    renderOrders();
+  } catch(e){
+    console.error(e);
+    setChecklistEditError('Could not save — check your connection and try again.');
+  }
+}
+
+document.getElementById('checklistItemsList').addEventListener('click', e=>{
+  const btn = e.target.closest('.remove-checklist-item');
+  if(!btn) return;
+  const idx = parseInt(btn.dataset.index, 10);
+  if(CHECKLIST_ITEMS.length <= 1){
+    setChecklistEditError("Can't remove the last item — the checklist needs at least one.");
+    return;
+  }
+  const removed = CHECKLIST_ITEMS[idx];
+  if(!confirm(`Remove "${removed}" from the checklist? Any dates already saved for it on existing orders will stay in your records, just hidden from view.`)) return;
+  const newList = CHECKLIST_ITEMS.filter((_,i)=>i!==idx);
+  saveChecklistItems(newList);
+});
+
+document.getElementById('addChecklistItemBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('newChecklistItem');
+  const name = input.value.trim();
+  if(!name){ setChecklistEditError('Enter a name for the new item.'); return; }
+  if(CHECKLIST_ITEMS.some(n=>n.toLowerCase()===name.toLowerCase())){
+    setChecklistEditError('That item already exists on the checklist.');
+    return;
+  }
+  setChecklistEditError('');
+  const newList = [...CHECKLIST_ITEMS, name];
+  saveChecklistItems(newList);
+  input.value = '';
+});
+document.getElementById('newChecklistItem').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('addChecklistItemBtn').click(); }
+});
 
 function openOrderModal(id, prefill){
   editingOrderId = id || null;
@@ -1862,9 +1989,9 @@ ordersDeleteBtn.addEventListener('click', ()=>{
 });
 
 document.getElementById('ordersExportBtn').addEventListener('click', ()=>{
-  const headers = ['Community','Lot','Name','Address','Walk-Thru', ...CANON_ITEMS];
+  const headers = ['Community','Lot','Name','Address','Walk-Thru', ...CHECKLIST_ITEMS];
   const rows = orders.slice().sort((a,b)=> (a.walkthru||'').localeCompare(b.walkthru||'')).map(o=>[
-    o.community, o.lot, o.name, o.address, o.walkthru, ...CANON_ITEMS.map(k=>o.items && o.items[k] || '')
+    o.community, o.lot, o.name, o.address, o.walkthru, ...CHECKLIST_ITEMS.map(k=>o.items && o.items[k] || '')
   ]);
   downloadCSV('material_orders.csv', headers, rows);
 });
