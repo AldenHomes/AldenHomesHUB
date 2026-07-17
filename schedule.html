@@ -1533,18 +1533,81 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
   const id = editingJobId || jobsCol.doc().id;
   const slotIdToRemove = bookingFromSlotId;
   const lotIdToRemove = selectedLotForBuild ? selectedLotForBuild.id : null;
+
+  // If this job is consuming an available lot and/or an open date, keep a snapshot of
+  // each on the job record. That way, if the job is ever deleted, we can put them back
+  // exactly as they were rather than losing the lot's details (premium, acreage, map pin, etc).
+  if(!editingJobId){
+    if(selectedLotForBuild){
+      const {id:_omit, ...lotSnapshot} = selectedLotForBuild;
+      data.fromLot = lotSnapshot;
+    }
+    if(bookingFromSlotId){
+      const slot = openSlots.find(s=>s.id===bookingFromSlotId);
+      if(slot){
+        const {id:_omit2, ...slotSnapshot} = slot;
+        data.fromSlot = slotSnapshot;
+      }
+    }
+  } else {
+    // Editing an existing job — carry forward any snapshot it already had.
+    const existing = jobs.find(j=>j.id===editingJobId);
+    if(existing){
+      if(existing.fromLot) data.fromLot = existing.fromLot;
+      if(existing.fromSlot) data.fromSlot = existing.fromSlot;
+    }
+  }
+
   closeJobModal();
   writeJob(id, data);
   if(slotIdToRemove) deleteSlotDoc(slotIdToRemove);
   if(lotIdToRemove){ deleteLotDoc(lotIdToRemove); clearSelectedLot(); }
 });
-deleteBtn.addEventListener('click', ()=>{
+deleteBtn.addEventListener('click', async ()=>{
   if(!editingJobId) return;
-  if(confirm('Delete this job from the schedule? This cannot be undone.')){
-    const id = editingJobId;
-    closeJobModal();
-    deleteJobDoc(id);
+  const job = jobs.find(j=>j.id===editingJobId);
+  if(!job) return;
+
+  // Work out what (if anything) would come back if this job is deleted, so the
+  // confirmation can say so plainly rather than surprising anyone.
+  const restoreLot = job.fromLot || null;
+  const restoreSlot = job.fromSlot || (job.settle ? {
+    settle: job.settle, walk: job.walk||'', move: job.move||'', fndn: job.fndn||'', draftsman: job.draftsman||''
+  } : null);
+
+  const restoreBits = [];
+  if(restoreLot) restoreBits.push(`Lot ${restoreLot.lot} back to Available Lots`);
+  if(restoreSlot && restoreSlot.settle) restoreBits.push(`the ${fmtDate(restoreSlot.settle)} settle date back to Open Dates`);
+
+  const msg = restoreBits.length
+    ? `Delete this job from the schedule?\n\nThis will put ${restoreBits.join(' and ')}.`
+    : 'Delete this job from the schedule? This cannot be undone.';
+
+  if(!confirm(msg)) return;
+
+  const id = editingJobId;
+  closeJobModal();
+
+  try{
+    if(restoreLot){
+      const newLotId = lotsCol.doc().id;
+      await writeLot(newLotId, restoreLot);
+    }
+    if(restoreSlot && restoreSlot.settle){
+      const newSlotId = openSlotsCol.doc().id;
+      await writeSlot(newSlotId, {
+        settle: restoreSlot.settle,
+        walk: restoreSlot.walk || '',
+        move: restoreSlot.move || '',
+        fndn: restoreSlot.fndn || '',
+        draftsman: restoreSlot.draftsman || '',
+      });
+    }
+  } catch(e){
+    console.error('Could not restore lot/date on delete', e);
   }
+
+  deleteJobDoc(id);
 });
 
 document.getElementById('exportBtn').addEventListener('click', ()=>{
