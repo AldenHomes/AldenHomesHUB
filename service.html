@@ -104,7 +104,10 @@
   .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
   .auth-field{margin-bottom:14px;}
   label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
-  input[type=text], input[type=password]{width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
+  input[type=text], input[type=password], input[type=tel], input[type=email], textarea, select{width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
+  textarea{min-height:90px; resize:vertical;}
+  .field{margin-bottom:14px; text-align:left;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
   .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
   .auth-error.show{display:block;}
@@ -200,6 +203,7 @@
       </select>
       <button class="btn btn-ghost" id="copyLinkBtn">Copy Customer Link</button>
       <button class="btn btn-ghost" id="cleanupBtn" title="Deletes photos from requests already marked Sent, or older than 90 days">Clean Up Old Photos</button>
+      <button class="btn btn-primary" id="addRequestBtn">+ Add Request</button>
     </div>
 
     <table>
@@ -256,6 +260,62 @@
       <button class="btn btn-ghost" id="deleteBtn" style="color:#a8451a; border-color:#e3b5a0;">Delete</button>
       <div style="flex:1;"></div>
       <button class="btn btn-ghost" id="closeBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Request Modal (manual entry, back-end side) -->
+<div class="overlay" id="addRequestOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Add Service Request</h2>
+      <button class="modal-close" id="addRequestClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="ar_name">Name</label>
+        <input type="text" id="ar_name">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="ar_phone">Phone</label>
+          <input type="tel" id="ar_phone" placeholder="717-555-0100">
+        </div>
+        <div class="field">
+          <label for="ar_email">Email</label>
+          <input type="email" id="ar_email">
+        </div>
+      </div>
+      <div class="field">
+        <label for="ar_address">Address</label>
+        <input type="text" id="ar_address">
+      </div>
+      <div class="field">
+        <label for="ar_lot">Lot #</label>
+        <input type="text" id="ar_lot">
+      </div>
+      <div class="field">
+        <label for="ar_description">Description</label>
+        <textarea id="ar_description" placeholder="What's going on..."></textarea>
+      </div>
+      <div class="field">
+        <label for="ar_status">Status</label>
+        <select id="ar_status">
+          <option value="new">New</option>
+          <option value="in-progress">In Progress</option>
+          <option value="sent">Sent to BuilderTrend</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="ar_photos">Photos <span style="text-transform:none; font-weight:400;">(optional)</span></label>
+        <input type="file" id="ar_photos" accept="image/*" multiple>
+        <div id="ar_photoNote" style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;"></div>
+      </div>
+      <div class="auth-error" id="addRequestError"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="addRequestCancel">Cancel</button>
+      <button class="btn btn-primary" id="addRequestSave">Save Request</button>
     </div>
   </div>
 </div>
@@ -505,6 +565,86 @@ document.getElementById('cleanupBtn').addEventListener('click', async ()=>{
     btn.textContent = 'Error — try again';
   }
   setTimeout(()=>{ btn.textContent = original; btn.disabled = false; }, 2200);
+});
+
+/* ---- Add Request modal (manual entry) ---- */
+const addRequestOverlay = document.getElementById('addRequestOverlay');
+let arSelectedFiles = [];
+
+function openAddRequestModal(){
+  ['ar_name','ar_phone','ar_email','ar_address','ar_lot','ar_description'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('ar_status').value = 'new';
+  document.getElementById('ar_photos').value = '';
+  document.getElementById('ar_photoNote').textContent = '';
+  document.getElementById('addRequestError').classList.remove('show');
+  arSelectedFiles = [];
+  addRequestOverlay.classList.add('show');
+}
+function closeAddRequestModal(){ addRequestOverlay.classList.remove('show'); }
+document.getElementById('addRequestBtn').addEventListener('click', openAddRequestModal);
+document.getElementById('addRequestClose').addEventListener('click', closeAddRequestModal);
+document.getElementById('addRequestCancel').addEventListener('click', closeAddRequestModal);
+addRequestOverlay.addEventListener('click', e=>{ if(e.target===addRequestOverlay) closeAddRequestModal(); });
+
+document.getElementById('ar_photos').addEventListener('change', e=>{
+  arSelectedFiles = Array.from(e.target.files);
+  document.getElementById('ar_photoNote').textContent = arSelectedFiles.length
+    ? `${arSelectedFiles.length} photo${arSelectedFiles.length===1?'':'s'} selected`
+    : '';
+});
+
+document.getElementById('addRequestSave').addEventListener('click', async ()=>{
+  const errBox = document.getElementById('addRequestError');
+  errBox.classList.remove('show');
+
+  const name = document.getElementById('ar_name').value.trim();
+  const phone = document.getElementById('ar_phone').value.trim();
+  const email = document.getElementById('ar_email').value.trim();
+  const address = document.getElementById('ar_address').value.trim();
+  const lot = document.getElementById('ar_lot').value.trim();
+  const description = document.getElementById('ar_description').value.trim();
+  const status = document.getElementById('ar_status').value;
+
+  if(!name || !phone || !address || !description){
+    errBox.textContent = 'Name, phone, address, and a description are required.';
+    errBox.classList.add('show');
+    return;
+  }
+
+  const btn = document.getElementById('addRequestSave');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  setSyncStatus('saving');
+
+  try{
+    const requestId = requestsCol.doc().id;
+
+    let photoUrls = [];
+    if(arSelectedFiles.length){
+      btn.textContent = 'Uploading photos…';
+      photoUrls = await Promise.all(arSelectedFiles.map((file, i)=>{
+        const ref = storage.ref().child(`service-photos/${requestId}/${i}-${file.name}`);
+        return ref.put(file).then(()=>ref.getDownloadURL());
+      }));
+    }
+
+    btn.textContent = 'Saving…';
+    await requestsCol.doc(requestId).set({
+      name, phone, email, address, lot, description,
+      photoUrls, status,
+      submittedAt: new Date().toISOString(),
+    });
+
+    closeAddRequestModal();
+  } catch(err){
+    console.error(err);
+    errBox.textContent = 'Could not save — check your connection and try again.';
+    errBox.classList.add('show');
+  }
+  btn.disabled = false;
+  btn.textContent = originalLabel;
 });
 
 /* ---- Detail modal ---- */
