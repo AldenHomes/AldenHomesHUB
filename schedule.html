@@ -397,6 +397,7 @@
         <option value="">All Draftsmen</option>
       </select>
       <button class="btn btn-ghost" id="exportBtn">Export CSV</button>
+      <button class="btn btn-ghost" id="printScheduleBtn">Print / PDF</button>
       <button class="btn btn-primary" id="addBtn">+ Add Job</button>
     </div>
 
@@ -2594,6 +2595,160 @@ renderSchedule();
 renderOrders();
 renderOpenDates();
 renderLots();
+
+/* ============================================================
+   PRINT / EXPORT PDF
+   Opens a clean landscape print view built from the SAME jobs
+   currently on screen (respects search + community + draftsman
+   filters), grouped into "Not Yet Scheduled" then by settlement
+   year (newest first) — identical ordering to the live table.
+   Column headers repeat on every printed page; a blank Notes
+   column is included for pen mark-up. Uses the browser's built-in
+   Print -> "Save as PDF". No libraries.
+   ============================================================ */
+(function(){
+  function printFilteredJobs(){
+    const q = (document.getElementById('searchBox') && document.getElementById('searchBox').value || '').trim().toLowerCase();
+    const community = document.getElementById('communityFilter') ? document.getElementById('communityFilter').value : '';
+    const draftsman = document.getElementById('draftsmanFilter') ? document.getElementById('draftsmanFilter').value : '';
+    return jobs.filter(function(j){
+      if(community && j.community!==community) return false;
+      if(draftsman && j.draftsman!==draftsman) return false;
+      if(q){
+        const hay = [j.client, j.address, j.model, j.lot, j.community, j.phone].join(' ').toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function printGroupJobs(rows){
+    const groups = {};
+    const order = [];
+    rows.forEach(function(j){
+      const y = yearKeyFor(j);
+      if(!groups[y]){ groups[y] = []; order.push(y); }
+      groups[y].push(j);
+    });
+    order.sort(function(a,b){
+      if(a==='unscheduled') return -1;
+      if(b==='unscheduled') return 1;
+      return b.localeCompare(a);
+    });
+    order.forEach(function(y){ groups[y].sort(function(a,b){ return (a.settle||'').localeCompare(b.settle||''); }); });
+    return { groups: groups, order: order };
+  }
+
+  function printEsc(s){
+    return (s==null?'':String(s)).replace(/[&<>"]/g, function(c){
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c];
+    });
+  }
+
+  function printTagCell(community){
+    if(!community) return '<span class="ptag ptag-none">&mdash;</span>';
+    const color = (typeof communityColor==='function') ? communityColor(community) : '#555';
+    return '<span class="ptag" style="background:'+color+'">'+printEsc(community)+'</span>';
+  }
+
+  function printJobRow(j){
+    const soon = (typeof daysFromToday==='function') ? daysFromToday(j.settle) : null;
+    const soonClass = (soon!==null && soon>=0 && soon<=14) ? ' settle-soon' : '';
+    return '<tr>'
+      + '<td class="mono">'+printEsc(j.ytd||'')+'</td>'
+      + '<td>'+printTagCell(j.community)+'</td>'
+      + '<td class="mono">'+printEsc(j.lot||'')+'</td>'
+      + '<td>'+printEsc(j.model||'')+'</td>'
+      + '<td>'+printEsc(j.client||'')+'</td>'
+      + '<td class="muted">'+printEsc(j.address||'')+'</td>'
+      + '<td class="mono">'+printEsc(j.draftsman||'—')+'</td>'
+      + '<td class="mono muted">'+printEsc(fmtDate(j.fndn))+'</td>'
+      + '<td class="mono muted">'+printEsc(fmtDate(j.walk))+'</td>'
+      + '<td class="mono muted">'+printEsc(fmtDate(j.move))+'</td>'
+      + '<td class="mono settle-cell'+soonClass+'">'+printEsc(fmtDate(j.settle))+'</td>'
+      + '<td class="notes"></td>'
+      + '</tr>';
+  }
+
+  function printGroupHeader(yearKey, count){
+    const label = yearKey === 'unscheduled' ? 'Not Yet Scheduled' : yearKey;
+    return '<tr class="pgroup"><td colspan="12">'+printEsc(label)+' <span class="pgroup-count">'+count+'</span></td></tr>';
+  }
+
+  function buildPrintDoc(){
+    const rows = printFilteredJobs();
+    const g = printGroupJobs(rows);
+    const printed = new Date();
+    const stamp = printed.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+
+    const q = (document.getElementById('searchBox') && document.getElementById('searchBox').value || '').trim();
+    const community = document.getElementById('communityFilter') ? document.getElementById('communityFilter').value : '';
+    const draftsman = document.getElementById('draftsmanFilter') ? document.getElementById('draftsmanFilter').value : '';
+    const filterBits = [];
+    if(community) filterBits.push('Community: ' + community);
+    if(draftsman) filterBits.push('Draftsman: ' + draftsman);
+    if(q) filterBits.push('Search: "' + q + '"');
+    const filterLine = filterBits.length ? ' &nbsp;&middot;&nbsp; Filtered — ' + printEsc(filterBits.join('  ·  ')) : '';
+
+    const body = g.order.map(function(y){
+      return printGroupHeader(y, g.groups[y].length) + g.groups[y].map(printJobRow).join('');
+    }).join('');
+
+    const css = '@page { size: landscape; margin: 0.45in; }'
+      + '*{box-sizing:border-box;}'
+      + 'body{font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#2b2b2b;margin:0;padding:18px 20px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+      + '.phead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #3a4a5a;padding-bottom:8px;margin-bottom:12px;}'
+      + '.ptitle{font-size:18px;font-weight:700;color:#3a4a5a;}'
+      + '.psub{font-size:11px;color:#8a8578;margin-top:3px;}'
+      + '.pcount{font-size:11px;color:#8a8578;text-align:right;}'
+      + 'table{width:100%;border-collapse:collapse;}'
+      + 'thead th{font-size:8.5px;text-transform:uppercase;letter-spacing:.4px;color:#8a8578;text-align:left;font-weight:700;border-bottom:1px solid #b4ad9c;padding:5px 7px;}'
+      + 'tbody td{font-size:9px;color:#2b2b2b;padding:5px 7px;border-bottom:0.5px solid #e6e2d8;vertical-align:middle;}'
+      + 'td.mono{font-variant-numeric:tabular-nums;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:8.5px;}'
+      + 'td.muted{color:#8a8578;}'
+      + 'td.settle-cell{font-weight:700;}'
+      + 'td.settle-cell.settle-soon{color:#b4532a;}'
+      + 'td.notes{width:1.5in;}'
+      + '.ptag{display:inline-block;color:#fff;font-weight:700;font-size:8px;padding:2px 7px;border-radius:10px;}'
+      + '.ptag-none{background:none;color:#b4ad9c;}'
+      + 'tr.pgroup td{background:#f2efe6;font-weight:700;font-size:10px;color:#2b2b2b;padding:6px 8px;border-bottom:1px solid #ece8dd;}'
+      + 'tr.pgroup .pgroup-count{color:#8a8578;font-weight:700;font-size:8.5px;margin-left:4px;}'
+      + 'thead{display:table-header-group;}'
+      + 'tr{page-break-inside:avoid;}'
+      + 'tr.pgroup{page-break-after:avoid;}'
+      + '.pfoot{margin-top:14px;font-size:8px;color:#b4ad9c;text-align:center;}';
+
+    const head = '<' + 'style>' + css + '</' + 'style>';
+    const autoprint = '<' + 'script>window.onload=function(){setTimeout(function(){window.print();},120);};window.onafterprint=function(){window.close();};</' + 'script>';
+
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Production Schedule — '+printEsc(stamp)+'</title>'+head+'</head><body>'
+      + '<div class="phead"><div><div class="ptitle">Production Schedule</div>'
+      + '<div class="psub">Alden Homes &nbsp;&middot;&nbsp; printed '+printEsc(stamp)+filterLine+'</div></div>'
+      + '<div class="pcount">'+rows.length+' job'+(rows.length===1?'':'s')+'</div></div>'
+      + '<table><thead><tr>'
+      + '<th>YTD</th><th>Community</th><th>Lot</th><th>Model</th><th>Client</th>'
+      + '<th>Address</th><th>Draft</th><th>Fndn.</th><th>Walk</th><th>Move</th><th>Settle</th><th>Notes</th>'
+      + '</tr></thead><tbody>'+body+'</tbody></table>'
+      + '<div class="pfoot">Alden Homes — Job Production Schedule. Generated from the live schedule; dates subject to change.</div>'
+      + autoprint
+      + '</body></html>';
+  }
+
+  function openPrintView(){
+    if(typeof jobs === 'undefined' || !Array.isArray(jobs) || jobs.length === 0){
+      alert('No jobs loaded yet — give the schedule a moment to sync, then try again.');
+      return;
+    }
+    const w = window.open('', '_blank');
+    if(!w){ alert('Please allow pop-ups for this site to print the schedule.'); return; }
+    w.document.open();
+    w.document.write(buildPrintDoc());
+    w.document.close();
+  }
+
+  const printBtn = document.getElementById('printScheduleBtn');
+  if(printBtn) printBtn.addEventListener('click', openPrintView);
+})();
 </script>
 </body>
 </html>
