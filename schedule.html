@@ -570,7 +570,8 @@
       <div class="grid">
         <div>
           <label for="f_ytd">YTD #</label>
-          <input type="number" id="f_ytd" placeholder="e.g. 27">
+          <input type="text" id="f_ytd" readonly placeholder="Auto by settle date" style="background:#f2efe6; color:#8a8578; cursor:not-allowed;">
+          <div class="helper">Assigned automatically in settlement-date order. Model homes are not numbered.</div>
         </div>
         <div>
           <label for="f_community">Community</label>
@@ -608,6 +609,10 @@
         <div>
           <label for="f_phone">Phone</label>
           <input type="tel" id="f_phone" placeholder="717-555-0100">
+        </div>
+        <div>
+          <label for="f_email">Email</label>
+          <input type="email" id="f_email" placeholder="e.g. jkelsey@email.com">
         </div>
         <div>
           <label for="f_draftsman">Draftsman</label>
@@ -1086,6 +1091,7 @@ async function seedIfEmpty(){
 function attachListeners(){
   jobsCol.onSnapshot(snapshot=>{
     jobs = snapshot.docs.map(d=>({ id: d.id, ...d.data() }));
+    assignAutoYtd();
     renderSchedule();
     renderOrders();
     setSyncStatus('idle');
@@ -1209,6 +1215,38 @@ function populateScheduleFilters(){
   commSel.value = curComm; draftSel.value = curDraft;
 }
 
+// A job counts as a "model home" if its client name is some form of
+// "model home" (case-insensitive, extra spaces ignored). Model homes are
+// skipped when auto-numbering YTD.
+function isModelHome(j){
+  return String(j.client||'').trim().replace(/\s+/g,' ').toLowerCase() === 'model home';
+}
+
+// YTD numbers are assigned automatically, in settlement-date order, across
+// all scheduled jobs — model homes and not-yet-scheduled jobs are skipped.
+// The result is written to j._ytdAuto (in memory only; nothing is saved back
+// to the database) and is what the schedule and printout display.
+function assignAutoYtd(){
+  const numbered = jobs
+    .filter(j=> j.settle && !isModelHome(j))
+    .sort((a,b)=>{
+      const c = (a.settle||'').localeCompare(b.settle||'');
+      if(c!==0) return c;
+      // stable tiebreakers so equal settle dates keep a consistent order
+      return String(a.lot||'').localeCompare(String(b.lot||''))
+          || String(a.id||'').localeCompare(String(b.id||''));
+    });
+  // clear any previous run, then number the eligible jobs 1..n
+  jobs.forEach(j=>{ j._ytdAuto = ''; });
+  numbered.forEach((j,i)=>{ j._ytdAuto = i+1; });
+}
+
+// What to show in the YTD column: the auto-assigned number when there is one,
+// otherwise blank (model homes and unscheduled jobs show nothing).
+function ytdDisplay(j){
+  return (j._ytdAuto === '' || j._ytdAuto == null) ? '' : j._ytdAuto;
+}
+
 function buildJobRow(j, oKeys){
   const soon = daysFromToday(j.settle);
   const soonClass = (soon!==null && soon>=0 && soon<=14) ? 'settle-soon' : '';
@@ -1225,7 +1263,7 @@ function buildJobRow(j, oKeys){
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><line x1="12" y1="10" x2="12" y2="15"/><line x1="9.5" y1="12.5" x2="14.5" y2="12.5"/></svg>
       </button>`;
   return `<tr data-id="${j.id}">
-    <td data-label="YTD" class="mono">${j.ytd||''}</td>
+    <td data-label="YTD" class="mono">${ytdDisplay(j)}</td>
     <td data-label="Community"><span class="tag" style="background:${communityColor(j.community)}">${j.community||'—'}</span></td>
     <td data-label="Lot" class="mono">${j.lot||''}</td>
     <td data-label="Model">${j.model||''}</td>
@@ -1283,7 +1321,10 @@ function renderSchedule(){
 
   rows.sort((a,b)=>{
     let av = a[sortKey], bv = b[sortKey];
-    if(sortKey==='ytd'){ av = av===''?Infinity:Number(av); bv = bv===''?Infinity:Number(bv); }
+    if(sortKey==='ytd'){
+      av = ytdDisplay(a); bv = ytdDisplay(b);
+      av = av===''?Infinity:Number(av); bv = bv===''?Infinity:Number(bv);
+    }
     if(av===undefined||av===null) av='';
     if(bv===undefined||bv===null) bv='';
     if(av<bv) return sortDir==='asc'? -1: 1;
@@ -1332,7 +1373,7 @@ function renderSchedule(){
   }
 
   document.getElementById('statTotal').textContent = jobs.length;
-  document.getElementById('statYTD').textContent = jobs.filter(j=>j.ytd!=='' && j.ytd!=null).length;
+  document.getElementById('statYTD').textContent = jobs.filter(j=>ytdDisplay(j)!=='').length;
   document.getElementById('statUpcoming').textContent = jobs.filter(j=>{
     const d = daysFromToday(j.settle);
     return d!==null && d>=0 && d<=30;
@@ -1414,7 +1455,7 @@ function openJobModal(id, focusFiles, prefillSlot){
     }
   };
 
-  document.getElementById('f_ytd').value = job ? (job.ytd ?? '') : '';
+  document.getElementById('f_ytd').value = job ? (ytdDisplay(job) === '' ? '—' : ytdDisplay(job)) : '(assigned on save)';
   setSelectOrOther('f_community','f_community_other', job ? job.community : (lot ? lot.community : 'AP'), ['AP','MM','ML','CL','OS']);
   document.getElementById('f_lot').value = job ? job.lot||'' : (lot ? lot.lot||'' : '');
   document.getElementById('f_model').value = job ? job.model||'' : '';
@@ -1422,6 +1463,7 @@ function openJobModal(id, focusFiles, prefillSlot){
   document.getElementById('f_address').value = job ? job.address||'' : (lot ? lot.address||'' : '');
   document.getElementById('f_files').value = job ? job.filesUrl||'' : '';
   document.getElementById('f_phone').value = job ? job.phone||'' : '';
+  document.getElementById('f_email').value = job ? job.email||'' : '';
   const draftsmanValue = job ? job.draftsman : (prefillSlot ? prefillSlot.draftsman : '');
   setSelectOrOther('f_draftsman','f_draftsman_other', draftsmanValue, ['D','J','']);
   document.getElementById('f_fndn').value = job ? job.fndn||'' : (prefillSlot ? prefillSlot.fndn||'' : '');
@@ -1512,7 +1554,6 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
   const draftsman = draftSel==='__other' ? document.getElementById('f_draftsman_other').value.trim().toUpperCase() : draftSel;
 
   const data = {
-    ytd: document.getElementById('f_ytd').value,
     community,
     lot: document.getElementById('f_lot').value.trim(),
     model: document.getElementById('f_model').value.trim(),
@@ -1520,6 +1561,7 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
     address: document.getElementById('f_address').value.trim(),
     filesUrl: document.getElementById('f_files').value.trim(),
     phone: document.getElementById('f_phone').value.trim(),
+    email: document.getElementById('f_email').value.trim(),
     plan: '',
     draftsman,
     fndn: document.getElementById('f_fndn').value,
@@ -1612,9 +1654,9 @@ deleteBtn.addEventListener('click', async ()=>{
 });
 
 document.getElementById('exportBtn').addEventListener('click', ()=>{
-  const headers = ['YTD','Community','Lot','Model','Client','Address','Phone','Draftsman','Foundation','Walk','Move','Settle','OneDrive Folder'];
+  const headers = ['YTD','Community','Lot','Model','Client','Address','Phone','Email','Draftsman','Foundation','Walk','Move','Settle','OneDrive Folder'];
   const rows = jobs.slice().sort((a,b)=> (a.settle||'').localeCompare(b.settle||'')).map(j=>[
-    j.ytd, j.community, j.lot, j.model, j.client, j.address, j.phone, j.draftsman, j.fndn, j.walk, j.move, j.settle, j.filesUrl
+    ytdDisplay(j), j.community, j.lot, j.model, j.client, j.address, j.phone, j.email, j.draftsman, j.fndn, j.walk, j.move, j.settle, j.filesUrl
   ]);
   downloadCSV('job_production_schedule.csv', headers, rows);
 });
@@ -2655,7 +2697,7 @@ renderLots();
     const soon = (typeof daysFromToday==='function') ? daysFromToday(j.settle) : null;
     const soonClass = (soon!==null && soon>=0 && soon<=14) ? ' settle-soon' : '';
     return '<tr>'
-      + '<td class="mono">'+printEsc(j.ytd||'')+'</td>'
+      + '<td class="mono">'+printEsc(ytdDisplay(j))+'</td>'
       + '<td>'+printTagCell(j.community)+'</td>'
       + '<td class="mono">'+printEsc(j.lot||'')+'</td>'
       + '<td>'+printEsc(j.model||'')+'</td>'
