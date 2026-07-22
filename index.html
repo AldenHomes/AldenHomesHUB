@@ -333,7 +333,10 @@ function attachScheduleStatsListener(db){
   db.collection('jobs').onSnapshot(snapshot=>{
     const jobs = snapshot.docs.map(d=>d.data());
     document.getElementById('tileStatTotal').textContent = jobs.length;
-    document.getElementById('tileStatYTD').textContent = jobs.filter(j=>j.ytd!=='' && j.ytd!=null).length;
+    document.getElementById('tileStatYTD').textContent = jobs.filter(j=>{
+      const isModel = String(j.client||'').trim().replace(/\s+/g,' ').toLowerCase() === 'model home';
+      return j.settle && !isModel;
+    }).length;
     document.getElementById('tileStatUpcoming').textContent = jobs.filter(j=>{
       const d = daysFromToday(j.settle);
       return d!==null && d>=0 && d<=30;
