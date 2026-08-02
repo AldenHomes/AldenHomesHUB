@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alden Homes — Job Costing</title>
+<style>
+  :root{
+    --ink:#1a1d21; --ink-soft:#4a5158; --line:#dfe3e8; --line-soft:#eef1f4;
+    --paper:#f7f8fa; --card:#ffffff; --brand:#1f5c4d; --brand-soft:#e7f0ed;
+    --over:#b23b3b; --over-soft:#fbecec; --under:#1f7a4d; --under-soft:#e7f4ec;
+    --warn:#a86a1a; --warn-soft:#faf1e0; --accent:#2b6cb0; --accent-soft:#e8f1fb;
+    --mat:#3a6ea5; --sub:#7a4fa3; --oth:#8a7a2a; --push:#2b6cb0;
+    --radius:8px; --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);font-size:14px;line-height:1.45}
+  h1,h2,h3{margin:0;font-weight:600}
+  button{font-family:inherit;font-size:inherit;cursor:pointer}
+  input,select{font-family:inherit;font-size:inherit}
+  .mono{font-family:var(--mono)}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  .muted{color:var(--ink-soft)}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:600}
+
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
+  .logo{font-weight:700;letter-spacing:.02em;font-size:16px}
+  .logo span{color:var(--brand)}
+  .btn{background:var(--brand);color:#fff;border:1px solid var(--brand);padding:8px 14px;border-radius:6px;font-weight:600}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:none;color:var(--brand)}
+  .btn.ghost:hover{background:var(--brand-soft)}
+  .btn.gray{background:none;color:var(--ink-soft);border-color:var(--line)}
+  .btn.gray:hover{background:var(--line-soft)}
+  .btn.sm{padding:5px 10px;font-size:13px}
+  .btn.danger{background:none;color:var(--over);border-color:var(--over)}
+  .btn.danger:hover{background:var(--over-soft)}
+  .btn.push{background:var(--push);border-color:var(--push)}
+  .grow{flex:1}
+  .pill{font-size:11px;padding:3px 8px;border-radius:20px;background:var(--warn-soft);color:var(--warn);font-weight:600}
+  .devpick{display:flex;align-items:center;gap:8px}
+  .devpick select{padding:7px 28px 7px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:600;color:var(--ink)}
+  .devpick select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+
+  main{max-width:1200px;margin:0 auto;padding:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:16px}
+  .card-h{padding:12px 16px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:12px}
+  .card-h h2{font-size:15px}
+  .card-b{padding:16px}
+
+  /* ------- active jobs landing ------- */
+  .crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);margin-bottom:14px}
+  .crumb a{color:var(--brand);font-weight:600;cursor:pointer;text-decoration:none}
+  .crumb .sep{color:var(--line)}
+  .jobgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .jobcard{border:1px solid var(--line);border-radius:10px;background:#fff;padding:16px;cursor:pointer;transition:border-color .12s,box-shadow .12s;text-align:left;font-family:inherit;display:block;width:100%}
+  .jobcard:hover{border-color:var(--brand);box-shadow:0 2px 12px rgba(31,92,77,.09)}
+  .jobcard .jc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+  .jobcard .jc-name{font-weight:700;font-size:15px;color:var(--ink)}
+  .jobcard .jc-model{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+  .jobcard .jc-dev{font-size:10.5px;font-weight:700;color:var(--brand);background:var(--brand-soft);padding:2px 7px;border-radius:5px;letter-spacing:.03em;white-space:nowrap}
+  .jc-figs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px}
+  .jc-fig .l{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:600}
+  .jc-fig .v{font-family:var(--mono);font-weight:700;font-size:15px;margin-top:2px}
+  .jc-fig .v.pos{color:var(--under)} .jc-fig .v.neg{color:var(--over)}
+  .jc-bar{height:6px;border-radius:3px;background:var(--line-soft);margin-top:12px;overflow:hidden}
+  .jc-bar>span{display:block;height:100%}
+  .jc-bar.ok>span{background:var(--under)} .jc-bar.warn>span{background:var(--warn)} .jc-bar.over>span{background:var(--over)}
+  .jc-foot{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-soft);margin-top:6px}
+
+  /* ------- KPIs ------- */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .kpi .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:600}
+  .kpi .val{font-size:23px;font-weight:700;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:4px}
+  .kpi .val.over{color:var(--over)} .kpi .val.under{color:var(--under)}
+  .kpi .sub{font-size:11px;color:var(--ink-soft);margin-top:3px}
+
+  /* ------- tables ------- */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th.num,td.num{text-align:right}
+  td{padding:9px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tbody tr.hoverable:hover{background:var(--line-soft)}
+  .catbadge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.03em}
+  .cat-MAT{background:#e8f0f8;color:var(--mat)} .cat-SUB{background:#f1e9f7;color:var(--sub)} .cat-OTH{background:#f6f2e0;color:var(--oth)}
+  .bar{height:8px;border-radius:4px;background:var(--line-soft);overflow:hidden}
+  .bar>span{display:block;height:100%;border-radius:4px}
+  .bar.ok>span{background:var(--under)} .bar.over>span{background:var(--over)} .bar.warn>span{background:var(--warn)}
+  .var-over{color:var(--over);font-weight:600} .var-under{color:var(--under);font-weight:600}
+
+  /* budget edit + age flag */
+  .budget-in{width:96px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;text-align:right;font-family:var(--mono)}
+  .budget-in:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
+  .age{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:6px;white-space:nowrap}
+  .age.fresh{background:var(--under-soft);color:var(--under)}
+  .age.aging{background:var(--warn-soft);color:var(--warn)}
+  .age.stale{background:var(--over-soft);color:var(--over)}
+  .hist{font-size:11px;color:var(--ink-soft);font-family:var(--mono)}
+
+  /* push state chips */
+  .pushchip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:5px;display:inline-flex;align-items:center;gap:5px}
+  .push-draft{background:var(--warn-soft);color:var(--warn)}
+  .push-done{background:var(--accent-soft);color:var(--push)}
+  .dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
+
+  /* subnav inside house */
+  .subtabs{display:flex;gap:4px;margin:2px 0 16px}
+  .subtab{padding:7px 13px;border:1px solid var(--line);background:#fff;border-radius:6px;color:var(--ink-soft);font-weight:600}
+  .subtab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* selection list */
+  .sel-line{display:flex;justify-content:space-between;gap:14px;padding:9px 10px;border-bottom:1px solid var(--line-soft);font-size:13.5px}
+  .sel-line:last-child{border-bottom:none}
+  .sel-line .sl-l{color:var(--ink-soft)} .sel-line .sl-v{flex:1;text-align:right}
+  .sel-line .sl-p{width:96px;text-align:right;font-family:var(--mono);font-weight:600}
+  .tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;margin-left:6px}
+  .tag-co{background:#f6eee8;color:#a3592e} .tag-v1{background:#eef1e6;color:#5a6146}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(20,24,28,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+  .overlay.open{display:flex}
+  .modal{background:var(--card);border-radius:12px;width:100%;max-width:760px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .modal-h{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .modal-h h2{font-size:16px}
+  .modal-b{padding:20px}
+  .modal-f{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:var(--card);border-radius:0 0 12px 12px}
+  .x{margin-left:auto;background:none;border:none;font-size:22px;line-height:1;color:var(--ink-soft);padding:0 4px}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+  .field label{font-size:12px;font-weight:600;color:var(--ink-soft)}
+  .field input,.field select{padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;width:100%}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+  .rowf{display:flex;gap:12px}.rowf>*{flex:1}
+  .alloc{border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--paper)}
+  .alloc .rowf{align-items:flex-end}
+  .alloc-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .split-note{font-size:12px;color:var(--ink-soft);margin-top:4px}
+  .balance-ok{color:var(--under);font-weight:600}.balance-bad{color:var(--over);font-weight:600}
+  .house-lock{background:var(--brand-soft);color:var(--brand);font-weight:600;font-size:12.5px;padding:8px 12px;border-radius:6px;display:flex;align-items:center;gap:8px;margin-bottom:14px}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:12px 20px;border-radius:8px;opacity:0;transition:all .25s;z-index:100;font-weight:500}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .empty{padding:40px;text-align:center;color:var(--ink-soft)}
+  @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}.rowf{flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">ALDEN<span>·</span>HUB</div>
+  <a href="index.html" style="color:var(--ink-soft);text-decoration:none;font-size:13px;font-weight:600">Hub</a>
+  <button class="btn" id="btn-enter-invoice">+ Enter Invoice</button>
+  <div class="grow"></div>
+  <div class="devpick"><span class="eyebrow" style="margin:0">Development</span><select id="dev-select"></select></div>
+  <span class="pill">POC · placeholder $</span>
+</header>
+
+<main id="main"></main>
+
+<!-- INVOICE MODAL -->
+<div class="overlay" id="inv-modal">
+  <div class="modal">
+    <div class="modal-h"><h2 id="inv-modal-title">Enter Invoice</h2><button class="x" data-close>&times;</button></div>
+    <div class="modal-b">
+      <div id="house-lock-slot"></div>
+      <div class="rowf">
+        <div class="field"><label>Vendor</label><input id="f-vendor" list="vendor-list" placeholder="D &amp; S Flooring"></div>
+        <div class="field"><label>Invoice #</label><input id="f-invnum" placeholder="7529"></div>
+      </div>
+      <datalist id="vendor-list"></datalist>
+      <div class="rowf">
+        <div class="field"><label>Invoice Date</label><input id="f-date" type="date"></div>
+        <div class="field"><label>Amount ($)</label><input id="f-amount" type="number" step="0.01" class="num" placeholder="0.00"></div>
+        <div class="field"><label>Tax ($) <span class="muted">opt</span></label><input id="f-tax" type="number" step="0.01" class="num" placeholder="0.00"></div>
+      </div>
+      <div class="field"><label>Description</label><input id="f-desc" placeholder="LVP install throughout"></div>
+      <div class="alloc-head" style="margin-top:6px">
+        <span class="eyebrow" style="margin-right:auto">Coding — house, cost code, split if needed</span>
+        <button class="btn ghost sm" id="btn-add-alloc">+ Add split</button>
+      </div>
+      <div id="alloc-list"></div>
+      <div class="split-note" id="alloc-balance"></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn gray" data-close>Cancel</button>
+      <button class="btn" id="btn-save-invoice">Save (draft)</button>
+      <button class="btn push" id="btn-save-push">Save &amp; push to QuickBooks</button>
+    </div>
+  </div>
+</div>
+
+<!-- JOB MODAL -->
+<div class="overlay" id="job-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-h"><h2>Add House</h2><button class="x" data-close>&times;</button></div>
+    <div class="modal-b">
+      <div class="field"><label>Development <span class="muted">— start here</span></label><select id="j-community"></select></div>
+      <div class="field"><label>House / address</label><input id="j-name" placeholder="AP 154 Struck — 1028 Stanford Dr"></div>
+      <div class="field"><label>Model</label><input id="j-model" placeholder="The Hartwell"></div>
+      <p class="muted" style="font-size:13px">Budget seeds from historic model data per cost code (age-flagged, adjustable). Settlement comes from the completed selection sheet.</p>
+    </div>
+    <div class="modal-f"><button class="btn gray" data-close>Cancel</button><button class="btn" id="btn-save-job">Add house</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Alden Homes — Job Costing (house-centric, Option B)
+   Flow: enter+code invoice in-app (raw invoice in hand) push to QB.
+   QB receives the payable; house + cost code stay here for job costing.
+   Numbers:
+     Settlement = base + adders + change orders (from selections) — revenue
+     Budget     = historic-seeded per code, AGE-FLAGGED, adjustable — cost
+     Actual     = coded invoices
+     Margin     = settlement − budget (and − actual as it fills)
+   State declared first (TDZ-safe). Standalone in-memory.
+   ============================================================ */
+const USE_FIREBASE = false;
+
+/* ---- state (declared before init) ---- */
+let COST_CODES=[], JOBS=[], INVOICES=[];
+let allocDraft=[], editingInvoiceId=null, lockedHouseId=null;
+let currentDev="ALL", lastVendor="";
+let route={view:"jobs", jobId:null, tab:"budget"};   // jobs | house
+
+/* ---- developments ---- */
+const DEVELOPMENTS=[{code:"AP",name:"Alden Place"},{code:"CL",name:"Cliffs"},{code:"MM",name:"Mountain Meadows"},{code:"ML",name:"Maple Lane"}];
+const devName=c=>(DEVELOPMENTS.find(d=>d.code===c)||{}).name||c;
+
+/* ---- master cost codes ---- */
+const CODE_SEED=[
+  [2,"Site Improvements","SUB","5002"],[5,"Engineering","OTH","5005"],[10,"Permits","OTH","5010"],
+  [12,"Excavation","SUB","5012"],[14,"Footer / Foundation","SUB","5014"],[16,"Concrete","SUB","5016"],
+  [30,"Lumber","MAT","5030"],[32,"Doors / Windows","MAT","5032"],[34,"Framing","SUB","5034"],
+  [36,"Shingles / Roofing","SUB","5036"],[38,"Insulation","SUB","5038"],[40,"Siding / Fascia","SUB","5040"],
+  [41,"Railing","SUB","5041"],[42,"Brick / Stone","SUB","5042"],[44,"Spouting","SUB","5044"],
+  [50,"Plumbing","SUB","5050"],[51,"Sprinklers","SUB","5051"],[52,"Heating","SUB","5052"],
+  [54,"Electrical","SUB","5054"],[55,"Energy Star","OTH","5055"],[56,"Drywall","SUB","5056"],
+  [57,"Specialty Stairs","SUB","5057"],[58,"Trim","SUB","5058"],[59,"Shelves / Mirrors","MAT","5059"],
+  [60,"Painting","SUB","5060"],[70,"Kitchens / Vanities","MAT","5070"],[71,"Fireplace","SUB","5071"],
+  [72,"Floor Covering","SUB","5072"],[74,"Appliances","MAT","5074"],[76,"Driveway","SUB","5076"],
+  [77,"Wash Line","MAT","5077"],[78,"Landscaping","SUB","5078"],[80,"Utilities","OTH","5080"],
+  [90,"Misc.","OTH","5090"],[91,"Service Work","SUB","5091"],[94,"Warranty / After 1st Year","SUB","5094"]
+];
+
+/* historic per-model budget (placeholder) with a build date per code so age shows */
+const BUDGET_SEED={2:6000,5:1200,10:4500,12:9000,14:14000,16:12000,30:38000,32:16000,34:22000,
+  36:11000,38:7000,40:15000,41:3000,42:6000,44:2500,50:18000,51:1800,52:14000,54:16000,55:1200,
+  56:12000,57:2500,58:14000,59:1500,60:11000,70:26000,71:3500,72:17000,74:8000,76:6500,77:400,
+  78:7000,80:5000,90:2000,91:0,94:0};
+
+/* seed houses — each carries a historic source date (how old the comp is) */
+const JOB_SEED=[
+  {name:"AP 154 Struck — 1028 Stanford Dr",model:"The Hartwell",community:"AP",histDate:"2026-02-10",
+   settlement:{base:324900,adders:41780,co:2100,coFees:200},budgetStatus:"approved"},
+  {name:"ML 117 Lowrie — 117 Maple Ln",model:"The Coleman",community:"ML",histDate:"2024-06-01",
+   settlement:{base:311000,adders:38650,co:0,coFees:0},budgetStatus:"approved"},
+  {name:"CL 102 — Cliffs Sec 2",model:"The Coleman",community:"CL",histDate:"2025-09-15",
+   settlement:{base:311000,adders:52300,co:1450,coFees:100},budgetStatus:"approved"},
+  {name:"219 Alden Place — 1059 Percy Ln",model:"The Ashford",community:"AP",histDate:"2026-05-20",
+   settlement:{base:298500,adders:22900,co:0,coFees:0},budgetStatus:"approved"},
+  {name:"MM 23 Weaver — 14 Meadow View",model:"The Coleman",community:"MM",histDate:"2026-07-28",
+   settlement:{base:334000,adders:47600,co:900,coFees:100},budgetStatus:"review"},
+];
+
+/* per-model historic builds (lined up per code for side-by-side review).
+   Real version pulls from the comp engine's 136 builds by matching model name. */
+const MODEL_COMPS={
+  "The Coleman":[
+    {lot:"372",date:"2022-05-23",sqft:1859,codes:{14:11200,16:10800,30:33000,34:19000,36:9500,38:6200,40:13000,50:15500,52:12000,54:12224,56:10500,58:12500,60:9800,70:22000,72:14500,74:7200}},
+    {lot:"51", date:"2025-03-31",sqft:2158,codes:{14:13500,16:12100,30:39000,34:22500,36:11200,38:7100,40:15200,50:18200,52:14200,54:17130,56:12300,58:14500,60:11400,70:25800,72:17200,74:8100}},
+    {lot:"106",date:"2025-05-30",sqft:2986,codes:{14:16800,16:15400,30:52000,34:29000,36:14800,38:9100,40:19500,50:23500,52:18500,54:40236,56:16200,58:19000,60:15200,70:34000,72:22800,74:10200}},
+    {lot:"110",date:"2026-07-28",sqft:3257,codes:{14:17900,16:16100,30:55000,34:31000,36:15600,38:9600,40:21000,50:25000,52:19800,54:29325,56:17600,58:20500,60:16400,70:36500,72:24500,74:11000}},
+  ],
+  "The Hartwell":[
+    {lot:"201",date:"2025-11-10",sqft:2340,codes:{14:14200,16:12600,30:41000,34:23800,36:11800,38:7400,40:16000,50:19000,52:14800,54:18500,56:12900,58:15200,60:11900,70:27000,72:18000,74:8400}},
+    {lot:"208",date:"2026-03-15",sqft:2410,codes:{14:14600,16:13000,30:42500,34:24500,36:12100,38:7600,40:16500,50:19600,52:15200,54:19200,56:13300,58:15700,60:12300,70:27800,72:18600,74:8700}},
+  ],
+  "The Ashford":[
+    {lot:"216",date:"2025-04-14",sqft:1746,codes:{14:10385,16:11960,30:26204,34:14924,36:9200,38:5800,40:12000,50:14200,52:11500,54:14100,56:10100,58:11800,60:9200,70:20500,72:13200,74:6800}},
+  ],
+};
+
+/* seed invoices (coded), some pushed some draft */
+const INV_SEED=[
+  {vendor:"D & S Flooring",invnum:"7529",date:"2026-04-23",amount:10816.47,tax:0,desc:"Revered LVP install throughout",pushed:true,alloc:[{jobIdx:3,code:72,amount:10816.47}]},
+  {vendor:"First Rate Drywall",invnum:"R26-080",date:"2026-07-15",amount:385.00,tax:0,desc:"Electrical outlets moved, patches",pushed:true,alloc:[{jobIdx:1,code:56,amount:385.00}]},
+  {vendor:"First Rate Drywall",invnum:"R26-085",date:"2026-07-15",amount:460.00,tax:0,desc:"Hang & finish wall around bsmt fridge",pushed:false,alloc:[{jobIdx:1,code:56,amount:460.00}]},
+  {vendor:"Energy Auditors LLC",invnum:"8352",date:"2026-07-14",amount:1150.00,tax:0,desc:"Energy Star + UGI rebate",pushed:true,alloc:[{jobIdx:0,code:55,amount:1150.00}]},
+  {vendor:"Energy Auditors LLC",invnum:"8366",date:"2026-07-16",amount:1150.00,tax:0,desc:"Energy Star + UGI rebate",pushed:false,alloc:[{jobIdx:1,code:55,amount:1150.00}]},
+  {vendor:"Elite Outdoor Expressions",invnum:"49997",date:"2026-07-23",amount:8220.96,tax:0,desc:"Model railing + privacy fence",pushed:false,alloc:[{jobIdx:1,code:41,amount:8220.96}]},
+  {vendor:"Fast Supply LP",invnum:"125608",date:"2026-07-15",amount:1310.68,tax:74.19,desc:"Basin, corr plastic, backwater valve",pushed:true,alloc:[{jobIdx:2,code:14,amount:655.34},{jobIdx:2,code:50,amount:655.34}]},
+];
+
+/* =================== helpers =================== */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const money=n=>(n<0?"-$":"$")+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const money0=n=>(n<0?"-$":"$")+Math.abs(Math.round(n)).toLocaleString("en-US");
+const codeById=id=>COST_CODES.find(c=>c.code===id);
+const uid=()=>Math.random().toString(36).slice(2,10);
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);}
+
+function monthsOld(dateStr){
+  const d=new Date(dateStr), now=new Date("2026-08-01");
+  return (now.getFullYear()-d.getFullYear())*12 + (now.getMonth()-d.getMonth());
+}
+function ageClass(m){ return m<=6?"fresh":(m<=15?"aging":"stale"); }
+function ageLabel(m){ if(m<12) return m+" mo"; const y=(m/12); return (Math.round(y*10)/10)+" yr"; }
+
+/* =================== bootstrap =================== */
+/* selection adders per house, by cost code — what the selections app feeds in.
+   Keyed by JOB_SEED index. These stack onto the comp base per the merge rule. */
+const SELECTION_ADDERS=[
+  {14:0,70:6800,72:9800,50:5200,41:1480,71:4850},   // Struck (Hartwell)
+  {70:5400,72:11200,50:3200,58:1900},               // Lowrie (Coleman)
+  {70:8100,72:14300,50:6200,58:2400,41:3000},       // Bair (Coleman)
+  {70:3200,72:2600},                                 // Nolt (Ashford)
+  {70:7600,72:12800,50:5800,58:2100,41:2600,71:4850},// Weaver (Coleman) — in review
+];
+
+/* seed method for generating the comp base (average of same-model builds) */
+function compBaseForModel(model){
+  const builds=MODEL_COMPS[model]||[];
+  if(!builds.length) return {...BUDGET_SEED};
+  const base={};
+  const allCodes=new Set();
+  builds.forEach(b=>Object.keys(b.codes).forEach(c=>allCodes.add(+c)));
+  allCodes.forEach(code=>{
+    const vals=builds.map(b=>b.codes[code]||0);
+    base[code]=Math.round(vals.reduce((s,v)=>s+v,0)/vals.length);
+  });
+  return base;
+}
+
+function seedData(){
+  COST_CODES=CODE_SEED.map(([code,desc,cat,gl])=>({code,desc,cat,gl}));
+  JOBS=JOB_SEED.map((j,idx)=>{
+    const compBase=compBaseForModel(j.model);       // historic average per code
+    const adders=SELECTION_ADDERS[idx]||{};          // selection-driven per code
+    // MERGE: budget per code = comp base + selection adder (the agreed rule)
+    const merged={};
+    const codes=new Set([...Object.keys(compBase),...Object.keys(adders)].map(Number));
+    codes.forEach(c=>{ merged[c]=(compBase[c]||0)+(adders[c]||0); });
+    return {
+      id:uid(), name:j.name, model:j.model, community:j.community, histDate:j.histDate,
+      settlement:j.settlement, budgetStatus:j.budgetStatus||"approved",
+      compBase,                                       // historic reference (read-only)
+      adders,                                         // selection contribution (read-only)
+      budget:{...merged},                             // generated + editable
+      histBudget:{...merged},                         // snapshot of generated (to show "adj" flag)
+    };
+  });
+  INVOICES=INV_SEED.map(v=>({
+    id:uid(),vendor:v.vendor,invnum:v.invnum,date:v.date,amount:v.amount,tax:v.tax,desc:v.desc,
+    pushed:v.pushed, payment:null, discount:null,
+    alloc:v.alloc.map(a=>({jobId:JOBS[a.jobIdx].id,code:a.code,amount:a.amount}))
+  }));
+}
+
+/* comps for a house's model, for side-by-side display */
+function compsForModel(model){ return MODEL_COMPS[model]||[]; }
+function reviewQueue(){ return JOBS.filter(j=>j.budgetStatus==="review"); }
+
+/* =================== rollups =================== */
+function actualByJobCode(jobId,code){let s=0;for(const inv of INVOICES)for(const a of inv.alloc)if(a.jobId===jobId&&a.code===code)s+=a.amount;return s;}
+function jobBudget(j){return Object.values(j.budget).reduce((a,b)=>a+b,0);}
+function jobActual(j){let s=0;for(const inv of INVOICES)for(const a of inv.alloc)if(a.jobId===j.id)s+=a.amount;return s;}
+function jobSettlement(j){const s=j.settlement;return s.base+s.adders+s.co+s.coFees;}
+function jobMargin(j){return jobSettlement(j)-jobBudget(j);}       // vs budget
+function jobMarginActual(j){return jobSettlement(j)-jobActual(j);} // vs actual so far
+function visibleJobs(){return currentDev==="ALL"?JOBS:JOBS.filter(j=>j.community===currentDev);}
+function jobCountFor(code){return JOBS.filter(j=>j.community===code).length;}
+function invoicesForJob(id){return INVOICES.filter(inv=>inv.alloc.some(a=>a.jobId===id));}
+function draftCount(){return INVOICES.filter(i=>!i.pushed).length;}
+
+/* =================== render: router =================== */
+function render(){
+  populateDev();
+  if(route.view==="review" && JOBS.find(j=>j.id===route.jobId)) renderBudgetReview();
+  else if(route.view==="house" && JOBS.find(j=>j.id===route.jobId)) renderHouse();
+  else { route.view="jobs"; renderJobsLanding(); }
+}
+
+/* =================== active jobs landing =================== */
+function renderJobsLanding(){
+  const jobs=visibleJobs();
+  const totSettle=jobs.reduce((s,j)=>s+jobSettlement(j),0);
+  const totBud=jobs.reduce((s,j)=>s+jobBudget(j),0);
+  const totAct=jobs.reduce((s,j)=>s+jobActual(j),0);
+  const totMargin=totSettle-totBud;
+  const drafts=draftCount();
+
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="lbl">Active houses</div><div class="val">${jobs.length}</div><div class="sub">${currentDev==="ALL"?"all developments":devName(currentDev)}</div></div>
+    <div class="kpi"><div class="lbl">Settlement (contract)</div><div class="val">${money0(totSettle)}</div><div class="sub">base + adders + COs</div></div>
+    <div class="kpi"><div class="lbl">Budget Actual</div><div class="val">${money0(totAct)}</div><div class="sub">of ${money0(totBud)} budgeted</div></div>
+    <div class="kpi"><div class="lbl">Projected margin</div><div class="val ${totMargin<0?'over':'under'}">${money0(totMargin)}</div><div class="sub">settlement − budget</div></div>
+  </div>`;
+
+  const cards=jobs.length?jobs.map(j=>{
+    const settle=jobSettlement(j),bud=jobBudget(j),act=jobActual(j),margin=settle-bud;
+    const pct=bud?Math.min(100,act/bud*100):0;
+    const cls=act>bud?'over':(pct>85?'warn':'ok');
+    const drafts=invoicesForJob(j.id).filter(i=>!i.pushed).length;
+    return `<button class="jobcard" data-job="${j.id}">
+      <div class="jc-top">
+        <div><div class="jc-name">${j.name}</div><div class="jc-model">${j.model}</div></div>
+        <span class="jc-dev">${j.community}</span>
+      </div>
+      <div class="jc-figs">
+        <div class="jc-fig"><div class="l">Settlement</div><div class="v">${money0(settle)}</div></div>
+        <div class="jc-fig"><div class="l">Actual</div><div class="v">${money0(act)}</div></div>
+        <div class="jc-fig"><div class="l">Margin</div><div class="v ${margin<0?'neg':'pos'}">${money0(margin)}</div></div>
+      </div>
+      <div class="jc-bar ${cls}"><span style="width:${pct}%"></span></div>
+      <div class="jc-foot"><span>${money0(act)} of ${money0(bud)} budget</span><span>${drafts?drafts+" draft invoice"+(drafts>1?"s":""):"all pushed"}</span></div>
+    </button>`;
+  }).join(""):`<div class="empty">No active houses in ${devName(currentDev)} yet.</div>`;
+
+  const queue=reviewQueue().filter(j=>currentDev==="ALL"||j.community===currentDev);
+  const reviewBanner=queue.length?`
+    <div class="card" style="border-color:#ecd9b0;background:var(--warn-soft)">
+      <div class="card-h" style="border-bottom-color:#ecd9b0">
+        <span class="pushchip push-draft" style="font-size:12px"><span class="dot"></span>New budget${queue.length>1?"s":""} for review</span>
+        <h2 style="font-size:14px;color:var(--warn)">${queue.length} house${queue.length>1?"s":""} finished selections — budget auto-generated, needs your review</h2>
+        <div class="grow"></div>
+      </div>
+      <div class="card-b" style="padding:10px 12px">
+        ${queue.map(j=>`<button class="btn gray sm" style="margin:4px;background:#fff" data-review="${j.id}">${j.name} — review budget</button>`).join("")}
+      </div>
+    </div>`:"";
+
+  $("#main").innerHTML=`
+    <div class="crumb"><span>Active houses</span>${drafts?`<span class="sep">·</span><span class="pushchip push-draft"><span class="dot"></span>${drafts} invoice${drafts>1?"s":""} not yet pushed to QuickBooks</span>`:""}<div class="grow"></div></div>
+    ${reviewBanner}
+    ${kpis}
+    <div class="card">
+      <div class="card-h"><h2>Houses</h2><div class="grow"></div><button class="btn ghost sm" id="btn-add-job">+ Add House</button></div>
+      <div class="card-b"><div class="jobgrid">${cards}</div></div>
+    </div>`;
+  $$("#main .jobcard").forEach(b=>b.onclick=()=>{route={view:"house",jobId:b.dataset.job,tab:"budget"};render();window.scrollTo({top:0});});
+  $$("#main [data-review]").forEach(b=>b.onclick=()=>{route={view:"review",jobId:b.dataset.review,tab:"budget"};render();window.scrollTo({top:0});});
+  $("#btn-add-job").onclick=openJobModal;
+}
+
+/* =================== budget review (comps side-by-side) =================== */
+function renderBudgetReview(){
+  const j=JOBS.find(x=>x.id===route.jobId);
+  const comps=compsForModel(j.model);
+  const settle=jobSettlement(j), bud=jobBudget(j), margin=settle-bud;
+
+  const compHeads=comps.map(c=>{
+    const m=monthsOld(c.date);
+    return `<th class="num">${c.lot}<br><span class="muted" style="font-weight:400">${c.date.slice(0,7)}</span> <span class="age ${ageClass(m)}">${ageLabel(m)}</span><br><span class="muted" style="font-weight:400;font-size:10px">${c.sqft} sf</span></th>`;
+  }).join("");
+
+  // codes present in either comps or adders
+  const codeSet=new Set();
+  comps.forEach(c=>Object.keys(c.codes).forEach(k=>codeSet.add(+k)));
+  Object.keys(j.adders).forEach(k=>codeSet.add(+k));
+  Object.keys(j.budget).forEach(k=>codeSet.add(+k));
+  const codes=[...codeSet].sort((a,b)=>a-b);
+
+  const rows=codes.map(code=>{
+    const c=codeById(code); if(!c) return "";
+    const compVals=comps.map(cp=>cp.codes[code]||0);
+    const compAvg=compVals.length?Math.round(compVals.reduce((s,v)=>s+v,0)/compVals.length):0;
+    const adder=j.adders[code]||0;
+    const b=j.budget[code]||0;
+    const compCells=comps.map((cp,i)=>`<td class="num hist">${compVals[i]?money0(compVals[i]):"·"}</td>`).join("");
+    return `<tr>
+      <td class="mono">${code}</td><td>${c.desc}</td>
+      ${compCells}
+      <td class="num" style="background:var(--brand-soft);font-weight:700">${money0(compAvg)}</td>
+      <td class="num ${adder?'':'muted'}">${adder?"+ "+money0(adder):"—"}</td>
+      <td class="num"><input class="budget-in" data-code="${code}" type="number" step="100" value="${Math.round(b)}"></td>
+    </tr>`;}).filter(Boolean).join("");
+
+  $("#main").innerHTML=`
+    <div class="crumb"><a id="back-jobs">Active houses</a><span class="sep">/</span><span>Budget review</span></div>
+    <div class="card" style="border-color:#ecd9b0">
+      <div class="card-h" style="background:var(--warn-soft);border-bottom-color:#ecd9b0">
+        <span class="pushchip push-draft"><span class="dot"></span>New budget for review</span>
+        <div><h2>${j.name}</h2><div class="muted" style="font-size:13px">${j.model} · selections complete — budget auto-generated from history + this customer's selections</div></div>
+        <div class="grow"></div>
+        <button class="btn" id="approve-budget">Approve budget</button>
+      </div>
+      <div class="card-b">
+        <div class="kpis" style="margin-bottom:14px">
+          <div class="kpi"><div class="lbl">Settlement</div><div class="val">${money0(settle)}</div><div class="sub">contract to customer</div></div>
+          <div class="kpi"><div class="lbl">Generated budget</div><div class="val">${money0(bud)}</div><div class="sub">comp avg + selections</div></div>
+          <div class="kpi"><div class="lbl">Projected margin</div><div class="val ${margin<0?'over':'under'}">${money0(margin)}</div><div class="sub">${((margin/settle)*100).toFixed(1)}%</div></div>
+          <div class="kpi"><div class="lbl">Comps found</div><div class="val">${comps.length}</div><div class="sub">${j.model} builds</div></div>
+        </div>
+        <div style="padding:10px 12px;background:var(--accent-soft);color:#20476e;border-radius:6px;font-size:12.5px;margin-bottom:14px">
+          Auto-gathered every <strong>${j.model}</strong> build from history (the columns), averaged them (green), added this customer's selection adders, and generated the editable budget on the right. Adjust any line against the comps, then approve.
+        </div>
+        <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Code</th><th>Section</th>
+            ${compHeads}
+            <th class="num" style="background:var(--brand-soft)">Comp avg</th>
+            <th class="num">Selections</th>
+            <th class="num">Budget</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        </div>
+      </div>
+    </div>`;
+  $("#back-jobs").onclick=()=>{route={view:"jobs",jobId:null,tab:"budget"};render();window.scrollTo({top:0});};
+  $$("#main .budget-in").forEach(inp=>inp.onchange=()=>{
+    j.budget[+inp.dataset.code]=parseFloat(inp.value||0);
+    renderBudgetReview();
+  });
+  $("#approve-budget").onclick=()=>{
+    j.budgetStatus="approved";
+    route={view:"house",jobId:j.id,tab:"budget"};
+    render(); window.scrollTo({top:0});
+    toast("Budget approved — now live for job costing");
+  };
+}
+
+/* =================== house detail =================== */
+function renderHouse(){
+  const j=JOBS.find(x=>x.id===route.jobId);
+  const settle=jobSettlement(j),bud=jobBudget(j),act=jobActual(j),margin=settle-bud,marginAct=settle-act;
+  const m=monthsOld(j.histDate);
+
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="lbl">Settlement (contract)</div><div class="val">${money0(settle)}</div><div class="sub">${money0(j.settlement.base)} base + ${money0(j.settlement.adders)} adders${j.settlement.co?` + ${money0(j.settlement.co+j.settlement.coFees)} COs`:""}</div></div>
+    <div class="kpi"><div class="lbl">Budget</div><div class="val">${money0(bud)}</div><div class="sub">comps + selections${j.budgetStatus==="review"?' · <span style="color:var(--warn)">review pending</span>':''}</div></div>
+    <div class="kpi"><div class="lbl">Actual to date</div><div class="val">${money0(act)}</div><div class="sub">${money0(bud-act)} of budget left</div></div>
+    <div class="kpi"><div class="lbl">Projected margin</div><div class="val ${margin<0?'over':'under'}">${money0(margin)}</div><div class="sub">vs actual so far ${money0(marginAct)}</div></div>
+  </div>`;
+
+  const tabs=`<div class="subtabs">
+    <button class="subtab ${route.tab==='budget'?'active':''}" data-tab="budget">Budget vs Actual</button>
+    <button class="subtab ${route.tab==='invoices'?'active':''}" data-tab="invoices">Invoices (${invoicesForJob(j.id).length})</button>
+    <button class="subtab ${route.tab==='selections'?'active':''}" data-tab="selections">Selections &amp; settlement</button>
+  </div>`;
+
+  let body="";
+  if(route.tab==="budget") body=houseBudgetTab(j);
+  else if(route.tab==="invoices") body=houseInvoicesTab(j);
+  else body=houseSelectionsTab(j);
+
+  $("#main").innerHTML=`
+    <div class="crumb"><a id="back-jobs">Active houses</a><span class="sep">/</span><span>${j.community} — ${devName(j.community)}</span></div>
+    <div class="card"><div class="card-h">
+      <div><h2>${j.name}</h2><div class="muted" style="font-size:13px">${j.model}</div></div>
+      <div class="grow"></div>
+      <button class="btn" id="btn-house-invoice">+ Enter Invoice for this house</button>
+    </div></div>
+    ${kpis}${tabs}
+    <div class="card"><div class="card-b" style="padding:0">${body}</div></div>`;
+
+  $("#back-jobs").onclick=()=>{route={view:"jobs",jobId:null,tab:"budget"};render();window.scrollTo({top:0});};
+  $$("#main .subtab").forEach(b=>b.onclick=()=>{route.tab=b.dataset.tab;renderHouse();});
+  $("#btn-house-invoice").onclick=()=>openInvoice(null,{house:j.id});
+  if(route.tab==="budget") wireBudgetEdits(j);
+  if(route.tab==="invoices") $$("#main [data-editinv]").forEach(b=>b.onclick=()=>openInvoice(b.dataset.editinv));
+}
+
+function houseBudgetTab(j){
+  const note=`<div style="padding:12px 16px;background:var(--brand-soft);color:var(--brand);font-size:12.5px;border-bottom:1px solid var(--line-soft)">
+    Budget = historic comp average + this customer's selection adders, merged per code. The two source columns show where each number came from. Adjust the budget column anytime; margin recomputes live.
+    <a id="reopen-review" style="color:var(--brand);font-weight:700;cursor:pointer;margin-left:8px">Re-open full comp review</a></div>`;
+  const rows=COST_CODES.map(c=>{
+    const compBase=j.compBase[c.code]||0, adder=j.adders[c.code]||0;
+    const b=j.budget[c.code]||0, a=actualByJobCode(j.id,c.code), v=b-a;
+    const seeded=compBase+adder;
+    if(compBase===0 && adder===0 && b===0 && a===0) return "";
+    const pct=b?Math.min(100,a/b*100):(a>0?100:0);
+    const cls=a>b?'over':(pct>85?'warn':'ok');
+    const changed=Math.abs(b-seeded)>0.5;
+    return `<tr>
+      <td class="mono">${c.code}</td><td>${c.desc}</td>
+      <td><span class="catbadge cat-${c.cat}">${c.cat}</span></td>
+      <td class="num hist">${compBase?money0(compBase):"·"}</td>
+      <td class="num ${adder?'':'muted'}">${adder?"+ "+money0(adder):"—"}</td>
+      <td class="num"><input class="budget-in" data-code="${c.code}" type="number" step="100" value="${Math.round(b)}">${changed?'<span class="age fresh" style="margin-left:4px">adj</span>':''}</td>
+      <td class="num">${money(a)}</td>
+      <td class="num ${v<0?'var-over':(a>0?'var-under':'')}">${(a>0||b>0)?money(v):'—'}</td>
+      <td style="width:110px"><div class="bar ${cls}"><span style="width:${pct}%"></span></div></td>
+    </tr>`;}).filter(Boolean).join("");
+  return note+`<table>
+    <thead><tr><th>Code</th><th>Description</th><th>Cat</th><th class="num">Comp base</th><th class="num">Selections</th><th class="num">Budget</th><th class="num">Actual</th><th class="num">Variance</th><th>Used</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function wireBudgetEdits(j){
+  const rr=$("#reopen-review");
+  if(rr) rr.onclick=()=>{route={view:"review",jobId:j.id,tab:"budget"};render();window.scrollTo({top:0});};
+  $$("#main .budget-in").forEach(inp=>{
+    inp.onchange=()=>{
+      const code=+inp.dataset.code;
+      j.budget[code]=parseFloat(inp.value||0);
+      renderHouse();               // recompute margin/variance live
+      toast(`Budget updated for code ${code}`);
+    };
+  });
+}
+
+function houseInvoicesTab(j){
+  const invs=invoicesForJob(j.id).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  if(!invs.length) return `<div class="empty">No invoices coded to this house yet.</div>`;
+  return `<table>
+    <thead><tr><th>Vendor</th><th>Date</th><th>Inv #</th><th>Codes (this house)</th><th class="num">Amount</th><th>QuickBooks</th><th></th></tr></thead>
+    <tbody>${invs.map(inv=>{
+      const mine=inv.alloc.filter(a=>a.jobId===j.id);
+      const amt=mine.reduce((s,a)=>s+a.amount,0);
+      const codes=[...new Set(mine.map(a=>a.code))].map(c=>`<span class="mono">${c}</span>`).join(", ");
+      return `<tr class="hoverable">
+        <td><strong>${inv.vendor}</strong><div class="muted" style="font-size:12px">${inv.desc||""}</div></td>
+        <td class="mono">${inv.date}</td><td class="mono">${inv.invnum||"—"}</td>
+        <td>${codes}${inv.alloc.length>mine.length?' <span class="muted">(split w/ other house)</span>':''}</td>
+        <td class="num">${money(amt)}</td>
+        <td>${inv.pushed?'<span class="pushchip push-done"><span class="dot"></span>Pushed</span>':'<span class="pushchip push-draft"><span class="dot"></span>Draft</span>'}</td>
+        <td class="num"><button class="btn gray sm" data-editinv="${inv.id}">Edit</button></td>
+      </tr>`;}).join("")}</tbody></table>`;
+}
+
+function houseSelectionsTab(j){
+  const s=j.settlement;
+  // placeholder selection lines (would come from the selections app)
+  const lines=[
+    {t:"Foundation",v:"In-ground basement",p:18500,tag:"v1"},
+    {t:"Kitchen countertops",v:"Quartz",p:6800,tag:"v1"},
+    {t:"Main-floor flooring",v:"Hardwood",p:9800,tag:"v1"},
+    {t:"Master bath",v:"Tile shower",p:5200,tag:"v1"},
+    {t:"Outdoor living",v:"Deck",p:1480,tag:"v1"},
+    {t:"Kitchen faucet",v:"Gibson / Glyde",p:210,tag:""},
+    {t:"Shower door",v:"Frameless",p:1490,tag:""},
+    {t:"Door hardware",v:"Brushed gold",p:340,tag:""},
+  ];
+  const co = s.co? [{t:"Add floor outlet, great room",v:"Change order",p:s.co,tag:"co"}] : [];
+  const all=[...lines,...co];
+  return `<div style="padding:14px 16px;background:var(--brand-soft);color:var(--brand);font-size:12.5px;border-bottom:1px solid var(--line-soft)">
+      Settlement = <strong>${money0(jobSettlement(j))}</strong> — the contract total the customer owes. This is the completed selection sheet from the selections app; adders and change orders build the number above base.</div>
+    <div class="sel-line" style="font-weight:700;background:#fafbfc"><span class="sl-l">Base price — ${j.model}</span><span class="sl-v"></span><span class="sl-p">${money0(s.base)}</span></div>
+    ${all.map(l=>`<div class="sel-line"><span class="sl-l">${l.t}${l.tag==='co'?'<span class="tag tag-co">Change order</span>':(l.tag==='v1'?'<span class="tag tag-v1">Visit 1</span>':'')}</span><span class="sl-v">${l.v}</span><span class="sl-p">+ ${money0(l.p)}</span></div>`).join("")}
+    ${s.coFees?`<div class="sel-line"><span class="sl-l">Change order fees</span><span class="sl-v"></span><span class="sl-p">+ ${money0(s.coFees)}</span></div>`:""}
+    <div class="sel-line" style="font-weight:700;border-top:2px solid var(--line);background:#fafbfc"><span class="sl-l">Settlement total</span><span class="sl-v"></span><span class="sl-p">${money0(jobSettlement(j))}</span></div>`;
+}
+
+/* =================== invoice modal =================== */
+function blankAlloc(house){const jobs=visibleJobs();return {id:uid(),jobId:house||(jobs[0]||JOBS[0])?.id||"",code:72,amount:0};}
+
+function openInvoice(id,opts={}){
+  editingInvoiceId=id||null;
+  lockedHouseId=opts.house||null;
+  const inv=id?INVOICES.find(i=>i.id===id):null;
+  $("#inv-modal-title").textContent=inv?"Edit Invoice":"Enter Invoice";
+  $("#f-vendor").value=inv?.vendor||opts.vendor||"";
+  $("#f-invnum").value=inv?.invnum||"";
+  $("#f-date").value=inv?.date||new Date().toISOString().slice(0,10);
+  $("#f-amount").value=inv?.amount||"";
+  $("#f-tax").value=inv?.tax||"";
+  $("#f-desc").value=inv?.desc||"";
+  allocDraft = inv? inv.alloc.map(a=>({id:uid(),...a})) : [blankAlloc(lockedHouseId)];
+  // house lock banner
+  if(lockedHouseId){
+    const j=JOBS.find(x=>x.id===lockedHouseId);
+    $("#house-lock-slot").innerHTML=`<div class="house-lock">Coding to <strong>${j.name}</strong> — house is set for this invoice</div>`;
+  } else $("#house-lock-slot").innerHTML="";
+  $("#vendor-list").innerHTML=[...new Set(INVOICES.map(i=>i.vendor))].map(v=>`<option value="${v}">`).join("");
+  renderAllocs();
+  $("#inv-modal").classList.add("open");
+  $("#f-vendor").focus();
+}
+
+function renderAllocs(){
+  const scoped=visibleJobs().length?visibleJobs():JOBS;
+  const jobOpts=scoped.map(j=>`<option value="${j.id}">${j.name}</option>`).join("");
+  const codeOpts=COST_CODES.map(c=>`<option value="${c.code}">${c.code} — ${c.desc}</option>`).join("");
+  $("#alloc-list").innerHTML=allocDraft.map((a,i)=>{
+    const c=codeById(a.code);
+    return `<div class="alloc" data-i="${i}">
+      <div class="alloc-head"><span class="eyebrow" style="margin-right:auto">Split ${i+1}</span>
+        ${allocDraft.length>1?`<button class="btn danger sm" data-rm="${i}">Remove</button>`:""}</div>
+      <div class="rowf">
+        <div class="field" style="flex:2"><label>House</label><select data-f="jobId" data-i="${i}" ${lockedHouseId?'disabled':''}>${jobOpts}</select></div>
+        <div class="field" style="flex:2"><label>Cost code</label><select data-f="code" data-i="${i}">${codeOpts}</select></div>
+        <div class="field"><label>Amount ($)</label><input data-f="amount" data-i="${i}" type="number" step="0.01" class="num" value="${a.amount||""}"></div>
+      </div>
+      <div class="split-note">Auto-fills: <span class="catbadge cat-${c.cat}">${c.cat}</span> · GL <span class="mono">${c.gl}</span> <span class="muted">(GL is what posts to QuickBooks; house + code stay here)</span></div>
+    </div>`;}).join("");
+  allocDraft.forEach((a,i)=>{
+    const js=$(`select[data-f="jobId"][data-i="${i}"]`); if(js) js.value=a.jobId;
+    const cs=$(`select[data-f="code"][data-i="${i}"]`); if(cs) cs.value=a.code;
+  });
+  $$("#alloc-list [data-f]").forEach(el=>el.oninput=()=>{
+    const i=+el.dataset.i,f=el.dataset.f;
+    allocDraft[i][f]=f==="amount"?parseFloat(el.value||0):(f==="code"?+el.value:el.value);
+    if(f==="code") renderAllocs();
+    updateBalance();
+  });
+  $$("#alloc-list [data-rm]").forEach(b=>b.onclick=()=>{allocDraft.splice(+b.dataset.rm,1);renderAllocs();updateBalance();});
+  updateBalance();
+}
+
+function updateBalance(){
+  const total=parseFloat($("#f-amount").value||0);
+  const coded=allocDraft.reduce((s,a)=>s+(a.amount||0),0);
+  const diff=+(total-coded).toFixed(2);
+  const el=$("#alloc-balance");
+  if(Math.abs(diff)<0.005) el.innerHTML=`<span class="balance-ok">Fully coded — ${money(coded)} of ${money(total)}</span>`;
+  else if(diff>0) el.innerHTML=`<span class="balance-bad">${money(diff)} uncoded</span> — coded ${money(coded)} of ${money(total)}`;
+  else el.innerHTML=`<span class="balance-bad">Over-coded by ${money(-diff)}</span> — coded ${money(coded)} of ${money(total)}`;
+}
+
+function collectInvoice(){
+  const vendor=$("#f-vendor").value.trim();
+  const amount=parseFloat($("#f-amount").value||0);
+  if(!vendor){toast("Vendor is required");return null;}
+  if(!amount){toast("Amount is required");return null;}
+  const coded=allocDraft.reduce((s,a)=>s+(a.amount||0),0);
+  if(Math.abs(amount-coded)>=0.01){toast("Coding must equal the invoice amount");return null;}
+  if(allocDraft.some(a=>!a.jobId)){toast("Every split needs a house");return null;}
+  return {vendor,invnum:$("#f-invnum").value.trim(),date:$("#f-date").value,amount,
+    tax:parseFloat($("#f-tax").value||0),desc:$("#f-desc").value.trim(),
+    alloc:allocDraft.map(a=>({jobId:a.jobId,code:a.code,amount:+(a.amount||0)}))};
+}
+
+function saveInvoice(push){
+  const rec=collectInvoice(); if(!rec) return;
+  if(editingInvoiceId){
+    const inv=INVOICES.find(i=>i.id===editingInvoiceId);
+    Object.assign(inv,rec); if(push) inv.pushed=true;
+    toast(push?"Updated & pushed to QuickBooks":"Invoice updated");
+    closeModals(); render();
+  }else{
+    INVOICES.push({id:uid(),pushed:!!push,payment:null,discount:null,...rec});
+    lastVendor=rec.vendor;
+    render();
+    // vendor-preload: reopen fresh for the same vendor (alphabetical stack)
+    openInvoice(null,{vendor:rec.vendor, house:lockedHouseId});
+    toast(push?`Pushed to QuickBooks — next invoice preloaded for ${rec.vendor}`:`Saved draft — next preloaded for ${rec.vendor}`);
+  }
+}
+
+/* =================== add house =================== */
+function openJobModal(){
+  $("#j-community").value=currentDev!=="ALL"?currentDev:DEVELOPMENTS[0].code;
+  $("#j-name").value="";$("#j-model").value="";
+  $("#job-modal").classList.add("open");$("#j-community").focus();
+}
+function saveJob(){
+  const name=$("#j-name").value.trim(); if(!name){toast("House name required");return;}
+  const community=$("#j-community").value;
+  JOBS.push({id:uid(),name,model:$("#j-model").value.trim()||"—",community,histDate:"2026-08-01",
+    settlement:{base:310000,adders:0,co:0,coFees:0},histBudget:{...BUDGET_SEED},budget:{...BUDGET_SEED}});
+  currentDev=community; closeModals(); render(); toast(`House added to ${devName(community)}`);
+}
+
+/* =================== plumbing =================== */
+function populateDev(){
+  $("#dev-select").innerHTML=`<option value="ALL">All developments</option>`+DEVELOPMENTS.map(d=>`<option value="${d.code}">${d.code} — ${d.name} (${jobCountFor(d.code)})</option>`).join("");
+  $("#dev-select").value=currentDev;
+  $("#j-community").innerHTML=DEVELOPMENTS.map(d=>`<option value="${d.code}">${d.code} — ${d.name}</option>`).join("");
+}
+function closeModals(){$$(".overlay").forEach(o=>o.classList.remove("open"));}
+
+function init(){
+  seedData(); render();
+  $("#dev-select").onchange=e=>{currentDev=e.target.value;render();};
+  $("#btn-enter-invoice").onclick=()=>openInvoice(null,{vendor:lastVendor||undefined});
+  $("#btn-add-alloc").onclick=()=>{allocDraft.push(blankAlloc(lockedHouseId));renderAllocs();};
+  $("#btn-save-invoice").onclick=()=>saveInvoice(false);
+  $("#btn-save-push").onclick=()=>saveInvoice(true);
+  $("#btn-save-job").onclick=saveJob;
+  $("#f-amount").oninput=updateBalance;
+  $$("[data-close]").forEach(b=>b.onclick=closeModals);
+  $$(".overlay").forEach(o=>o.onclick=e=>{if(e.target===o)closeModals();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModals();});
+}
+
+/* Firebase / QuickBooks stub:
+   Option B — invoices born here. On push: create a QB *bill* (vendor, date,
+   amount, terms, GL account). House + cost code are NOT sent to QB — they
+   live here for job costing. pushed flag mirrors QB state. */
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alden Homes — Project Management</title>
+<style>
+  :root{
+    --ink:#1a1d21;--ink-soft:#4a5158;--line:#dfe3e8;--line-soft:#eef1f4;
+    --paper:#f7f8fa;--card:#ffffff;--brand:#1f5c4d;--brand-soft:#e7f0ed;
+    --over:#b23b3b;--over-soft:#fbecec;--under:#1f7a4d;--under-soft:#e7f4ec;
+    --warn:#a86a1a;--warn-soft:#faf1e0;--accent:#2b6cb0;--accent-soft:#e8f1fb;
+    --radius:8px;--mono:"SFMono-Regular",Consolas,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);font-size:14px;line-height:1.45}
+  h1,h2,h3{margin:0;font-weight:600}
+  button{font-family:inherit;font-size:inherit;cursor:pointer}
+  .mono{font-family:var(--mono)} .muted{color:var(--ink-soft)}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:600}
+  .grow{flex:1}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:30}
+  .logo{font-weight:700;font-size:16px}.logo span{color:var(--brand)}
+  .homelink{color:var(--ink-soft);text-decoration:none;font-size:13px;font-weight:600}.homelink:hover{color:var(--brand)}
+  .pill{font-size:11px;padding:3px 8px;border-radius:20px;background:var(--warn-soft);color:var(--warn);font-weight:600}
+  .tabs{display:flex;gap:2px}
+  .tab{background:none;border:none;padding:8px 14px;border-radius:6px;color:var(--ink-soft);font-weight:600}
+  .tab.active{background:var(--brand-soft);color:var(--brand)}.tab:hover:not(.active){background:var(--line-soft)}
+  main{max-width:1240px;margin:0 auto;padding:20px}
+  .btn{background:var(--brand);color:#fff;border:1px solid var(--brand);padding:8px 14px;border-radius:6px;font-weight:600}
+  .btn.ghost{background:none;color:var(--brand)}.btn.ghost:hover{background:var(--brand-soft)}
+  .btn.gray{background:none;color:var(--ink-soft);border:1px solid var(--line)}.btn.gray:hover{background:var(--line-soft)}
+  .btn.sm{padding:5px 10px;font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:16px}
+  .card-h{padding:12px 16px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:12px}
+  .card-h h2{font-size:15px}
+  .card-b{padding:16px}
+
+  .toggle{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .toggle button{background:#fff;border:none;padding:7px 14px;font-weight:600;color:var(--ink-soft)}
+  .toggle button.active{background:var(--ink);color:#fff}
+
+  /* status chips */
+  .st{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:5px}
+  .st .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .st-confirmed{background:var(--under-soft);color:var(--under)}
+  .st-pending{background:var(--warn-soft);color:var(--warn)}
+  .st-declined{background:var(--over-soft);color:var(--over)}
+
+  /* board */
+  .board{display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#fff}
+  .board-row{display:contents}
+  .board-name{padding:12px;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line);font-weight:600;font-size:13px;background:var(--paper)}
+  .board-name .tr{font-size:11px;color:var(--ink-soft);font-weight:500}
+  .board-lane{border-bottom:1px solid var(--line-soft);position:relative;height:auto;min-height:52px;padding:6px}
+  .sched-chip{display:inline-block;margin:2px;padding:6px 9px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid;cursor:pointer}
+  .chip-confirmed{background:var(--under-soft);border-color:#bfe0cd;color:var(--under)}
+  .chip-pending{background:var(--warn-soft);border-color:#ecd9b0;color:var(--warn)}
+  .chip-declined{background:var(--over-soft);border-color:#e6bcbc;color:var(--over)}
+  .sched-chip .d{font-weight:400;font-size:11px;opacity:.8}
+
+  /* calendar */
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .cal-head{background:var(--paper);padding:8px;text-align:center;font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em}
+  .cal-cell{background:#fff;min-height:96px;padding:6px;font-size:12px}
+  .cal-cell.other{background:var(--paper);opacity:.5}
+  .cal-date{font-weight:600;color:var(--ink-soft);font-size:12px;margin-bottom:4px}
+  .cal-ev{font-size:11px;padding:3px 6px;border-radius:4px;margin-bottom:3px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ev-confirmed{background:var(--under-soft);color:var(--under)}
+  .ev-pending{background:var(--warn-soft);color:var(--warn)}
+  .ev-declined{background:var(--over-soft);color:var(--over)}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px;border-bottom:1px solid var(--line-soft)}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--line-soft)}
+
+  /* photos */
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .phase-pill{padding:5px 11px;border:1px solid var(--line);border-radius:20px;background:#fff;font-size:12.5px;font-weight:600;color:var(--ink-soft)}
+  .phase-pill.active{background:var(--brand);border-color:var(--brand);color:#fff}
+  .photogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  .photo{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+  .photo .img{height:130px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.9);font-weight:700;font-size:13px;letter-spacing:.03em}
+  .photo .meta{padding:8px 10px}
+  .photo .cap{font-size:13px;font-weight:600}
+  .photo .sub{font-size:11.5px;color:var(--ink-soft);margin-top:2px;display:flex;justify-content:space-between;gap:6px}
+  .phase-tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--brand-soft);color:var(--brand)}
+  .by-alden{color:var(--brand);font-weight:600} .by-sub{color:var(--accent);font-weight:600}
+
+  .plan{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:#fff}
+  .plan .ic{width:38px;height:46px;border-radius:4px;background:var(--over-soft);color:var(--over);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none;border:1px solid #e6bcbc}
+  .plan .info{flex:1}
+  .plan .nm{font-weight:600}
+  .plan .mt{font-size:12px;color:var(--ink-soft)}
+
+  .jobpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .jobpick select{padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:600}
+
+  .rolebar{background:#20242a;color:#cfd2d6;padding:10px 16px;border-radius:var(--radius);margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .rolebar .lbl{font-size:12px;font-weight:700;color:#9a9da2;text-transform:uppercase;letter-spacing:.4px}
+  .rolebtn{background:#2f3238;border:1px solid #45484e;color:#c7c9cc;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600}
+  .rolebtn:hover{border-color:#5a5e65}
+
+  /* overlay for preview role views */
+  .overlay{position:fixed;inset:0;background:rgba(20,24,28,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 16px;z-index:60;overflow:auto}
+  .overlay.open{display:flex}
+  .sheet{background:var(--paper);border-radius:14px;width:100%;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+  .sheet-h{background:var(--card);padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .sheet-h .x{margin-left:auto;background:none;border:none;font-size:22px;color:var(--ink-soft)}
+  .sheet-b{padding:18px;max-height:72vh;overflow:auto}
+  .device{background:#fff;border:1px solid var(--line);border-radius:12px;padding:0;overflow:hidden}
+  .device-top{background:var(--brand);color:#fff;padding:16px 18px}
+  .device-top .sm{opacity:.85;font-size:12.5px}
+  .email-card{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px}
+  .email-h{padding:12px 16px;border-bottom:1px solid var(--line-soft);font-size:13px}
+  .email-h .from{font-weight:700}
+  .email-b{padding:16px}
+  .confirm-row{display:flex;gap:8px;margin-top:14px}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:12px 20px;border-radius:8px;opacity:0;transition:all .25s;z-index:100;font-weight:500}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .empty{padding:40px;text-align:center;color:var(--ink-soft)}
+  @media(max-width:820px){.board{grid-template-columns:120px 1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">ALDEN<span>·</span>HUB</div>
+  <a class="homelink" href="index.html">Hub</a>
+  <span class="muted" style="font-size:13px">Project Management</span>
+  <nav class="tabs" style="margin-left:8px">
+    <button class="tab active" data-view="schedule">Schedule</button>
+    <button class="tab" data-view="jobs">Job Site</button>
+  </nav>
+  <div class="grow"></div>
+  <span class="pill">DEMO · dummy data</span>
+</header>
+<main id="main"></main>
+<div class="overlay" id="overlay"><div class="sheet">
+  <div class="sheet-h"><h2 id="sheet-title">Preview</h2><button class="x" id="sheet-close">&times;</button></div>
+  <div class="sheet-b" id="sheet-body"></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Alden Hub — Vision Demo · SHARED DUMMY DATA
+   One consistent cast across every demo app. All fake.
+   Kept separate from the live Alden Hub production data.
+   ============================================================ */
+window.ALDEN_DEMO = (function(){
+
+  const DEVELOPMENTS = [
+    {code:"AP", name:"Alden Place"},
+    {code:"CL", name:"Cliffs"},
+    {code:"MM", name:"Mountain Meadows"},
+    {code:"ML", name:"Maple Lane"},
+  ];
+
+  /* the shared cast of active houses */
+  const HOUSES = [
+    {id:"h1", comm:"AP", lot:"154", addr:"1028 Stanford Dr", model:"The Hartwell", sqft:2340,
+     customer:"Struck Family", stage:"Framing", pct:38,
+     settlement:{base:324900,adders:41780,co:2100,coFees:200}, histDate:"2026-02-10"},
+    {id:"h2", comm:"ML", lot:"117", addr:"117 Maple Ln", model:"The Coleman", sqft:2986,
+     customer:"Lowrie Family", stage:"Drywall", pct:62,
+     settlement:{base:311000,adders:38650,co:0,coFees:0}, histDate:"2025-09-15"},
+    {id:"h3", comm:"CL", lot:"102", addr:"401 Cannon Way", model:"The Coleman", sqft:2158,
+     customer:"Bair Family", stage:"Trim & Paint", pct:81,
+     settlement:{base:311000,adders:52300,co:1450,coFees:100}, histDate:"2025-09-15"},
+    {id:"h4", comm:"AP", lot:"219", addr:"1059 Percy Ln", model:"The Ashford", sqft:1746,
+     customer:"Nolt Family", stage:"Selections", pct:8,
+     settlement:{base:298500,adders:22900,co:0,coFees:0}, histDate:"2026-05-20"},
+    {id:"h5", comm:"MM", lot:"23", addr:"14 Meadow View", model:"The Stanford", sqft:2510,
+     customer:"Weaver Family", stage:"Foundation", pct:22,
+     settlement:{base:334000,adders:47600,co:900,coFees:100}, histDate:"2026-04-01"},
+  ];
+
+  /* shared vendors / contractors */
+  const CONTRACTORS = [
+    {id:"c1", name:"D & S Flooring", trade:"Flooring", contact:"Leroy Martin", email:"leroy@dsflooring.example", phone:"717-553-2900"},
+    {id:"c2", name:"First Rate Drywall", trade:"Drywall", contact:"Office", email:"office@firstratedrywall.example", phone:"717-664-0484"},
+    {id:"c3", name:"Elite Outdoor Expressions", trade:"Railing / Decks", contact:"Ken Nolt", email:"ken@eliteoutdoor.example", phone:"717-354-0524"},
+    {id:"c4", name:"Fast Supply LP", trade:"Plumbing supply", contact:"Willie", email:"willie@fastsupply.example", phone:"717-336-3800"},
+    {id:"c5", name:"Energy Auditors LLC", trade:"Energy Star", contact:"Admin", email:"admin@paenergyauditors.example", phone:"717-914-8155"},
+    {id:"c6", name:"Keystone Framing", trade:"Framing", contact:"Marlin Z.", email:"marlin@keystoneframing.example", phone:"717-555-0142"},
+    {id:"c7", name:"Lancaster Electric", trade:"Electrical", contact:"Dave H.", email:"dave@lancasterelectric.example", phone:"717-555-0177"},
+    {id:"c8", name:"Summit HVAC", trade:"Heating", contact:"Ryan B.", email:"ryan@summithvac.example", phone:"717-555-0193"},
+  ];
+
+  /* schedule items — each ties a contractor to a house on a date range, with confirm state */
+  const SCHEDULE = [
+    {id:"s1", houseId:"h1", contractorId:"c6", trade:"Framing", start:"2026-08-03", end:"2026-08-08", status:"confirmed", note:"Frame first floor + second floor"},
+    {id:"s2", houseId:"h1", contractorId:"c7", trade:"Electrical rough-in", start:"2026-08-11", end:"2026-08-14", status:"pending", note:"Rough-in, coordinate with HVAC"},
+    {id:"s3", houseId:"h1", contractorId:"c8", trade:"HVAC rough-in", start:"2026-08-12", end:"2026-08-15", status:"pending", note:"Set trunk lines"},
+    {id:"s4", houseId:"h2", contractorId:"c2", trade:"Drywall hang", start:"2026-08-04", end:"2026-08-09", status:"confirmed", note:"Hang whole house"},
+    {id:"s5", houseId:"h2", contractorId:"c1", trade:"Flooring", start:"2026-08-18", end:"2026-08-21", status:"pending", note:"LVP main floor, carpet beds"},
+    {id:"s6", houseId:"h3", contractorId:"c1", trade:"Flooring", start:"2026-08-05", end:"2026-08-07", status:"confirmed", note:"Hardwood + tile baths"},
+    {id:"s7", houseId:"h3", contractorId:"c3", trade:"Deck / railing", start:"2026-08-19", end:"2026-08-20", status:"declined", note:"Rear deck — CONFLICT, sub double-booked"},
+    {id:"s8", houseId:"h5", contractorId:"c6", trade:"Framing", start:"2026-08-17", end:"2026-08-22", status:"pending", note:"Full frame"},
+    {id:"s9", houseId:"h1", contractorId:"c5", trade:"Energy Star pre-drywall", start:"2026-08-10", end:"2026-08-10", status:"confirmed", note:"Inspection"},
+    {id:"s10", houseId:"h2", contractorId:"c1", trade:"Flooring measure", start:"2026-08-03", end:"2026-08-03", status:"confirmed", note:"Final measure"},
+  ];
+
+  /* phase-tagged jobsite photos (placeholder colored tiles instead of real images) */
+  const PHASES = ["Site","Foundation","Framing","Rough-ins","Insulation","Drywall","Trim","Paint","Flooring","Final"];
+  const PHOTOS = [
+    {id:"p1", houseId:"h1", phase:"Framing", by:"Alden", caption:"First floor walls up", date:"2026-08-01", hue:28},
+    {id:"p2", houseId:"h1", phase:"Foundation", by:"Alden", caption:"Poured & backfilled", date:"2026-07-20", hue:210},
+    {id:"p3", houseId:"h1", phase:"Framing", by:"Keystone Framing", caption:"Second floor decking", date:"2026-08-02", hue:35},
+    {id:"p4", houseId:"h2", phase:"Drywall", by:"First Rate Drywall", caption:"Hang complete, ready for finish", date:"2026-07-30", hue:190},
+    {id:"p5", houseId:"h2", phase:"Rough-ins", by:"Alden", caption:"Electrical + plumbing rough", date:"2026-07-18", hue:150},
+    {id:"p6", houseId:"h3", phase:"Trim", by:"Alden", caption:"Interior doors hung", date:"2026-07-29", hue:45},
+    {id:"p7", houseId:"h3", phase:"Paint", by:"Alden", caption:"Primer coat main floor", date:"2026-08-01", hue:60},
+    {id:"p8", houseId:"h1", phase:"Site", by:"Alden", caption:"Lot cleared & staked", date:"2026-07-10", hue:95},
+  ];
+
+  /* plans per house (placeholder PDFs) */
+  const PLANS = [
+    {id:"pl1", houseId:"h1", name:"Hartwell — Floor Plans Rev C", pages:4, date:"2026-06-15"},
+    {id:"pl2", houseId:"h1", name:"Hartwell — Elevations", pages:2, date:"2026-06-15"},
+    {id:"pl3", houseId:"h1", name:"Site Plan — Lot 154", pages:1, date:"2026-06-01"},
+    {id:"pl4", houseId:"h2", name:"Coleman — Floor Plans Rev B", pages:4, date:"2026-05-20"},
+    {id:"pl5", houseId:"h3", name:"Coleman — Floor Plans Rev B", pages:4, date:"2026-05-20"},
+  ];
+
+  /* helpers */
+  const devName = c => (DEVELOPMENTS.find(d=>d.code===c)||{}).name || c;
+  const house = id => HOUSES.find(h=>h.id===id);
+  const contractor = id => CONTRACTORS.find(c=>c.id===id);
+  const settlement = h => { const s=h.settlement; return s.base+s.adders+s.co+s.coFees; };
+  const scheduleForHouse = id => SCHEDULE.filter(s=>s.houseId===id);
+  const scheduleForContractor = id => SCHEDULE.filter(s=>s.contractorId===id);
+  const photosForHouse = id => PHOTOS.filter(p=>p.houseId===id);
+  const plansForHouse = id => PLANS.filter(p=>p.houseId===id);
+
+  return {DEVELOPMENTS, HOUSES, CONTRACTORS, SCHEDULE, PHASES, PHOTOS, PLANS,
+    devName, house, contractor, settlement, scheduleForHouse, scheduleForContractor,
+    photosForHouse, plansForHouse};
+})();
+
+</script>
+<script>
+/* Alden PM demo — office primary; contractor & customer as preview links.
+   State declared first (TDZ-safe). All dummy, in-memory. */
+let view="schedule", schedMode="board", jobTab="photos", curPhase="All", curJob="h1";
+const D=window.ALDEN_DEMO;
+const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);}
+function fmtRange(a,b){const f=d=>new Date(d+"T00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});return a===b?f(a):f(a)+"–"+f(b).replace(/^\w+ /,"");}
+
+/* ---------- SCHEDULE ---------- */
+function renderSchedule(){
+  const pending=D.SCHEDULE.filter(s=>s.status==="pending").length;
+  const declined=D.SCHEDULE.filter(s=>s.status==="declined").length;
+  $("#main").innerHTML=`
+    <div class="jobpick">
+      <span class="eyebrow">Contractor schedules</span>
+      <div class="grow"></div>
+      <div class="toggle">
+        <button data-mode="board" class="${schedMode==='board'?'active':''}">Board</button>
+        <button data-mode="calendar" class="${schedMode==='calendar'?'active':''}">Calendar</button>
+      </div>
+      <button class="btn ghost sm" id="email-all">Email schedules to confirm</button>
+    </div>
+    <div class="rolebar">
+      <span class="lbl">Preview as</span>
+      <button class="rolebtn" id="prev-contractor">Contractor's emailed schedule</button>
+      <span class="muted" style="font-size:12.5px">— what a sub receives &amp; clicks to confirm</span>
+      <div class="grow"></div>
+      <span class="st st-pending"><span class="dot"></span>${pending} pending</span>
+      ${declined?`<span class="st st-declined"><span class="dot"></span>${declined} conflict</span>`:""}
+    </div>
+    <div class="card"><div class="card-b">${schedMode==='board'?boardHTML():calendarHTML()}</div></div>`;
+  $$("[data-mode]").forEach(b=>b.onclick=()=>{schedMode=b.dataset.mode;renderSchedule();});
+  $("#email-all").onclick=()=>toast("Demo: schedule emails queued to 8 contractors");
+  $("#prev-contractor").onclick=()=>previewContractor("c6");
+  $$(".sched-chip,.cal-ev").forEach(el=>el.onclick=()=>{const s=D.SCHEDULE.find(x=>x.id===el.dataset.s);if(s)previewContractor(s.contractorId);});
+}
+
+function boardHTML(){
+  // rows = contractors that have schedule items
+  const active=D.CONTRACTORS.filter(c=>D.scheduleForContractor(c.id).length);
+  let rows=active.map(c=>{
+    const items=D.scheduleForContractor(c.id).sort((a,b)=>a.start.localeCompare(b.start));
+    const chips=items.map(s=>{
+      const h=D.house(s.houseId);
+      return `<span class="sched-chip chip-${s.status}" data-s="${s.id}">${h.comm} ${h.lot} · ${s.trade}<div class="d">${fmtRange(s.start,s.end)}</div></span>`;
+    }).join("");
+    return `<div class="board-name">${c.name}<div class="tr">${c.trade}</div></div><div class="board-lane">${chips}</div>`;
+  }).join("");
+  return `<div class="board">${rows}</div><p class="muted" style="font-size:12px;margin:10px 2px 0">Click any block to preview the confirmation the contractor gets. Amber = awaiting confirm, red = conflict/declined.</p>`;
+}
+
+function calendarHTML(){
+  // August 2026 grid
+  const y=2026,m=7; // August (0-idx)
+  const first=new Date(y,m,1), startDow=first.getDay(), days=new Date(y,m+1,0).getDate();
+  const dows=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  let cells=dows.map(d=>`<div class="cal-head">${d}</div>`).join("");
+  // leading blanks
+  for(let i=0;i<startDow;i++) cells+=`<div class="cal-cell other"></div>`;
+  for(let day=1;day<=days;day++){
+    const dateStr=`2026-08-${String(day).padStart(2,"0")}`;
+    const evs=D.SCHEDULE.filter(s=>dateStr>=s.start && dateStr<=s.end);
+    const evHTML=evs.slice(0,3).map(s=>{const h=D.house(s.houseId);return `<div class="cal-ev ev-${s.status}" data-s="${s.id}">${h.comm}${h.lot} ${s.trade}</div>`;}).join("");
+    cells+=`<div class="cal-cell"><div class="cal-date">${day}</div>${evHTML}${evs.length>3?`<div class="muted" style="font-size:10px">+${evs.length-3} more</div>`:""}</div>`;
+  }
+  return `<div style="margin-bottom:10px;font-weight:600">August 2026</div><div class="cal">${cells}</div>`;
+}
+
+/* ---------- JOB SITE (photos + plans) ---------- */
+function renderJobs(){
+  const h=D.house(curJob);
+  const photos=D.photosForHouse(curJob).filter(p=>curPhase==="All"||p.phase===curPhase).sort((a,b)=>b.date.localeCompare(a.date));
+  const usedPhases=["All",...new Set(D.photosForHouse(curJob).map(p=>p.phase))];
+  $("#main").innerHTML=`
+    <div class="jobpick">
+      <span class="eyebrow">Job site</span>
+      <select id="job-select">${D.HOUSES.map(x=>`<option value="${x.id}" ${x.id===curJob?"selected":""}>${x.comm} ${x.lot} — ${x.model} (${x.customer})</option>`).join("")}</select>
+      <div class="grow"></div>
+      <div class="toggle">
+        <button data-jt="photos" class="${jobTab==='photos'?'active':''}">Photos</button>
+        <button data-jt="plans" class="${jobTab==='plans'?'active':''}">Plans</button>
+      </div>
+    </div>
+    <div class="rolebar">
+      <span class="lbl">Preview as</span>
+      <button class="rolebtn" id="prev-customer">Customer's update page</button>
+      <button class="rolebtn" id="prev-sub-photos">Contractor photo view</button>
+      <div class="grow"></div>
+      <span class="muted" style="font-size:12.5px">${h.customer} · ${h.stage} · ${h.pct}% complete</span>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>${h.comm} ${h.lot} — ${h.model}</h2><div class="grow"></div>
+        ${jobTab==='photos'?`<button class="btn ghost sm" id="add-photo">+ Post photo</button>`:`<button class="btn ghost sm" id="add-plan">+ Upload plan</button>`}
+      </div>
+      <div class="card-b">
+        ${jobTab==='photos'?`
+          <div class="filters">${usedPhases.map(p=>`<button class="phase-pill ${curPhase===p?'active':''}" data-phase="${p}">${p}</button>`).join("")}</div>
+          <div class="photogrid">${photos.map(photoCard).join("")||'<div class="empty">No photos in this phase yet.</div>'}</div>`
+        :`${D.plansForHouse(curJob).map(planRow).join("")||'<div class="empty">No plans uploaded.</div>'}`}
+      </div>
+    </div>`;
+  $("#job-select").onchange=e=>{curJob=e.target.value;curPhase="All";renderJobs();};
+  $$("[data-jt]").forEach(b=>b.onclick=()=>{jobTab=b.dataset.jt;renderJobs();});
+  $$("[data-phase]").forEach(b=>b.onclick=()=>{curPhase=b.dataset.phase;renderJobs();});
+  const ap=$("#add-photo");if(ap)ap.onclick=()=>toast("Demo: photo upload — would post to the job gallery");
+  const al=$("#add-plan");if(al)al.onclick=()=>toast("Demo: plan upload — would add a PDF to this job");
+  $("#prev-customer").onclick=()=>previewCustomer(curJob);
+  $("#prev-sub-photos").onclick=()=>previewSubPhotos(curJob);
+}
+function photoCard(p){
+  const byAlden=p.by==="Alden";
+  return `<div class="photo">
+    <div class="img" style="background:hsl(${p.hue},42%,52%)">${p.phase}</div>
+    <div class="meta"><div class="cap">${p.caption}</div>
+      <div class="sub"><span class="phase-tag">${p.phase}</span><span class="${byAlden?'by-alden':'by-sub'}">${p.by}</span></div>
+      <div class="sub"><span>${p.date}</span></div>
+    </div></div>`;
+}
+function planRow(pl){
+  return `<div class="plan"><div class="ic">PDF</div>
+    <div class="info"><div class="nm">${pl.name}</div><div class="mt">${pl.pages} page${pl.pages>1?'s':''} · uploaded ${pl.date}</div></div>
+    <button class="btn gray sm" onclick="ALDEN_DEMO && window.__toast&&window.__toast('Demo: opens the plan viewer')">Open</button></div>`;
+}
+window.__toast=null;
+
+/* ---------- PREVIEW: contractor emailed schedule ---------- */
+function previewContractor(cid){
+  const c=D.contractor(cid);
+  const items=D.scheduleForContractor(cid).sort((a,b)=>a.start.localeCompare(b.start));
+  $("#sheet-title").textContent="Contractor preview — emailed schedule";
+  $("#sheet-body").innerHTML=`
+    <div class="email-card">
+      <div class="email-h"><div class="from">Alden Homes Scheduling</div><div class="muted">to ${c.contact} &lt;${c.email}&gt;</div><div class="muted">Your Alden schedule — please confirm</div></div>
+      <div class="email-b">
+        <p style="margin-top:0">Hi ${c.contact}, here's your upcoming schedule with Alden Homes. Please review and confirm each job, or flag a conflict.</p>
+        <a class="btn" style="text-decoration:none;display:inline-block" id="open-conf">View &amp; confirm my schedule</a>
+      </div>
+    </div>
+    <div class="muted" style="font-size:12px;margin-bottom:8px">what opens when they click the link (no login — a private link, like the packet viewer)</div>
+    <div class="device">
+      <div class="device-top"><div style="font-weight:700;font-size:16px">${c.name}</div><div class="sm">${c.trade} · your Alden schedule</div></div>
+      <div style="padding:14px">
+        ${items.map(s=>{const h=D.house(s.houseId);return `
+          <div style="border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;gap:8px">
+              <div><strong>${h.comm} ${h.lot}</strong> — ${s.trade}<div class="muted" style="font-size:12.5px">${h.addr} · ${h.model}</div></div>
+              <span class="st st-${s.status}"><span class="dot"></span>${s.status}</span>
+            </div>
+            <div class="muted" style="font-size:13px;margin-top:6px">${fmtRange(s.start,s.end)} · ${s.note}</div>
+            ${s.status!=="confirmed"?`<div class="confirm-row">
+              <button class="btn sm" data-conf="${s.id}">Confirm</button>
+              <button class="btn gray sm" data-decl="${s.id}">Flag conflict</button></div>`:`<div class="muted" style="font-size:12px;margin-top:8px">Confirmed — thanks!</div>`}
+          </div>`;}).join("")}
+      </div>
+    </div>`;
+  openSheet();
+  $("#open-conf").onclick=()=>document.querySelector(".device").scrollIntoView({behavior:"smooth"});
+  $$("[data-conf]").forEach(b=>b.onclick=()=>{const s=D.SCHEDULE.find(x=>x.id===b.dataset.conf);s.status="confirmed";previewContractor(cid);toast("Confirmed — office sees this live");});
+  $$("[data-decl]").forEach(b=>b.onclick=()=>{const s=D.SCHEDULE.find(x=>x.id===b.dataset.decl);s.status="declined";previewContractor(cid);toast("Conflict flagged — office notified");});
+}
+
+/* ---------- PREVIEW: customer update page ---------- */
+function previewCustomer(hid){
+  const h=D.house(hid);
+  const photos=D.photosForHouse(hid).sort((a,b)=>b.date.localeCompare(a.date));
+  $("#sheet-title").textContent="Customer preview — build updates";
+  $("#sheet-body").innerHTML=`
+    <div class="device">
+      <div class="device-top"><div style="font-weight:700;font-size:17px">Your new home</div><div class="sm">${h.model} · ${h.addr}</div></div>
+      <div style="padding:16px">
+        <div style="background:var(--brand-soft);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+          <div style="font-weight:700;color:var(--brand)">${h.stage} · ${h.pct}% complete</div>
+          <div class="muted" style="font-size:12.5px">Follow along as we build. New photos are posted as each phase wraps.</div>
+        </div>
+        <div class="photogrid">${photos.map(p=>`
+          <div class="photo"><div class="img" style="background:hsl(${p.hue},42%,52%)">${p.phase}</div>
+            <div class="meta"><div class="cap">${p.caption}</div><div class="sub"><span class="phase-tag">${p.phase}</span><span>${p.date}</span></div></div></div>`).join("")}</div>
+        <p class="muted" style="font-size:12px;margin-top:14px">Customers see photos &amp; progress only — never budgets, schedules, or contractor details.</p>
+      </div>
+    </div>`;
+  openSheet();
+}
+
+/* ---------- PREVIEW: contractor photo view ---------- */
+function previewSubPhotos(hid){
+  const h=D.house(hid);
+  const photos=D.photosForHouse(hid).sort((a,b)=>b.date.localeCompare(a.date));
+  $("#sheet-title").textContent="Contractor preview — job photos & plans";
+  $("#sheet-body").innerHTML=`
+    <div class="device">
+      <div class="device-top"><div style="font-weight:700;font-size:16px">${h.comm} ${h.lot} — ${h.model}</div><div class="sm">plans &amp; site photos for your trade</div></div>
+      <div style="padding:14px">
+        <div style="margin-bottom:12px">${D.plansForHouse(hid).map(pl=>`<div class="plan"><div class="ic">PDF</div><div class="info"><div class="nm">${pl.name}</div><div class="mt">${pl.pages} pages</div></div><button class="btn gray sm">Open</button></div>`).join("")||'<div class="muted">No plans</div>'}</div>
+        <button class="btn" style="width:100%;margin-bottom:12px" id="sub-add">Add a photo from the site</button>
+        <div class="photogrid">${photos.map(p=>`<div class="photo"><div class="img" style="background:hsl(${p.hue},42%,52%)">${p.phase}</div><div class="meta"><div class="cap">${p.caption}</div><div class="sub"><span class="phase-tag">${p.phase}</span><span class="${p.by==='Alden'?'by-alden':'by-sub'}">${p.by}</span></div></div></div>`).join("")}</div>
+      </div>
+    </div>`;
+  openSheet();
+  $("#sub-add").onclick=()=>toast("Demo: contractor uploads a site photo — shows up for Alden & customer");
+}
+
+/* ---------- shell ---------- */
+function openSheet(){$("#overlay").classList.add("open");}
+function closeSheet(){$("#overlay").classList.remove("open");}
+function render(){ view==="schedule"?renderSchedule():renderJobs(); }
+function init(){
+  window.__toast=toast;
+  render();
+  $$(".tab").forEach(t=>t.onclick=()=>{view=t.dataset.view;$$(".tab").forEach(x=>x.classList.toggle("active",x===t));render();});
+  $("#sheet-close").onclick=closeSheet;
+  $("#overlay").onclick=e=>{if(e.target===$("#overlay"))closeSheet();};
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet();});
+}
+init();
+</script>
+</body>
+</html>

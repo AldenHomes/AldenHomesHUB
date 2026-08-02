@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alden Homes | Selections — Two-Visit</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --sage:#A3AA83; --sage-2:#6B7355; --amber:#c98a2b;
+    --red:#a94438; --blue:#4a6b8a; --shadow:0 1px 2px rgba(30,32,34,.08),0 4px 14px rgba(30,32,34,.06);
+    --radius:8px; --co:#a3592e; --co-soft:#f6eee8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;font-size:16px}
+  h1,h2,h3{margin:0}
+  button{font-family:inherit;cursor:pointer}
+  .mono{font-family:"Courier New",monospace}
+
+  /* demo switcher */
+  .demo-bar{background:#22242a;padding:10px clamp(12px,3vw,32px);display:flex;gap:6px;flex-wrap:wrap;align-items:center;position:sticky;top:0;z-index:60;border-bottom:1px solid #3a3d43}
+  .demo-label{color:#9a9da2;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-right:6px;white-space:nowrap}
+  .demo-btn{background:#2f3238;color:#c7c9cc;border:1px solid #45484e;border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:6px}
+  .demo-btn .num{background:#45484e;color:#dcdedf;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px}
+  .demo-btn:hover{border-color:#5a5e65}
+  .demo-btn.active{background:var(--sage-2);border-color:var(--sage-2);color:#fff}
+  .demo-btn.active .num{background:rgba(255,255,255,.25);color:#fff}
+  .demo-arrow{color:#5a5e65;font-size:13px}
+
+  .header{background:var(--paper-2);border-bottom:1px solid var(--steel-line);padding:16px clamp(16px,4vw,40px);display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:45px;z-index:40}
+  .header-mark{height:34px;width:34px;border-radius:7px;background:var(--navy);color:#f0efe9;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none}
+  .header-brand{display:flex;align-items:center;gap:11px}
+  .header-brand-name{font-weight:700;color:var(--navy);font-size:15px}
+  .header-who{font-size:12.5px;color:var(--ink-soft);text-align:right;line-height:1.5}
+  .header-who strong{display:block;color:var(--navy);font-size:14px}
+  .status-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:4px 10px;border-radius:20px;margin-top:4px}
+  .status-chip.rough{background:#eef1e6;color:var(--sage-2)}
+  .status-chip.full{background:#eef2f6;color:var(--blue)}
+  .status-chip.signed{background:#eaf2ec;color:#2f7a4d}
+  .status-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  .rail{background:var(--paper-2);border-bottom:1px solid var(--steel-line);padding:0 clamp(16px,4vw,40px);display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;position:sticky;top:112px;z-index:39}
+  .rail::-webkit-scrollbar{display:none}
+  .rail-item{flex:none;padding:13px 15px;font-size:13px;font-weight:600;color:var(--ink-soft);border:none;background:none;border-bottom:3px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:7px}
+  .rail-item:hover{color:var(--navy)}
+  .rail-item.active{color:var(--navy);border-bottom-color:var(--sage)}
+  .rail-item.locked{opacity:.55}
+  .rail-dot{width:7px;height:7px;border-radius:50%;background:var(--steel-line);flex:none}
+  .rail-dot.done{background:var(--sage-2)}
+  .rail-lock{font-size:11px}
+
+  .wrap{max-width:1000px;margin:0 auto;padding:30px clamp(16px,4vw,40px) 150px}
+  .wrap.no-total{padding-bottom:60px}
+  .step-head{margin-bottom:24px}
+  .step-eyebrow{font-size:11.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--sage-2);margin-bottom:6px}
+  .step-head h1{margin:0 0 8px;font-size:clamp(23px,3.5vw,31px);color:var(--navy);font-weight:700;letter-spacing:-.3px}
+  .step-head p{margin:0;font-size:15px;color:var(--ink-soft);line-height:1.6;max-width:66ch}
+
+  .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px}
+  .opt{border:2px solid var(--steel-line);border-radius:6px;padding:13px;cursor:pointer;background:#fff;display:flex;flex-direction:column;gap:8px;text-align:left;font-family:inherit;transition:border-color .12s,background .12s}
+  .opt:hover{border-color:var(--sage)}
+  .opt.selected{border-color:var(--sage-2);background:#f7f9f4}
+  .opt-swatch{height:104px;border-radius:5px;border:1px solid rgba(0,0,0,.08);overflow:hidden;background:#f3f1ea;display:flex;align-items:center;justify-content:center}
+  .opt-swatch svg{width:100%;height:100%;display:block}
+  .opt-name{font-size:14px;font-weight:600;color:var(--ink);line-height:1.35}
+  .opt-price{font-size:13px;color:var(--ink-soft);font-family:"Courier New",monospace}
+  .opt-price.included{color:var(--sage-2);font-weight:700}
+
+  .q{background:var(--paper-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;margin-bottom:16px}
+  .q-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .q-title{font-size:16px;font-weight:700;color:var(--navy);margin:0}
+  .q-code{font-size:11px;color:var(--ink-soft);font-weight:600;background:#f2f0e8;padding:3px 8px;border-radius:5px;white-space:nowrap}
+  .q-locked-note{font-size:12px;color:var(--blue);font-weight:600;display:flex;align-items:center;gap:5px}
+  .carried{background:#f8faf5;border:1px solid #e4ead6}
+  .carried .q-title::after{content:"carried from Visit 1";font-size:10.5px;font-weight:700;color:var(--sage-2);background:#eef1e6;padding:2px 7px;border-radius:20px;margin-left:8px;text-transform:uppercase;letter-spacing:.3px;vertical-align:middle}
+
+  .totalbar{position:fixed;left:0;right:0;bottom:0;background:var(--paper-2);border-top:1px solid var(--steel-line);box-shadow:0 -4px 20px rgba(30,32,34,.07);padding:13px clamp(16px,4vw,40px);z-index:50}
+  .totalbar-inner{max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .total-figures{display:flex;align-items:baseline;gap:10px}
+  .total-label{font-size:12px;color:var(--ink-soft);letter-spacing:.4px;text-transform:uppercase;font-weight:700}
+  .total-amount{font-size:25px;font-weight:700;color:var(--navy);font-family:"Courier New",monospace;letter-spacing:-.5px}
+  .total-sub{font-size:12.5px;color:var(--ink-soft)}
+  .totalbar-actions{display:flex;gap:10px;align-items:center}
+  .btn{padding:11px 20px;border-radius:6px;border:1px solid transparent;font-size:14.5px;font-weight:700;font-family:inherit}
+  .btn-ghost{background:transparent;color:var(--navy);border-color:var(--steel-line)}
+  .btn-ghost:hover{background:#f0eee7}
+  .btn-primary{background:var(--navy);color:#fff}.btn-primary:hover{background:var(--navy-2)}
+  .btn-sage{background:var(--sage-2);color:#fff}.btn-sage:hover{background:#5a6146}
+  .btn-co{background:var(--co);color:#fff}.btn-co:hover{filter:brightness(1.1)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn-sm{padding:7px 13px;font-size:13px}
+
+  .review-group{background:var(--paper-2);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+  .review-group h3{margin:0;padding:13px 20px;font-size:14px;color:var(--navy);background:#f7f5ee;border-bottom:1px solid #ece8dd;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .review-line{display:flex;justify-content:space-between;gap:16px;padding:11px 20px;border-bottom:1px solid #f2efe6;font-size:14px;align-items:center}
+  .review-line:last-child{border-bottom:none}
+  .review-line .rl-label{color:var(--ink-soft);flex:1}
+  .review-line .rl-val{flex:1;text-align:right;color:var(--ink)}
+  .review-line .rl-price{width:110px;text-align:right;font-family:"Courier New",monospace;font-weight:700;color:var(--navy)}
+  .group-sub{font-size:13px;font-weight:700;color:var(--ink-soft);font-family:"Courier New",monospace}
+
+  .tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;margin-left:8px;vertical-align:middle}
+  .tag-co{background:var(--co-soft);color:var(--co)}
+  .tag-v1{background:#eef1e6;color:var(--sage-2)}
+  .cc-badge{font-size:10.5px;font-weight:700;color:var(--ink-soft);font-family:"Courier New",monospace;margin-left:8px}
+
+  /* budget/cost-code feed panel */
+  .feed{background:#20242a;color:#e8e6df;border-radius:var(--radius);padding:20px;margin-bottom:16px}
+  .feed h3{color:#fff;font-size:15px;margin-bottom:4px}
+  .feed p{color:#a8adb3;font-size:13px;margin:0 0 14px;line-height:1.5}
+  .feed-table{width:100%;border-collapse:collapse;font-size:13.5px}
+  .feed-table th{text-align:left;color:#8b9098;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-bottom:1px solid #363b42}
+  .feed-table td{padding:8px 10px;border-bottom:1px solid #2b3037}
+  .feed-table td.num,.feed-table th.num{text-align:right;font-family:"Courier New",monospace}
+  .feed-code{color:#c7c9cc;font-family:"Courier New",monospace}
+  .feed-total td{border-top:2px solid #454b53;font-weight:700;color:#fff;border-bottom:none}
+
+  .co-banner{background:var(--co-soft);border:1px solid #e6cdb8;border-radius:var(--radius);padding:16px 18px;margin-bottom:18px;display:flex;gap:14px;align-items:flex-start}
+  .co-banner .ic{color:var(--co);flex:none;margin-top:1px}
+  .co-banner h3{color:var(--co);font-size:14.5px;margin-bottom:3px}
+  .co-banner p{margin:0;font-size:13px;color:#7a5232;line-height:1.5}
+
+  .locked-banner{background:#eaf2ec;border:1px solid #cfe3d5;border-radius:var(--radius);padding:16px 18px;margin-bottom:18px;display:flex;gap:14px;align-items:flex-start}
+  .locked-banner h3{color:#2f7a4d;font-size:14.5px;margin-bottom:3px}
+  .locked-banner p{margin:0;font-size:13px;color:#3d6b4e;line-height:1.5}
+
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--navy-2);color:#fff;padding:12px 20px;border-radius:8px;opacity:0;transition:all .25s;z-index:100;font-weight:600;pointer-events:none}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+  .co-form{background:var(--paper-2);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+  .co-form .row{display:flex;gap:12px;flex-wrap:wrap}
+  .co-form .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;flex:1;min-width:150px}
+  .co-form label{font-size:12px;font-weight:700;color:var(--ink-soft)}
+  .co-form input,.co-form select{padding:9px 11px;border:1px solid var(--steel-line);border-radius:6px;font-family:inherit;font-size:14px;background:#fff}
+  .co-form input:focus,.co-form select:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 3px #eef1e6}
+
+  /* development / lot gate */
+  .gate-wrap{max-width:820px;margin:0 auto;padding:44px clamp(16px,4vw,40px) 80px}
+  .gate-step{font-size:11.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--sage-2);margin-bottom:6px}
+  .gate-wrap h1{font-size:clamp(24px,3.5vw,32px);color:var(--navy);margin:0 0 8px}
+  .gate-wrap p.lede{font-size:15px;color:var(--ink-soft);margin:0 0 28px;max-width:60ch}
+  .dev-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:10px}
+  .dev-card{border:2px solid var(--steel-line);border-radius:10px;padding:22px;background:#fff;text-align:left;font-family:inherit;transition:border-color .12s,background .12s}
+  .dev-card:hover{border-color:var(--sage);background:#f7f9f4}
+  .dev-card.active{border-color:var(--sage-2);background:#f4f7ee}
+  .dev-card .dc-code{font-family:"Courier New",monospace;font-size:26px;font-weight:700;color:var(--sage-2)}
+  .dev-card .dc-name{font-weight:700;color:var(--navy);margin-top:2px;font-size:16px}
+  .dev-card .dc-meta{font-size:12.5px;color:var(--ink-soft);margin-top:10px}
+  .lot-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:8px}
+  .lot-card{border:2px solid var(--steel-line);border-radius:8px;padding:14px;background:#fff;text-align:left;font-family:inherit;transition:border-color .12s,background .12s}
+  .lot-card:hover{border-color:var(--sage);background:#f7f9f4}
+  .lot-card .lc-lot{font-weight:700;color:var(--navy)}
+  .lot-card .lc-model{font-size:12.5px;color:var(--ink-soft);margin-top:3px}
+  .lot-card .lc-status{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-top:8px;display:inline-block;padding:2px 7px;border-radius:20px}
+  .lc-status.avail{background:#eef1e6;color:var(--sage-2)}
+  .lc-status.sold{background:#f6eee8;color:var(--co)}
+  .gate-back{background:none;border:none;color:var(--sage-2);font-weight:700;font-family:inherit;font-size:13.5px;cursor:pointer;margin-bottom:16px;padding:0}
+  .gate-crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);margin-bottom:20px}
+  .gate-crumb .on{color:var(--navy);font-weight:700}
+  @media(max-width:640px){.opts{grid-template-columns:repeat(2,1fr)}.header-who{display:none}.dev-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="demo-bar" id="demoBar"></div>
+<div class="header">
+  <div class="header-brand"><div class="header-mark">AH</div><div class="header-brand-name">Alden Homes</div><a href="index.html" style="color:var(--ink-soft);text-decoration:none;font-size:13px;font-weight:600;margin-left:8px">Hub</a></div>
+  <div class="header-who" id="headerWho"></div>
+</div>
+<div class="rail" id="rail"></div>
+<div id="screenRoot"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Alden Homes — Two-Visit Selections (merged build)
+   Preserves the prototype's design system + 5-screen arc, adds:
+     • Visit 1 (rough, ~10 structural items) Visit 2 (full detail)
+     • Visit-1 answers carry forward + lock into Visit 2
+     • Every non-base pick = an adder line; post-sign = change order
+     • Each option carries a cost code (cc) rolls to job-costing budget
+   Standalone in-memory so the whole arc demos with no backend.
+   State declared first (TDZ-safe).
+   ============================================================ */
+
+/* ---------- state (declared before init) ---------- */
+let currentScreen = 'gate-dev';   // start at development choice for a new customer
+let signed = false;
+let coDraft = {desc:'', code:72, amount:'', section:'Change Orders'};
+let chosenDev = null;             // community code
+let chosenLot = null;             // lot object
+
+/* ---------- developments = 4 community codes (edit names here) ---------- */
+const DEVELOPMENTS = [
+  {code:"AP", name:"Alden Place"},
+  {code:"CL", name:"Cliffs"},
+  {code:"MM", name:"Mountain Meadows"},
+  {code:"ML", name:"Maple Lane"},
+];
+const devName = code => (DEVELOPMENTS.find(d=>d.code===code)||{}).name || code;
+
+/* lots per development (placeholder sample — real list comes from Available Lots) */
+const LOTS = [
+  {dev:"AP", lot:"151", addr:"1022 Stanford Dr", model:"The Coleman", status:"avail"},
+  {dev:"AP", lot:"154", addr:"1028 Stanford Dr", model:"The Hartwell", status:"avail"},
+  {dev:"AP", lot:"219", addr:"1059 Percy Ln",    model:"The Ashford",  status:"sold"},
+  {dev:"CL", lot:"1",   addr:"401 Cannon Way",   model:"The Bellmore", status:"avail"},
+  {dev:"CL", lot:"102", addr:"Cliffs Sec 2",     model:"The Coleman",  status:"avail"},
+  {dev:"MM", lot:"14",  addr:"Mountain Meadows",  model:"The Hartwell", status:"avail"},
+  {dev:"MM", lot:"23",  addr:"Mountain Meadows",  model:"The Ashford",  status:"avail"},
+  {dev:"ML", lot:"117", addr:"117 Maple Ln",     model:"The Coleman",  status:"avail"},
+  {dev:"ML", lot:"120", addr:"120 Maple Ln",     model:"The Bellmore", status:"avail"},
+];
+const lotsFor = dev => LOTS.filter(l=>l.dev===dev);
+
+/* ---------- SVG art (verbatim from prototype) ---------- */
+const ART = {
+  faucet:(metal,arc)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><rect x="18" y="86" width="84" height="5" rx="1.5" fill="#dcd8ce"/><ellipse cx="60" cy="86" rx="26" ry="4" fill="#e8e5dd"/>${arc==='high'?`<path d="M46 86 L46 44 Q46 26 60 26 Q74 26 74 44 L74 56" fill="none" stroke="${metal}" stroke-width="6" stroke-linecap="round"/>`:arc==='pull'?`<path d="M46 86 L46 40 Q46 24 62 24 L70 24 Q78 24 78 34 L78 54" fill="none" stroke="${metal}" stroke-width="6" stroke-linecap="round"/><rect x="73" y="52" width="10" height="14" rx="3" fill="${metal}"/>`:`<path d="M46 86 L46 46 Q46 32 60 32 L72 32" fill="none" stroke="${metal}" stroke-width="6" stroke-linecap="round"/>`}<rect x="40" y="82" width="14" height="7" rx="2" fill="${metal}"/><rect x="30" y="66" width="5" height="18" rx="2" fill="${metal}"/></svg>`,
+  tile:(c1,c2,grout)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="${grout}"/>${[0,1,2,3,4].map(r=>[0,1,2,3].map(c=>{const off=r%2?-14:0;const fill=((r+c)%3===0)?c2:c1;return `<rect x="${c*30+off+1}" y="${r*22+1}" width="28" height="20" rx="1" fill="${fill}"/>`;}).join('')).join('')}</svg>`,
+  floorPlank:(base,grain)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="${base}"/>${[0,1,2,3,4,5].map(i=>`<rect x="0" y="${i*18}" width="120" height="17" fill="${base}" stroke="${grain}" stroke-width="0.6" opacity="0.9"/><path d="M${i%2?10:40} ${i*18+6} q30 3 60 -1 t50 2" stroke="${grain}" stroke-width="0.8" fill="none" opacity="0.5"/>`).join('')}</svg>`,
+  carpet:(base,fleck)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="${base}"/>${Array.from({length:150},(_,i)=>{const x=(i*37)%118,y=(i*53)%108;return `<circle cx="${x}" cy="${y}" r="1.6" fill="${fleck}" opacity="0.5"/>`;}).join('')}</svg>`,
+  showerDoor:(fw,fc)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><rect x="26" y="14" width="68" height="84" fill="#dfeaef" opacity="0.65"/><path d="M34 96 L70 18" stroke="#fff" stroke-width="7" opacity="0.55"/>${fw>0?`<rect x="26" y="14" width="68" height="84" fill="none" stroke="${fc}" stroke-width="${fw}"/>`:''}<rect x="24" y="96" width="72" height="4" rx="1" fill="${fc}"/></svg>`,
+  door:(panels,color)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><rect x="32" y="8" width="56" height="94" rx="2" fill="${color}" stroke="#c9c2b4" stroke-width="1.2"/><circle cx="82" cy="56" r="2.6" fill="#9a9182"/></svg>`,
+  knob:(metal)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><circle cx="60" cy="55" r="26" fill="${metal}"/><circle cx="60" cy="55" r="9" fill="rgba(0,0,0,.10)"/></svg>`,
+  fireplace:()=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><rect x="14" y="20" width="92" height="72" rx="2" fill="#e6e2d8"/><rect x="22" y="44" width="76" height="26" fill="#2f3133"/><rect x="10" y="14" width="100" height="7" rx="2" fill="#8b7355"/></svg>`,
+  yesNo:(yes)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/>${yes?`<circle cx="60" cy="55" r="28" fill="#eef0e8"/><path d="M46 55 l10 11 20 -24" fill="none" stroke="#6B7355" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`:`<circle cx="60" cy="55" r="28" fill="#eeece6"/><path d="M48 43 l24 24 M72 43 l-24 24" stroke="#9a9182" stroke-width="5" stroke-linecap="round"/>`}</svg>`,
+  house:(c)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><path d="M60 24 L96 52 L96 90 L24 90 L24 52 Z" fill="${c}" stroke="#c9c2b4"/><path d="M18 54 L60 22 L102 54" fill="none" stroke="#8b7355" stroke-width="4" stroke-linecap="round"/><rect x="52" y="66" width="16" height="24" fill="#f7f6f1"/></svg>`,
+  swatch:(c)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="${c}"/></svg>`,
+};
+
+const money = n => '$' + Math.round(n).toLocaleString('en-US');
+
+/* ============================================================
+   MODEL
+   Each question carries a cost code `cc` (maps to the 37-code
+   master used by jobcosting.html). Each option has price + optional art.
+   `stage`: 'v1' = shown at Visit 1 (rough) AND carried into Visit 2.
+            'v2' = only appears at the full Visit 2 sheet.
+   Base price is the model's included price; adders sit on top.
+   ============================================================ */
+const BASE_PRICE = 324900;   // placeholder base for this model
+
+/* Visit-1 rough pass — the ~10 structural big-ticket items */
+const V1_STEPS = [
+  { id:'structure', name:'Home & site', title:'The home', cc:34,
+    intro:"Start with the shape of the house. These big choices set the ballpark before we get into finishes at your next visit.",
+    questions:[
+      { id:'model', title:'Model & elevation', cc:34, stage:'v1',
+        options:[{label:'The Coleman — Elevation A', price:0, art:ART.house('#d8d2c4')},{label:'The Coleman — Elevation B', price:3200, art:ART.house('#cdd0c2')},{label:'The Coleman — Elevation C', price:5400, art:ART.house('#c6cabb')}] },
+      { id:'foundation', title:'Foundation', cc:14, stage:'v1',
+        options:[{label:'Slab', price:0, art:ART.yesNo(false)},{label:'In-ground basement', price:18500, art:ART.yesNo(true)},{label:'Daylight / walkout basement', price:31000, art:ART.yesNo(true)}] },
+      { id:'basement_finish', title:'Finish the basement', cc:56, stage:'v1',
+        options:[{label:'Leave unfinished', price:0, art:ART.yesNo(false)},{label:'Finish basement', price:42000, art:ART.yesNo(true)}] },
+      { id:'garage', title:'Garage', cc:34, stage:'v1',
+        options:[{label:'2-car (standard)', price:0, art:ART.house('#d3d5c8')},{label:'Add 3rd bay', price:22000, art:ART.house('#c9ccbe')}] },
+    ]},
+  { id:'bigfinishes', name:'Big finishes', title:'The finishes that move the number', cc:70,
+    intro:"A few tier-level choices carry most of the cost. Pick the level here; the exact product comes at your full-selection visit.",
+    questions:[
+      { id:'counters', title:'Kitchen countertops', cc:70, stage:'v1',
+        options:[{label:'Standard laminate', price:0, art:ART.swatch('#cfc7b5')},{label:'Quartz', price:6800, art:ART.swatch('#e8e4dc')},{label:'Granite', price:5400, art:ART.swatch('#8a8f86')}] },
+      { id:'flooring_tier', title:'Main-floor flooring', cc:72, stage:'v1',
+        options:[{label:'Builder LVP', price:0, art:ART.floorPlank('#a9855f','#7d5f3f')},{label:'Upgrade LVP', price:2600, art:ART.floorPlank('#c9b193','#a68b68')},{label:'Hardwood', price:9800, art:ART.floorPlank('#8b5e34','#5f3f21')}] },
+      { id:'masterbath_tier', title:'Master bath', cc:50, stage:'v1',
+        options:[{label:'Standard tub/shower', price:0, art:ART.shower&&ART.yesNo(false)||''},{label:'Tile shower', price:5200, art:ART.tile('#d4cfc6','#c2bcb1','#efece5')},{label:'Custom tile + curbless', price:11400, art:ART.tile('#828a90','#6e767c','#b9bec2')}] },
+      { id:'deck', title:'Outdoor living', cc:41, stage:'v1',
+        options:[{label:'None', price:0, art:ART.yesNo(false)},{label:'Deck', price:14500, art:ART.house('#c8b79a')},{label:'Covered patio', price:26000, art:ART.house('#bfb091')}] },
+      { id:'fireplace_v1', title:'Fireplace', cc:71, stage:'v1',
+        options:[{label:'No fireplace', price:0, art:ART.yesNo(false)},{label:'Add fireplace', price:4850, art:ART.fireplace()}] },
+    ]},
+];
+
+/* Visit-2 full detail — carries every v1 question, then adds the fine-grained ones */
+const V2_STEPS = [
+  { id:'kitchen', name:'Kitchen', title:'Your kitchen', cc:70,
+    intro:"The room you'll live in most. Every option is shown with what it adds to your base price.",
+    questions:[
+      { id:'counters', title:'Kitchen countertops', cc:70, stage:'v1',
+        options:[{label:'Standard laminate', price:0, art:ART.swatch('#cfc7b5')},{label:'Quartz', price:6800, art:ART.swatch('#e8e4dc')},{label:'Granite', price:5400, art:ART.swatch('#8a8f86')}] },
+      { id:'k_faucet', title:'Kitchen faucet', cc:50, stage:'v2', vendor:'Moen',
+        options:[{label:'Brantford', price:0, art:ART.faucet('#b9bec2','high')},{label:'Align', price:145, art:ART.faucet('#a8aeb3','low')},{label:'Gibson / Glyde', price:210, art:ART.faucet('#9aa1a6','pull')}] },
+      { id:'k_backsplash', title:'Tile backsplash', cc:72, stage:'v2', vendor:'Qualis Ceramica',
+        options:[{label:'Ash Mix', price:0, art:ART.tile('#d4cfc6','#c2bcb1','#efece5')},{label:'Bone', price:320, art:ART.tile('#e9e3d8','#ddd5c7','#f4f1ea')},{label:'Slate', price:320, art:ART.tile('#828a90','#6e767c','#b9bec2')}] },
+      { id:'k_sink', title:'Kitchen sink', cc:50, stage:'v2', vendor:'Ruvati',
+        options:[{label:'Standard stainless', price:0, art:ART.yesNo(false)},{label:'Farmhouse', price:890, art:ART.yesNo(true)}] },
+      { id:'k_potfiller', title:'Pot filler', cc:50, stage:'v2', vendor:'Moen',
+        options:[{label:'Add one', price:640, art:ART.yesNo(true)},{label:'No thanks', price:0, art:ART.yesNo(false)}] },
+    ]},
+  { id:'flooring', name:'Flooring', title:'Floors throughout', cc:72,
+    intro:"You picked a tier at Visit 1 — now choose the exact colour and where it goes.",
+    questions:[
+      { id:'flooring_tier', title:'Main-floor flooring', cc:72, stage:'v1',
+        options:[{label:'Builder LVP', price:0, art:ART.floorPlank('#a9855f','#7d5f3f')},{label:'Upgrade LVP', price:2600, art:ART.floorPlank('#c9b193','#a68b68')},{label:'Hardwood', price:9800, art:ART.floorPlank('#8b5e34','#5f3f21')}] },
+      { id:'f_color', title:'Main-floor colour', cc:72, stage:'v2', vendor:'Province Flooring',
+        options:[{label:'1012 Duxbury Oak', price:0, art:ART.floorPlank('#a9855f','#7d5f3f')},{label:'1104 Sandbar', price:0, art:ART.floorPlank('#c9b193','#a68b68')},{label:'Hatfield Maple', price:0, art:ART.floorPlank('#b89a6e','#8f7048')}] },
+      { id:'f_bed', title:'Bedrooms & closets', cc:72, stage:'v2', vendor:'Shaw',
+        options:[{label:'Carpet — Natural Sisal', price:0, art:ART.carpet('#cdc4b0','#b3a894')},{label:'Carpet — Warm Stone', price:0, art:ART.carpet('#bcb09a','#a1937c')},{label:'LVP throughout', price:1850, art:ART.floorPlank('#a9855f','#7d5f3f')}] },
+      { id:'f_pad', title:'Carpet padding', cc:72, stage:'v2', vendor:'Shaw',
+        options:[{label:'8 lb standard', price:0},{label:'10 lb plush', price:520}] },
+    ]},
+  { id:'baths', name:'Baths', title:'Master bath', cc:50,
+    intro:"You set the master-bath level at Visit 1 — here are the fixtures and finishes.",
+    questions:[
+      { id:'masterbath_tier', title:'Master bath', cc:50, stage:'v1',
+        options:[{label:'Standard tub/shower', price:0, art:ART.yesNo(false)},{label:'Tile shower', price:5200, art:ART.tile('#d4cfc6','#c2bcb1','#efece5')},{label:'Custom tile + curbless', price:11400, art:ART.tile('#828a90','#6e767c','#b9bec2')}] },
+      { id:'b_door', title:'Shower door', cc:50, stage:'v2', vendor:'Glass',
+        options:[{label:'Framed clear', price:0, art:ART.showerDoor(5,'#b9bec2')},{label:'Semi-frameless', price:720, art:ART.showerDoor(2.5,'#b9bec2')},{label:'Frameless', price:1490, art:ART.showerDoor(0,'#b9bec2')}] },
+      { id:'b_faucet', title:'Vanity faucet', cc:50, stage:'v2', vendor:'Moen',
+        options:[{label:'Brantford', price:0, art:ART.faucet('#b9bec2','low')},{label:'Voss', price:165, art:ART.faucet('#a8aeb3','high')},{label:'Align', price:145, art:ART.faucet('#9aa1a6','low')}] },
+      { id:'b_grab', title:'Grab bar', cc:50, stage:'v2', vendor:'Moen',
+        options:[{label:'Add one', price:180, art:ART.yesNo(true)},{label:'No thanks', price:0, art:ART.yesNo(false)}] },
+    ]},
+  { id:'hardware', name:'Hardware & trim', title:'Hardware and trim', cc:58,
+    intro:"Small things you touch every day. Finish carries through the whole house.",
+    questions:[
+      { id:'h_finish', title:'Door hardware finish', cc:58, stage:'v2', vendor:'Schlage',
+        options:[{label:'Brushed nickel', price:0, art:ART.knob('#b9bec2')},{label:'Aged bronze', price:0, art:ART.knob('#6b5545')},{label:'Matte black', price:0, art:ART.knob('#2f3133')},{label:'Brushed gold', price:340, art:ART.knob('#c2a469')}] },
+      { id:'h_frontdoor', title:'Front door handle', cc:32, stage:'v2', vendor:'Schlage',
+        options:[{label:'Standard handleset', price:0},{label:'Schlage Encode smart lock', price:495}] },
+      { id:'h_doors', title:'Interior door style', cc:58, stage:'v2', vendor:'Trim',
+        options:[{label:'Cambrian', price:0, art:ART.door(2,'#f0ebe2')},{label:'Connelly', price:0, art:ART.door(3,'#ece6dc')},{label:'Keystone', price:260, art:ART.door(1,'#e7e0d4')}] },
+      { id:'h_trim', title:'Trim profile', cc:58, stage:'v2', vendor:'Trim',
+        options:[{label:'Traditional', price:0},{label:'Beaded', price:0},{label:'Square', price:210}] },
+    ]},
+  { id:'fireplace', name:'Fireplace', title:'Fireplace', cc:71,
+    intro:"You added a fireplace at Visit 1 — pick the model and mantel.",
+    questions:[
+      { id:'fireplace_v1', title:'Fireplace', cc:71, stage:'v1',
+        options:[{label:'No fireplace', price:0, art:ART.yesNo(false)},{label:'Add fireplace', price:4850, art:ART.fireplace()}] },
+      { id:'fp_model', title:'Model', cc:71, stage:'v2', vendor:'Napoleon', dependsOn:{q:'fireplace_v1', is:'Add fireplace'},
+        options:[{label:'Ascent 36', price:0, art:ART.fireplace()},{label:'Ascent 36 Linear', price:780, art:ART.fireplace()},{label:'Ascent 42', price:1150, art:ART.fireplace()}] },
+      { id:'fp_mantel', title:'Mantel', cc:58, stage:'v2', vendor:'Alden Millwork', dependsOn:{q:'fireplace_v1', is:'Add fireplace'},
+        options:[{label:'Kenwood w/ slate', price:0},{label:'Walnut live edge shelf', price:1240}] },
+    ]},
+];
+
+/* ---------- answer state ---------- */
+/* answers[qid] = {label, price, cc, vendor, stage, changeOrder?, coMeta?} */
+const answers = {};
+
+/* pre-fill Visit-1 as if the first meeting already happened (demo) */
+function seedV1(){
+  const pick = (steps, qid, label) => {
+    for(const s of steps) for(const q of s.questions) if(q.id===qid){
+      const o = q.options.find(o=>o.label===label) || q.options[0];
+      answers[qid] = {label:o.label, price:o.price, cc:q.cc, vendor:q.vendor||sectionVendor(s), stage:'v1'};
+      return;
+    }
+  };
+  pick(V1_STEPS,'model','The Coleman — Elevation B');
+  pick(V1_STEPS,'foundation','In-ground basement');
+  pick(V1_STEPS,'basement_finish','Leave unfinished');
+  pick(V1_STEPS,'garage','2-car (standard)');
+  pick(V1_STEPS,'counters','Quartz');
+  pick(V1_STEPS,'flooring_tier','Hardwood');
+  pick(V1_STEPS,'masterbath_tier','Tile shower');
+  pick(V1_STEPS,'deck','Deck');
+  pick(V1_STEPS,'fireplace_v1','Add fireplace');
+}
+function seedV2(){
+  const pick = (qid, label) => {
+    for(const s of V2_STEPS) for(const q of s.questions) if(q.id===qid){
+      const o = q.options.find(o=>o.label===label) || q.options[0];
+      if(!answers[qid]) answers[qid]={label:o.label,price:o.price,cc:q.cc,vendor:q.vendor,stage:q.stage};
+    }
+  };
+  // v2 detail picks (v1 ones already carried)
+  pick('k_faucet','Gibson / Glyde'); pick('k_backsplash','Slate'); pick('k_sink','Farmhouse');
+  pick('k_potfiller','No thanks'); pick('f_color','Hatfield Maple'); pick('f_bed','Carpet — Warm Stone');
+  pick('f_pad','10 lb plush'); pick('b_door','Frameless'); pick('b_faucet','Voss'); pick('b_grab','Add one');
+  pick('h_finish','Brushed gold'); pick('h_frontdoor','Schlage Encode smart lock'); pick('h_doors','Keystone');
+  pick('h_trim','Square'); pick('fp_model','Ascent 42'); pick('fp_mantel','Walnut live edge shelf');
+}
+function sectionVendor(s){ return s.name; }
+
+/* ---------- change orders (post-sign adders) ---------- */
+const changeOrders = []; // {id, desc, cc, amount, date}
+const CO_FEE = 100;
+
+/* ============================================================
+   COST CODES (subset of the 37-code master, for the feed panel)
+   ============================================================ */
+const CODE_NAMES = {14:'Footer/Foundation',32:'Doors/Windows',34:'Framing',41:'Railing',
+  50:'Plumbing',56:'Drywall',58:'Trim',70:'Kitchens/Vanities',71:'Fireplace',72:'Floor Covering'};
+
+/* ---------- rollups ---------- */
+function addersList(){
+  // every non-zero-price answer is an adder line
+  const lines = [];
+  Object.entries(answers).forEach(([qid,a])=>{
+    if(a.price>0) lines.push({qid, label:a.label, title:titleFor(qid), price:a.price, cc:a.cc, stage:a.stage, changeOrder:false});
+  });
+  changeOrders.forEach(co=>lines.push({qid:'co_'+co.id, label:co.desc, title:co.desc, price:co.amount, cc:co.cc, stage:'co', changeOrder:true}));
+  return lines;
+}
+function titleFor(qid){
+  for(const s of V2_STEPS) for(const q of s.questions) if(q.id===qid) return q.title;
+  for(const s of V1_STEPS) for(const q of s.questions) if(q.id===qid) return q.title;
+  return qid;
+}
+function adderTotal(){ return addersList().filter(l=>!l.changeOrder).reduce((s,l)=>s+l.price,0); }
+function coTotal(){ return changeOrders.reduce((s,c)=>s+c.amount,0); }
+function coFees(){ return changeOrders.length*CO_FEE; }
+function grandTotal(){ return BASE_PRICE + adderTotal() + coTotal() + coFees(); }
+
+/* budget by cost code = base allocation (from jobcosting seed) + adders + COs.
+   For the feed we show the *selection-driven* portion (adders+COs) by code. */
+function byCostCode(){
+  const map = {};
+  addersList().forEach(l=>{ map[l.cc]=(map[l.cc]||0)+l.price; });
+  if(changeOrders.length) map[90]=(map[90]||0)+coFees(); // fees Misc
+  return Object.entries(map).map(([cc,amt])=>({cc:+cc, name:CODE_NAMES[cc]||('Code '+cc), amt}))
+    .sort((a,b)=>b.amt-a.amt);
+}
+
+/* ============================================================
+   SCREENS
+   ============================================================ */
+const SCREENS = [
+  {id:'gate-dev', label:'Development'},
+  {id:'v1', label:'Visit 1 — Rough'},
+  {id:'v2', label:'Visit 2 — Full'},
+  {id:'review', label:'Adders & change orders'},
+  {id:'feed', label:'Budget feed Job Costing'},
+  {id:'sign', label:'Sign & lock'},
+];
+
+function renderDemoBar(){
+  const bar = document.getElementById('demoBar');
+  bar.innerHTML = `<span class="demo-label">Walkthrough</span>` +
+    SCREENS.map((s,i)=>`${i>0?'<span class="demo-arrow"></span>':''}
+      <button class="demo-btn ${currentScreen===s.id?'active':''}" data-screen="${s.id}">
+        <span class="num">${i+1}</span>${s.label}</button>`).join('');
+  bar.querySelectorAll('[data-screen]').forEach(b=>b.onclick=()=>{
+    const target=b.dataset.screen;
+    // demo convenience: if jumping past the gate without choosing, default to Coleman/151
+    if(target!=='gate-dev' && !chosenLot){ chosenDev='AP'; chosenLot=LOTS.find(l=>l.lot==='151'); }
+    currentScreen=target;renderAll();window.scrollTo({top:0,behavior:'instant'});
+  });
+}
+
+function statusChip(){
+  if(!chosenLot) return '';
+  if(signed) return `<span class="status-chip signed"><span class="status-dot"></span>Signed & locked</span>`;
+  if(currentScreen==='v1') return `<span class="status-chip rough"><span class="status-dot"></span>Visit 1 · rough</span>`;
+  if(currentScreen==='gate-dev') return '';
+  return `<span class="status-chip full"><span class="status-dot"></span>Visit 2 · full selections</span>`;
+}
+function renderHeaderWho(){
+  const who = document.getElementById('headerWho');
+  if(!chosenLot){
+    who.innerHTML = `<strong>New selection sheet</strong>Choose a development to begin`;
+    return;
+  }
+  who.innerHTML =
+    `<strong>${chosenLot.model} · Lot ${chosenLot.lot}</strong>${chosenDev} — ${devName(chosenDev)} · ${chosenLot.addr}${statusChip()}`;
+}
+
+function renderRail(){
+  const rail = document.getElementById('rail');
+  const curIdx = SCREENS.findIndex(s=>s.id===currentScreen);
+  rail.innerHTML = SCREENS.map((s,i)=>{
+    // everything past the gate is locked until a lot is chosen
+    const gateLock = !chosenLot && s.id!=='gate-dev';
+    const signLock = signed && s.id!=='sign' && s.id!=='feed' && s.id!=='review' && s.id!=='gate-dev';
+    const locked = gateLock || signLock;
+    return `<button class="rail-item ${currentScreen===s.id?'active':''} ${locked?'locked':''}" data-r="${s.id}" ${locked?'data-locked="1"':''}>
+      <span class="rail-dot ${i<curIdx?'done':''}"></span>${s.label}${locked?' <span class="rail-lock"></span>':''}</button>`;
+  }).join('');
+  rail.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.locked){ toast(chosenLot?'Signed — locked':'Choose a development first'); return; }
+    currentScreen=b.dataset.r;renderAll();window.scrollTo({top:0,behavior:'instant'});
+  });
+}
+
+/* ---- option-card question renderer (shared v1/v2) ---- */
+function renderQuestion(q, opts){
+  const carried = opts.carried;
+  const locked = opts.locked;
+  const a = answers[q.id];
+  // dependsOn gate
+  if(q.dependsOn){
+    const dep = answers[q.dependsOn.q];
+    if(!dep || dep.label!==q.dependsOn.is) return '';
+  }
+  const cards = q.options.map(o=>{
+    const sel = a && a.label===o.label;
+    const art = o.art ? `<div class="opt-swatch">${o.art}</div>` : '';
+    return `<button class="opt ${sel?'selected':''}" data-q="${q.id}" data-opt="${o.label.replace(/"/g,'&quot;')}" ${locked?'disabled':''}>
+      ${art}<div class="opt-name">${o.label}</div>
+      <div class="opt-price ${o.price===0?'included':''}">${o.price===0?'Included':'+ '+money(o.price)}</div></button>`;
+  }).join('');
+  return `<div class="q ${carried?'carried':''}">
+    <div class="q-head">
+      <h3 class="q-title">${q.title}</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${locked?`<span class="q-locked-note">set at Visit 1</span>`:''}
+        <span class="q-code">code ${q.cc}</span>
+      </div>
+    </div>
+    <div class="opts">${cards}</div>
+  </div>`;
+}
+
+function screenV1(){
+  const body = V1_STEPS.map(s=>`
+    <div class="step-head" style="margin-top:8px">
+      <div class="step-eyebrow">${s.name}</div>
+      <p style="margin-top:2px">${s.intro}</p>
+    </div>
+    ${s.questions.map(q=>renderQuestion(q,{})).join('')}`).join('');
+  const total = adderTotal();
+  return `<div class="wrap">
+    <div class="step-head">
+      <div class="step-eyebrow">Visit 1 · first meeting · customer sees the number</div>
+      <h1>Rough selections</h1>
+      <p>Ten big choices to land a ballpark price today. These carry straight into your full-selection visit — you won't re-pick them.</p>
+    </div>
+    ${body}
+  </div>
+  <div class="totalbar"><div class="totalbar-inner">
+    <div><div class="total-figures"><span class="total-label">Rough upgrades over base</span>
+      <span class="total-amount">${money(total)}</span></div>
+      <div class="total-sub">Base ${money(BASE_PRICE)} · rough all-in ≈ <strong>${money(BASE_PRICE+total)}</strong></div></div>
+    <div class="totalbar-actions">
+      <button class="btn btn-primary" data-goto="v2">Continue to full selections</button>
+    </div>
+  </div></div>`;
+}
+
+function screenV2(){
+  const body = V2_STEPS.map(s=>`
+    <div class="step-head" style="margin-top:10px">
+      <div class="step-eyebrow">${s.name}</div>
+      <p style="margin-top:2px">${s.intro}</p>
+    </div>
+    ${s.questions.map(q=>{
+      const carried = q.stage==='v1';
+      return renderQuestion(q,{carried, locked:carried});
+    }).join('')}`).join('');
+  const total = adderTotal();
+  return `<div class="wrap">
+    <div class="step-head">
+      <div class="step-eyebrow">Visit 2 · second meeting · full detail</div>
+      <h1>Full selections</h1>
+      <p>Everything from Visit 1 is carried down and locked (the green cards) so nothing gets re-decided. Fill in the finish-level detail around them.</p>
+    </div>
+    ${body}
+  </div>
+  <div class="totalbar"><div class="totalbar-inner">
+    <div><div class="total-figures"><span class="total-label">Total upgrades over base</span>
+      <span class="total-amount">${money(total)}</span></div>
+      <div class="total-sub">All-in ≈ <strong>${money(BASE_PRICE+total)}</strong></div></div>
+    <div class="totalbar-actions">
+      <button class="btn btn-ghost" data-goto="v1">Visit 1</button>
+      <button class="btn btn-primary" data-goto="review">Review adders</button>
+    </div>
+  </div></div>`;
+}
+
+function screenReview(){
+  const lines = addersList();
+  const v1 = lines.filter(l=>l.stage==='v1');
+  const v2 = lines.filter(l=>l.stage==='v2');
+  const co = lines.filter(l=>l.changeOrder);
+  const grp = (title, arr, sub, extra='') => arr.length?`
+    <div class="review-group">
+      <h3>${title}<span class="group-sub">${money(sub)}${extra}</span></h3>
+      ${arr.map(l=>`<div class="review-line">
+        <span class="rl-label">${l.title}${l.changeOrder?'<span class="tag tag-co">Change order</span>':(l.stage==='v1'?'<span class="tag tag-v1">Visit 1</span>':'')}<span class="cc-badge">code ${l.cc}</span></span>
+        <span class="rl-val">${l.label}</span>
+        <span class="rl-price">+ ${money(l.price)}</span></div>`).join('')}
+    </div>`:'';
+  return `<div class="wrap">
+    <div class="step-head">
+      <div class="step-eyebrow">Adders broken out · base + adders (change orders flagged)</div>
+      <h1>Adders &amp; change orders</h1>
+      <p>Base price plus every option above base, itemized. Change orders — anything added after signing — are flagged separately and carry the $100 assessment fee.</p>
+    </div>
+    <div class="review-group"><h3>Base price<span class="group-sub">${money(BASE_PRICE)}</span></h3>
+      <div class="review-line"><span class="rl-label">The Coleman — included spec</span><span class="rl-val"></span><span class="rl-price">${money(BASE_PRICE)}</span></div></div>
+    ${grp('Adders — Visit 1 (structural)', v1, v1.reduce((s,l)=>s+l.price,0))}
+    ${grp('Adders — Visit 2 (finishes)', v2, v2.reduce((s,l)=>s+l.price,0))}
+    ${co.length?grp('Change orders (post-signing)', co, coTotal(), ` + ${money(coFees())} fees`):''}
+    ${signed?renderCOForm():''}
+  </div>
+  <div class="totalbar"><div class="totalbar-inner">
+    <div><div class="total-figures"><span class="total-label">Contract total</span>
+      <span class="total-amount">${money(grandTotal())}</span></div>
+      <div class="total-sub">Base ${money(BASE_PRICE)} · adders ${money(adderTotal())}${changeOrders.length?` · change orders ${money(coTotal()+coFees())}`:''}</div></div>
+    <div class="totalbar-actions">
+      <button class="btn btn-ghost" data-goto="feed">Budget feed</button>
+      ${signed?'':'<button class="btn btn-sage" data-goto="sign">Continue to sign</button>'}
+    </div>
+  </div></div>`;
+}
+
+function renderCOForm(){
+  const codeOpts = Object.entries(CODE_NAMES).map(([c,n])=>`<option value="${c}" ${+c===coDraft.code?'selected':''}>${c} — ${n}</option>`).join('');
+  return `<div class="co-banner">
+      <div class="ic"></div>
+      <div><h3>Sheet is signed — new items are change orders</h3>
+      <p>Per Alden's Change Order Policy, anything added now is submitted in writing, carries a $100 assessment fee, and is office-approved. Add one below to see it flow into the totals and the budget feed.</p></div>
+    </div>
+    <div class="co-form">
+      <div class="row">
+        <div class="field" style="flex:2"><label>What's changing</label>
+          <input id="co-desc" placeholder="e.g. Add floor outlet in great room" value="${coDraft.desc}"></div>
+        <div class="field"><label>Cost code</label><select id="co-code">${codeOpts}</select></div>
+        <div class="field"><label>Amount ($)</label><input id="co-amt" type="number" step="1" placeholder="0" value="${coDraft.amount}"></div>
+      </div>
+      <button class="btn btn-co" id="co-add">Add change order (+ $100 fee)</button>
+    </div>`;
+}
+
+function screenFeed(){
+  const rows = byCostCode();
+  const tot = rows.reduce((s,r)=>s+r.amt,0);
+  return `<div class="wrap no-total">
+    <div class="step-head">
+      <div class="step-eyebrow">The handoff · this is what jobcosting.html consumes</div>
+      <h1>Budget feed Job Costing</h1>
+      <p>Every selection carries a cost code. Rolled up by code, the selection sheet becomes the selection-driven budget for this job — replacing the placeholder numbers in the job-costing app. Base-spec budget is added on top from the model's historic breakout.</p>
+    </div>
+    <div class="feed">
+      <h3>Selection-driven budget by cost code — Lot 151</h3>
+      <p>Adders + change orders, grouped by the same 37-code master the invoices code against. When wired, this posts to the job's budget document in Firestore.</p>
+      <table class="feed-table">
+        <thead><tr><th>Code</th><th>Category</th><th class="num">Selection budget</th></tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr><td class="feed-code">${r.cc}</td><td>${r.name}</td><td class="num">${money(r.amt)}</td></tr>`).join('')}
+          <tr class="feed-total"><td colspan="2">Selection-driven total</td><td class="num">${money(tot)}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="review-group"><h3>How it lands in Job Costing</h3>
+      <div class="review-line"><span class="rl-label">Base spec (from historic model breakout)</span><span class="rl-price">${money(BASE_PRICE)}</span></div>
+      <div class="review-line"><span class="rl-label">+ Selection adders &amp; change orders (above, by code)</span><span class="rl-price">${money(tot)}</span></div>
+      <div class="review-line"><span class="rl-label"><strong>= Job budget, per cost code, vs. actual invoices</strong></span><span class="rl-price">${money(BASE_PRICE+tot)}</span></div>
+    </div>
+    <p style="font-size:13px;color:var(--ink-soft);margin-top:14px">In the live suite this is one Firestore write to the job's <span class="mono">budget</span> map — the same map <span class="mono">jobcosting.html</span> already reads for budget-vs-actual. No PO numbers; keyed by lot/address.</p>
+    <div style="margin-top:20px"><button class="btn btn-ghost" data-goto="review">Back to adders</button></div>
+  </div>`;
+}
+
+function screenSign(){
+  if(signed) return screenPacket();
+  return `<div class="wrap">
+    <div class="step-head">
+      <div class="step-eyebrow">Sign & lock · plans signed = build begins</div>
+      <h1>Approve &amp; sign</h1>
+      <p>Signing locks these selections as the document of record. After this, any change goes through the Change Order Policy — you'll see that flow live once you sign.</p>
+    </div>
+    <div class="review-group"><h3>You're approving<span class="group-sub">${money(grandTotal())}</span></h3>
+      <div class="review-line"><span class="rl-label">Base price</span><span class="rl-price">${money(BASE_PRICE)}</span></div>
+      <div class="review-line"><span class="rl-label">Adders (${addersList().filter(l=>!l.changeOrder).length} items)</span><span class="rl-price">+ ${money(adderTotal())}</span></div>
+    </div>
+    <div class="co-banner" style="background:#f7f5ee;border-color:#e6e1d4">
+      <div class="ic" style="color:var(--navy)">§</div>
+      <div><h3 style="color:var(--navy)">Change Order Policy</h3>
+      <p style="color:var(--ink-soft)">Once signed, this sheet is final. Any requested change must be submitted in writing to Chase Martin and is subject to office approval, a $100 change order assessment fee, and any resulting vendor price adjustment.</p></div>
+    </div>
+    <div class="co-form">
+      <label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer">
+        <input type="checkbox" id="sig-agree" style="margin-top:3px;width:auto">
+        <span>I approve these selections as final for Lot 151 and understand the Change Order Policy.</span></label>
+    </div>
+  </div>
+  <div class="totalbar"><div class="totalbar-inner">
+    <div><div class="total-figures"><span class="total-label">Contract total</span><span class="total-amount">${money(grandTotal())}</span></div>
+      <div class="total-sub">Base + ${addersList().filter(l=>!l.changeOrder).length} adders</div></div>
+    <div class="totalbar-actions">
+      <button class="btn btn-ghost" data-goto="review">Review</button>
+      <button class="btn btn-primary" id="sign-btn">Sign &amp; lock selections</button>
+    </div>
+  </div></div>`;
+}
+
+function screenPacket(){
+  return `<div class="wrap no-total">
+    <div class="step-head">
+      <div class="step-eyebrow">Locked · document of record</div>
+      <h1>Signed &amp; locked</h1>
+      <p>Selections are locked as of signing. Change orders now flow through the policy — go to <strong>Adders &amp; change orders</strong> to add one and watch it hit the totals and the budget feed.</p>
+    </div>
+    <div class="locked-banner">
+      <div style="color:#2f7a4d;font-size:20px"></div>
+      <div><h3>Locked — signed today</h3>
+      <p>Base ${money(BASE_PRICE)} + ${money(adderTotal())} adders = <strong>${money(BASE_PRICE+adderTotal())}</strong> at signing.
+      ${changeOrders.length?` Since signing: ${changeOrders.length} change order${changeOrders.length>1?'s':''} totalling ${money(coTotal()+coFees())} (incl. fees) new total <strong>${money(grandTotal())}</strong>.`:''}</p></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-co" data-goto="review">Add a change order</button>
+      <button class="btn btn-ghost" data-goto="feed">View budget feed</button>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   RENDER + EVENTS
+   ============================================================ */
+/* ---- development / lot gate (first step for a new customer) ---- */
+function screenGateDev(){
+  // two-step gate in one screen: pick development, then pick a lot within it
+  if(!chosenDev){
+    return `<div class="gate-wrap">
+      <div class="gate-step">New customer · step 1 of 2</div>
+      <h1>Choose the development</h1>
+      <p class="lede">Start by picking which community this customer is building in. Only that development's lots and homes load next.</p>
+      <div class="dev-grid">
+        ${DEVELOPMENTS.map(d=>{
+          const lots=lotsFor(d.code), avail=lots.filter(l=>l.status==='avail').length;
+          return `<button class="dev-card" data-dev="${d.code}">
+            <div class="dc-code">${d.code}</div>
+            <div class="dc-name">${d.name}</div>
+            <div class="dc-meta">${lots.length} lots · ${avail} available</div>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+  // step 2 — lots within the chosen development
+  const lots = lotsFor(chosenDev);
+  return `<div class="gate-wrap">
+    <button class="gate-back" id="gate-back">Change development</button>
+    <div class="gate-crumb"><span class="on">${chosenDev} — ${devName(chosenDev)}</span> · choose a lot</div>
+    <div class="gate-step">New customer · step 2 of 2</div>
+    <h1>Choose the lot &amp; home</h1>
+    <p class="lede">These are the lots in ${devName(chosenDev)}. Pick one to start this customer's selection sheet.</p>
+    <div class="lot-list">
+      ${lots.map((l,i)=>`<button class="lot-card" data-lot="${i}">
+        <div class="lc-lot">Lot ${l.lot}</div>
+        <div class="lc-model">${l.model}<br>${l.addr}</div>
+        <span class="lc-status ${l.status}">${l.status==='avail'?'Available':'Sold'}</span>
+      </button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderAll(){
+  renderDemoBar(); renderHeaderWho(); renderRail();
+  const root = document.getElementById('screenRoot');
+  const map = {'gate-dev':screenGateDev, v1:screenV1, v2:screenV2, review:screenReview, feed:screenFeed, sign:screenSign};
+  root.innerHTML = (map[currentScreen]||screenGateDev)();
+  attach();
+}
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+
+function attach(){
+  // development gate — pick development
+  document.querySelectorAll('.dev-card[data-dev]').forEach(el=>{
+    el.onclick=()=>{ chosenDev=el.dataset.dev; renderAll(); window.scrollTo({top:0,behavior:'instant'}); };
+  });
+  const gb=document.getElementById('gate-back');
+  if(gb) gb.onclick=()=>{ chosenDev=null; renderAll(); };
+  // development gate — pick lot, then enter Visit 1
+  document.querySelectorAll('.lot-card[data-lot]').forEach(el=>{
+    el.onclick=()=>{
+      chosenLot = lotsFor(chosenDev)[+el.dataset.lot];
+      currentScreen='v1'; renderAll(); window.scrollTo({top:0,behavior:'instant'});
+      toast(`Started ${chosenLot.model} · Lot ${chosenLot.lot}`);
+    };
+  });
+
+  // option selection
+  document.querySelectorAll('.opt[data-q]').forEach(el=>{
+    if(el.disabled) return;
+    el.onclick=()=>{
+      const qid=el.dataset.q, label=el.dataset.opt;
+      const q = [...V1_STEPS,...V2_STEPS].flatMap(s=>s.questions).find(q=>q.id===qid);
+      const o = q.options.find(o=>o.label===label);
+      answers[qid]={label:o.label,price:o.price,cc:q.cc,vendor:q.vendor,stage:q.stage};
+      renderAll();
+    };
+  });
+  // nav buttons
+  document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>{currentScreen=b.dataset.goto;renderAll();window.scrollTo({top:0,behavior:'instant'});});
+  // sign
+  const sb=document.getElementById('sign-btn');
+  if(sb) sb.onclick=()=>{
+    const a=document.getElementById('sig-agree');
+    if(!a||!a.checked){toast('Check the approval box to sign');return;}
+    signed=true; currentScreen='sign'; renderAll(); window.scrollTo({top:0,behavior:'instant'});
+  };
+  // change-order form
+  const cd=document.getElementById('co-desc'); if(cd) cd.oninput=e=>coDraft.desc=e.target.value;
+  const cc=document.getElementById('co-code'); if(cc) cc.onchange=e=>coDraft.code=+e.target.value;
+  const ca=document.getElementById('co-amt'); if(ca) ca.oninput=e=>coDraft.amount=e.target.value;
+  const cadd=document.getElementById('co-add');
+  if(cadd) cadd.onclick=()=>{
+    const amt=parseFloat(coDraft.amount||0);
+    if(!coDraft.desc.trim()){toast('Describe the change');return;}
+    if(!amt){toast('Enter an amount');return;}
+    changeOrders.push({id:Math.random().toString(36).slice(2,8),desc:coDraft.desc.trim(),cc:coDraft.code,amount:amt,date:new Date().toISOString().slice(0,10)});
+    coDraft={desc:'',code:72,amount:'',section:'Change Orders'};
+    toast('Change order added (+ $100 fee)');
+    renderAll();
+  };
+}
+
+/* ---------- init (TDZ-safe: state already declared above) ----------
+   Seeds carry the Coleman/151 sample so Visit 1/2 are pre-filled once a
+   lot is chosen; the flow opens on the development gate for a new customer. */
+seedV1(); seedV2();
+currentScreen = 'gate-dev';
+renderAll();
+</script>
+</body>
+</html>
