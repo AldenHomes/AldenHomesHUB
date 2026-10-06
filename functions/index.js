@@ -307,7 +307,9 @@ async function emailSubs(bySub, kind){
     if(!doc.exists){ logger.warn('Task assigned to a vendor that no longer exists', { subId }); continue; }
     const sub = { id: subId, ...doc.data() };
     // Texting isn't connected yet, so everyone with an email address gets email for now.
-    if(!sub.email){ outcome.skipped.push(sub.name || subId); continue; }
+    // A vendor can have several addresses (office, scheduler, owner) — everyone listed gets it.
+    const recipients = String(sub.email || '').split(/[;,]/).map(s=>s.trim()).filter(Boolean);
+    if(!recipients.length){ outcome.skipped.push(sub.name || subId); continue; }
     // Every sub gets a personal link automatically the first time they're emailed.
     if(!sub.linkToken){
       sub.linkToken = newToken();
@@ -316,7 +318,7 @@ async function emailSubs(bySub, kind){
     const items = bySub[subId].sort((a, b)=>a.t.start.localeCompare(b.t.start));
     const mail = buildEmail(sub, items, `${PORTAL_URL}?k=${encodeURIComponent(sub.linkToken)}`, kind);
     try{
-      await transport.sendMail({ from, replyTo, to: sub.email, subject: mail.subject, text: mail.text, html: mail.html });
+      await transport.sendMail({ from, replyTo, to: recipients, subject: mail.subject, text: mail.text, html: mail.html });
       outcome.emailed.push(sub.name || subId);
       items.forEach(i=>outcome.asked.push({ houseId: i.houseId, taskId: i.t.id, subId, start: i.t.start, end: i.t.end }));
     } catch(err){
