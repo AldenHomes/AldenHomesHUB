@@ -100,7 +100,19 @@
   .photo-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:10px; margin-top:8px;}
   .photo{position:relative; border-radius:var(--radius); overflow:hidden; background:#ece8dd; aspect-ratio:1;}
   .photo img{width:100%; height:100%; object-fit:cover; display:block;}
-  .photo .who{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(20,20,22,.75)); color:#fff; font-size:10.5px; padding:14px 7px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .photo .who{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(20,20,22,.82)); color:#fff; font-size:10.5px; line-height:1.35; padding:18px 7px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none;}
+  .photo .who strong{font-size:11.5px;}
+  .photo .move{position:absolute; top:4px; left:4px; max-width:calc(100% - 38px); font-size:11px; padding:3px 4px; border:none; border-radius:3px; background:rgba(20,20,22,.6); color:#fff; cursor:pointer; opacity:0; transition:opacity .12s;}
+  .photo:hover .move, .photo .move:focus{opacity:1;}
+  .photo .move option{color:#33363a; background:#fff;}
+  @media (hover:none){ .photo .move{opacity:1;} }
+  .folder-row{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
+  .fchip{border:1px solid var(--steel-line); background:var(--paper-2); color:var(--ink-soft); border-radius:20px; padding:5px 12px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .fchip:hover{border-color:var(--navy); color:var(--navy);}
+  .fchip.on{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .fchip .n{font-weight:400; opacity:.7; font-family:"Courier New",monospace; font-size:11px;}
+  .fchip.add{border-style:dashed;}
+  .fchip.del{border-color:#e3b5a0; color:#a8451a; margin-left:auto;}
   .photo .x-btn{position:absolute; top:4px; right:4px; background:rgba(20,20,22,.6); color:#fff; border-radius:50%; width:24px; height:24px; padding:0;}
   .photo .x-btn:hover{background:#a8451a; color:#fff;}
   .missing{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:50px 20px; text-align:center; color:var(--ink-soft); line-height:1.7;}
@@ -241,7 +253,8 @@
             </label>
           </div>
           <div class="card-body">
-            <div class="muted" id="uploadNote" style="font-size:12.5px; min-height:16px;"></div>
+            <div class="folder-row" id="folderRow" style="display:none;"></div>
+            <div class="muted" style="font-size:12.5px; min-height:16px;"><span id="uploadTarget"></span> <span id="uploadNote"></span></div>
             <div class="photo-grid" id="photoGrid"></div>
           </div>
         </div>
@@ -502,18 +515,91 @@ function renderFiles(){
       </div>`).join('')
     : '<span class="muted">No plans uploaded yet.</span>';
 
-  const photos = files.filter(f=>f.kind === 'photo');
-  $('photoCount').textContent = photos.length ? `(${photos.length})` : '';
+  // Photos: newest first (the list is already sorted by upload time), optionally narrowed to a folder.
+  const allPhotos = files.filter(f=>f.kind === 'photo');
+  const folders = folderNames();
+  if(currentFolder !== ALL && currentFolder !== '' && !folders.includes(currentFolder)) currentFolder = ALL; // folder was removed
+  const photos = allPhotos.filter(f=>currentFolder === ALL || (f.folder || '') === currentFolder);
+  $('photoCount').textContent = allPhotos.length ? `(${allPhotos.length})` : '';
+
+  const count = name=>allPhotos.filter(f=>(f.folder || '') === name).length;
+  const chip = (value, label, n)=>`<button type="button" class="fchip${currentFolder === value ? ' on' : ''}" data-folder="${esc(value)}">${esc(label)} <span class="n">${n}</span></button>`;
+  $('folderRow').style.display = filesState === 'ready' ? 'flex' : 'none';
+  $('folderRow').innerHTML = chip(ALL, 'All photos', allPhotos.length)
+    + (folders.length ? chip('', 'Not in a folder', count('')) : '')
+    + folders.map(name=>chip(name, name, count(name))).join('')
+    + `<button type="button" class="fchip add" id="newFolderBtn">+ New folder</button>`
+    + (currentFolder !== ALL && currentFolder !== '' ? `<button type="button" class="fchip del" id="deleteFolderBtn" title="Remove this folder. Its photos are kept and go back to 'Not in a folder'.">Remove folder</button>` : '');
+  $('uploadTarget').textContent = currentFolder !== ALL && currentFolder !== '' ? `New photos go into “${currentFolder}”.` : '';
+
+  const moveOptions = f=>`<option value="">Move to…</option>`
+    + ((f.folder || '') !== '' ? `<option value="__none">Not in a folder</option>` : '')
+    + folders.filter(n=>n !== (f.folder || '')).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+
   $('photoGrid').innerHTML = filesState === 'blocked' ? blocked
     : photos.length ? photos.map(f=>{
-        const who = [(f.by && f.by.name) || 'Alden Homes', f.taskTitle, f.uploadedAt ? fmtDate(f.uploadedAt.slice(0,10)) : ''].filter(Boolean).join(' · ');
+        const by = (f.by && f.by.name) || 'Alden Homes';
+        const detail = [f.taskTitle, f.uploadedAt ? fmtDate(f.uploadedAt.slice(0,10)) : '', currentFolder === ALL && f.folder ? f.folder : ''].filter(Boolean).join(' · ');
         return `<div class="photo">
           <a href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="" loading="lazy"></a>
-          <div class="who" title="${esc(who)}">${esc(who)}</div>
+          <div class="who" title="${esc(by + (detail ? ' · ' + detail : ''))}"><strong>${esc(by)}</strong>${detail ? `<br>${esc(detail)}` : ''}</div>
           <button type="button" class="x-btn" data-delete="${esc(f.id)}" title="Remove">&times;</button>
+          ${folders.length ? `<select class="move" data-move="${esc(f.id)}" title="Move this photo to a folder">${moveOptions(f)}</select>` : ''}
         </div>`;
       }).join('')
-    : (filesState === 'loading' ? '' : '<span class="muted">No photos yet. Photos added by subs on site show up here too.</span>');
+    : (filesState === 'loading' ? '' : `<span class="muted">${allPhotos.length ? 'No photos in this folder yet.' : 'No photos yet. Photos added by subs on site show up here too.'}</span>`);
+}
+
+/* ---- photo folders ----
+   A folder is its own small record alongside the photos (kind: 'folder'), so an empty
+   folder still exists. Each photo just carries the name of the folder it's in. */
+const ALL = '__all';
+let currentFolder = ALL;
+function folderNames(){
+  return files.filter(f=>f.kind === 'folder').map(f=>f.name).filter(Boolean).sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:'base' }));
+}
+document.getElementById('folderRow').addEventListener('click', async e=>{
+  const chip = e.target.closest('[data-folder]');
+  if(chip){ currentFolder = chip.dataset.folder; renderFiles(); return; }
+
+  if(e.target.closest('#newFolderBtn')){
+    const name = (prompt('Name for the new folder (for example Framing, Kitchen, or Before drywall):') || '').trim().slice(0, 60);
+    if(!name) return;
+    if(folderNames().some(n=>n.toLowerCase() === name.toLowerCase())){ alert('There is already a folder with that name.'); return; }
+    const user = firebase.auth().currentUser;
+    try{
+      await db.collection('house-files').add({ houseId, kind:'folder', name, uploadedAt: new Date().toISOString(), by: { type:'staff', id: user ? user.uid : '', name: staffName() } });
+      currentFolder = name;
+      renderFiles();
+    } catch(err){ console.error(err); alert('Could not create the folder — check your connection and try again.'); }
+    return;
+  }
+
+  if(e.target.closest('#deleteFolderBtn')){
+    const name = currentFolder;
+    const inside = files.filter(f=>f.kind === 'photo' && (f.folder || '') === name);
+    if(!confirm(`Remove the folder “${name}”?\n\n${inside.length ? `Its ${inside.length} photo${inside.length===1?'':'s'} will be kept and moved to “Not in a folder”.` : 'It is empty.'}`)) return;
+    try{
+      const batch = db.batch();
+      inside.forEach(f=>batch.update(db.collection('house-files').doc(f.id), { folder: '' }));
+      files.filter(f=>f.kind === 'folder' && f.name === name).forEach(f=>batch.delete(db.collection('house-files').doc(f.id)));
+      await batch.commit();
+      currentFolder = ALL;
+    } catch(err){ console.error(err); alert('Could not remove the folder — check your connection and try again.'); }
+  }
+});
+document.getElementById('photoGrid').addEventListener('change', async e=>{
+  const sel = e.target.closest('select[data-move]');
+  if(!sel || !sel.value) return;
+  try{ await db.collection('house-files').doc(sel.dataset.move).update({ folder: sel.value === '__none' ? '' : sel.value }); }
+  catch(err){ console.error(err); alert('Could not move the photo — check your connection and try again.'); }
+});
+
+// Who an upload from the office is tagged with: the signed-in person's name, or their email if no name is set.
+function staffName(){
+  const user = firebase.auth().currentUser;
+  if(!user) return 'Alden Homes';
+  return user.displayName || (user.email || '').split('@')[0] || 'Alden Homes';
 }
 
 /* ---- uploading plans and photos ---- */
@@ -555,7 +641,9 @@ async function uploadFiles(list, kind){
         houseId, kind, name: file.name, path, url: await stored.getDownloadURL(),
         contentType: isPhoto ? 'image/jpeg' : (file.type || ''), size: blob.size,
         caption: '', taskId: '', taskTitle: '', phase: '',
-        by: { type: 'staff', id: user ? user.uid : '', name: 'Alden Homes' },
+        // a photo goes into whichever folder is open when it's added
+        folder: isPhoto && currentFolder !== ALL ? currentFolder : '',
+        by: { type: 'staff', id: user ? user.uid : '', name: staffName() },
         uploadedAt: new Date().toISOString(),
       });
     } catch(err){ console.error(err); failed++; }

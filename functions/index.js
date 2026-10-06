@@ -36,7 +36,10 @@ function fileUrl(path, token){
 }
 // What a sub sees about one file on a house.
 function fileForSub(id, f){
-  return { id, kind: f.kind || 'photo', name: f.name || '', url: f.url || '', caption: f.caption || '', by: (f.by && f.by.name) || 'Alden Homes', at: f.uploadedAt || '' };
+  // Photos are tagged with who added them. Staff show simply as "Alden Homes" to subs —
+  // the office sees the individual's name, but it isn't handed out to vendors.
+  const by = f.by && f.by.type === 'sub' ? (f.by.name || 'Subcontractor') : 'Alden Homes';
+  return { id, kind: f.kind || 'photo', name: f.name || '', url: f.url || '', caption: f.caption || '', folder: f.folder || '', by, at: f.uploadedAt || '' };
 }
 // A sub may only open a house the office has sent out AND where they have at least one task.
 async function houseForSub(houseId, subId){
@@ -189,10 +192,16 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
       const sched = await houseForSub(body.houseId, sub.id);
       if(!sched){ res.status(404).json({ error: 'not-yours' }); return; }
       const filesSnap = await db.collection('house-files').where('houseId', '==', body.houseId).get();
-      const files = [];
-      filesSnap.forEach(d=>files.push(fileForSub(d.id, d.data())));
-      files.sort((a, b)=>(b.at || '').localeCompare(a.at || ''));
+      const files = [], folders = [];
+      filesSnap.forEach(d=>{
+        const f = d.data();
+        if(f.kind === 'folder'){ if(f.name) folders.push(f.name); }
+        else files.push(fileForSub(d.id, f));
+      });
+      files.sort((a, b)=>(b.at || '').localeCompare(a.at || '')); // newest first
+      folders.sort((a, b)=>a.localeCompare(b, 'en', { sensitivity: 'base' }));
       res.json({
+        folders,
         house: { community: sched.community || '', lot: sched.lot || '', client: sched.client || '', address: sched.address || '', model: sched.model || '' },
         tasks: (sched.tasks || []).filter(t=>t.id && t.start && (t.subIds || []).includes(sub.id)).map(t=>taskForSub(body.houseId, sched, t, sub.id)),
         files,
@@ -218,7 +227,14 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
       });
       // which of their jobs it goes with, if they picked one that really is theirs
       const task = (sched.tasks || []).find(t=>t.id === body.taskId && (t.subIds || []).includes(sub.id));
+      // it can go into a folder the office has set up on this house — but subs can't invent folders
+      let folder = '';
+      if(typeof body.folder === 'string' && body.folder){
+        const match = await db.collection('house-files').where('houseId', '==', body.houseId).where('kind', '==', 'folder').where('name', '==', body.folder).limit(1).get();
+        if(!match.empty) folder = body.folder;
+      }
       const file = {
+        folder,
         houseId: body.houseId, kind: 'photo', name: `${ref.id}.${ext}`, path, url: fileUrl(path, token),
         contentType: `image/${m[1]}`, size: bytes.length,
         caption: typeof body.caption === 'string' ? body.caption.slice(0, 200) : '',

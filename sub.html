@@ -109,8 +109,14 @@
   .file .n{font-size:15.5px; font-weight:700; color:var(--navy); word-break:break-word;}
   .file .s{font-size:12.5px; color:var(--ink-soft);}
   .photos{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
-  .photos a{display:block; aspect-ratio:1; border-radius:8px; overflow:hidden; background:#ece8dd;}
+  .photos a{display:block; position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden; background:#ece8dd;}
   .photos img{width:100%; height:100%; object-fit:cover; display:block;}
+  .photos .tag{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(20,20,22,.82)); color:#fff; font-size:10.5px; font-weight:600; padding:14px 6px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .folder-row{display:flex; gap:7px; overflow-x:auto; padding-bottom:10px; margin-bottom:2px; scrollbar-width:none;}
+  .folder-row::-webkit-scrollbar{display:none;}
+  .fchip{flex:none; border:2px solid var(--steel-line); background:#fff; color:var(--ink-soft); border-radius:20px; padding:7px 13px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;}
+  .fchip.on{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .fchip .n{font-weight:400; opacity:.7;}
   .upload-note{font-size:13.5px; color:var(--ink-soft); margin-top:10px; text-align:center; min-height:18px;}
   /* full-size photo */
   .viewer{position:fixed; inset:0; background:rgba(20,20,22,.94); z-index:40; display:none; align-items:center; justify-content:center; flex-direction:column; padding:14px;}
@@ -298,8 +304,9 @@ const demoState = {
     d1: [
       { id:'f1', kind:'plan', name:'Coleman — Floor Plans Rev B.pdf', url:'#', by:'Alden Homes', at:demoIso(-40) },
       { id:'f2', kind:'plan', name:'Kitchen layout — Lot 70.pdf', url:'#', by:'Alden Homes', at:demoIso(-12) },
-      { id:'f3', kind:'photo', name:'', url:demoPhoto(95,'Kitchen — before'), caption:'Kitchen wall before cabinets', by:'Alden Homes', at:demoIso(-3) },
-      { id:'f4', kind:'photo', name:'', url:demoPhoto(30,'Trim delivery'), caption:'Trim staged in garage', by:'Alden Homes', at:demoIso(-2) },
+      { id:'f4', kind:'photo', name:'', url:demoPhoto(30,'Trim delivery'), caption:'Trim staged in garage', folder:'Trim', by:'Alden Homes', at:demoIso(-2) },
+      { id:'f3', kind:'photo', name:'', url:demoPhoto(95,'Kitchen — before'), caption:'Kitchen wall before cabinets', folder:'Kitchen', by:'Alden Homes', at:demoIso(-3) },
+      { id:'f6', kind:'photo', name:'', url:demoPhoto(200,'Rough-in'), caption:'Plumbing rough-in', folder:'', by:'Sample Plumbing Co.', at:demoIso(-20) },
     ],
     d2: [ { id:'f5', kind:'plan', name:'Rivet — Floor Plans.pdf', url:'#', by:'Alden Homes', at:demoIso(-30) } ],
     d3: [],
@@ -310,9 +317,9 @@ async function demoApi(action, extra){
   const copy = x=>JSON.parse(JSON.stringify(x));
   if(action === 'load') return { sub: demoState.sub, today: demoIso(0), tasks: copy(demoState.tasks) };
   if(action === 'setNotify'){ demoState.sub.notify = extra.notify; return { notify: extra.notify }; }
-  if(action === 'house') return { house: DEMO_HOUSES[extra.houseId], tasks: copy(demoState.tasks.filter(t=>t.houseId===extra.houseId)), files: copy(demoState.files[extra.houseId] || []) };
+  if(action === 'house') return { house: DEMO_HOUSES[extra.houseId], folders: extra.houseId === 'd1' ? ['Kitchen', 'Trim'] : [], tasks: copy(demoState.tasks.filter(t=>t.houseId===extra.houseId)), files: copy(demoState.files[extra.houseId] || []) };
   if(action === 'addPhoto'){
-    const f = { id:'n'+Date.now(), kind:'photo', name:'', url: extra.dataUrl, caption:'', by: demoState.sub.name, at: new Date().toISOString() };
+    const f = { id:'n'+Date.now(), kind:'photo', name:'', url: extra.dataUrl, caption:'', folder: extra.folder || '', by: demoState.sub.name, at: new Date().toISOString() };
     demoState.files[extra.houseId].unshift(f);
     return { file: f };
   }
@@ -543,7 +550,7 @@ $('notifySeg').addEventListener('click', async e=>{
    ============================================================ */
 async function openHouse(houseId){
   const known = tasks.find(t=>t.houseId === houseId);
-  house = { id: houseId, house: known ? known.house : {}, tasks: [], files: [] };
+  house = { id: houseId, house: known ? known.house : {}, tasks: [], files: [], folders: [], folder: ALL };
   $('houseTitle').textContent = houseLabel(house.house) || 'House';
   $('houseLoading').style.display = 'block';
   $('houseLoading').textContent = 'Loading…';
@@ -558,6 +565,7 @@ async function openHouse(houseId){
     house.house = data.house || house.house;
     house.tasks = data.tasks || [];
     house.files = data.files || [];
+    house.folders = data.folders || [];
     $('houseLoading').style.display = 'none';
     $('houseBody').style.display = 'block';
     renderHouse();
@@ -588,14 +596,32 @@ function renderHouse(){
     </a>`).join('')
     : '<span style="color:var(--ink-soft); font-size:15px;">No plans have been posted for this house yet.</span>';
 
-  const photos = house.files.filter(f=>f.kind === 'photo');
-  $('housePhotos').innerHTML = photos.length
-    ? `<div class="photos">${photos.map(f=>`<a href="${esc(f.url)}" data-photo="${esc(f.id)}"><img src="${esc(f.url)}" alt="${esc(f.caption || 'Photo')}" loading="lazy"></a>`).join('')}</div>`
-    : '<div style="color:var(--ink-soft); font-size:15px; text-align:center; padding:6px 0;">No photos yet.</div>';
+  // Photos: newest first, each tagged with who added it. Folders the office set up show as tabs.
+  const allPhotos = house.files.filter(f=>f.kind === 'photo');
+  const folders = house.folders || [];
+  if(house.folder !== ALL && !folders.includes(house.folder)) house.folder = ALL;
+  const photos = allPhotos.filter(f=>house.folder === ALL || (f.folder || '') === house.folder);
+  const chip = (value, label, n)=>`<button type="button" class="fchip${house.folder === value ? ' on' : ''}" data-folder="${esc(value)}">${esc(label)} <span class="n">${n}</span></button>`;
+  const chips = folders.length
+    ? `<div class="folder-row">${chip(ALL, 'All', allPhotos.length)}${folders.map(n=>chip(n, n, allPhotos.filter(f=>(f.folder||'') === n).length)).join('')}</div>` : '';
+  $('housePhotos').innerHTML = chips + (photos.length
+    ? `<div class="photos">${photos.map(f=>`<a href="${esc(f.url)}" data-photo="${esc(f.id)}">
+        <img src="${esc(f.url)}" alt="${esc(f.caption || 'Photo')}" loading="lazy">
+        <span class="tag">${esc(f.by || 'Alden Homes')}${f.at ? ' · ' + esc(shortDate(f.at)) : ''}</span>
+      </a>`).join('')}</div>`
+    : `<div style="color:var(--ink-soft); font-size:15px; text-align:center; padding:6px 0;">${allPhotos.length ? 'No photos in this folder yet.' : 'No photos yet.'}</div>`);
+  $('addPhotoBtn').firstChild.textContent = house.folder !== ALL ? `Add photos to “${house.folder}” ` : 'Add photos ';
+}
+const ALL = '__all';
+function shortDate(iso){
+  const d = new Date(iso.length > 10 ? iso : iso + 'T12:00:00');
+  return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
 }
 
 /* full-size photo */
 $('housePhotos').addEventListener('click', e=>{
+  const folderChip = e.target.closest('[data-folder]');
+  if(folderChip){ house.folder = folderChip.dataset.folder; renderHouse(); return; }
   const a = e.target.closest('a[data-photo]');
   if(!a) return;
   e.preventDefault();
@@ -642,7 +668,7 @@ $('photoInput').addEventListener('change', async e=>{
     $('uploadNote').textContent = `Uploading photo ${i+1} of ${files.length}…`;
     try{
       const dataUrl = await shrinkPhoto(files[i]);
-      const data = await api('addPhoto', { houseId, taskId: current ? current.taskId : '', dataUrl });
+      const data = await api('addPhoto', { houseId, taskId: current ? current.taskId : '', folder: house && house.folder !== ALL ? house.folder : '', dataUrl });
       if(house && house.id === houseId){ house.files.unshift(data.file); renderHouse(); }
     } catch(err){ console.error(err); failed++; }
   }
