@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
 <title>Alden Homes Hub</title>
 <style>
   :root{
@@ -181,6 +188,7 @@
         <span id="syncLabel">Synced</span>
       </div>
       <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <button class="signout-btn" id="installBtn" style="display:none;">Install app</button>
       <button class="signout-btn" id="signOutBtn">Sign out</button>
     </div>
   </div>
@@ -361,6 +369,34 @@ function attachPacketsStatsListener(db){
     setSyncStatus('idle');
   }, err=>{ console.error('sales-packets listener error', err); setSyncStatus('offline'); });
 }
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('Service worker registration failed', err));
+  });
+}
+
+// "Install app" button — only shown when the browser says the hub can be installed
+// (Chrome / Edge on desktop and Android). It hides itself once installed.
+let deferredInstallPrompt = null;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBtn.style.display = '';
+});
+installBtn.addEventListener('click', async ()=>{
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installBtn.style.display = 'none';
+});
+window.addEventListener('appinstalled', ()=>{
+  deferredInstallPrompt = null;
+  installBtn.style.display = 'none';
+});
 </script>
 </body>
 </html>
