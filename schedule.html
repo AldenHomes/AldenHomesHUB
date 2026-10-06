@@ -173,6 +173,49 @@
   .progress-fill.none{background:#cbc5b4;}
   .progress-label{font-size:11px; font-family:"Courier New",monospace; color:var(--ink-soft); white-space:nowrap;}
 
+  /* ---- Material Orders grid: one row per job, one tappable box per checklist item ---- */
+  .order-grid-wrap{
+    overflow:auto; max-height:calc(100vh - 200px); min-height:160px;
+    background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius);
+  }
+  .order-grid{border-collapse:separate; border-spacing:0; box-shadow:none; border-radius:0; overflow:visible; width:max-content; min-width:100%;}
+  .order-grid thead th{position:sticky; top:0; z-index:2; padding:10px 8px;}
+  .order-grid th.item-col{
+    width:58px; min-width:58px; max-width:58px; padding:8px 3px; text-align:center; vertical-align:bottom;
+    white-space:normal; font-size:10px; letter-spacing:.2px; line-height:1.25; cursor:default;
+  }
+  .order-grid th.item-col:hover{background:var(--navy);}
+  .order-grid tbody td{padding:7px 8px; background:var(--paper-2);}
+  .order-grid tbody tr:hover td{background:#faf8f2;}
+  .order-grid tbody tr.flash td{animation: flash 1.6s ease;}
+  /* job columns stay put while the item columns scroll sideways */
+  .order-grid .c-comm, .order-grid .c-lot, .order-grid .c-name{position:sticky; z-index:1;}
+  .order-grid thead .c-comm, .order-grid thead .c-lot, .order-grid thead .c-name{z-index:3;}
+  .order-grid .c-comm{left:0; width:58px; min-width:58px; max-width:58px;}
+  .order-grid .c-lot{left:58px; width:52px; min-width:52px; max-width:52px;}
+  .order-grid .c-name{left:110px; width:178px; min-width:178px; max-width:178px; border-right:2px solid #e2ddd0;}
+  .order-grid thead .c-name{border-right-color:var(--navy-2);}
+  .order-grid .job-name{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .order-grid .job-addr{font-size:11px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;}
+  .order-grid td.item-cell{padding:0; border-left:1px solid #f1ede3; text-align:center;}
+  .item-toggle{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    width:100%; min-height:42px; padding:2px; border:none; background:transparent; cursor:pointer;
+    color:var(--good); font-family:inherit;
+  }
+  .item-toggle:hover{background:#eef0e8;}
+  .item-toggle:focus-visible{outline:2px solid var(--amber); outline-offset:-2px;}
+  .item-cell.done .item-toggle{background:#eaf1ec;}
+  .item-cell.done .item-toggle:hover{background:#d9e8dd;}
+  .item-note{
+    max-width:52px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-size:9.5px; line-height:1; font-family:"Courier New",monospace; color:var(--ink-soft);
+  }
+  .order-grid .row-actions{flex-wrap:nowrap; gap:2px; justify-content:flex-end;}
+  .order-count{font-size:11px; font-family:"Courier New",monospace; color:var(--ink-soft); white-space:nowrap; margin-right:4px;}
+  .icon-btn.ready, .icon-btn.ready:hover{background:var(--good); color:#fff;}
+  .grid-hint{font-size:12px; color:var(--ink-soft); margin:8px 2px 0;}
+
   /* Modal */
   .overlay{
     position:fixed; inset:0; background:rgba(21,34,56,.55); display:none;
@@ -297,6 +340,20 @@
     tbody td{border-bottom:none; padding:4px 10px; display:flex; justify-content:space-between; gap:10px;}
     tbody td::before{content:attr(data-label); font-weight:700; color:var(--ink-soft); font-size:11px; text-transform:uppercase;}
     .row-actions{justify-content:flex-end;}
+
+    /* The orders grid stays a real grid on phones — scroll sideways, job name pinned. */
+    .order-grid{display:table; width:max-content;}
+    .order-grid thead{display:table-header-group;}
+    .order-grid tbody{display:table-row-group;}
+    .order-grid tr{display:table-row;}
+    .order-grid tbody tr{border-bottom:none; padding:0;}
+    .order-grid th, .order-grid td{display:table-cell; width:auto;}
+    .order-grid tbody td{padding:7px 8px; border-bottom:1px solid #ece8dd;}
+    .order-grid tbody td::before{content:none;}
+    .order-grid td.item-cell{padding:0;}
+    .order-grid .c-comm, .order-grid .c-lot{position:static;}
+    .order-grid .c-name{left:0; width:132px; min-width:132px; max-width:132px;}
+    .order-grid-wrap{max-height:calc(100vh - 150px);}
   }
   @media print{
     .toolbar, .btn, .row-actions, footer, .tabbar{display:none !important;}
@@ -445,21 +502,17 @@
       <button class="btn btn-primary" id="ordersAddBtn">+ Add Order</button>
     </div>
 
-    <table>
-      <thead>
-        <tr id="ordersHeaderRow">
-          <th data-key="community">Community</th>
-          <th data-key="lot">Lot</th>
-          <th data-key="name">Name</th>
-          <th data-key="address">Address</th>
-          <th data-key="walkthru" class="sorted asc">Walk-Thru</th>
-          <th>Items Ordered</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="ordersTableBody"></tbody>
-    </table>
-    <div class="empty" id="ordersEmptyState" style="display:none;">No orders match your search.</div>
+    <div class="order-grid-wrap">
+      <table class="order-grid">
+        <thead>
+          <!-- built in renderOrders(): one column per checklist item -->
+          <tr id="ordersHeaderRow"></tr>
+        </thead>
+        <tbody id="ordersTableBody"></tbody>
+      </table>
+      <div class="empty" id="ordersEmptyState" style="display:none;">No orders match your search.</div>
+    </div>
+    <div class="grid-hint">Tap a box to mark that item ordered — tap again to clear it. Tap a job's name to add dates or edit the order.</div>
 
     <button class="completed-toggle" id="completedToggle">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" id="completedChevron"><path d="M9 6l6 6-6 6"/></svg>
@@ -1678,10 +1731,7 @@ function jobKeysSet(){
 
 function orderProgress(o){
   const total = CHECKLIST_ITEMS.length;
-  const done = CHECKLIST_ITEMS.filter(name => {
-    const v = o.items && o.items[name];
-    return v && v.toString().trim() !== '';
-  }).length;
+  const done = CHECKLIST_ITEMS.filter(name => orderItemState(o, name).done).length;
   return {done, total};
 }
 
@@ -1740,6 +1790,112 @@ function buildOrderRow(o, jKeys, isCompleted){
   </tr>`;
 }
 
+/* ---- Active orders grid: one row per job, one tappable box per checklist item ---- */
+const ITEM_CHECK_SVG = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+
+function escHtml(s){
+  return (s==null?'':String(s)).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+
+// An item's saved value is '' (not ordered), 'X' (ordered), or an X plus a note —
+// a date set in the order modal ("X 2026-03-04") or text from the old spreadsheet ("ABC X").
+// Only the X means ordered: text on its own ("ABC") is just a note and the box stays empty.
+function itemValueState(value){
+  const raw = (value || '').toString().trim();
+  const note = raw.replace(/(^|\s)X(?=\s|$)/i, ' ').trim();
+  return { done: note !== raw, note };
+}
+function orderItemState(o, name){
+  return itemValueState(o.items && o.items[name]);
+}
+function isDateNote(note){ return /^\d{4}-\d{2}-\d{2}$/.test(note); }
+function itemNoteLabel(note){
+  const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(note);
+  return m ? `${Number(m[1])}/${Number(m[2])}` : note;
+}
+
+function buildOrderGridHeader(){
+  return `<th class="c-comm" data-key="community">Comm</th>
+    <th class="c-lot" data-key="lot">Lot</th>
+    <th class="c-name" data-key="name">Name</th>
+    <th data-key="walkthru">Walk-Thru</th>`
+    + CHECKLIST_ITEMS.map(name=>`<th class="item-col">${escHtml(name)}</th>`).join('')
+    + '<th></th>';
+}
+
+function buildOrderGridRow(o, jKeys){
+  const {done,total} = orderProgress(o);
+  const key = normKey(o.community, o.lot);
+  const inSchedule = o.lot && jKeys.has(key);
+  const jumpBtn = inSchedule ? `<button class="icon-btn jump-to-job" data-key="${key}" title="View this job in the Production Schedule">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    </button>` : '';
+  const matchedJob = inSchedule ? jobs.find(j=>j.lot && normKey(j.community,j.lot)===key) : null;
+  const filesBtn = (matchedJob && matchedJob.filesUrl)
+    ? `<button class="icon-btn files-btn" data-job-id="${matchedJob.id}" title="Open this lot's OneDrive folder">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+      </button>`
+    : '';
+  const allDone = total>0 && done===total;
+
+  const itemCells = CHECKLIST_ITEMS.map((name, idx)=>{
+    const s = orderItemState(o, name);
+    const tip = s.done
+      ? `${name} — ordered${s.note ? ` (${s.note})` : ''}. Tap to clear.`
+      : `${name} — not ordered yet. Tap to mark ordered.`;
+    const inner = s.done
+      ? ITEM_CHECK_SVG + (s.note ? `<span class="item-note">${escHtml(itemNoteLabel(s.note))}</span>` : '')
+      : '';
+    return `<td class="item-cell${s.done?' done':''}"><button type="button" class="item-toggle" data-idx="${idx}" title="${escHtml(tip)}" aria-pressed="${s.done}">${inner}</button></td>`;
+  }).join('');
+
+  return `<tr data-id="${o.id}" data-key="${key}">
+    <td class="c-comm"><span class="tag" style="background:${communityColor(o.community)}">${o.community||'—'}</span></td>
+    <td class="c-lot mono">${o.lot||''}</td>
+    <td class="c-name" title="${escHtml([o.name, o.address].filter(Boolean).join(' — '))}">
+      <div class="job-name">${o.name||''}</div>
+      ${o.address ? `<div class="job-addr">${o.address}</div>` : ''}
+    </td>
+    <td class="mono muted">${fmtDate(o.walkthru)}</td>
+    ${itemCells}
+    <td>
+      <div class="row-actions">
+        <span class="order-count">${done}/${total}</span>
+        ${jumpBtn}
+        ${filesBtn}
+        <button class="icon-btn mark-complete-btn${allDone?' ready':''}" title="${allDone ? 'Everything is ordered — mark complete' : 'Mark complete — moves to Completed Orders'}" data-id="${o.id}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </button>
+        <button class="icon-btn orders-edit-btn" title="Edit" data-id="${o.id}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+// Flip one checklist box straight from the grid. Only that one field is written,
+// so two people ticking different boxes on the same job don't overwrite each other.
+async function toggleOrderItem(orderId, itemName){
+  const o = orders.find(x=>x.id===orderId);
+  if(!o || !itemName) return;
+  const s = orderItemState(o, itemName);
+  let next;
+  if(!s.done){
+    next = s.note ? `${s.note} X` : 'X';
+  } else if(isDateNote(s.note)){
+    // un-checking throws the saved date away, so make sure it wasn't a stray tap
+    if(!confirm(`${itemName} for ${o.name||'this job'} has a date saved with it (${fmtDate(s.note)}).\n\nClear it?`)) return;
+    next = '';
+  } else {
+    next = s.note; // keep any text note, just drop the X
+  }
+  setSyncStatus('saving');
+  try{
+    await ordersCol.doc(orderId).update(new firebase.firestore.FieldPath('items', itemName), next);
+  } catch(e){ console.error(e); alert('Could not save — check your connection and try again.'); }
+}
+
 function renderOrders(){
   const q = document.getElementById('ordersSearchBox').value.trim().toLowerCase();
   const community = document.getElementById('ordersCommunityFilter').value;
@@ -1767,11 +1923,12 @@ function renderOrders(){
   const jKeys = jobKeysSet();
   const tbody = document.getElementById('ordersTableBody');
   const empty = document.getElementById('ordersEmptyState');
+  document.getElementById('ordersHeaderRow').innerHTML = buildOrderGridHeader();
   if(activeRows.length===0){
     tbody.innerHTML=''; empty.style.display='block';
   } else {
     empty.style.display='none';
-    tbody.innerHTML = activeRows.map(o=>buildOrderRow(o, jKeys, false)).join('');
+    tbody.innerHTML = activeRows.map(o=>buildOrderGridRow(o, jKeys)).join('');
   }
 
   const ctbody = document.getElementById('completedTableBody');
@@ -1851,6 +2008,8 @@ document.getElementById('ordersSearchBox').addEventListener('input', renderOrder
 document.getElementById('ordersCommunityFilter').addEventListener('change', renderOrders);
 
 document.getElementById('ordersTableBody').addEventListener('click', e=>{
+  const itemBtn = e.target.closest('.item-toggle');
+  if(itemBtn){ toggleOrderItem(itemBtn.closest('tr').dataset.id, CHECKLIST_ITEMS[Number(itemBtn.dataset.idx)]); return; }
   const jumpBtn = e.target.closest('.jump-to-job');
   if(jumpBtn){ jumpToJob(jumpBtn.dataset.key); return; }
   const filesBtn = e.target.closest('.files-btn');
@@ -1883,13 +2042,12 @@ const checklistContainer = document.getElementById('checklistContainer');
 
 function buildChecklist(items){
   checklistContainer.innerHTML = CHECKLIST_ITEMS.map(name=>{
-    const raw = (items && items[name]) || '';
-    const checked = raw.trim() !== '';
-    const note = raw.replace(/^X\s*/i,'').trim();
-    const dateVal = /^\d{4}-\d{2}-\d{2}$/.test(note) ? note : '';
+    const {done: checked, note} = itemValueState(items && items[name]);
+    const dateVal = isDateNote(note) ? note : '';
+    const textNote = dateVal ? '' : note; // e.g. "ABC" — carried through untouched on save
     const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
     return `<div class="check-item">
-      <input type="checkbox" id="chk_${safeName}" data-item="${name}" ${checked?'checked':''}>
+      <input type="checkbox" id="chk_${safeName}" data-item="${name}" data-note="${escHtml(textNote)}" ${checked?'checked':''}>
       <label for="chk_${safeName}">${name}</label>
       <input type="date" id="note_${safeName}" data-item-date="${name}" value="${dateVal}">
     </div>`;
@@ -1907,10 +2065,12 @@ function readChecklist(){
   const items = {};
   CHECKLIST_ITEMS.forEach(name=>{
     const safeName = name.replace(/[^a-zA-Z0-9]/g,'_');
-    const checked = document.getElementById('chk_'+safeName).checked;
+    const chk = document.getElementById('chk_'+safeName);
+    const checked = chk.checked;
+    const textNote = chk.dataset.note || '';
     const dateVal = document.getElementById('note_'+safeName).value;
-    if(!checked){ items[name] = ''; }
-    else { items[name] = dateVal ? `X ${dateVal}` : 'X'; }
+    if(!checked){ items[name] = textNote; }
+    else { items[name] = dateVal ? `X ${dateVal}` : (textNote ? `${textNote} X` : 'X'); }
   });
   return items;
 }
