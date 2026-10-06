@@ -297,7 +297,8 @@ async function emailSubs(bySub, kind){
   if(!subIds.length) return outcome;
 
   const nodemailer = require('nodemailer');
-  const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: MAIL_USER.value(), pass: GMAIL_APP_PASSWORD.value() } });
+  const transport = nodemailer.createTransport({ service: 'gmail', // Google shows app passwords in groups of four with spaces; strip them in case they were pasted that way.
+    auth: { user: MAIL_USER.value(), pass: GMAIL_APP_PASSWORD.value().replace(/\s+/g, '') } });
   const from = `"${MAIL_NAME.value()}" <${MAIL_USER.value()}>`;
   const replyTo = MAIL_REPLY_TO.value() || undefined;
 
