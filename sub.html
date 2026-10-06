@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | My Jobs</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh; font-size:16px;}
+  .header{background:var(--paper-2); padding:18px 18px 14px; text-align:center;}
+  .header img{height:46px; display:block; margin:0 auto 10px;}
+  .header h1{margin:0; font-size:20px; color:var(--navy);}
+  .header p{margin:4px 0 0; font-size:14px; color:var(--ink-soft);}
+
+  /* the two views: what needs doing, and the whole schedule */
+  .tabs{display:flex; background:var(--paper-2); border-bottom:4px solid var(--rust); position:sticky; top:0; z-index:5;}
+  .tabs button{flex:1; border:none; background:none; padding:13px 6px 11px; font-size:15.5px; font-weight:700; color:var(--ink-soft); cursor:pointer; font-family:inherit; border-bottom:3px solid transparent; margin-bottom:-4px;}
+  .tabs button.on{color:var(--navy); border-bottom-color:var(--navy);}
+  .tabs .count{background:var(--amber); color:#fff; border-radius:20px; padding:1px 8px; font-size:12px; margin-left:4px;}
+
+  .wrap{max-width:560px; margin:0 auto; padding:20px 14px 50px;}
+  h2{font-size:13px; letter-spacing:.6px; text-transform:uppercase; color:var(--ink-soft); margin:26px 4px 10px;}
+  h2:first-child{margin-top:4px;}
+
+  .job{background:var(--paper-2); border-radius:10px; box-shadow:var(--shadow); padding:16px 16px 14px; margin-bottom:12px;}
+  .job.ask{border-left:5px solid var(--amber);}
+  .job.done{opacity:.6;}
+  .job-title{font-size:18px; font-weight:700; color:var(--navy); line-height:1.25;}
+  .job-when{font-size:16px; font-weight:600; margin-top:5px;}
+  .job-notes{font-size:14.5px; background:#faf8f2; border:1px solid #ece8dd; border-radius:6px; padding:9px 11px; margin-top:10px; line-height:1.45; white-space:pre-wrap;}
+  /* the house line is a button: tap it for the address, plans and photos */
+  .house-btn{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; text-align:left;
+    margin-top:10px; padding:10px 12px; background:#f3f5ee; border:1px solid #dfe3d3; border-radius:8px; cursor:pointer; font-family:inherit;
+  }
+  .house-btn .hb-name{font-size:15px; font-weight:700; color:var(--rust-2);}
+  .house-btn .hb-addr{font-size:13.5px; color:var(--ink-soft); margin-top:2px;}
+  .house-btn .hb-go{font-size:12.5px; font-weight:700; color:var(--rust-2); white-space:nowrap;}
+  .chip{display:inline-block; font-size:11.5px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; border-radius:20px; padding:3px 10px; margin-bottom:8px;}
+  .chip.confirmed{background:#eaf1ec; color:var(--good);}
+  .chip.now{background:#e6ecf5; color:#3b5a8a;}
+  .chip.declined{background:#fbeae4; color:var(--danger);}
+  .chip.finished{background:#ece8dd; color:var(--ink-soft);}
+  .chip.pending{background:#fbeee0; color:var(--amber);}
+
+  .btn-row{display:flex; gap:10px; margin-top:14px;}
+  .btn{flex:1; border:none; border-radius:8px; padding:15px 10px; font-size:16.5px; font-weight:700; cursor:pointer; font-family:inherit; text-align:center; text-decoration:none;}
+  .btn:disabled{opacity:.5; cursor:default;}
+  .btn-yes{background:var(--good); color:#fff;}
+  .btn-no{background:#fff; color:var(--danger); border:2px solid #e3b5a0;}
+  .btn-plain{background:#fff; color:var(--navy); border:2px solid var(--steel-line);}
+  .btn-dark{background:var(--navy); color:#fff;}
+  .link-btn{background:none; border:none; padding:6px 2px; margin-top:8px; font-size:14px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; font-family:inherit;}
+
+  .state{text-align:center; padding:60px 20px; color:var(--ink-soft); font-size:16px; line-height:1.6;}
+  .state strong{display:block; font-size:19px; color:var(--navy); margin-bottom:8px;}
+  .none{background:var(--paper-2); border-radius:10px; padding:20px 16px; color:var(--ink-soft); font-size:15px; text-align:center;}
+  .error-bar{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:14.5px; padding:11px 13px; border-radius:8px; margin-bottom:14px; display:none;}
+  .error-bar.show{display:block;}
+
+  /* schedule view: a small month calendar, then that month's jobs */
+  .cal-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .cal-nav button{border:2px solid var(--steel-line); background:#fff; border-radius:8px; width:44px; height:44px; font-size:20px; color:var(--navy); cursor:pointer;}
+  .cal-nav .m{font-size:18px; font-weight:700; color:var(--navy);}
+  .mini{background:var(--paper-2); border-radius:10px; box-shadow:var(--shadow); padding:10px 8px 8px; margin-bottom:16px;}
+  .mini-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px; text-align:center;}
+  .mini-grid .dow{font-size:11px; font-weight:700; color:var(--ink-soft); padding:4px 0 6px;}
+  .day{position:relative; padding:9px 0 13px; font-size:14.5px; border-radius:8px; color:var(--ink);}
+  .day.out{color:#c5c0b2;}
+  .day.today{font-weight:800; box-shadow:inset 0 0 0 2px var(--navy);}
+  .day.has{font-weight:700;}
+  .day.has.confirmed{background:#eaf1ec; color:var(--good);}
+  .day.has.pending{background:#fbeee0; color:#96661a;}
+  .day.has.declined{background:#fbeae4; color:var(--danger);}
+  .legend{display:flex; gap:14px; justify-content:center; font-size:12px; color:var(--ink-soft); margin-top:8px;}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
+  .row{display:flex; gap:12px; align-items:center; width:100%; text-align:left; background:var(--paper-2); border:none; border-radius:10px; box-shadow:var(--shadow); padding:12px 14px; margin-bottom:9px; cursor:pointer; font-family:inherit;}
+  .row .when{flex:none; width:62px; text-align:center; font-weight:700; color:var(--navy); font-size:14px; line-height:1.25;}
+  .row .when small{display:block; font-weight:400; color:var(--ink-soft); font-size:12px;}
+  .row .what{flex:1; min-width:0;}
+  .row .what .t{font-size:15.5px; font-weight:700; color:var(--navy);}
+  .row .what .w{font-size:13.5px; color:var(--ink-soft); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .row .chip{margin:0; flex:none;}
+
+  /* house screen: slides over everything */
+  .screen{position:fixed; inset:0; background:var(--paper); z-index:20; overflow-y:auto; display:none;}
+  .screen.show{display:block;}
+  .screen-top{position:sticky; top:0; background:var(--paper-2); border-bottom:4px solid var(--rust); padding:12px 14px; display:flex; align-items:center; gap:10px; z-index:2;}
+  .screen-top button{border:2px solid var(--steel-line); background:#fff; border-radius:8px; padding:9px 14px; font-size:15px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit;}
+  .screen-top .ttl{font-size:17px; font-weight:700; color:var(--navy); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .card{background:var(--paper-2); border-radius:10px; box-shadow:var(--shadow); padding:16px; margin-bottom:12px;}
+  .card .addr{font-size:16px; line-height:1.4;}
+  .card .addr a{color:var(--rust-2); font-weight:700;}
+  .mini-job{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 0; border-top:1px solid #f1ede3; font-size:15px;}
+  .mini-job:first-child{border-top:none; padding-top:0;}
+  .mini-job .d{font-size:13.5px; color:var(--ink-soft);}
+  .file{display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid #f1ede3; text-decoration:none; color:inherit;}
+  .file:first-child{border-top:none; padding-top:2px;}
+  .file .ic{flex:none; width:40px; height:40px; border-radius:8px; background:#eef0e8; color:var(--rust-2); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;}
+  .file .n{font-size:15.5px; font-weight:700; color:var(--navy); word-break:break-word;}
+  .file .s{font-size:12.5px; color:var(--ink-soft);}
+  .photos{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+  .photos a{display:block; aspect-ratio:1; border-radius:8px; overflow:hidden; background:#ece8dd;}
+  .photos img{width:100%; height:100%; object-fit:cover; display:block;}
+  .upload-note{font-size:13.5px; color:var(--ink-soft); margin-top:10px; text-align:center; min-height:18px;}
+  /* full-size photo */
+  .viewer{position:fixed; inset:0; background:rgba(20,20,22,.94); z-index:40; display:none; align-items:center; justify-content:center; flex-direction:column; padding:14px;}
+  .viewer.show{display:flex;}
+  .viewer img{max-width:100%; max-height:82vh; border-radius:4px;}
+  .viewer .cap{color:#eee; font-size:14px; margin-top:12px; text-align:center;}
+  .viewer button{position:absolute; top:10px; right:12px; background:none; border:none; color:#fff; font-size:34px; line-height:1; cursor:pointer;}
+
+  .prefs{margin-top:34px; padding-top:18px; border-top:1px solid #e2ddd0; font-size:14.5px; color:var(--ink-soft); text-align:center; line-height:1.6;}
+  .seg{display:inline-flex; margin-top:8px; border:2px solid var(--steel-line); border-radius:8px; overflow:hidden; background:#fff;}
+  .seg button{border:none; background:#fff; padding:10px 20px; font-size:15px; font-weight:700; color:var(--ink-soft); cursor:pointer; font-family:inherit;}
+  .seg button + button{border-left:2px solid var(--steel-line);}
+  .seg button.on{background:var(--navy); color:#fff;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12.5px; margin-top:26px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img src="icons/logo.png" alt="Alden Homes">
+  <h1 id="hello">My Jobs</h1>
+  <p>Your schedule with Alden Homes</p>
+</div>
+
+<div id="demoBar" style="display:none; background:var(--amber); color:#fff; text-align:center; font-size:13.5px; font-weight:700; padding:8px 12px;">
+  Demo — sample jobs only. Nothing here is real or saved.
+</div>
+
+<div class="tabs" id="tabs" style="display:none;">
+  <button type="button" data-view="todo" class="on">To do <span class="count" id="askCount"></span></button>
+  <button type="button" data-view="schedule">Schedule</button>
+</div>
+
+<div class="wrap">
+  <div class="state" id="stateLoading">Loading your jobs…</div>
+  <div class="state" id="stateBad" style="display:none;">
+    <strong>This link isn't working</strong>
+    It may have been replaced with a newer one. Check your most recent message from Alden Homes, or call the office and we'll send you a fresh link.
+  </div>
+  <div class="state" id="stateDown" style="display:none;">
+    <strong>We couldn't load your jobs</strong>
+    Check your connection and try again.<br><br>
+    <button class="btn btn-plain" id="retryBtn" style="flex:none; padding:12px 26px;">Try again</button>
+  </div>
+
+  <div id="main" style="display:none;">
+    <div class="error-bar" id="errorBar"></div>
+
+    <!-- To do -->
+    <div id="viewTodo">
+      <h2>Needs your answer</h2>
+      <div id="askList"></div>
+
+      <h2>Your jobs</h2>
+      <div id="jobList"></div>
+
+      <div id="declinedWrap" style="display:none;">
+        <h2>You said you can't make these</h2>
+        <div id="declinedList"></div>
+      </div>
+    </div>
+
+    <!-- Schedule -->
+    <div id="viewSchedule" style="display:none;">
+      <div class="cal-nav">
+        <button type="button" id="calPrev" aria-label="Previous month">&lsaquo;</button>
+        <div class="m" id="calLabel"></div>
+        <button type="button" id="calNext" aria-label="Next month">&rsaquo;</button>
+      </div>
+      <div class="mini">
+        <div class="mini-grid" id="miniGrid"></div>
+        <div class="legend"><span><i style="background:#eaf1ec; border:1px solid #c5dccb;"></i>Confirmed</span><span><i style="background:#fbeee0; border:1px solid #eccba2;"></i>Needs answer</span></div>
+      </div>
+      <div id="monthList"></div>
+    </div>
+
+    <div class="prefs">
+      How should we send you jobs to confirm?
+      <div><div class="seg" id="notifySeg">
+        <button type="button" data-notify="email">Email</button>
+        <button type="button" data-notify="text">Text</button>
+      </div></div>
+      <div id="notifyNote" style="font-size:13px; margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <footer>Alden Homes — Handcrafted Homes &amp; Communities</footer>
+</div>
+
+<!-- One house: address, your jobs there, plans and photos -->
+<div class="screen" id="houseScreen">
+  <div class="screen-top">
+    <button type="button" id="houseBack">&lsaquo; Back</button>
+    <div class="ttl" id="houseTitle"></div>
+  </div>
+  <div class="wrap" style="padding-top:16px;">
+    <div class="state" id="houseLoading" style="padding:40px 20px;">Loading…</div>
+    <div id="houseBody" style="display:none;">
+      <div class="error-bar" id="houseError"></div>
+      <div class="card"><div class="addr" id="houseAddr"></div></div>
+
+      <h2>Your jobs here</h2>
+      <div class="card" id="houseJobs"></div>
+
+      <h2>Plans &amp; prints</h2>
+      <div class="card" id="housePlans"></div>
+
+      <h2>Photos</h2>
+      <div class="card">
+        <div id="housePhotos"></div>
+        <div class="btn-row">
+          <label class="btn btn-dark" id="addPhotoBtn" style="cursor:pointer;">
+            Add photos
+            <input type="file" id="photoInput" accept="image/*" multiple style="display:none;">
+          </label>
+        </div>
+        <div class="upload-note" id="uploadNote"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="viewer" id="viewer">
+  <button type="button" id="viewerClose" aria-label="Close">&times;</button>
+  <img id="viewerImg" alt="">
+  <div class="cap" id="viewerCap"></div>
+</div>
+
+<script>
+/* ============================================================
+   A subcontractor's own page. No login: the private code in the link
+   (…/sub.html?k=CODE) is what identifies them. Everything goes through
+   the hub's server, which only ever returns this one sub's jobs.
+   ============================================================ */
+const API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/subPortal';
+const token = new URLSearchParams(location.search).get('k') || '';
+
+let me = null;      // { name, notify, hasPhone, hasEmail }
+let today = '';
+let tasks = [];
+let view = 'todo';  // 'todo' | 'schedule'
+let calMonth = '';  // 'YYYY-MM' shown on the Schedule tab
+let house = null;   // the house screen, when open: { id, house, tasks, files }
+
+const $ = id => document.getElementById(id);
+function esc(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function niceDate(iso){
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+}
+function whenText(t){
+  return t.start === t.end ? niceDate(t.start) : `${niceDate(t.start)} – ${niceDate(t.end)}`;
+}
+function houseLabel(h){ return [h.community, h.lot ? 'Lot '+h.lot : '', h.client].filter(Boolean).join(' · '); }
+function mapLink(address){ return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`; }
+function isoOf(y, m, d){ return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+
+/* ---- demo mode (sub.html?demo=1): sample jobs so the office can see what a sub sees.
+        Nothing is read from or saved to the real schedule. ---- */
+const DEMO = new URLSearchParams(location.search).has('demo');
+function demoIso(n){
+  const d = new Date(); d.setDate(d.getDate()+n);
+  return isoOf(d.getFullYear(), d.getMonth()+1, d.getDate());
+}
+function demoPhoto(hue, label){
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="600" height="600" fill="hsl(${hue} 30% 62%)"/><text x="300" y="315" font-family="Arial" font-size="34" font-weight="700" fill="#fff" text-anchor="middle">${label}</text></svg>`);
+}
+const DEMO_HOUSES = {
+  d1:{ community:'AP', lot:'70', client:'Sample Family', address:'1123 Alden Way, Lititz, PA', model:'Coleman' },
+  d2:{ community:'CL', lot:'5', client:'Example Family', address:'415 Cannon Way, Lititz, PA', model:'Rivet' },
+  d3:{ community:'MM', lot:'23', client:'Demo Family', address:'14 Meadow View, Lititz, PA', model:'Stanford' },
+};
+const demoState = {
+  sub: { name: 'Sample Trim & Kitchens', notify: 'email', hasPhone: true, hasEmail: true },
+  tasks: [
+    { houseId:'d1', taskId:'a', title:'KITCHEN INSTALL', start:demoIso(8), end:demoIso(9), days:2, answer:'pending', done:false,
+      notes:'Customer upgraded to soft-close hardware — boxes are in the garage.', house:DEMO_HOUSES.d1 },
+    { houseId:'d2', taskId:'b', title:'Trim and railing finish out', start:demoIso(13), end:demoIso(13), days:1, answer:'pending', done:false, notes:'', house:DEMO_HOUSES.d2 },
+    { houseId:'d1', taskId:'c', title:'TRIM INSTALL', start:demoIso(-1), end:demoIso(1), days:3, answer:'confirmed', done:false, notes:'', house:DEMO_HOUSES.d1 },
+    { houseId:'d3', taskId:'d', title:'KITCHEN INSTALL', start:demoIso(22), end:demoIso(23), days:2, answer:'confirmed', done:false, notes:'', house:DEMO_HOUSES.d3 },
+  ],
+  files: {
+    d1: [
+      { id:'f1', kind:'plan', name:'Coleman — Floor Plans Rev B.pdf', url:'#', by:'Alden Homes', at:demoIso(-40) },
+      { id:'f2', kind:'plan', name:'Kitchen layout — Lot 70.pdf', url:'#', by:'Alden Homes', at:demoIso(-12) },
+      { id:'f3', kind:'photo', name:'', url:demoPhoto(95,'Kitchen — before'), caption:'Kitchen wall before cabinets', by:'Alden Homes', at:demoIso(-3) },
+      { id:'f4', kind:'photo', name:'', url:demoPhoto(30,'Trim delivery'), caption:'Trim staged in garage', by:'Alden Homes', at:demoIso(-2) },
+    ],
+    d2: [ { id:'f5', kind:'plan', name:'Rivet — Floor Plans.pdf', url:'#', by:'Alden Homes', at:demoIso(-30) } ],
+    d3: [],
+  },
+};
+async function demoApi(action, extra){
+  await new Promise(r=>setTimeout(r, 250));
+  const copy = x=>JSON.parse(JSON.stringify(x));
+  if(action === 'load') return { sub: demoState.sub, today: demoIso(0), tasks: copy(demoState.tasks) };
+  if(action === 'setNotify'){ demoState.sub.notify = extra.notify; return { notify: extra.notify }; }
+  if(action === 'house') return { house: DEMO_HOUSES[extra.houseId], tasks: copy(demoState.tasks.filter(t=>t.houseId===extra.houseId)), files: copy(demoState.files[extra.houseId] || []) };
+  if(action === 'addPhoto'){
+    const f = { id:'n'+Date.now(), kind:'photo', name:'', url: extra.dataUrl, caption:'', by: demoState.sub.name, at: new Date().toISOString() };
+    demoState.files[extra.houseId].unshift(f);
+    return { file: f };
+  }
+  const t = demoState.tasks.find(x=>x.houseId===extra.houseId && x.taskId===extra.taskId);
+  if(action === 'respond') t.answer = extra.answer;
+  if(action === 'done') t.done = extra.done !== false;
+  return { task: copy(t) };
+}
+
+async function api(action, extra){
+  if(DEMO) return demoApi(action, extra);
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, action, ...(extra || {}) }),
+  });
+  if(res.status === 403) throw Object.assign(new Error('bad-link'), { badLink: true });
+  if(!res.ok) throw new Error('server ' + res.status);
+  return res.json();
+}
+
+function show(which){
+  ['stateLoading','stateBad','stateDown','main'].forEach(id=>{ $(id).style.display = id===which ? 'block' : 'none'; });
+  $('tabs').style.display = which === 'main' ? 'flex' : 'none';
+}
+function showError(msg, barId){
+  const bar = $(barId || 'errorBar');
+  bar.textContent = msg;
+  bar.classList.add('show');
+  bar.scrollIntoView({ block:'center', behavior:'smooth' });
+}
+
+async function load(){
+  if(DEMO) $('demoBar').style.display = 'block';
+  if(!token && !DEMO){ show('stateBad'); return; }
+  show('stateLoading');
+  try{
+    const data = await api('load');
+    me = data.sub; today = data.today; tasks = data.tasks || [];
+    calMonth = calMonth || today.slice(0,7);
+    $('hello').textContent = me.name ? `Hi, ${me.name}` : 'My Jobs';
+    show('main');
+    render();
+  } catch(err){
+    console.error(err);
+    show(err.badLink ? 'stateBad' : 'stateDown');
+  }
+}
+$('retryBtn').addEventListener('click', load);
+
+/* ============================================================
+   TO DO
+   ============================================================ */
+function houseButton(t){
+  const h = t.house || {};
+  return `<button type="button" class="house-btn" data-open-house="${esc(t.houseId)}">
+    <span><div class="hb-name">${esc(houseLabel(h) || 'This house')}</div>${h.address ? `<div class="hb-addr">${esc(h.address)}</div>` : ''}</span>
+    <span class="hb-go">Plans &amp; photos &rsaquo;</span>
+  </button>`;
+}
+
+function jobCard(t, kind){
+  const key = `data-house="${esc(t.houseId)}" data-task="${esc(t.taskId)}"`;
+  const happening = t.start <= today && t.end >= today;
+
+  let chip = '', buttons = '';
+  if(kind === 'ask'){
+    buttons = `<div class="btn-row">
+        <button class="btn btn-yes" data-act="confirmed" ${key}>Confirm</button>
+        <button class="btn btn-no" data-act="declined" ${key}>Can't make it</button>
+      </div>`;
+  } else if(kind === 'job'){
+    chip = t.done ? '<span class="chip finished">Done</span>'
+         : happening ? '<span class="chip now">Happening now</span>'
+         : '<span class="chip confirmed">Confirmed</span>';
+    buttons = t.done
+      ? `<button class="link-btn" data-act="undone" ${key}>Not finished after all? Undo</button>`
+      : `<div class="btn-row"><button class="btn ${t.start <= today ? 'btn-yes' : 'btn-plain'}" data-act="done" ${key}>Mark done</button></div>
+         <button class="link-btn" data-act="declined" ${key}>Can't make it any more</button>`;
+  } else {
+    chip = '<span class="chip declined">Can\'t make it</span>';
+    buttons = `<button class="link-btn" data-act="confirmed" ${key}>I can make it after all — confirm</button>`;
+  }
+
+  return `<div class="job ${kind==='ask'?'ask':''} ${t.done?'done':''}">
+    ${chip ? `<div>${chip}</div>` : ''}
+    <div class="job-title">${esc(t.title)}</div>
+    <div class="job-when">${esc(whenText(t))}${t.days > 1 ? ` <span style="font-weight:400; color:var(--ink-soft);">· ${t.days} days</span>` : ''}</div>
+    ${houseButton(t)}
+    ${t.notes ? `<div class="job-notes">${esc(t.notes)}</div>` : ''}
+    ${buttons}
+  </div>`;
+}
+
+function render(){
+  const ask = tasks.filter(t=>!t.done && t.answer === 'pending');
+  const jobs = tasks.filter(t=>t.answer === 'confirmed');
+  const declined = tasks.filter(t=>!t.done && t.answer === 'declined');
+
+  $('askCount').textContent = ask.length || '';
+  $('askCount').style.display = ask.length ? '' : 'none';
+  $('askList').innerHTML = ask.length ? ask.map(t=>jobCard(t, 'ask')).join('') : '<div class="none">Nothing waiting on you. Thanks!</div>';
+  $('jobList').innerHTML = jobs.length ? jobs.map(t=>jobCard(t, 'job')).join('') : '<div class="none">No confirmed jobs coming up.</div>';
+  $('declinedWrap').style.display = declined.length ? 'block' : 'none';
+  $('declinedList').innerHTML = declined.map(t=>jobCard(t, 'declined')).join('');
+
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
+  $('viewTodo').style.display = view === 'todo' ? 'block' : 'none';
+  $('viewSchedule').style.display = view === 'schedule' ? 'block' : 'none';
+  if(view === 'schedule') renderSchedule();
+
+  document.querySelectorAll('#notifySeg button').forEach(b=>b.classList.toggle('on', b.dataset.notify === me.notify));
+  $('notifyNote').textContent = me.notify === 'text'
+    ? (me.hasPhone ? 'Texting is being set up — until it\'s ready you\'ll keep getting email.' : 'We don\'t have a mobile number for you yet — call the office to add one.')
+    : (me.hasEmail ? '' : 'We don\'t have an email address for you yet — call the office to add one.');
+}
+
+$('tabs').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-view]');
+  if(!b) return;
+  view = b.dataset.view;
+  render();
+  window.scrollTo(0, 0);
+});
+
+/* ============================================================
+   SCHEDULE — every job, by month
+   ============================================================ */
+function statusChip(t){
+  if(t.done) return '<span class="chip finished">Done</span>';
+  if(t.answer === 'confirmed') return '<span class="chip confirmed">Confirmed</span>';
+  if(t.answer === 'declined') return '<span class="chip declined">Can\'t</span>';
+  return '<span class="chip pending">Answer</span>';
+}
+
+function renderSchedule(){
+  const [y, m] = calMonth.split('-').map(Number);
+  $('calLabel').textContent = new Date(y, m-1, 1).toLocaleDateString(undefined, { month:'long', year:'numeric' });
+
+  // what each day of the month holds: 'pending' wins over 'confirmed' so nothing waiting gets hidden
+  const first = isoOf(y, m, 1);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const last = isoOf(y, m, daysInMonth);
+  const dayState = {};
+  tasks.filter(t=>t.answer !== 'declined').forEach(t=>{
+    for(let d = 1; d <= daysInMonth; d++){
+      const iso = isoOf(y, m, d);
+      if(iso < t.start || iso > t.end) continue;
+      const wd = new Date(y, m-1, d).getDay();
+      if(wd === 0 || wd === 6) continue; // jobs run on working days
+      if(t.answer === 'pending' && !t.done) dayState[iso] = 'pending';
+      else if(dayState[iso] !== 'pending') dayState[iso] = 'confirmed';
+    }
+  });
+
+  const lead = new Date(y, m-1, 1).getDay();
+  let cells = ['S','M','T','W','T','F','S'].map(d=>`<div class="dow">${d}</div>`).join('');
+  for(let i = 0; i < lead; i++) cells += '<div class="day out"></div>';
+  for(let d = 1; d <= daysInMonth; d++){
+    const iso = isoOf(y, m, d);
+    const state = dayState[iso];
+    cells += `<div class="day${state ? ' has '+state : ''}${iso === today ? ' today' : ''}">${d}</div>`;
+  }
+  $('miniGrid').innerHTML = cells;
+
+  const inMonth = tasks.filter(t=>t.start <= last && t.end >= first);
+  $('monthList').innerHTML = inMonth.length ? inMonth.map(t=>{
+    const [, sm, sd] = t.start.split('-').map(Number);
+    const monthName = new Date(y, sm-1, 1).toLocaleDateString(undefined, { month:'short' });
+    return `<button type="button" class="row" data-open-house="${esc(t.houseId)}">
+      <span class="when">${monthName} ${sd}<small>${t.days > 1 ? t.days+' days' : '1 day'}</small></span>
+      <span class="what"><div class="t">${esc(t.title)}</div><div class="w">${esc(houseLabel(t.house || {}))}</div></span>
+      ${statusChip(t)}
+    </button>`;
+  }).join('') : '<div class="none">No jobs this month.</div>';
+}
+function shiftMonth(n){
+  const [y, m] = calMonth.split('-').map(Number);
+  const d = new Date(y, m-1+n, 1);
+  calMonth = isoOf(d.getFullYear(), d.getMonth()+1, 1).slice(0,7);
+  renderSchedule();
+}
+$('calPrev').addEventListener('click', ()=>shiftMonth(-1));
+$('calNext').addEventListener('click', ()=>shiftMonth(1));
+
+/* ============================================================
+   Buttons on a job (confirm / can't / done) and opening a house
+   ============================================================ */
+document.body.addEventListener('click', async e=>{
+  const opener = e.target.closest('[data-open-house]');
+  if(opener){ openHouse(opener.dataset.openHouse); return; }
+
+  const btn = e.target.closest('[data-act]');
+  if(!btn) return;
+  const act = btn.dataset.act;
+  const t = tasks.find(x=>x.houseId === btn.dataset.house && x.taskId === btn.dataset.task);
+  if(!t) return;
+  if(act === 'declined' && !confirm(`Tell Alden Homes you can't make "${t.title}" on ${whenText(t)}?`)) return;
+
+  $('errorBar').classList.remove('show');
+  btn.disabled = true;
+  try{
+    const data = (act === 'done' || act === 'undone')
+      ? await api('done', { houseId: t.houseId, taskId: t.taskId, done: act === 'done' })
+      : await api('respond', { houseId: t.houseId, taskId: t.taskId, answer: act });
+    Object.assign(t, data.task);
+    render();
+  } catch(err){
+    console.error(err);
+    btn.disabled = false;
+    if(err.badLink){ show('stateBad'); return; }
+    showError('That didn\'t save. Check your connection and try again, or call the office.');
+  }
+});
+
+$('notifySeg').addEventListener('click', async e=>{
+  const btn = e.target.closest('button[data-notify]');
+  if(!btn || btn.dataset.notify === me.notify) return;
+  const before = me.notify;
+  me.notify = btn.dataset.notify;
+  render();
+  try{ await api('setNotify', { notify: me.notify }); }
+  catch(err){ console.error(err); me.notify = before; render(); showError('That didn\'t save. Check your connection and try again.'); }
+});
+
+/* ============================================================
+   HOUSE SCREEN — address, your jobs there, plans, photos
+   ============================================================ */
+async function openHouse(houseId){
+  const known = tasks.find(t=>t.houseId === houseId);
+  house = { id: houseId, house: known ? known.house : {}, tasks: [], files: [] };
+  $('houseTitle').textContent = houseLabel(house.house) || 'House';
+  $('houseLoading').style.display = 'block';
+  $('houseLoading').textContent = 'Loading…';
+  $('houseBody').style.display = 'none';
+  $('houseError').classList.remove('show');
+  $('uploadNote').textContent = '';
+  $('houseScreen').classList.add('show');
+  $('houseScreen').scrollTop = 0;
+  try{
+    const data = await api('house', { houseId });
+    if(!house || house.id !== houseId) return; // they backed out while it loaded
+    house.house = data.house || house.house;
+    house.tasks = data.tasks || [];
+    house.files = data.files || [];
+    $('houseLoading').style.display = 'none';
+    $('houseBody').style.display = 'block';
+    renderHouse();
+  } catch(err){
+    console.error(err);
+    $('houseLoading').textContent = 'We couldn\'t load this house. Check your connection and go back to try again.';
+  }
+}
+function closeHouse(){ house = null; $('houseScreen').classList.remove('show'); }
+$('houseBack').addEventListener('click', closeHouse);
+
+function renderHouse(){
+  const h = house.house;
+  $('houseTitle').textContent = houseLabel(h) || 'House';
+  $('houseAddr').innerHTML = h.address
+    ? `<a href="${esc(mapLink(h.address))}" target="_blank" rel="noopener">${esc(h.address)}</a><div style="font-size:13.5px; color:var(--ink-soft); margin-top:3px;">Tap the address for directions${h.model ? ' · ' + esc(h.model) : ''}</div>`
+    : '<span style="color:var(--ink-soft);">No address on file.</span>';
+
+  $('houseJobs').innerHTML = house.tasks.length ? house.tasks.map(t=>
+    `<div class="mini-job"><span><div style="font-weight:700; color:var(--navy);">${esc(t.title)}</div><div class="d">${esc(whenText(t))}</div></span>${statusChip(t)}</div>`).join('')
+    : '<span style="color:var(--ink-soft);">No jobs listed.</span>';
+
+  const plans = house.files.filter(f=>f.kind === 'plan');
+  $('housePlans').innerHTML = plans.length ? plans.map(f=>
+    `<a class="file" href="${esc(f.url)}" target="_blank" rel="noopener">
+      <span class="ic">${/\.pdf$/i.test(f.name) ? 'PDF' : 'FILE'}</span>
+      <span><div class="n">${esc(f.name || 'Plan')}</div><div class="s">Tap to open</div></span>
+    </a>`).join('')
+    : '<span style="color:var(--ink-soft); font-size:15px;">No plans have been posted for this house yet.</span>';
+
+  const photos = house.files.filter(f=>f.kind === 'photo');
+  $('housePhotos').innerHTML = photos.length
+    ? `<div class="photos">${photos.map(f=>`<a href="${esc(f.url)}" data-photo="${esc(f.id)}"><img src="${esc(f.url)}" alt="${esc(f.caption || 'Photo')}" loading="lazy"></a>`).join('')}</div>`
+    : '<div style="color:var(--ink-soft); font-size:15px; text-align:center; padding:6px 0;">No photos yet.</div>';
+}
+
+/* full-size photo */
+$('housePhotos').addEventListener('click', e=>{
+  const a = e.target.closest('a[data-photo]');
+  if(!a) return;
+  e.preventDefault();
+  const f = house.files.find(x=>x.id === a.dataset.photo);
+  if(!f) return;
+  $('viewerImg').src = f.url;
+  $('viewerCap').textContent = [f.caption, f.by ? 'From ' + f.by : ''].filter(Boolean).join(' · ');
+  $('viewer').classList.add('show');
+});
+$('viewerClose').addEventListener('click', ()=>$('viewer').classList.remove('show'));
+$('viewer').addEventListener('click', e=>{ if(e.target === $('viewer')) $('viewer').classList.remove('show'); });
+
+/* adding photos: shrink each one on the phone first so it uploads quickly on a jobsite signal */
+function shrinkPhoto(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      const max = 1600;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('unreadable photo')); };
+    img.src = url;
+  });
+}
+$('photoInput').addEventListener('change', async e=>{
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  if(!files.length || !house) return;
+  const houseId = house.id;
+  // if they have a job going on here right now, file the photos under it
+  const current = house.tasks.find(t=>t.start <= today && t.end >= today && !t.done) || house.tasks.find(t=>!t.done) || null;
+  $('houseError').classList.remove('show');
+  $('addPhotoBtn').style.opacity = '.5';
+  $('addPhotoBtn').style.pointerEvents = 'none';
+  let failed = 0;
+  for(let i = 0; i < files.length; i++){
+    $('uploadNote').textContent = `Uploading photo ${i+1} of ${files.length}…`;
+    try{
+      const dataUrl = await shrinkPhoto(files[i]);
+      const data = await api('addPhoto', { houseId, taskId: current ? current.taskId : '', dataUrl });
+      if(house && house.id === houseId){ house.files.unshift(data.file); renderHouse(); }
+    } catch(err){ console.error(err); failed++; }
+  }
+  $('addPhotoBtn').style.opacity = '';
+  $('addPhotoBtn').style.pointerEvents = '';
+  const ok = files.length - failed;
+  $('uploadNote').textContent = ok ? `${ok} photo${ok===1?'':'s'} added. Thank you!` : '';
+  if(failed) showError(`${failed} photo${failed===1?'':'s'} didn't upload. Check your connection and try again.`, 'houseError');
+});
+
+load();
+</script>
+</body>
+</html>

@@ -104,6 +104,11 @@
   .house-head .sub{font-size:12.5px; color:var(--ink-soft); margin-top:3px;}
   .fact label{display:block; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:4px;}
   .fact .v{font-size:15px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace;}
+  .send-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    background:#fbeee0; border:1px solid #eccba2; border-radius:var(--radius); padding:12px 16px; margin-bottom:14px; font-size:14px;
+  }
+  .send-bar.sent{background:#eaf1ec; border-color:#c5dccb;}
   .back-link{background:none; border:none; padding:0; margin:0 0 12px; color:var(--ink-soft); font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;}
   .back-link:hover{color:var(--navy);}
 
@@ -185,6 +190,7 @@
   .cal-bar.from-prev{border-top-left-radius:0; border-bottom-left-radius:0;}
   .cal-bar.to-next{border-top-right-radius:0; border-bottom-right-radius:0;}
   .cal-bar.dragging{opacity:.4;}
+  .cal-bar.is-done{opacity:.45; text-decoration:line-through;}
   @media (max-width:760px){
     .cal-dow div{font-size:9.5px; letter-spacing:0;}
     .cal-day{min-height:84px; padding:4px 2px;}
@@ -219,6 +225,7 @@
   .modal-foot{padding:16px 24px 22px; display:flex; justify-content:flex-end; gap:10px;}
   label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
   .field{margin-bottom:14px;}
+  .field select{cursor:pointer;}
   .field input, .field select, .auth-field input{width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
   .field input:focus, .field select:focus, .auth-field input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
   .field textarea, .tk-notes{width:100%; min-height:84px; resize:vertical; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; line-height:1.45; color:var(--ink); background:#fff; font-family:inherit;}
@@ -359,6 +366,13 @@
           <div class="fact"><label>Working days</label><div class="v" id="hdDays">—</div></div>
           <button class="btn btn-danger" id="deleteScheduleBtn">Delete Schedule</button>
         </div>
+        <div class="send-bar">
+          <div>
+            <strong id="sendTitle">Not sent to subs yet</strong>
+            <div class="muted small" id="sendNote"></div>
+          </div>
+          <button class="btn btn-primary" id="sendSubsBtn">Send to subs</button>
+        </div>
         <div class="toolbar" style="margin-bottom:12px;">
           <div class="view-toggle" id="viewToggle">
             <button type="button" data-view="calendar">Calendar</button>
@@ -473,7 +487,7 @@
       </div>
       <div class="table-wrap clickable">
         <table>
-          <thead><tr><th>Company</th><th>Trade</th><th>Contact</th><th>Email</th><th>Phone</th><th>Usually Does</th></tr></thead>
+          <thead><tr><th>Company</th><th>Trade</th><th>Contact</th><th>Email</th><th>Phone</th><th>Send By</th><th>Usually Does</th></tr></thead>
           <tbody id="subsBody"></tbody>
         </table>
         <div class="empty" id="subsEmpty" style="display:none;">No vendors match.</div>
@@ -543,6 +557,23 @@
       <div class="row2">
         <div class="field"><label for="sb_email">Email</label><input type="email" id="sb_email"></div>
         <div class="field"><label for="sb_phone">Phone</label><input type="tel" id="sb_phone" placeholder="717-555-0100"></div>
+      </div>
+      <div class="field">
+        <label for="sb_notify">Send schedules by</label>
+        <select id="sb_notify">
+          <option value="email">Email</option>
+          <option value="text">Text message</option>
+        </select>
+        <div class="muted small" style="margin-top:5px;">How this vendor gets asked to confirm dates. Nothing is sent yet — this is saved for when sending is switched on.</div>
+      </div>
+      <div class="field" id="sb_linkField">
+        <label for="sb_link">Their personal link</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="sb_link" readonly placeholder="No link yet">
+          <button type="button" class="btn btn-ghost" id="sb_linkCopy" style="white-space:nowrap;">Copy</button>
+          <button type="button" class="btn btn-ghost" id="sb_linkNew" style="white-space:nowrap;">New link</button>
+        </div>
+        <div class="muted small" style="margin-top:5px;">Opens this vendor's own jobs with no login. Anyone who has the link can answer for them, so use <strong>New link</strong> if it ever gets passed around — the old one stops working.</div>
       </div>
       <div class="field"><label for="sb_notes">Notes</label><textarea id="sb_notes" placeholder="Anything worth remembering — lead time, who to call, how they like to be scheduled…"></textarea></div>
       <div class="muted small" id="sb_usedFor"></div>
@@ -935,6 +966,13 @@ function storedTask(t, withDates){
     // one confirmation per assigned sub: 'pending' | 'confirmed' | 'declined'
     out.confirm = {};
     out.subIds.forEach(id=>{ out.confirm[id] = (t.confirm && t.confirm[id]) || 'pending'; });
+    // set when a task is finished — by the sub from their own page, or by staff here
+    out.done = !!t.done;
+    out.doneAt = t.done ? (t.doneAt || '') : '';
+    out.doneBy = t.done ? (t.doneBy || '') : '';
+    // bookkeeping the server keeps (when each sub answered / was last asked) — carried through untouched
+    if(t.confirmAt) out.confirmAt = t.confirmAt;
+    if(t.asked) out.asked = t.asked;
   }
   return out;
 }
@@ -1175,6 +1213,8 @@ function renderHouseDetail(){
   $('hdMove').textContent = fmtDate(h.move) || '—';
   $('hdDays').textContent = laid.span || '—';
 
+  renderSendBar(sched);
+
   document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('active', b.dataset.view===houseView));
   const isCal = houseView === 'calendar';
   $('calView').style.display = isCal ? 'block' : 'none';
@@ -1184,6 +1224,48 @@ function renderHouseDetail(){
   if(isCal) renderCalendar(sched, laid);
   else $('scheduleBody').innerHTML = laid.tasks.map((t,i)=>taskRowHtml(t, i, 'schedule', laid.span)).join('');
   renderTaskModal(sched, laid, h);
+}
+
+/* ---- sending a house's schedule to its subs ----
+   A schedule is a draft until the office presses "Send to subs". That stamps the house
+   with sendRequestedAt; the server sees it, emails every sub their jobs, and stamps
+   sentAt back. Until then subs see nothing for this house. */
+// Pressing the button publishes the house to subs immediately (sentAt) and asks the server
+// to email them (sendRequestedAt). The server reports back in lastSend when the emails are out.
+function emailsReported(sched){
+  return !!sched.lastSend && !!sched.sendRequestedAt && sched.lastSend.at >= sched.sendRequestedAt;
+}
+function isSendPending(sched){
+  // "in progress" for a couple of minutes after the button is pressed; after that, let them try again
+  return !!sched.sendRequestedAt && !emailsReported(sched)
+    && (Date.now() - new Date(sched.sendRequestedAt).getTime() < 120000);
+}
+let sendBarTimer = null;
+function renderSendBar(sched){
+  const bar = document.querySelector('.send-bar');
+  const pending = isSendPending(sched);
+  bar.classList.toggle('sent', !!sched.sentAt && !pending);
+  $('sendSubsBtn').disabled = pending;
+  $('sendSubsBtn').textContent = pending ? 'Sending…' : (sched.sentAt ? 'Send again' : 'Send to subs');
+  clearTimeout(sendBarTimer);
+  if(pending){
+    $('sendTitle').textContent = 'Sending to subs…';
+    $('sendNote').textContent = 'Each sub is being emailed their jobs for this house.';
+    sendBarTimer = setTimeout(renderAll, 15000); // keep checking so "Sending…" can't get stuck on screen
+  } else if(sched.sentAt && !emailsReported(sched)){
+    $('sendTitle').textContent = `Shared with subs ${new Date(sched.sentAt).toLocaleDateString()} — but no emails went out`;
+    $('sendNote').textContent = 'Emailing isn\'t switched on yet. Subs can see this house from their personal link (Vendors tab → Copy), but nobody was notified.';
+  } else if(sched.sentAt){
+    const last = sched.lastSend || {};
+    $('sendTitle').textContent = `Sent to subs ${new Date(sched.sentAt).toLocaleDateString()}`;
+    const bits = [`${(last.emailed||[]).length} emailed`];
+    if((last.skipped||[]).length) bits.push(`no email address for: ${last.skipped.join(', ')}`);
+    if((last.failed||[]).length) bits.push(`couldn't send to: ${last.failed.join(', ')}`);
+    $('sendNote').textContent = bits.join(' · ') + '. Date changes after this are re-sent automatically the next morning.';
+  } else {
+    $('sendTitle').textContent = 'Not sent to subs yet';
+    $('sendNote').textContent = 'This schedule is a draft — subs can\'t see it. Send it when the dates are right and each sub is emailed their jobs to confirm.';
+  }
 }
 
 /* ---- calendar: one month, tasks drawn as bars across the days they cover ---- */
@@ -1236,7 +1318,7 @@ function renderCalendar(sched, laid){
       const mark = (c.declined ? '✕ ' : ((s.t.subIds||[]).length && !c.pending ? '✓ ' : '')) + (s.t.notes ? '✎ ' : '');
       const names = (s.t.subIds||[]).map(id=>subName(id)).filter(Boolean).join(', ');
       const tip = `${s.t.title} — ${fmtDate(s.t.start)}${s.t.end!==s.t.start ? ' to '+fmtDate(s.t.end) : ''}${names ? ' — '+names : ''}${s.t.notes ? '\nNote: '+s.t.notes : ''}`;
-      return `<button type="button" draggable="true" class="cal-bar${s.fromPrev?' from-prev':''}${s.toNext?' to-next':''}" data-idx="${s.idx}"
+      return `<button type="button" draggable="true" class="cal-bar${s.fromPrev?' from-prev':''}${s.toNext?' to-next':''}${s.t.done?' is-done':''}" data-idx="${s.idx}"
         style="grid-column:${s.from+1} / ${s.to+2}; grid-row:${s.lane+2}; background:${barColor(s.t)};" title="${esc(tip)}">${mark}${esc(s.t.title || 'Untitled task')}</button>`;
     }).join('');
     html += `<div class="cal-week" style="grid-template-rows:30px repeat(${lanes.length}, 25px) minmax(8px,1fr);">${dayCells}${bars}</div>`;
@@ -1287,6 +1369,10 @@ function renderTaskModal(sched, laid, h){
       ? `<div class="confirm-summary"><span class="c-yes">✓ ${c.confirmed} confirmed</span><span class="c-no">✕ ${c.declined} declined</span><span class="c-wait">… ${c.pending} pending</span></div>${subRows}
          <div class="hint">Subs can't answer for themselves yet, so set this by hand when they confirm by phone or text. If the dates change afterwards it goes back to Pending.</div>`
       : `<div class="muted" style="font-size:13.5px;">Nobody is assigned to this task. Assign a vendor in the List view.</div>`}
+    <label class="check-label" style="margin-top:20px; font-size:14px; color:var(--ink);">
+      <input type="checkbox" id="tkDone" ${t.done ? 'checked' : ''}> This task is finished
+      ${t.done && t.doneAt ? `<span class="muted small" style="font-weight:400;">— marked ${esc(new Date(t.doneAt).toLocaleDateString())}${t.doneBy ? ' by ' + esc(subName(t.doneBy) || 'the sub') : ''}</span>` : ''}
+    </label>
     <label for="tkNotes" style="margin-top:20px;">Notes for this house</label>
     <textarea class="tk-notes" id="tkNotes" placeholder="Anything specific to this task on this house…">${esc(t.notes || '')}</textarea>`;
 }
@@ -1376,12 +1462,17 @@ function renderSubs(){
   $('subsEmpty').style.display = rows.length ? 'none' : 'block';
   $('subsBody').innerHTML = rows.map(s=>{
     const does = usualTasksFor(s.id);
+    // which way they want to be reached, and whether we actually have that detail on file
+    const byText = s.notify === 'text';
+    const reachable = byText ? !!s.phone : !!s.email;
+    const sendCell = `<span class="pill ${reachable ? 'going' : 'todo'}" title="${reachable ? '' : `No ${byText ? 'phone number' : 'email address'} on file yet`}">${byText ? 'Text' : 'Email'}${reachable ? '' : ' — missing'}</span>`;
     return `<tr data-id="${esc(s.id)}">
       <td><strong>${esc(s.name)}</strong>${s.notes ? `<div class="muted small">${esc(s.notes)}</div>` : ''}</td>
       <td>${esc(s.trade) || '<span class="muted">—</span>'}</td>
       <td>${esc(s.contact) || '<span class="muted">—</span>'}</td>
       <td>${esc(s.email) || '<span class="muted">—</span>'}</td>
       <td class="mono">${esc(s.phone) || '<span class="muted">—</span>'}</td>
+      <td>${sendCell}</td>
       <td class="muted small" title="${esc(does.join(', '))}">${does.length ? esc(does.slice(0,3).join(', ')) + (does.length > 3 ? ` +${does.length-3} more` : '') : '—'}</td>
     </tr>`;
   }).join('');
@@ -1632,6 +1723,11 @@ $('tkBody').addEventListener('change', e=>{
   if(e.target.id === 'tkStart'){ setTaskStart(ctx, idx, e.target.value); }
   else if(e.target.id === 'tkDays'){ ctx.tasks[idx].duration = Math.max(1, parseInt(e.target.value, 10) || 1); }
   else if(e.target.id === 'tkNotes'){ ctx.tasks[idx].notes = e.target.value.trim(); }
+  else if(e.target.id === 'tkDone'){
+    ctx.tasks[idx].done = e.target.checked;
+    ctx.tasks[idx].doneAt = e.target.checked ? new Date().toISOString() : '';
+    ctx.tasks[idx].doneBy = '';
+  }
   else return;
   e.target.blur(); // let the popup refresh with the new dates
   ctx.commit(ctx.tasks);
@@ -1710,6 +1806,27 @@ $('hdStart').addEventListener('change', e=>{
   const start = snapToWorkday(e.target.value);
   e.target.value = start;
   saveSchedule(sched, sched.tasks || [], start);
+});
+
+$('sendSubsBtn').addEventListener('click', async ()=>{
+  const sched = openSchedule();
+  if(!sched) return;
+  // who would hear about it: every sub with work still ahead that they haven't answered
+  const today = todayIso();
+  const ids = new Set();
+  (sched.tasks||[]).forEach(t=>{
+    if(t.done || !t.start || t.end < today) return;
+    (t.subIds||[]).forEach(id=>{ if(((t.confirm && t.confirm[id]) || 'pending') === 'pending') ids.add(id); });
+  });
+  const people = [...ids].map(id=>subs.find(s=>s.id===id)).filter(Boolean);
+  const noEmail = people.filter(s=>!s.email).map(s=>s.name);
+  const willGet = people.length - noEmail.length;
+  if(!people.length){ alert('Nothing to send — every sub on this house has already answered, or no tasks have a sub assigned.'); return; }
+  let msg = `Email ${willGet} sub${willGet===1?'':'s'} their jobs for this house so they can confirm?`;
+  if(noEmail.length) msg += `\n\nThese have no email address on the Vendors tab and will be skipped:\n• ${noEmail.join('\n• ')}`;
+  if(!confirm(msg)) return;
+  const now = new Date().toISOString();
+  await save(schedCol.doc(sched.id).update({ sendRequestedAt: now, sentAt: now }));
 });
 
 $('deleteScheduleBtn').addEventListener('click', async ()=>{
@@ -1853,6 +1970,10 @@ function openSubModal(id){
   $('sb_email').value = s ? s.email||'' : '';
   $('sb_phone').value = s ? s.phone||'' : '';
   $('sb_notes').value = s ? s.notes||'' : '';
+  $('sb_notify').value = s && s.notify === 'text' ? 'text' : 'email';
+  $('sb_linkField').style.display = s ? '' : 'none'; // a brand-new vendor gets a link once they're saved
+  $('sb_link').value = s && s.linkToken ? subLink(s.linkToken) : '';
+  $('sb_linkNew').textContent = s && s.linkToken ? 'New link' : 'Create link';
   const does = s ? usualTasksFor(s.id) : [];
   $('sb_usedFor').textContent = does.length ? `Usually does: ${does.join(', ')}. Change that on the Tasks tab.` : '';
   $('subDeleteBtn').style.display = s ? '' : 'none';
@@ -1873,6 +1994,7 @@ $('subSaveBtn').addEventListener('click', async ()=>{
   }
   const id = editingSubId || newId();
   closeOverlay('subOverlay');
+  // merge, so the vendor's personal link (kept on the same record) isn't wiped by an edit
   await save(subsCol.doc(id).set({
     name,
     trade: $('sb_trade').value.trim(),
@@ -1880,7 +2002,37 @@ $('subSaveBtn').addEventListener('click', async ()=>{
     email: $('sb_email').value.trim(),
     phone: $('sb_phone').value.trim(),
     notes: $('sb_notes').value.trim(),
-  }));
+    notify: $('sb_notify').value,   // 'email' (default) or 'text'
+  }, { merge: true }));
+});
+
+/* ---- a vendor's personal link: opens only their own jobs, no login ---- */
+function subLink(token){
+  return new URL('sub.html?k=' + encodeURIComponent(token), window.location.href).toString();
+}
+function newLinkToken(){
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+$('sb_linkNew').addEventListener('click', async ()=>{
+  const s = subs.find(x=>x.id===editingSubId);
+  if(!s) return;
+  if(s.linkToken && !confirm(`Give ${s.name} a new link?\n\nTheir old link stops working straight away, including any already emailed to them.`)) return;
+  const token = newLinkToken();
+  if(await save(subsCol.doc(s.id).set({ linkToken: token }, { merge: true }))){
+    $('sb_link').value = subLink(token);
+    $('sb_linkNew').textContent = 'New link';
+  }
+});
+$('sb_linkCopy').addEventListener('click', ()=>{
+  const link = $('sb_link').value;
+  if(!link) return;
+  const btn = $('sb_linkCopy');
+  navigator.clipboard.writeText(link).then(()=>{
+    btn.textContent = 'Copied!';
+    setTimeout(()=>{ btn.textContent = 'Copy'; }, 1500);
+  }).catch(()=>{ prompt('Copy this link:', link); });
 });
 $('subDeleteBtn').addEventListener('click', async ()=>{
   const s = subs.find(x=>x.id===editingSubId);

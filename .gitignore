@@ -1,0 +1,8 @@
+# Server-side dependencies and local Firebase files — never committed
+functions/node_modules/
+firebase-debug.log
+firebase-debug.*.log
+.firebase/
+*.local
+.env.local
+.secret.local

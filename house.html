@@ -90,6 +90,19 @@
   .btn-primary:hover{background:var(--navy-2);}
   .btn-ghost{background:transparent; color:var(--navy); border-color:var(--steel-line);}
   .btn-ghost:hover{background:#e9e5da;}
+  .card.wide{grid-column:1 / -1; min-height:0;}
+  .file-row{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid #f1ede3; font-size:13.5px;}
+  .file-row:first-child{border-top:none; padding-top:0;}
+  .file-row a{flex:1; min-width:0; color:var(--navy); font-weight:600; text-decoration:none; word-break:break-word;}
+  .file-row a:hover{text-decoration:underline;}
+  .x-btn{flex:none; border:none; background:transparent; color:var(--ink-soft); cursor:pointer; font-size:17px; line-height:1; padding:3px 7px; border-radius:3px;}
+  .x-btn:hover{background:#fbeae4; color:#a8451a;}
+  .photo-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:10px; margin-top:8px;}
+  .photo{position:relative; border-radius:var(--radius); overflow:hidden; background:#ece8dd; aspect-ratio:1;}
+  .photo img{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo .who{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(20,20,22,.75)); color:#fff; font-size:10.5px; padding:14px 7px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .photo .x-btn{position:absolute; top:4px; right:4px; background:rgba(20,20,22,.6); color:#fff; border-radius:50%; width:24px; height:24px; padding:0;}
+  .photo .x-btn:hover{background:#a8451a; color:#fff;}
   .missing{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:50px 20px; text-align:center; color:var(--ink-soft); line-height:1.7;}
 
   /* Auth gate */
@@ -196,7 +209,14 @@
             <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
             <h3>Prints &amp; Files</h3>
           </div>
-          <div class="card-body" id="filesBody"></div>
+          <div class="card-body">
+            <div id="plansList"></div>
+            <div class="muted" id="filesBody" style="font-size:12.5px; margin-top:10px;"></div>
+          </div>
+          <label class="btn btn-primary" style="cursor:pointer;">
+            Upload plans
+            <input type="file" id="planInput" accept="application/pdf,image/*" multiple style="display:none;">
+          </label>
           <a class="btn btn-ghost" id="filesBtn" href="#" target="_blank" rel="noopener" style="display:none;">Open OneDrive folder</a>
         </div>
 
@@ -210,16 +230,23 @@
           <div class="card-body muted">Settlement, budget, actuals and margin for this home will show here once job costing is built.</div>
         </div>
 
-        <!-- Photos (not built yet) -->
-        <div class="card soon">
+        <!-- Photos: from the office and from subs on site -->
+        <div class="card wide">
           <div class="card-head">
             <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
-            <h3>Photos</h3>
-            <span class="badge">Coming soon</span>
+            <h3>Photos <span class="muted" id="photoCount" style="font-size:12px; font-weight:400;"></span></h3>
+            <label class="btn btn-primary" style="cursor:pointer; margin-left:auto; padding:8px 14px;">
+              Add photos
+              <input type="file" id="photoInput" accept="image/*" multiple style="display:none;">
+            </label>
           </div>
-          <div class="card-body muted">Jobsite photos by phase, including ones uploaded by subcontractors, will show here.</div>
+          <div class="card-body">
+            <div class="muted" id="uploadNote" style="font-size:12.5px; min-height:16px;"></div>
+            <div class="photo-grid" id="photoGrid"></div>
+          </div>
         </div>
       </div>
+      <div class="muted" style="font-size:12px; margin-top:12px;">Plans and photos posted here can be seen by any subcontractor with a job on this home, once its schedule has been sent to subs.</div>
     </div>
 
     <footer>Alden Homes internal tools — data syncs live across your team.</footer>
@@ -229,6 +256,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -253,6 +281,8 @@ let schedState = 'loading';   // 'loading' | 'ready' | 'blocked'
 let orders = [];         // material orders (matched to this home by community + lot)
 let checklistItems = [...DEFAULT_CHECKLIST_ITEMS];
 let vendors = {};        // id -> name, for showing who's on each task
+let files = [];          // plans and photos posted to this home
+let filesState = 'loading';   // 'loading' | 'ready' | 'blocked'
 
 const $ = id => document.getElementById(id);
 function esc(s){
@@ -354,6 +384,12 @@ function attachListeners(){
     render();
   }, err=>{ console.error('build-schedule listener error', err); schedState = 'blocked'; render(); });
 
+  db.collection('house-files').where('houseId', '==', houseId).onSnapshot(s=>{
+    files = s.docs.map(d=>({ id: d.id, ...d.data() })).sort((a,b)=>(b.uploadedAt||'').localeCompare(a.uploadedAt||''));
+    filesState = 'ready';
+    render();
+  }, err=>{ console.error('house-files listener error', err); filesState = 'blocked'; render(); });
+
   db.collection('subs').onSnapshot(s=>{
     vendors = {};
     s.docs.forEach(d=>{ vendors[d.id] = d.data().name || ''; });
@@ -452,10 +488,99 @@ function renderFiles(){
   const has = isSafeUrl(job.filesUrl);
   $('filesBtn').style.display = has ? '' : 'none';
   if(has) $('filesBtn').href = job.filesUrl.trim();
-  $('filesBody').innerHTML = has
-    ? 'Plans, prints and documents for this home are kept in its OneDrive folder.'
-    : '<span class="muted">No OneDrive folder is linked to this home yet. Add the folder link on the Job Production Schedule and it will open from here.</span>';
+  $('filesBody').textContent = has
+    ? 'Subs can\'t open OneDrive — upload anything they need to see here.'
+    : 'No OneDrive folder is linked to this home on the Job Production Schedule.';
+
+  const blocked = '<span class="muted">Plans and photos can\'t be read yet — the database security rules need the house-files collection added.</span>';
+  const plans = files.filter(f=>f.kind === 'plan');
+  $('plansList').innerHTML = filesState === 'blocked' ? blocked
+    : filesState === 'loading' ? '<span class="muted">Loading…</span>'
+    : plans.length ? plans.map(f=>`<div class="file-row">
+        <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name || 'Plan')}</a>
+        <button type="button" class="x-btn" data-delete="${esc(f.id)}" title="Remove">&times;</button>
+      </div>`).join('')
+    : '<span class="muted">No plans uploaded yet.</span>';
+
+  const photos = files.filter(f=>f.kind === 'photo');
+  $('photoCount').textContent = photos.length ? `(${photos.length})` : '';
+  $('photoGrid').innerHTML = filesState === 'blocked' ? blocked
+    : photos.length ? photos.map(f=>{
+        const who = [(f.by && f.by.name) || 'Alden Homes', f.taskTitle, f.uploadedAt ? fmtDate(f.uploadedAt.slice(0,10)) : ''].filter(Boolean).join(' · ');
+        return `<div class="photo">
+          <a href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="" loading="lazy"></a>
+          <div class="who" title="${esc(who)}">${esc(who)}</div>
+          <button type="button" class="x-btn" data-delete="${esc(f.id)}" title="Remove">&times;</button>
+        </div>`;
+      }).join('')
+    : (filesState === 'loading' ? '' : '<span class="muted">No photos yet. Photos added by subs on site show up here too.</span>');
 }
+
+/* ---- uploading plans and photos ---- */
+function shrinkPhoto(file){
+  // phone photos are huge; 1600px is plenty to see the work and keeps storage small
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(b=>b ? resolve(b) : reject(new Error('could not shrink photo')), 'image/jpeg', 0.82);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('unreadable photo')); };
+    img.src = url;
+  });
+}
+async function uploadFiles(list, kind){
+  const picked = Array.from(list || []);
+  if(!picked.length || !job) return;
+  const user = firebase.auth().currentUser;
+  let failed = 0;
+  for(let i = 0; i < picked.length; i++){
+    const file = picked[i];
+    $('uploadNote').textContent = `Uploading ${kind === 'plan' ? 'file' : 'photo'} ${i+1} of ${picked.length}…`;
+    try{
+      const ref = db.collection('house-files').doc();
+      const isPhoto = kind === 'photo';
+      const blob = isPhoto ? await shrinkPhoto(file) : file;
+      const safeName = file.name.replace(/[^\w.\- ]+/g, '_');
+      const path = `houses/${houseId}/${isPhoto ? 'photos' : 'plans'}/${ref.id}-${isPhoto ? safeName.replace(/\.[^.]+$/, '') + '.jpg' : safeName}`;
+      const stored = firebase.storage().ref().child(path);
+      await stored.put(blob, { contentType: isPhoto ? 'image/jpeg' : (file.type || 'application/octet-stream') });
+      await ref.set({
+        houseId, kind, name: file.name, path, url: await stored.getDownloadURL(),
+        contentType: isPhoto ? 'image/jpeg' : (file.type || ''), size: blob.size,
+        caption: '', taskId: '', taskTitle: '', phase: '',
+        by: { type: 'staff', id: user ? user.uid : '', name: 'Alden Homes' },
+        uploadedAt: new Date().toISOString(),
+      });
+    } catch(err){ console.error(err); failed++; }
+  }
+  $('uploadNote').textContent = failed
+    ? `${failed} of ${picked.length} didn't upload. If this keeps happening, the storage security rules may not allow it yet.`
+    : '';
+}
+$('planInput').addEventListener('change', e=>{ const l = e.target.files; uploadFiles(l, 'plan').then(()=>{ e.target.value = ''; }); });
+$('photoInput').addEventListener('change', e=>{ const l = e.target.files; uploadFiles(l, 'photo').then(()=>{ e.target.value = ''; }); });
+
+document.querySelector('.cards').addEventListener('click', async e=>{
+  const btn = e.target.closest('[data-delete]');
+  if(!btn) return;
+  const f = files.find(x=>x.id === btn.dataset.delete);
+  if(!f) return;
+  if(!confirm(`Remove ${f.kind === 'plan' ? '"' + (f.name || 'this plan') + '"' : 'this photo'}? Subs will no longer see it. This cannot be undone.`)) return;
+  try{
+    if(f.path){
+      try{ await firebase.storage().ref().child(f.path).delete(); }
+      catch(err){ console.warn('File was already gone from storage', err); }
+    }
+    await db.collection('house-files').doc(f.id).delete();
+  } catch(err){ console.error(err); alert('Could not remove it — check your connection and try again.'); }
+});
 </script>
 <script>
 if('serviceWorker' in navigator){
