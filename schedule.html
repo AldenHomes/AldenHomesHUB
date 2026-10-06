@@ -87,6 +87,8 @@
   }
 
   .wrap{max-width:1400px; margin:0 auto; padding: 22px clamp(16px,4vw,40px) 60px;}
+  /* the Material Orders grid needs the room — let that tab use more of a wide screen */
+  .wrap:has(#panel-orders.active){max-width:1500px; padding-left:16px; padding-right:16px;}
   .panel{display:none;}
   .panel.active{display:block;}
 
@@ -181,8 +183,8 @@
   .order-grid{border-collapse:separate; border-spacing:0; box-shadow:none; border-radius:0; overflow:visible; width:max-content; min-width:100%;}
   .order-grid thead th{position:sticky; top:0; z-index:2; padding:10px 8px;}
   .order-grid th.item-col{
-    width:58px; min-width:58px; max-width:58px; padding:8px 3px; text-align:center; vertical-align:bottom;
-    white-space:normal; font-size:10px; letter-spacing:.2px; line-height:1.25; cursor:default;
+    width:52px; min-width:52px; max-width:52px; padding:8px 2px; text-align:center; vertical-align:bottom;
+    white-space:normal; font-size:9.5px; letter-spacing:.1px; line-height:1.25; cursor:default;
   }
   .order-grid th.item-col:hover{background:var(--navy);}
   .order-grid tbody td{padding:7px 8px; background:var(--paper-2);}
@@ -191,9 +193,9 @@
   /* job columns stay put while the item columns scroll sideways */
   .order-grid .c-comm, .order-grid .c-lot, .order-grid .c-name{position:sticky; z-index:1;}
   .order-grid thead .c-comm, .order-grid thead .c-lot, .order-grid thead .c-name{z-index:3;}
-  .order-grid .c-comm{left:0; width:58px; min-width:58px; max-width:58px;}
-  .order-grid .c-lot{left:58px; width:52px; min-width:52px; max-width:52px;}
-  .order-grid .c-name{left:110px; width:178px; min-width:178px; max-width:178px; border-right:2px solid #e2ddd0;}
+  .order-grid .c-comm{left:0; width:54px; min-width:54px; max-width:54px;}
+  .order-grid .c-lot{left:54px; width:48px; min-width:48px; max-width:48px;}
+  .order-grid .c-name{left:102px; width:160px; min-width:160px; max-width:160px; border-right:2px solid #e2ddd0;}
   .order-grid thead .c-name{border-right-color:var(--navy-2);}
   .order-grid .job-name{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .order-grid .job-addr{font-size:11px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;}
