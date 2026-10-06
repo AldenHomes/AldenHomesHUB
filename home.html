@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | My Home</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh; font-size:16px;}
+  .header{background:var(--paper-2); border-bottom:4px solid var(--rust); padding:22px 18px 18px; text-align:center;}
+  .header img{height:52px; display:block; margin:0 auto 12px;}
+  .header h1{margin:0; font-size:22px; color:var(--navy);}
+  .header p{margin:5px 0 0; font-size:15px; color:var(--ink-soft);}
+  .wrap{max-width:620px; margin:0 auto; padding:22px 14px 50px;}
+  h2{font-size:13px; letter-spacing:.6px; text-transform:uppercase; color:var(--ink-soft); margin:28px 4px 10px;}
+  .card{background:var(--paper-2); border-radius:10px; box-shadow:var(--shadow); padding:18px; margin-bottom:12px;}
+
+  /* sign in */
+  .login h2{font-size:19px; text-transform:none; letter-spacing:0; color:var(--navy); margin:0 0 6px;}
+  .login p{margin:0 0 18px; font-size:15px; color:var(--ink-soft); line-height:1.5;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px;}
+  .field .hint{font-size:13px; color:var(--ink-soft); margin-top:5px; line-height:1.4;}
+  .field input{width:100%; padding:14px 13px; border:2px solid var(--steel-line); border-radius:8px; font-size:19px; font-family:inherit; color:var(--ink); background:#fff; letter-spacing:.5px;}
+  .field input:focus{outline:none; border-color:var(--navy);}
+  .btn{display:block; width:100%; border:none; border-radius:8px; padding:15px 10px; font-size:17px; font-weight:700; cursor:pointer; font-family:inherit; text-align:center; text-decoration:none;}
+  .btn:disabled{opacity:.5; cursor:default;}
+  .btn-dark{background:var(--navy); color:#fff;}
+  .btn-plain{background:#fff; color:var(--navy); border:2px solid var(--steel-line);}
+  .error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:14.5px; padding:11px 13px; border-radius:8px; margin-bottom:16px; display:none; line-height:1.45;}
+  .error.show{display:block;}
+  .link-btn{background:none; border:none; padding:6px 2px; font-size:14px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; font-family:inherit;}
+
+  /* the home */
+  .addr{font-size:17px; font-weight:700; color:var(--navy);}
+  .addr-sub{font-size:14px; color:var(--ink-soft); margin-top:3px;}
+  .dates{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:16px; padding-top:16px; border-top:1px solid #ece8dd; text-align:center;}
+  .dates .l{font-size:11.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft);}
+  .dates .v{font-size:17px; font-weight:700; color:var(--navy); margin-top:4px;}
+  .dates .v.none{font-size:14px; font-weight:400; color:#b9b4a5;}
+
+  .pct{font-size:34px; font-weight:800; color:var(--navy); line-height:1;}
+  .pct small{font-size:15px; font-weight:400; color:var(--ink-soft); margin-left:6px;}
+  .bar{height:12px; background:#e7e2d5; border-radius:6px; overflow:hidden; margin:12px 0 18px;}
+  .bar div{height:100%; background:var(--good); border-radius:6px;}
+  .phase{display:flex; align-items:center; gap:12px; padding:9px 0; font-size:16px;}
+  .phase .dot{flex:none; width:26px; height:26px; border-radius:50%; border:2px solid var(--steel-line); display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; font-weight:800;}
+  .phase.done .dot{background:var(--good); border-color:var(--good);}
+  .phase.now .dot{border-color:var(--amber); background:var(--amber);}
+  .phase.now{font-weight:700; color:var(--navy);}
+  .phase.upcoming{color:var(--ink-soft);}
+  .phase .tagline{margin-left:auto; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--amber);}
+  .phase.done .tagline{color:var(--good);}
+  .mini-h{font-size:12.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft); margin:16px 0 6px; padding-top:14px; border-top:1px solid #ece8dd;}
+  .item{font-size:15.5px; padding:4px 0;}
+
+  .folder-row{display:flex; gap:7px; overflow-x:auto; padding-bottom:10px; margin-bottom:2px; scrollbar-width:none;}
+  .folder-row::-webkit-scrollbar{display:none;}
+  .fchip{flex:none; border:2px solid var(--steel-line); background:#fff; color:var(--ink-soft); border-radius:20px; padding:7px 13px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;}
+  .fchip.on{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .fchip .n{font-weight:400; opacity:.7;}
+  .photos{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+  .photos a{display:block; position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden; background:#ece8dd;}
+  .photos img{width:100%; height:100%; object-fit:cover; display:block;}
+  .photos .tag{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(20,20,22,.8)); color:#fff; font-size:10.5px; font-weight:600; padding:14px 6px 4px;}
+  .file{display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid #f1ede3; text-decoration:none; color:inherit;}
+  .file:first-child{border-top:none; padding-top:2px;}
+  .file .ic{flex:none; width:40px; height:40px; border-radius:8px; background:#eef0e8; color:var(--rust-2); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;}
+  .file .n{font-size:15.5px; font-weight:700; color:var(--navy); word-break:break-word;}
+  .file .s{font-size:12.5px; color:var(--ink-soft);}
+  .quiet{color:var(--ink-soft); font-size:15px; line-height:1.5;}
+
+  .viewer{position:fixed; inset:0; background:rgba(20,20,22,.94); z-index:40; display:none; align-items:center; justify-content:center; flex-direction:column; padding:14px;}
+  .viewer.show{display:flex;}
+  .viewer img{max-width:100%; max-height:84vh; border-radius:4px;}
+  .viewer .cap{color:#eee; font-size:14px; margin-top:12px; text-align:center;}
+  .viewer button{position:absolute; top:10px; right:12px; background:none; border:none; color:#fff; font-size:34px; line-height:1; cursor:pointer;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12.5px; margin-top:28px; line-height:1.8;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img src="icons/logo.png" alt="Alden Homes">
+  <h1 id="hello">Your New Home</h1>
+  <p id="helloSub">Follow along as we build it</p>
+</div>
+
+<div id="demoBar" style="display:none; background:var(--amber); color:#fff; text-align:center; font-size:13.5px; font-weight:700; padding:8px 12px;">
+  Demo — a sample home. Nothing here is real.
+</div>
+
+<div class="wrap">
+
+  <!-- Sign in -->
+  <div class="card login" id="loginCard" style="display:none;">
+    <h2>See your home's progress</h2>
+    <p>Enter your home code and the last four digits of the phone number you gave us.</p>
+    <div class="error" id="loginError"></div>
+    <div class="field">
+      <label for="code">Home code</label>
+      <input type="text" id="code" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="AP1123">
+      <div class="hint">Your community's letters followed by your house number — the number in your street address. For 1123 Alden Way in Alden Place, that's <strong>AP1123</strong>.</div>
+    </div>
+    <div class="field">
+      <label for="pin">Last 4 digits of your phone number</label>
+      <input type="text" id="pin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000">
+    </div>
+    <button class="btn btn-dark" id="loginBtn">View my home</button>
+    <p style="margin:16px 0 0; font-size:13.5px;">Not sure of your code, or changed your number? Call the Alden Homes office and we'll sort it out.</p>
+  </div>
+
+  <div class="quiet" id="loading" style="text-align:center; padding:60px 20px;">Loading…</div>
+
+  <!-- The home -->
+  <div id="home" style="display:none;">
+    <div class="card">
+      <div class="addr" id="addr"></div>
+      <div class="addr-sub" id="addrSub"></div>
+      <div class="dates" id="dates"></div>
+    </div>
+
+    <h2>Progress</h2>
+    <div class="card" id="progress"></div>
+
+    <h2>Photos</h2>
+    <div class="card" id="photos"></div>
+
+    <h2>Plans &amp; documents</h2>
+    <div class="card" id="plans"></div>
+
+    <h2>Need something looked at?</h2>
+    <div class="card">
+      <div class="quiet" style="margin-bottom:14px;">If something in your home needs attention, send us a service request and we'll follow up.</div>
+      <a class="btn btn-plain" href="request.html">Send a service request</a>
+    </div>
+
+    <div style="text-align:center; margin-top:20px;"><button class="link-btn" id="signOut">Sign out on this device</button></div>
+  </div>
+
+  <footer>Alden Homes — Handcrafted Homes &amp; Communities</footer>
+</div>
+
+<div class="viewer" id="viewer">
+  <button type="button" id="viewerClose" aria-label="Close">&times;</button>
+  <img id="viewerImg" alt="">
+  <div class="cap" id="viewerCap"></div>
+</div>
+
+<script>
+/* ============================================================
+   The home buyer's page. They sign in with their home code (community letters +
+   house number, e.g. AP1123) and the last four digits of the phone number on file.
+   Everything comes from the hub's server, which only returns their own home.
+   ============================================================ */
+const API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/homePortal';
+const params = new URLSearchParams(location.search);
+const DEMO = params.has('demo');
+const KEY = 'alden-home-login';
+const ALL = '__all';
+
+let data = null;        // what the server sent back for this home
+let folder = ALL;       // which photo folder is showing
+
+const $ = id => document.getElementById(id);
+function esc(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function niceDate(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.slice(0,10).split('-').map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+}
+function shortDate(iso){
+  const d = new Date(iso.length > 10 ? iso : iso + 'T12:00:00');
+  return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+}
+
+/* remembered on this device so they don't retype it every visit */
+function savedLogin(){
+  try{ return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e){ return null; }
+}
+function saveLogin(v){ try{ v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch(e){} }
+
+/* ---- demo mode (home.html?demo=1) ---- */
+function demoPhoto(hue, label){
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="600" height="600" fill="hsl(${hue} 30% 62%)"/><text x="300" y="315" font-family="Arial" font-size="34" font-weight="700" fill="#fff" text-anchor="middle">${label}</text></svg>`);
+}
+function demoData(){
+  const iso = n=>{ const d = new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+  return {
+    today: iso(0),
+    home: { name: 'Sample Family', community: 'AP', address: '1123 Alden Way', model: 'Coleman' },
+    dates: { walk: iso(38), move: iso(40), settle: iso(43) },
+    progress: {
+      percent: 62,
+      phases: [
+        { name:'Pre-Construction', state:'done' }, { name:'Foundation', state:'done' }, { name:'Framing', state:'done' },
+        { name:'Rough-Ins', state:'done' }, { name:'Exterior Finishes', state:'done' }, { name:'Drywall/Insulation', state:'done' },
+        { name:'Interior Finishes', state:'now' }, { name:'Final Finishes', state:'upcoming' },
+      ],
+      now: ['Trim install'], next: ['Painting', 'Light delivery', 'Electrical finish out'],
+    },
+    folders: ['Framing', 'Kitchen'],
+    photos: [
+      { id:'p1', url:demoPhoto(30,'Trim going in'), folder:'', caption:'', at:iso(-1) },
+      { id:'p2', url:demoPhoto(95,'Kitchen walls'), folder:'Kitchen', caption:'', at:iso(-6) },
+      { id:'p3', url:demoPhoto(200,'Drywall hung'), folder:'', caption:'', at:iso(-20) },
+      { id:'p4', url:demoPhoto(28,'Second floor framed'), folder:'Framing', caption:'', at:iso(-60) },
+      { id:'p5', url:demoPhoto(40,'First floor walls'), folder:'Framing', caption:'', at:iso(-66) },
+    ],
+    plans: [ { id:'f1', name:'Coleman — Floor Plans.pdf', url:'#' }, { id:'f2', name:'Site Plan — Lot 70.pdf', url:'#' } ],
+  };
+}
+
+function show(which){
+  ['loginCard','loading','home'].forEach(id=>{ $(id).style.display = id===which ? 'block' : 'none'; });
+}
+function loginError(msg){
+  $('loginError').textContent = msg;
+  $('loginError').classList.add('show');
+}
+
+async function signIn(code, pin, quiet){
+  if(!quiet){ $('loginBtn').disabled = true; $('loginBtn').textContent = 'Checking…'; }
+  try{
+    const res = await fetch(API, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ code, pin }) });
+    if(res.status === 429){
+      show('loginCard');
+      loginError('Too many tries. For your security this home code is locked for a few minutes — please wait a bit and try again, or call the office.');
+      return;
+    }
+    if(res.status === 403){
+      saveLogin(null);
+      show('loginCard');
+      loginError(quiet ? 'Please sign in again.' : 'That didn\'t match our records. Check your home code and the last four digits of your phone number, or call the office.');
+      return;
+    }
+    if(!res.ok) throw new Error('server ' + res.status);
+    data = await res.json();
+    saveLogin({ code, pin });
+    show('home');
+    render();
+  } catch(err){
+    console.error(err);
+    show('loginCard');
+    loginError('We couldn\'t reach Alden Homes just now. Check your connection and try again.');
+  } finally {
+    $('loginBtn').disabled = false; $('loginBtn').textContent = 'View my home';
+  }
+}
+
+$('loginBtn').addEventListener('click', ()=>{
+  $('loginError').classList.remove('show');
+  const code = $('code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const pin = $('pin').value.replace(/\D/g, '');
+  if(!/^[A-Z]+\d+$/.test(code)){ loginError('Your home code is your community\'s letters followed by your house number, like AP1123.'); return; }
+  if(pin.length !== 4){ loginError('Enter the last four digits of your phone number.'); return; }
+  signIn(code, pin, false);
+});
+['code','pin'].forEach(id=>$(id).addEventListener('keydown', e=>{ if(e.key === 'Enter') $('loginBtn').click(); }));
+$('signOut').addEventListener('click', ()=>{
+  saveLogin(null); data = null;
+  $('pin').value = '';
+  $('hello').textContent = 'Your New Home';
+  show('loginCard');
+});
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  const h = data.home;
+  $('hello').textContent = h.name ? `Welcome, ${h.name}` : 'Your New Home';
+  $('addr').textContent = h.address || 'Your home';
+  $('addrSub').textContent = [h.model ? 'The ' + h.model : '', h.community].filter(Boolean).join(' · ');
+
+  $('dates').innerHTML = [['Walk-through', data.dates.walk], ['Move-in', data.dates.move], ['Settlement', data.dates.settle]]
+    .map(([l, iso])=>`<div><div class="l">${l}</div><div class="v${iso ? '' : ' none'}">${iso ? esc(shortDate(iso)) : 'to be set'}</div></div>`).join('');
+
+  /* progress */
+  const p = data.progress;
+  if(!p){
+    $('progress').innerHTML = '<div class="quiet">Your build schedule isn\'t set up here yet. Once it is, you\'ll see each stage of your home come together on this page.</div>';
+  } else {
+    const label = { done:'Done', now:'In progress', upcoming:'' };
+    $('progress').innerHTML = `
+      <div class="pct">${p.percent}%<small>complete</small></div>
+      <div class="bar"><div style="width:${p.percent}%"></div></div>
+      ${p.phases.map(ph=>`<div class="phase ${ph.state}"><span class="dot">${ph.state === 'done' ? '✓' : ''}</span>${esc(ph.name)}<span class="tagline">${label[ph.state]}</span></div>`).join('')}
+      ${p.now.length ? `<div class="mini-h">Happening now</div>${p.now.map(t=>`<div class="item">${esc(t)}</div>`).join('')}` : ''}
+      ${p.next.length ? `<div class="mini-h">Coming up next</div>${p.next.map(t=>`<div class="item">${esc(t)}</div>`).join('')}` : ''}
+      <div class="quiet" style="font-size:13px; margin-top:14px;">Building schedules shift with weather and deliveries, so treat this as a guide rather than fixed dates.</div>`;
+  }
+
+  /* photos — newest first, with any folders as tabs */
+  const all = data.photos || [];
+  const folders = data.folders || [];
+  if(folder !== ALL && !folders.includes(folder)) folder = ALL;
+  const shown = all.filter(f=>folder === ALL || f.folder === folder);
+  const chip = (value, name, n)=>`<button type="button" class="fchip${folder === value ? ' on' : ''}" data-folder="${esc(value)}">${esc(name)} <span class="n">${n}</span></button>`;
+  $('photos').innerHTML = (folders.length ? `<div class="folder-row">${chip(ALL, 'All', all.length)}${folders.map(n=>chip(n, n, all.filter(f=>f.folder === n).length)).join('')}</div>` : '')
+    + (shown.length
+      ? `<div class="photos">${shown.map(f=>`<a href="${esc(f.url)}" data-photo="${esc(f.id)}"><img src="${esc(f.url)}" alt="Photo of your home" loading="lazy">${f.at ? `<span class="tag">${esc(shortDate(f.at))}</span>` : ''}</a>`).join('')}</div>`
+      : `<div class="quiet">${all.length ? 'No photos in this folder yet.' : 'No photos yet — we\'ll post them here as your home takes shape.'}</div>`);
+
+  /* plans */
+  $('plans').innerHTML = (data.plans || []).length
+    ? data.plans.map(f=>`<a class="file" href="${esc(f.url)}" target="_blank" rel="noopener"><span class="ic">${/\.pdf$/i.test(f.name) ? 'PDF' : 'FILE'}</span><span><div class="n">${esc(f.name)}</div><div class="s">Tap to open</div></span></a>`).join('')
+    : '<div class="quiet">No plans have been posted yet.</div>';
+}
+
+$('photos').addEventListener('click', e=>{
+  const c = e.target.closest('[data-folder]');
+  if(c){ folder = c.dataset.folder; render(); return; }
+  const a = e.target.closest('a[data-photo]');
+  if(!a) return;
+  e.preventDefault();
+  const f = data.photos.find(x=>x.id === a.dataset.photo);
+  if(!f) return;
+  $('viewerImg').src = f.url;
+  $('viewerCap').textContent = [f.caption, f.at ? niceDate(f.at) : ''].filter(Boolean).join(' · ');
+  $('viewer').classList.add('show');
+});
+$('viewerClose').addEventListener('click', ()=>$('viewer').classList.remove('show'));
+$('viewer').addEventListener('click', e=>{ if(e.target === $('viewer')) $('viewer').classList.remove('show'); });
+
+/* ---- start ---- */
+(function(){
+  if(DEMO){
+    $('demoBar').style.display = 'block';
+    data = demoData();
+    show('home');
+    render();
+    return;
+  }
+  // the office can hand out a link with the home code already filled in (never the phone digits)
+  const preset = (params.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const saved = savedLogin();
+  if(saved && saved.code && saved.pin && (!preset || preset === saved.code)){
+    signIn(saved.code, saved.pin, true);
+  } else {
+    if(preset) $('code').value = preset;
+    show('loginCard');
+  }
+})();
+</script>
+</body>
+</html>

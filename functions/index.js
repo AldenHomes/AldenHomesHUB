@@ -262,6 +262,123 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
 });
 
 /* ============================================================
+   homePortal — the home buyer's page
+
+   A buyer signs in with their home code — the development's abbreviation plus their
+   house number, e.g. AP1123 — and the last four digits of the phone number on file.
+   The code alone is just their address, which anyone can see, so the phone digits are
+   what actually keep a stranger out. Wrong guesses are limited per home code.
+
+   They only ever get their own home: progress, key dates, photos and plans. No
+   subcontractor names, no costs.
+   ============================================================ */
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_MINUTES = 15;
+
+function homeCodeFor(job){
+  const number = /^\s*(\d+)/.exec(job.address || '');
+  const community = String(job.community || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return number && community ? community + number[1] : '';
+}
+function lastFour(phone){
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits.length >= 4 ? digits.slice(-4) : '';
+}
+// Task names are written in trade shorthand. Tidy them a little for a home buyer.
+function plainTitle(title){
+  const fix = { RI: 'rough-in', DW: 'drywall', HVAC: 'HVAC', UGI: 'UGI' };
+  const words = String(title || '').trim().split(/\s+/).map((w, i)=>{
+    const bare = w.replace(/[^A-Za-z]/g, '').toUpperCase();
+    if(fix[bare]) return w.replace(/[A-Za-z]+/, fix[bare]);
+    const lower = w === w.toUpperCase() ? w.toLowerCase() : w;
+    return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
+  });
+  return words.join(' ');
+}
+
+exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (req, res)=>{
+  if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
+  const body = req.body || {};
+  try{
+    const code = String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const pin = String(body.pin || '').replace(/\D/g, '');
+    if(!/^[A-Z]{1,8}\d{1,7}$/.test(code)){ res.status(403).json({ error: 'no-match' }); return; }
+
+    // too many wrong guesses for this home code recently?
+    const guardRef = db.collection('home-logins').doc(code);
+    const guard = await guardRef.get();
+    const now = Date.now();
+    const recent = guard.exists && now - (guard.data().since || 0) < LOGIN_LOCK_MINUTES * 60000;
+    if(recent && (guard.data().fails || 0) >= LOGIN_MAX_FAILS){ res.status(429).json({ error: 'locked', minutes: LOGIN_LOCK_MINUTES }); return; }
+
+    // Several homes can share a house number on different streets; the phone digits pick the right one.
+    const jobsSnap = await db.collection('jobs').where('community', '==', /^[A-Z]+/.exec(code)[0]).get();
+    let job = null;
+    jobsSnap.forEach(d=>{
+      const j = d.data();
+      if(!job && pin.length === 4 && homeCodeFor(j) === code && lastFour(j.phone) === pin) job = { id: d.id, ...j };
+    });
+    if(!job){
+      await guardRef.set({ fails: recent ? (guard.data().fails || 0) + 1 : 1, since: recent ? guard.data().since : now });
+      res.status(403).json({ error: 'no-match' });
+      return;
+    }
+    if(guard.exists) await guardRef.delete();
+
+    const today = todayIso();
+    const [schedDoc, filesSnap] = await Promise.all([
+      db.collection('build-schedules').doc(job.id).get(),
+      db.collection('house-files').where('houseId', '==', job.id).get(),
+    ]);
+
+    // Progress: how far along, which phase, what's happening now and what's next — no sub names.
+    let progress = null;
+    if(schedDoc.exists){
+      const tasks = (schedDoc.data().tasks || []).filter(t=>t.start);
+      const isDone = t=>!!t.done || t.end < today;
+      const isNow = t=>!isDone(t) && t.start <= today;
+      const phases = [];
+      tasks.forEach(t=>{
+        const name = t.phase || 'General';
+        let p = phases.find(x=>x.name === name);
+        if(!p){ p = { name, total: 0, done: 0, active: false }; phases.push(p); }
+        p.total++;
+        if(isDone(t)) p.done++;
+        if(isNow(t)) p.active = true;
+      });
+      const done = tasks.filter(isDone).length;
+      progress = {
+        percent: tasks.length ? Math.round(done / tasks.length * 100) : 0,
+        phases: phases.map(p=>({ name: p.name, state: p.done === p.total ? 'done' : (p.active || p.done > 0 ? 'now' : 'upcoming') })),
+        now: tasks.filter(isNow).map(t=>plainTitle(t.title)),
+        next: tasks.filter(t=>!isDone(t) && t.start > today).slice(0, 3).map(t=>plainTitle(t.title)),
+      };
+    }
+
+    const photos = [], plans = [], folders = [];
+    filesSnap.forEach(d=>{
+      const f = d.data();
+      if(f.kind === 'folder'){ if(f.name) folders.push(f.name); }
+      else if(f.kind === 'plan') plans.push({ id: d.id, name: f.name || 'Plan', url: f.url || '', at: f.uploadedAt || '' });
+      else photos.push({ id: d.id, url: f.url || '', folder: f.folder || '', caption: f.caption || '', at: f.uploadedAt || '' });
+    });
+    photos.sort((a, b)=>(b.at || '').localeCompare(a.at || '')); // newest first
+    plans.sort((a, b)=>(a.name || '').localeCompare(b.name || ''));
+    folders.sort((a, b)=>a.localeCompare(b, 'en', { sensitivity: 'base' }));
+
+    res.json({
+      today,
+      home: { name: job.client || '', community: job.community || '', address: job.address || '', model: job.model || '' },
+      dates: { walk: job.walk || '', move: job.move || '', settle: job.settle || '' },
+      progress, photos, plans, folders,
+    });
+  } catch(err){
+    logger.error('homePortal failed', err);
+    res.status(500).json({ error: 'server' });
+  }
+});
+
+/* ============================================================
    Emailing subs
    ============================================================ */
 function buildEmail(sub, items, link, kind){

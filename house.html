@@ -90,6 +90,11 @@
   .btn-primary:hover{background:var(--navy-2);}
   .btn-ghost{background:transparent; color:var(--navy); border-color:var(--steel-line);}
   .btn-ghost:hover{background:#e9e5da;}
+  .owner-login{margin-top:16px; padding-top:14px; border-top:1px solid #ece8dd; font-size:13px; color:var(--ink-soft); line-height:1.7;}
+  .owner-login strong{color:var(--ink);}
+  .owner-login .code{font-family:"Courier New",monospace; font-weight:700; color:var(--navy); background:#eef0e8; border-radius:3px; padding:1px 6px;}
+  .mini-btn{margin-left:8px; border:1px solid var(--steel-line); background:transparent; color:var(--navy); border-radius:var(--radius); padding:4px 10px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .mini-btn:hover{background:#e9e5da;}
   .card.wide{grid-column:1 / -1; min-height:0;}
   .file-row{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid #f1ede3; font-size:13.5px;}
   .file-row:first-child{border-top:none; padding-top:0;}
@@ -192,6 +197,7 @@
           </div>
         </div>
         <div class="dates" id="hDates"></div>
+        <div class="owner-login" id="hOwner"></div>
       </div>
 
       <div class="cards">
@@ -434,10 +440,44 @@ function render(){
   ].map(([label, iso])=>`<div class="date"><div class="l">${label}</div>
       <div class="v${iso ? (label==='Settlement' && settleIn!==null && settleIn>=0 && settleIn<=14 ? ' soon' : '') : ' none'}">${fmtDate(iso) || 'not set'}</div></div>`).join('');
 
+  renderOwnerLogin();
   renderSchedule();
   renderOrders();
   renderFiles();
 }
+
+/* ---- how this home's buyer signs in to their own page ----
+   Home code = community letters + house number from the address (AP + 1123 = AP1123),
+   plus the last four digits of the phone number on file. Both come from the job, so
+   there is nothing to set up — this just shows the office what to tell the buyer. */
+function ownerLogin(){
+  const number = /^\s*(\d+)/.exec(job.address || '');
+  const community = String(job.community || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const digits = String(job.phone || '').replace(/\D/g, '');
+  return { code: number && community ? community + number[1] : '', pin: digits.length >= 4 ? digits.slice(-4) : '' };
+}
+function renderOwnerLogin(){
+  const { code, pin } = ownerLogin();
+  const el = $('hOwner');
+  if(!code){
+    el.innerHTML = '<strong>Homeowner page:</strong> not available yet — this home needs a street address starting with the house number.';
+  } else if(!pin){
+    el.innerHTML = `<strong>Homeowner page:</strong> home code <span class="code">${esc(code)}</span>, but there's no phone number on file, so the buyer can't sign in yet. Add one on the Job Production Schedule.`;
+  } else {
+    el.innerHTML = `<strong>Homeowner page:</strong> the buyer signs in with home code <span class="code">${esc(code)}</span> and the last four digits of their phone <span class="code">${esc(pin)}</span>.
+      <button type="button" class="mini-btn" id="copyOwnerLink">Copy link to send them</button>`;
+  }
+}
+document.getElementById('hOwner').addEventListener('click', e=>{
+  const btn = e.target.closest('#copyOwnerLink');
+  if(!btn) return;
+  // the link carries the home code only — never the phone digits
+  const link = new URL('home.html?code=' + encodeURIComponent(ownerLogin().code), window.location.href).toString();
+  navigator.clipboard.writeText(link).then(()=>{
+    btn.textContent = 'Copied!';
+    setTimeout(()=>{ btn.textContent = 'Copy link to send them'; }, 1500);
+  }).catch(()=>{ prompt('Copy this link:', link); });
+});
 
 function renderSchedule(){
   const body = $('schedBody');
