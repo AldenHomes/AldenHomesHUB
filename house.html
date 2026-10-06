@@ -403,6 +403,11 @@ function attachListeners(){
     render();
   }, err=>{ console.error('build-schedule listener error', err); schedState = 'blocked'; render(); });
 
+  db.collection('settings').doc('home-links').onSnapshot(doc=>{
+    homeLinks = doc.exists ? doc.data() : {};
+    render();
+  }, err=>console.error('home-links listener error', err));
+
   db.collection('house-files').where('houseId', '==', houseId).onSnapshot(s=>{
     files = s.docs.map(d=>({ id: d.id, ...d.data() })).sort((a,b)=>(b.uploadedAt||'').localeCompare(a.uploadedAt||''));
     filesState = 'ready';
@@ -446,37 +451,55 @@ function render(){
   renderFiles();
 }
 
-/* ---- how this home's buyer signs in to their own page ----
-   Home code = community letters + house number from the address (AP + 1123 = AP1123),
-   plus the last four digits of the phone number on file. Both come from the job, so
-   there is nothing to set up — this just shows the office what to tell the buyer. */
-function ownerLogin(){
-  const number = /^\s*(\d+)/.exec(job.address || '');
-  const community = String(job.community || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const digits = String(job.phone || '').replace(/\D/g, '');
-  return { code: number && community ? community + number[1] : '', pin: digits.length >= 4 ? digits.slice(-4) : '' };
+/* ---- this home's buyer page ----
+   No login for the buyer: each home has its own private link. The link codes are kept
+   together in settings/home-links as { jobId: code }. One is made automatically the first
+   time a home's page is opened here, so there is nothing to set up — just copy and send. */
+let homeLinks = null;        // null until loaded
+let makingHomeLink = false;
+function newLinkCode(){
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function homeLinkUrl(){
+  const code = homeLinks && homeLinks[houseId];
+  return code ? new URL('home.html?k=' + encodeURIComponent(code), window.location.href).toString() : '';
+}
+async function setHomeLink(){
+  makingHomeLink = true;
+  try{ await db.collection('settings').doc('home-links').set({ [houseId]: newLinkCode() }, { merge: true }); }
+  catch(err){ console.error('Could not save the homeowner link', err); }
+  makingHomeLink = false;
 }
 function renderOwnerLogin(){
-  const { code, pin } = ownerLogin();
   const el = $('hOwner');
-  if(!code){
-    el.innerHTML = '<strong>Homeowner page:</strong> not available yet — this home needs a street address starting with the house number.';
-  } else if(!pin){
-    el.innerHTML = `<strong>Homeowner page:</strong> home code <span class="code">${esc(code)}</span>, but there's no phone number on file, so the buyer can't sign in yet. Add one on the Job Production Schedule.`;
-  } else {
-    el.innerHTML = `<strong>Homeowner page:</strong> the buyer signs in with home code <span class="code">${esc(code)}</span> and the last four digits of their phone <span class="code">${esc(pin)}</span>.
-      <button type="button" class="mini-btn" id="copyOwnerLink">Copy link to send them</button>`;
+  if(homeLinks === null){ el.innerHTML = '<strong>Homeowner page:</strong> loading…'; return; }
+  const url = homeLinkUrl();
+  if(!url){
+    el.innerHTML = '<strong>Homeowner page:</strong> setting up this home\'s private link…';
+    if(!makingHomeLink) setHomeLink();
+    return;
   }
+  el.innerHTML = `<strong>Homeowner page:</strong> the buyer opens their own page from a private link — no login.
+    <button type="button" class="mini-btn" id="copyOwnerLink">Copy link to send them</button>
+    <a class="mini-btn" href="${esc(url)}" target="_blank" rel="noopener" style="text-decoration:none;">Preview</a>
+    <button type="button" class="mini-btn" id="newOwnerLink" title="Replaces the link. The old one stops working.">New link</button>`;
 }
-document.getElementById('hOwner').addEventListener('click', e=>{
-  const btn = e.target.closest('#copyOwnerLink');
-  if(!btn) return;
-  // the link carries the home code only — never the phone digits
-  const link = new URL('home.html?code=' + encodeURIComponent(ownerLogin().code), window.location.href).toString();
-  navigator.clipboard.writeText(link).then(()=>{
-    btn.textContent = 'Copied!';
-    setTimeout(()=>{ btn.textContent = 'Copy link to send them'; }, 1500);
-  }).catch(()=>{ prompt('Copy this link:', link); });
+document.getElementById('hOwner').addEventListener('click', async e=>{
+  const copy = e.target.closest('#copyOwnerLink');
+  if(copy){
+    const link = homeLinkUrl();
+    navigator.clipboard.writeText(link).then(()=>{
+      copy.textContent = 'Copied!';
+      setTimeout(()=>{ copy.textContent = 'Copy link to send them'; }, 1500);
+    }).catch(()=>{ prompt('Copy this link:', link); });
+    return;
+  }
+  if(e.target.closest('#newOwnerLink')){
+    if(!confirm('Give this home a new link?\n\nThe old link stops working straight away, so the buyer will need the new one sent to them.')) return;
+    await setHomeLink();
+  }
 });
 
 function renderSchedule(){

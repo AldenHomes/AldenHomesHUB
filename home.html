@@ -101,22 +101,15 @@
 
 <div class="wrap">
 
-  <!-- Sign in -->
-  <div class="card login" id="loginCard" style="display:none;">
-    <h2>See your home's progress</h2>
-    <p>Enter your home code and the last four digits of the phone number you gave us.</p>
-    <div class="error" id="loginError"></div>
-    <div class="field">
-      <label for="code">Home code</label>
-      <input type="text" id="code" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="AP1123">
-      <div class="hint">Your community's letters followed by your house number — the number in your street address. For 1123 Alden Way in Alden Place, that's <strong>AP1123</strong>.</div>
-    </div>
-    <div class="field">
-      <label for="pin">Last 4 digits of your phone number</label>
-      <input type="text" id="pin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000">
-    </div>
-    <button class="btn btn-dark" id="loginBtn">View my home</button>
-    <p style="margin:16px 0 0; font-size:13.5px;">Not sure of your code, or changed your number? Call the Alden Homes office and we'll sort it out.</p>
+  <!-- No login: the private link is the key. These show when it's missing, replaced, or can't be reached. -->
+  <div class="card login" id="badLink" style="display:none;">
+    <h2>This link isn't working</h2>
+    <p style="margin:0;">It may have been replaced with a newer one. Check your most recent message from Alden Homes, or call the office and we'll send you a fresh link to your home's page.</p>
+  </div>
+  <div class="card login" id="down" style="display:none;">
+    <h2>We couldn't load your home</h2>
+    <p>Check your connection and try again.</p>
+    <button class="btn btn-plain" id="retryBtn">Try again</button>
   </div>
 
   <div class="quiet" id="loading" style="text-align:center; padding:60px 20px;">Loading…</div>
@@ -144,7 +137,7 @@
       <a class="btn btn-plain" href="request.html">Send a service request</a>
     </div>
 
-    <div style="text-align:center; margin-top:20px;"><button class="link-btn" id="signOut">Sign out on this device</button></div>
+    <div class="quiet" style="text-align:center; font-size:13px; margin-top:20px;">This page is private to your home. Save or bookmark it to come back any time.</div>
   </div>
 
   <footer>Alden Homes — Handcrafted Homes &amp; Communities</footer>
@@ -158,14 +151,14 @@
 
 <script>
 /* ============================================================
-   The home buyer's page. They sign in with their home code (community letters +
-   house number, e.g. AP1123) and the last four digits of the phone number on file.
-   Everything comes from the hub's server, which only returns their own home.
+   The home buyer's page. No login: the private code in their link
+   (…/home.html?k=CODE) is what identifies their home. Everything comes from
+   the hub's server, which only returns that one home.
    ============================================================ */
 const API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/homePortal';
 const params = new URLSearchParams(location.search);
 const DEMO = params.has('demo');
-const KEY = 'alden-home-login';
+const token = params.get('k') || '';
 const ALL = '__all';
 
 let data = null;        // what the server sent back for this home
@@ -184,12 +177,6 @@ function shortDate(iso){
   const d = new Date(iso.length > 10 ? iso : iso + 'T12:00:00');
   return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
 }
-
-/* remembered on this device so they don't retype it every visit */
-function savedLogin(){
-  try{ return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e){ return null; }
-}
-function saveLogin(v){ try{ v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch(e){} }
 
 /* ---- demo mode (home.html?demo=1) ---- */
 function demoPhoto(hue, label){
@@ -223,57 +210,25 @@ function demoData(){
 }
 
 function show(which){
-  ['loginCard','loading','home'].forEach(id=>{ $(id).style.display = id===which ? 'block' : 'none'; });
-}
-function loginError(msg){
-  $('loginError').textContent = msg;
-  $('loginError').classList.add('show');
+  ['badLink','down','loading','home'].forEach(id=>{ $(id).style.display = id===which ? 'block' : 'none'; });
 }
 
-async function signIn(code, pin, quiet){
-  if(!quiet){ $('loginBtn').disabled = true; $('loginBtn').textContent = 'Checking…'; }
+async function load(){
+  if(!token){ show('badLink'); return; }
+  show('loading');
   try{
-    const res = await fetch(API, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ code, pin }) });
-    if(res.status === 429){
-      show('loginCard');
-      loginError('Too many tries. For your security this home code is locked for a few minutes — please wait a bit and try again, or call the office.');
-      return;
-    }
-    if(res.status === 403){
-      saveLogin(null);
-      show('loginCard');
-      loginError(quiet ? 'Please sign in again.' : 'That didn\'t match our records. Check your home code and the last four digits of your phone number, or call the office.');
-      return;
-    }
+    const res = await fetch(API, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ token }) });
+    if(res.status === 403){ show('badLink'); return; }
     if(!res.ok) throw new Error('server ' + res.status);
     data = await res.json();
-    saveLogin({ code, pin });
     show('home');
     render();
   } catch(err){
     console.error(err);
-    show('loginCard');
-    loginError('We couldn\'t reach Alden Homes just now. Check your connection and try again.');
-  } finally {
-    $('loginBtn').disabled = false; $('loginBtn').textContent = 'View my home';
+    show('down');
   }
 }
-
-$('loginBtn').addEventListener('click', ()=>{
-  $('loginError').classList.remove('show');
-  const code = $('code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const pin = $('pin').value.replace(/\D/g, '');
-  if(!/^[A-Z]+\d+$/.test(code)){ loginError('Your home code is your community\'s letters followed by your house number, like AP1123.'); return; }
-  if(pin.length !== 4){ loginError('Enter the last four digits of your phone number.'); return; }
-  signIn(code, pin, false);
-});
-['code','pin'].forEach(id=>$(id).addEventListener('keydown', e=>{ if(e.key === 'Enter') $('loginBtn').click(); }));
-$('signOut').addEventListener('click', ()=>{
-  saveLogin(null); data = null;
-  $('pin').value = '';
-  $('hello').textContent = 'Your New Home';
-  show('loginCard');
-});
+$('retryBtn').addEventListener('click', load);
 
 /* ============================================================
    RENDER
@@ -343,15 +298,7 @@ $('viewer').addEventListener('click', e=>{ if(e.target === $('viewer')) $('viewe
     render();
     return;
   }
-  // the office can hand out a link with the home code already filled in (never the phone digits)
-  const preset = (params.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const saved = savedLogin();
-  if(saved && saved.code && saved.pin && (!preset || preset === saved.code)){
-    signIn(saved.code, saved.pin, true);
-  } else {
-    if(preset) $('code').value = preset;
-    show('loginCard');
-  }
+  load();
 })();
 </script>
 </body>

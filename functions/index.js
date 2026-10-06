@@ -264,26 +264,14 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
 /* ============================================================
    homePortal — the home buyer's page
 
-   A buyer signs in with their home code — the development's abbreviation plus their
-   house number, e.g. AP1123 — and the last four digits of the phone number on file.
-   The code alone is just their address, which anyone can see, so the phone digits are
-   what actually keep a stranger out. Wrong guesses are limited per home code.
+   No login: each home has its own private link (…/home.html?k=CODE), the same idea as
+   the subcontractor links. The office copies it from the home's page in the hub and
+   sends it to the buyer. The codes live in one record, settings/home-links, as
+   { jobId: code }, so the office can replace a home's link at any time.
 
-   They only ever get their own home: progress, key dates, photos and plans. No
+   A buyer only ever gets their own home: progress, key dates, photos and plans. No
    subcontractor names, no costs.
    ============================================================ */
-const LOGIN_MAX_FAILS = 5;
-const LOGIN_LOCK_MINUTES = 15;
-
-function homeCodeFor(job){
-  const number = /^\s*(\d+)/.exec(job.address || '');
-  const community = String(job.community || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  return number && community ? community + number[1] : '';
-}
-function lastFour(phone){
-  const digits = String(phone || '').replace(/\D/g, '');
-  return digits.length >= 4 ? digits.slice(-4) : '';
-}
 // Task names are written in trade shorthand. Tidy them a little for a home buyer.
 function plainTitle(title){
   const fix = { RI: 'rough-in', DW: 'drywall', HVAC: 'HVAC', UGI: 'UGI' };
@@ -300,30 +288,15 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
   const body = req.body || {};
   try{
-    const code = String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const pin = String(body.pin || '').replace(/\D/g, '');
-    if(!/^[A-Z]{1,8}\d{1,7}$/.test(code)){ res.status(403).json({ error: 'no-match' }); return; }
-
-    // too many wrong guesses for this home code recently?
-    const guardRef = db.collection('home-logins').doc(code);
-    const guard = await guardRef.get();
-    const now = Date.now();
-    const recent = guard.exists && now - (guard.data().since || 0) < LOGIN_LOCK_MINUTES * 60000;
-    if(recent && (guard.data().fails || 0) >= LOGIN_MAX_FAILS){ res.status(429).json({ error: 'locked', minutes: LOGIN_LOCK_MINUTES }); return; }
-
-    // Several homes can share a house number on different streets; the phone digits pick the right one.
-    const jobsSnap = await db.collection('jobs').where('community', '==', /^[A-Z]+/.exec(code)[0]).get();
-    let job = null;
-    jobsSnap.forEach(d=>{
-      const j = d.data();
-      if(!job && pin.length === 4 && homeCodeFor(j) === code && lastFour(j.phone) === pin) job = { id: d.id, ...j };
-    });
-    if(!job){
-      await guardRef.set({ fails: recent ? (guard.data().fails || 0) + 1 : 1, since: recent ? guard.data().since : now });
-      res.status(403).json({ error: 'no-match' });
-      return;
-    }
-    if(guard.exists) await guardRef.delete();
+    // Which home does this link's code belong to? Anything that isn't a current code is refused.
+    const token = body.token;
+    if(typeof token !== 'string' || token.length < 20 || token.length > 100){ res.status(403).json({ error: 'bad-link' }); return; }
+    const linksDoc = await db.collection('settings').doc('home-links').get();
+    const links = linksDoc.exists ? linksDoc.data() : {};
+    const jobId = Object.keys(links).find(id=>links[id] === token);
+    const jobDoc = jobId ? await db.collection('jobs').doc(jobId).get() : null;
+    if(!jobDoc || !jobDoc.exists){ res.status(403).json({ error: 'bad-link' }); return; }
+    const job = { id: jobDoc.id, ...jobDoc.data() };
 
     const today = todayIso();
     const [schedDoc, filesSnap] = await Promise.all([
