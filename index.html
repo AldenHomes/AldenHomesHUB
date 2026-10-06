@@ -58,7 +58,26 @@
   }
   .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
 
-  .wrap{max-width:1100px; margin:0 auto; padding: 40px clamp(16px,4vw,40px) 60px;}
+  .wrap{max-width:1320px; margin:0 auto; padding: 40px clamp(16px,4vw,40px) 60px;}
+
+  /* tools on the left, the list of active homes on the right */
+  .hub-cols{display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:24px; align-items:start;}
+  @media (max-width:900px){ .hub-cols{grid-template-columns:1fr;} }
+  .homes-card{background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust);}
+  .homes-head{padding:18px 18px 12px; border-bottom:1px solid #ece8dd;}
+  .homes-head h3{margin:0 0 10px; font-size:16.5px; color:var(--navy);}
+  .homes-count{font-size:11px; font-weight:400; font-family:"Courier New",monospace; color:var(--ink-soft); background:#ece8dd; border-radius:20px; padding:1px 8px; margin-left:4px; vertical-align:middle;}
+  .homes-list{max-height:min(68vh, 640px); overflow-y:auto;}
+  .home-row{display:flex; align-items:center; gap:11px; padding:11px 18px; border-bottom:1px solid #f1ede3; text-decoration:none; color:inherit;}
+  .home-row:last-child{border-bottom:none;}
+  .home-row:hover{background:#faf8f2;}
+  .home-tag{flex:none; min-width:34px; text-align:center; padding:2px 7px; border-radius:20px; font-size:11px; font-weight:700; color:#fff;}
+  .home-main{flex:1; min-width:0;}
+  .home-name{font-size:13.5px; font-weight:600; color:var(--navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .home-sub{font-size:11.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;}
+  .home-date{flex:none; text-align:right; font-family:"Courier New",monospace; font-size:11.5px; color:var(--ink-soft); line-height:1.3;}
+  .home-date .soon{color:var(--amber); font-weight:700;}
+  .homes-empty{padding:28px 18px; text-align:center; color:var(--ink-soft); font-size:13px;}
   .welcome{margin-bottom:28px;}
   .welcome h2{margin:0 0 6px; font-size:22px; color:var(--navy);}
   .welcome p{margin:0; color:var(--ink-soft); font-size:14px;}
@@ -199,6 +218,7 @@
       <p>Pick a tool below to get started. More will show up here as they're built.</p>
     </div>
 
+    <div class="hub-cols">
     <div class="tile-grid">
       <a class="tile" id="scheduleTile" href="schedule.html">
         <div class="tile-icon">
@@ -242,6 +262,30 @@
           <div class="tile-stat"><div class="n" id="tileStatPackets">—</div><div class="l">Packets</div></div>
         </div>
       </a>
+
+      <a class="tile" id="constructionTile" href="construction.html">
+        <div class="tile-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/></svg>
+        </div>
+        <div>
+          <h3 class="tile-title">Construction Schedules</h3>
+          <p class="tile-desc">Build each house's schedule from a template, with subcontractors and durations preset.</p>
+        </div>
+        <div class="tile-stats" id="constructionTileStats">
+          <div class="tile-stat"><div class="n" id="tileStatBuilds">—</div><div class="l">Houses Scheduled</div></div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Active homes: every house that hasn't settled yet, soonest first -->
+    <aside class="homes-card">
+      <div class="homes-head">
+        <h3>Active Homes <span class="homes-count" id="homesCount"></span></h3>
+        <input type="text" id="homesSearch" placeholder="Search name, lot, address…">
+      </div>
+      <div class="homes-list" id="homesList"></div>
+      <div class="homes-empty" id="homesEmpty" style="display:none;">No active homes match.</div>
+    </aside>
     </div>
 
     <footer>Alden Homes internal tools — data syncs live across your team.</footer>
@@ -321,6 +365,7 @@ if(!FIREBASE_CONFIGURED){
       attachScheduleStatsListener(db);
       attachServiceStatsListener(db);
       attachPacketsStatsListener(db);
+      attachConstructionStatsListener(db);
     } else {
       showLoginGate();
     }
@@ -340,6 +385,11 @@ function daysFromToday(iso){
 function attachScheduleStatsListener(db){
   db.collection('jobs').onSnapshot(snapshot=>{
     const jobs = snapshot.docs.map(d=>d.data());
+    activeHomes = snapshot.docs.map(d=>({ id: d.id, ...d.data() })).filter(j=>{
+      const d = daysFromToday(j.settle);
+      return d===null || d>=0; // active until it settles
+    });
+    renderActiveHomes();
     document.getElementById('tileStatTotal').textContent = jobs.length;
     document.getElementById('tileStatYTD').textContent = jobs.filter(j=>{
       const isModel = String(j.client||'').trim().replace(/\s+/g,' ').toLowerCase() === 'model home';
@@ -352,6 +402,40 @@ function attachScheduleStatsListener(db){
     setSyncStatus('idle');
   }, err=>{ console.error('jobs listener error', err); setSyncStatus('offline'); });
 }
+
+/* ---- Active homes list (right side) ---- */
+let activeHomes = [];
+const HOME_COLORS = { AP:'#3d5570', MM:'#5a7247', ML:'#8a5a3a', CL:'#6a4c93', OS:'#c1531f', ET:'#2f7d8c', NG:'#8c6b2f' };
+function escHtml(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function shortDate(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${m}/${d}/${y.slice(2)}`;
+}
+function renderActiveHomes(){
+  const q = document.getElementById('homesSearch').value.trim().toLowerCase();
+  const rows = activeHomes
+    .filter(j=>!q || [j.community, j.lot, j.client, j.address, j.model].join(' ').toLowerCase().includes(q))
+    // soonest to settle first; homes with no settle date yet go last
+    .sort((a,b)=>(a.settle||'9999').localeCompare(b.settle||'9999') || String(a.lot||'').localeCompare(String(b.lot||'')));
+  document.getElementById('homesCount').textContent = activeHomes.length;
+  document.getElementById('homesEmpty').style.display = rows.length ? 'none' : 'block';
+  document.getElementById('homesList').innerHTML = rows.map(j=>{
+    const days = daysFromToday(j.settle);
+    const soon = days!==null && days<=30;
+    return `<a class="home-row" href="house.html?id=${encodeURIComponent(j.id)}">
+      <span class="home-tag" style="background:${HOME_COLORS[j.community] || '#6b6f72'}">${escHtml(j.community || '—')}</span>
+      <span class="home-main">
+        <div class="home-name">${escHtml([j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') || 'Unnamed home')}</div>
+        <div class="home-sub">${escHtml([j.address, j.model].filter(Boolean).join(' · '))}</div>
+      </span>
+      <span class="home-date">${j.settle ? `settles<br><span class="${soon?'soon':''}">${shortDate(j.settle)}</span>` : 'no date'}</span>
+    </a>`;
+  }).join('');
+}
+document.getElementById('homesSearch').addEventListener('input', renderActiveHomes);
 
 function attachServiceStatsListener(db){
   db.collection('service-requests').onSnapshot(snapshot=>{
@@ -368,6 +452,12 @@ function attachPacketsStatsListener(db){
     document.getElementById('tileStatPackets').textContent = snapshot.size;
     setSyncStatus('idle');
   }, err=>{ console.error('sales-packets listener error', err); setSyncStatus('offline'); });
+}
+
+function attachConstructionStatsListener(db){
+  db.collection('build-schedules').onSnapshot(snapshot=>{
+    document.getElementById('tileStatBuilds').textContent = snapshot.size;
+  }, err=>{ console.error('build-schedules listener error', err); /* leave the tile at "—"; the rest of the hub is fine */ });
 }
 </script>
 <script>

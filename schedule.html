@@ -2806,6 +2806,8 @@ renderSchedule();
 renderOrders();
 renderOpenDates();
 renderLots();
+// A home's page links here as schedule.html#orders to land on the Material Orders tab.
+if(location.hash === '#orders') switchTab('orders');
 
 /* ============================================================
    PRINT / EXPORT PDF

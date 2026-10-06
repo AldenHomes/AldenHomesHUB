@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | Construction Schedules</title>
+<style>
+  :root{
+    --navy:#4B4F54;
+    --navy-2:#33363a;
+    --steel-line:#d4d2c8;
+    --paper:#f5f4ef;
+    --paper-2:#ffffff;
+    --ink:#33363a;
+    --ink-soft:#6b6f72;
+    --rust:#A3AA83;
+    --rust-2:#6B7355;
+    --amber:#c98a2b;
+    --good:#3f7a4e;
+    --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+
+  .titlebar{background:var(--paper-2); padding:20px clamp(16px,4vw,40px) 0; border-bottom:4px solid var(--rust);}
+  .titlebar-inner{max-width:1500px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; padding-bottom:16px;}
+  .brand{display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;}
+  .brand-mark{height:40px; flex:none; display:flex; align-items:center;}
+  .brand-mark img{height:100%; width:auto; display:block;}
+  h1{font-size:clamp(19px,2.4vw,24px); margin:0; font-weight:700; color:var(--navy);}
+  .subtitle{font-size:12px; color:var(--ink-soft); margin-top:3px; letter-spacing:.6px; text-transform:uppercase;}
+  .titlebar-stats{display:flex; gap:22px; font-family:"Courier New",monospace;}
+  .stat{text-align:right;}
+  .stat .n{font-size:22px; font-weight:700; color:var(--navy); line-height:1;}
+  .stat .l{font-size:10px; color:var(--ink-soft); letter-spacing:.6px; text-transform:uppercase; margin-top:3px;}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+  .sync-badge{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-soft); font-family:"Courier New",monospace;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.offline{background:var(--danger);}
+  .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
+  .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
+
+  .tabbar{max-width:1500px; margin:0 auto; display:flex; gap:4px; border-top:1px solid #ece8dd; overflow-x:auto; scrollbar-width:none;}
+  .tabbar::-webkit-scrollbar{display:none;}
+  .tab-btn{
+    flex:none; background:none; border:none; border-bottom:3px solid transparent; padding:12px 16px 10px;
+    font-size:13.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; font-family:inherit;
+  }
+  .tab-btn:hover{color:var(--navy);}
+  .tab-btn.active{color:var(--navy); border-bottom-color:var(--rust);}
+  .tab-badge{background:#ece8dd; color:var(--ink-soft); border-radius:20px; padding:1px 7px; font-size:10.5px; font-family:"Courier New",monospace; margin-left:4px;}
+
+  .wrap{max-width:1500px; margin:0 auto; padding:22px clamp(16px,3vw,40px) 60px;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .toolbar{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:16px;}
+  .grow{flex:1;}
+  .btn{padding:10px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-ghost{background:transparent; color:var(--navy); border-color:var(--steel-line);}
+  .btn-ghost:hover{background:#e9e5da;}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-primary:hover{background:var(--navy-2);}
+  .btn-danger{background:transparent; color:#a8451a; border-color:#e3b5a0;}
+  .btn-danger:hover{background:#fbeae4;}
+  .btn:disabled{opacity:.5; cursor:default;}
+
+  .table-wrap{overflow-x:auto; background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius);}
+  table{width:100%; border-collapse:collapse;}
+  thead th{text-align:left; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:#eee; background:var(--navy); padding:11px 10px; font-weight:600; white-space:nowrap;}
+  tbody td{padding:10px; border-bottom:1px solid #ece8dd; font-size:13.5px; vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  .clickable tbody tr{cursor:pointer;}
+  .clickable tbody tr:hover{background:#faf8f2;}
+  .muted{color:var(--ink-soft);}
+  .mono{font-family:"Courier New",monospace;}
+  .small{font-size:11.5px;}
+  .empty{padding:44px 20px; text-align:center; color:var(--ink-soft); font-size:14px; line-height:1.6;}
+  .tag{display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:.3px; color:#fff;}
+  .late{color:var(--danger); font-weight:700;}
+  .ok{color:var(--good); font-weight:700;}
+
+  .notice{
+    background:#fbeee0; border:1px solid #eccba2; color:#7a531a; border-radius:var(--radius);
+    padding:12px 14px; font-size:13px; line-height:1.55; margin-bottom:16px; display:none;
+  }
+  .notice.show{display:block;}
+  .notice code{background:#f3dfc4; padding:1px 5px; border-radius:2px; font-size:12px;}
+
+  /* ---- house schedule header ---- */
+  .house-head{
+    background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-top:4px solid var(--rust);
+    padding:16px 18px; margin-bottom:14px; display:flex; gap:20px 28px; align-items:flex-end; flex-wrap:wrap;
+  }
+  .house-head h2{margin:0; font-size:19px; color:var(--navy);}
+  .house-head .sub{font-size:12.5px; color:var(--ink-soft); margin-top:3px;}
+  .fact label{display:block; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:4px;}
+  .fact .v{font-size:15px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace;}
+  .back-link{background:none; border:none; padding:0; margin:0 0 12px; color:var(--ink-soft); font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .back-link:hover{color:var(--navy);}
+
+  /* ---- task editor (used for both a house schedule and a template) ---- */
+  .task-table thead th{position:sticky; top:0; z-index:2;}
+  .task-table tbody td{padding:5px 6px;}
+  .task-table tbody tr:hover{background:#faf8f2;}
+  .task-table tr.dragging{opacity:.4;}
+  .task-table tr.drop-above td{box-shadow:inset 0 2px 0 var(--amber);}
+  .task-table tr.drop-below td{box-shadow:inset 0 -2px 0 var(--amber);}
+  .task-table .num{width:34px; text-align:right; color:var(--ink-soft); font-family:"Courier New",monospace; font-size:12px;}
+  .grip{cursor:grab; color:#b9b4a5; padding:4px 2px; display:inline-flex; user-select:none;}
+  .grip:hover{color:var(--navy);}
+  .move-btns{display:none; gap:2px;}
+  @media (pointer:coarse){ .grip{display:none;} .move-btns{display:inline-flex;} }
+  .cell-input{
+    width:100%; padding:6px 7px; border:1px solid transparent; border-radius:var(--radius); background:transparent;
+    font-size:13.5px; color:var(--ink); font-family:inherit;
+  }
+  .cell-input:hover{border-color:var(--steel-line); background:#fff;}
+  .cell-input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber); background:#fff;}
+  .cell-input.days{width:58px; text-align:center; font-family:"Courier New",monospace;}
+  .cell-input.date{width:132px; font-family:"Courier New",monospace; font-size:12.5px;}
+  select.cell-input{cursor:pointer;}
+  .c-title{min-width:230px;}
+  .c-phase{width:170px;}
+  .c-subs{min-width:230px;}
+  .subs-cell{display:flex; flex-wrap:wrap; gap:4px; align-items:center;}
+  .chip{
+    display:inline-flex; align-items:center; gap:4px; background:#eef0e8; color:var(--rust-2); border-radius:20px;
+    padding:3px 4px 3px 9px; font-size:11.5px; font-weight:600; white-space:nowrap;
+  }
+  .chip button{border:none; background:none; cursor:pointer; color:inherit; font-size:14px; line-height:1; padding:0 3px; opacity:.6;}
+  .chip button:hover{opacity:1;}
+  .chip.missing{background:#fbeae4; color:#a8451a;}
+  .add-sub{width:auto; max-width:128px; font-size:12px; color:var(--ink-soft); padding:4px 5px;}
+  .icon-btn{border:none; background:transparent; cursor:pointer; padding:5px; border-radius:3px; color:var(--ink-soft); display:inline-flex;}
+  .icon-btn:hover{background:#e9e5da; color:var(--navy);}
+  .icon-btn.del:hover{background:#fbeae4; color:#a8451a;}
+  .end-cell{font-family:"Courier New",monospace; font-size:12.5px; color:var(--ink-soft); white-space:nowrap;}
+  .lag-note{
+    display:inline-flex; align-items:center; gap:2px; margin-top:2px; font-size:10.5px; font-weight:700; color:var(--amber);
+    background:#fbeee0; border-radius:20px; padding:1px 3px 1px 7px; white-space:nowrap;
+  }
+  .lag-note button{border:none; background:none; cursor:pointer; color:inherit; font-size:13px; line-height:1; padding:0 3px;}
+  .bar-cell{width:170px; min-width:120px;}
+  .bar-track{position:relative; height:10px; background:#f1ede3; border-radius:5px;}
+  .bar-fill{position:absolute; top:0; height:10px; border-radius:5px; min-width:3px;}
+  .phase-dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; flex:none;}
+  .hint{font-size:12px; color:var(--ink-soft); margin:10px 2px 0; line-height:1.5;}
+
+  /* ---- calendar view of a house schedule ---- */
+  .view-toggle{display:inline-flex; border:1px solid var(--steel-line); border-radius:var(--radius); overflow:hidden; background:var(--paper-2);}
+  .view-toggle button{border:none; background:transparent; padding:9px 16px; font-size:13.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; font-family:inherit;}
+  .view-toggle button + button{border-left:1px solid var(--steel-line);}
+  .view-toggle button.active{background:var(--navy); color:#fff;}
+  .cal-nav{display:flex; align-items:center; gap:6px;}
+  .cal-month{font-size:15px; font-weight:700; color:var(--navy); min-width:150px; text-align:center;}
+  .cal-legend{display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-soft);}
+  .cal-legend span{display:inline-flex; align-items:center;}
+  .cal{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); overflow:hidden;}
+  .cal-dow{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); background:var(--navy); color:#eee; font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; text-align:center;}
+  .cal-dow div{padding:10px 2px; overflow:hidden; text-overflow:ellipsis;}
+  .cal-week{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); border-bottom:1px solid #e2ddd0;}
+  .cal-week:last-child{border-bottom:none;}
+  .cal-day{grid-row:1 / -1; min-height:104px; padding:5px 7px; border-left:1px solid #f1ede3; font-size:12px; color:var(--ink-soft); text-align:center;}
+  .cal-day:first-child{border-left:none;}
+  .cal-day.weekend{background:#f8f6f0;}
+  .cal-day.other .n{opacity:.4;}
+  .cal-day .n{display:inline-block; min-width:22px; line-height:22px; border-radius:50%; font-weight:600;}
+  .cal-day.today .n{background:var(--navy); color:#fff;}
+  .cal-day.drop{background:#fbeee0;}
+  .cal-bar{
+    z-index:1; margin:1px 3px; height:23px; line-height:23px; padding:0 8px; border:none; border-radius:3px;
+    color:#fff; font-size:11.5px; font-weight:600; font-family:inherit; text-align:left; cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .cal-bar:hover{filter:brightness(1.12);}
+  .cal-bar.from-prev{border-top-left-radius:0; border-bottom-left-radius:0;}
+  .cal-bar.to-next{border-top-right-radius:0; border-bottom-right-radius:0;}
+  .cal-bar.dragging{opacity:.4;}
+  @media (max-width:760px){
+    .cal-dow div{font-size:9.5px; letter-spacing:0;}
+    .cal-day{min-height:84px; padding:4px 2px;}
+    .cal-bar{font-size:10px; padding:0 4px; margin:1px;}
+  }
+
+  /* ---- schedule item popup ---- */
+  .tk-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:20px;}
+  @media (max-width:520px){ .tk-grid{grid-template-columns:1fr;} }
+  .tk-grid .v{font-size:15px; padding:9px 0;}
+  .tk-grid input{width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; color:var(--ink); background:#fff;}
+  .tk-grid input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .confirm-summary{display:flex; gap:14px; font-size:13.5px; font-weight:700; margin:2px 0 10px;}
+  .confirm-summary .c-yes{color:var(--good);} .confirm-summary .c-no{color:var(--danger);} .confirm-summary .c-wait{color:var(--amber);}
+  .confirm-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:9px 0; border-top:1px solid #ece8dd;}
+  .confirm-row .who{font-weight:600; font-size:14px;}
+  .confirm-btns{display:inline-flex; border:1px solid var(--steel-line); border-radius:var(--radius); overflow:hidden;}
+  .confirm-btns button{border:none; background:#fff; padding:6px 11px; font-size:12px; font-weight:700; color:var(--ink-soft); cursor:pointer; font-family:inherit;}
+  .confirm-btns button + button{border-left:1px solid var(--steel-line);}
+  .confirm-btns button.on-pending{background:#fbeee0; color:var(--amber);}
+  .confirm-btns button.on-confirmed{background:#eaf1ec; color:var(--good);}
+  .confirm-btns button.on-declined{background:#fbeae4; color:var(--danger);}
+
+  /* Modal */
+  .overlay{position:fixed; inset:0; background:rgba(30,32,34,.55); display:none; align-items:flex-start; justify-content:center; padding:5vh 16px; z-index:50; overflow-y:auto;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--paper-2); width:100%; max-width:560px; border-radius:var(--radius); box-shadow:0 20px 60px rgba(0,0,0,.3); border-top:4px solid var(--rust);}
+  .modal-head{padding:20px 24px 14px; border-bottom:1px solid #ece8dd; display:flex; justify-content:space-between; align-items:center;}
+  .modal-head h2{margin:0; font-size:18px;}
+  .modal-close{border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:20px; line-height:1;}
+  .modal-body{padding:22px 24px;}
+  .modal-foot{padding:16px 24px 22px; display:flex; justify-content:flex-end; gap:10px;}
+  label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .field{margin-bottom:14px;}
+  .field input, .field select, .auth-field input{width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
+  .field input:focus, .field select:focus, .auth-field input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .field textarea, .tk-notes{width:100%; min-height:84px; resize:vertical; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; line-height:1.45; color:var(--ink); background:#fff; font-family:inherit;}
+  .field textarea:focus, .tk-notes:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .search{flex:1 1 240px;}
+  .search input{width:100%; padding:10px 12px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; background:var(--paper-2); color:var(--ink); font-family:inherit;}
+  .check-label{display:inline-flex; align-items:center; gap:7px; margin:0; font-size:13px; font-weight:600; text-transform:none; letter-spacing:0; color:var(--ink-soft); cursor:pointer; white-space:nowrap;}
+  .pill{display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; white-space:nowrap;}
+  .pill.todo{background:#fbeee0; color:var(--amber);}
+  .pill.going{background:#eaf1ec; color:var(--good);}
+  .dev-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:-4px 0 16px; font-size:13px; color:var(--ink-soft);}
+  .dev-btn{
+    border:1px solid var(--steel-line); background:var(--paper-2); color:var(--ink-soft); border-radius:20px;
+    padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .dev-btn:hover{border-color:var(--navy); color:var(--navy);}
+  .dev-btn.on{color:#fff; border-color:transparent;}
+  .dev-btn .elsewhere{font-weight:400; opacity:.75;}
+  .static-title{padding:6px 7px; font-size:13.5px;}
+  .static-phase{display:flex; align-items:center; padding:6px 0; font-size:13px; color:var(--ink-soft); white-space:nowrap;}
+  .icon-btn.has-note{color:var(--amber);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  @media (max-width:520px){ .row2{grid-template-columns:1fr;} }
+  .form-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .form-error.show{display:block;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-gate.hidden{display:none;}
+  .auth-card{width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;}
+  .auth-card .brand{margin-bottom:22px; pointer-events:none;}
+  .auth-card h2{margin:0; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-card .btn-primary{width:100%; padding:11px;}
+  .app-shell.locked{display:none;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+</style>
+</head>
+<body>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div><h2>Construction Schedules</h2></div>
+    </div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="form-error" id="loginError"></div>
+    <div class="auth-field">
+      <label for="loginEmail">Email</label>
+      <input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+  <div class="titlebar">
+    <div class="titlebar-inner">
+      <a class="brand" href="index.html" title="Back to Alden Homes Hub">
+        <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+        <div>
+          <h1>Construction Schedules</h1>
+          <div class="subtitle">Build schedules by house</div>
+        </div>
+      </a>
+      <div class="titlebar-stats">
+        <div class="stat"><div class="n" id="statHouses">0</div><div class="l">Houses Scheduled</div></div>
+        <div class="stat"><div class="n" id="statTemplates">0</div><div class="l">Templates</div></div>
+        <div class="stat"><div class="n" id="statSubs">0</div><div class="l">Vendors</div></div>
+      </div>
+      <div class="titlebar-account">
+        <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+        <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+        <button class="signout-btn" id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+    <div class="tabbar">
+      <button class="tab-btn active" data-tab="houses">Homes <span class="tab-badge" id="badgeHouses">0</span></button>
+      <button class="tab-btn" data-tab="templates">Templates <span class="tab-badge" id="badgeTemplates">0</span></button>
+      <button class="tab-btn" data-tab="tasks">Tasks <span class="tab-badge" id="badgeTasks">0</span></button>
+      <button class="tab-btn" data-tab="subs">Vendors <span class="tab-badge" id="badgeSubs">0</span></button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="notice" id="accessNotice">
+      <strong>This page can't reach its data yet.</strong> It uses four new database collections —
+      <code>build-schedules</code>, <code>schedule-templates</code>, <code>schedule-tasks</code> and <code>subs</code> — and the Firebase security rules
+      don't allow signed-in staff to read or write them. Add them to the Firestore rules (Firebase console → Firestore Database → Rules), then reload this page.
+    </div>
+
+    <!-- ===================== HOUSES ===================== -->
+    <div class="panel active" id="panel-houses">
+      <div id="housesList">
+        <div class="toolbar">
+          <div class="search">
+            <input type="text" id="houseSearch" placeholder="Search name, lot, address, model…" autofocus>
+          </div>
+          <label class="check-label"><input type="checkbox" id="showFinished"> Show finished homes</label>
+        </div>
+        <div class="table-wrap clickable">
+          <table>
+            <thead>
+              <tr>
+                <th>Comm</th><th>Lot</th><th>Home</th><th>Model</th><th>Schedule</th>
+                <th>Start</th><th>Projected Move-In</th><th>Scheduled Move-In</th>
+              </tr>
+            </thead>
+            <tbody id="housesBody"></tbody>
+          </table>
+          <div class="empty" id="housesEmpty" style="display:none;">No homes match.</div>
+        </div>
+        <div class="hint">Homes come from the Job Production Schedule. Click one to open its build schedule — or to start one if it doesn't have it yet.</div>
+      </div>
+
+      <div id="houseDetail" style="display:none;">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <button class="back-link" id="backToHouses">&larr; All homes</button>
+          <a class="back-link" id="hdHomeLink" href="#" style="text-decoration:none;">This home's page &rarr;</a>
+        </div>
+        <div class="house-head">
+          <div style="flex:1 1 240px;">
+            <h2 id="hdTitle"></h2>
+            <div class="sub" id="hdSub"></div>
+          </div>
+          <div class="fact">
+            <label for="hdStart">Start date</label>
+            <input type="date" class="cell-input date" id="hdStart" style="border-color:var(--steel-line); background:#fff;">
+          </div>
+          <div class="fact"><label>Projected move-in</label><div class="v" id="hdEnd">—</div></div>
+          <div class="fact"><label>Scheduled move-in</label><div class="v" id="hdMove">—</div></div>
+          <div class="fact"><label>Working days</label><div class="v" id="hdDays">—</div></div>
+          <button class="btn btn-danger" id="deleteScheduleBtn">Delete Schedule</button>
+        </div>
+        <div class="toolbar" style="margin-bottom:12px;">
+          <div class="view-toggle" id="viewToggle">
+            <button type="button" data-view="calendar">Calendar</button>
+            <button type="button" data-view="list">List</button>
+          </div>
+          <div class="cal-nav" id="calNav">
+            <button type="button" class="btn btn-ghost" id="calToday">Today</button>
+            <button type="button" class="icon-btn" id="calPrev" title="Previous month"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <span class="cal-month" id="calLabel"></span>
+            <button type="button" class="icon-btn" id="calNext" title="Next month"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></button>
+          </div>
+          <div class="grow"></div>
+          <div class="cal-legend" id="calLegend"></div>
+        </div>
+
+        <div id="calView">
+          <div class="cal">
+            <div class="cal-dow"><div>Sunday</div><div>Monday</div><div>Tuesday</div><div>Wednesday</div><div>Thursday</div><div>Friday</div><div>Saturday</div></div>
+            <div id="calWeeks"></div>
+          </div>
+          <div class="hint">
+            Click a task to see who's assigned and whether they've confirmed. Drag a task to another day to move it — everything after it in the schedule follows.
+          </div>
+        </div>
+
+        <div id="listView">
+          <div class="table-wrap">
+            <table class="task-table">
+              <thead>
+                <tr>
+                  <th></th><th>#</th><th>Task</th><th>Phase</th><th>Days</th><th>Subcontractor</th>
+                  <th>Start</th><th>End</th><th>Timeline</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="scheduleBody"></tbody>
+            </table>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button class="btn btn-ghost" id="addScheduleTaskBtn">+ Add Task</button>
+          </div>
+          <div class="hint">
+            Each task starts the working day after the one above it finishes (weekends are skipped). Change a task's days and everything below shifts.
+            Pick a different start date on a task to add a gap or an overlap — everything below follows. Drag the handle to reorder.
+            Changes here only affect this house, not the template.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== TEMPLATES ===================== -->
+    <div class="panel" id="panel-templates">
+      <div class="toolbar">
+        <select class="cell-input" id="templateSelect" style="width:auto; min-width:260px; border-color:var(--steel-line); background:#fff; padding:10px 12px;"></select>
+        <button class="btn btn-ghost" id="renameTemplateBtn">Rename</button>
+        <button class="btn btn-ghost" id="copyTemplateBtn">Duplicate</button>
+        <button class="btn btn-danger" id="deleteTemplateBtn">Delete</button>
+        <div class="grow"></div>
+        <span class="muted small" id="templateSummary"></span>
+        <button class="btn btn-primary" id="newTemplateBtn">+ New Template</button>
+      </div>
+      <div class="dev-row" id="tplDevRow"></div>
+      <div class="table-wrap">
+        <table class="task-table">
+          <thead>
+            <tr><th></th><th>#</th><th>Task</th><th>Phase</th><th>Days</th><th>Who Does It</th><th></th></tr>
+          </thead>
+          <tbody id="templateBody"></tbody>
+        </table>
+        <div class="empty" id="templateEmpty" style="display:none;">No templates yet. Use <strong>+ New Template</strong> to create one.</div>
+      </div>
+      <div class="toolbar" style="margin-top:12px;">
+        <select class="cell-input" id="tplAddSelect" style="width:auto; min-width:240px; border-color:var(--steel-line); background:#fff; padding:10px 12px;"></select>
+      </div>
+      <div class="hint">
+        A template is the order of tasks for a type of house. Each task's days and vendor come from the <strong>Tasks</strong> tab, so changing your painter there
+        changes it in every template at once. Only change days or the vendor <em>here</em> when this type of house is different from the usual — it gets a small
+        tag you can click to go back to the usual. Editing a template affects houses started after the edit; schedules already built keep what they have.
+      </div>
+    </div>
+
+    <!-- ===================== TASKS (the master list) ===================== -->
+    <div class="panel" id="panel-tasks">
+      <div class="toolbar">
+        <div class="search">
+          <input type="text" id="taskSearch" placeholder="Search tasks or vendors…">
+        </div>
+        <select class="cell-input" id="taskPhaseFilter" style="width:auto; border-color:var(--steel-line); background:#fff; padding:10px 12px;"></select>
+        <button class="btn btn-primary" id="addLibTaskBtn">+ Add Task</button>
+      </div>
+      <div class="table-wrap">
+        <table class="task-table">
+          <thead>
+            <tr><th></th><th>#</th><th>Task</th><th>Phase</th><th>Usual Days</th><th>Who Usually Does It</th><th>Used In</th><th></th></tr>
+          </thead>
+          <tbody id="libraryBody"></tbody>
+        </table>
+        <div class="empty" id="libraryEmpty" style="display:none;">No tasks match.</div>
+      </div>
+      <div class="hint">
+        This is the one place to set how long each task usually takes and who usually does it. It applies to every template and every house started from now on.
+        Houses already scheduled aren't changed — swap the vendor on those in the house's List view.
+      </div>
+    </div>
+
+    <!-- ===================== VENDORS ===================== -->
+    <div class="panel" id="panel-subs">
+      <div class="toolbar">
+        <div class="search">
+          <input type="text" id="subSearch" placeholder="Search company, trade, contact…">
+        </div>
+        <button class="btn btn-primary" id="addSubBtn">+ Add Vendor</button>
+      </div>
+      <div class="table-wrap clickable">
+        <table>
+          <thead><tr><th>Company</th><th>Trade</th><th>Contact</th><th>Email</th><th>Phone</th><th>Usually Does</th></tr></thead>
+          <tbody id="subsBody"></tbody>
+        </table>
+        <div class="empty" id="subsEmpty" style="display:none;">No vendors match.</div>
+      </div>
+      <div class="hint">Subcontractors and suppliers both live here. Email and phone aren't used yet — they'll be needed once schedules are sent out to be confirmed.</div>
+    </div>
+
+    <footer>Alden Homes internal tools — data syncs live across your team.</footer>
+  </div>
+</div>
+
+<!-- Start schedule modal -->
+<div class="overlay" id="startOverlay">
+  <div class="modal">
+    <div class="modal-head"><h2>Start a House Schedule</h2><button class="modal-close" data-close="startOverlay">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-error" id="startError"></div>
+      <div class="field">
+        <label for="st_job">House</label>
+        <select id="st_job"></select>
+        <div class="muted small" style="margin-top:5px;">Houses come from the Job Production Schedule. Ones that already have a build schedule aren't listed.</div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="st_template">Template</label>
+          <select id="st_template"></select>
+        </div>
+        <div class="field">
+          <label for="st_start">Start date</label>
+          <input type="date" id="st_start">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close="startOverlay">Cancel</button>
+      <button class="btn btn-primary" id="startSaveBtn">Build Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule item (one task on a house) -->
+<div class="overlay" id="taskOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="muted small" id="tkHouse"></div>
+        <h2 id="tkTitle"></h2>
+      </div>
+      <button class="modal-close" data-close="taskOverlay">&times;</button>
+    </div>
+    <div class="modal-body" id="tkBody"></div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close="taskOverlay">Close</button></div>
+  </div>
+</div>
+
+<!-- Sub modal -->
+<div class="overlay" id="subOverlay">
+  <div class="modal">
+    <div class="modal-head"><h2 id="subModalTitle">Add Vendor</h2><button class="modal-close" data-close="subOverlay">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-error" id="subError"></div>
+      <div class="row2">
+        <div class="field"><label for="sb_name">Company</label><input type="text" id="sb_name"></div>
+        <div class="field"><label for="sb_trade">Trade</label><input type="text" id="sb_trade" placeholder="e.g. Plumbing"></div>
+      </div>
+      <div class="field"><label for="sb_contact">Contact name</label><input type="text" id="sb_contact"></div>
+      <div class="row2">
+        <div class="field"><label for="sb_email">Email</label><input type="email" id="sb_email"></div>
+        <div class="field"><label for="sb_phone">Phone</label><input type="tel" id="sb_phone" placeholder="717-555-0100"></div>
+      </div>
+      <div class="field"><label for="sb_notes">Notes</label><textarea id="sb_notes" placeholder="Anything worth remembering — lead time, who to call, how they like to be scheduled…"></textarea></div>
+      <div class="muted small" id="sb_usedFor"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="subDeleteBtn" style="display:none; margin-right:auto;">Delete</button>
+      <button class="btn btn-ghost" data-close="subOverlay">Cancel</button>
+      <button class="btn btn-primary" id="subSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+
+<script>
+/* ============================================================
+   CONFIG + SEED DATA
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+
+const PHASES = ['Pre-Construction','Foundation','Framing','Rough-Ins','Exterior Finishes','Drywall/Insulation','Interior Finishes','Final Finishes'];
+const PHASE_COLORS = {
+  'Pre-Construction':'#8a8f94', 'Foundation':'#8a5a3a', 'Framing':'#c98a2b', 'Rough-Ins':'#2f7d8c',
+  'Exterior Finishes':'#5a7247', 'Drywall/Insulation':'#6a4c93', 'Interior Finishes':'#3d5570', 'Final Finishes':'#3f7a4e'
+};
+const COMMUNITY_COLORS = { AP:'#3d5570', MM:'#5a7247', ML:'#8a5a3a', CL:'#6a4c93', OS:'#c1531f', ET:'#2f7d8c', NG:'#8c6b2f' };
+function communityColor(c){
+  c = c || '';
+  if(COMMUNITY_COLORS[c]) return COMMUNITY_COLORS[c];
+  let h=0; for(const ch of c) h = (h*31 + ch.charCodeAt(0))>>>0;
+  return `hsl(${h%360} 35% 42%)`;
+}
+
+/* Starting data, loaded once into an empty database. It comes straight from the
+   "Schedule - temp Alden and mount med" spreadsheet: tasks in order, with the
+   phase, working days and assigned sub exactly as they were listed there. */
+const SUB = {
+  FHE:'FURNACE HILLS EXCAVATING', SJ:'SJ Masonry', SKY:'SKYVIEW ELECTRIC', COC:'COCALICO PLUMBING & HEATING',
+  LEZ:'LEZZER LUMBER', TRAIL:'Trailside Contractors', ZIM:'Zimmerman ROOFING', RHODA:'Rhoda Zook',
+  AMERI:'AMERI-TEC MECHANICAL', YALE:'Yale Lighting', H2:'H2 FIREPLACE', KMH:'KMHorst Exteriors',
+  STEALTH:'STEALTH INSULATION', FRD:'FIRST RATE DRYWALL', EA:'ENERGY AUDITORS', ACHEY:'HARVEY ACHEY CONSTRUCTION, LLC',
+  SERGE:'Serge Shelest Painting', SY:'Schaedler Yesco', DS:'D&S Flooring', ENGEL:'Engel Trim/Kitchens',
+  LAPP:'Lapp Tops', AS:'A & S CLOSET SHELVING', DANA:'Dana Shenk', LTV:'LONGENCEKERS TRUE VALUE', HSC:'HEAVENLY SCENT CLEANING'
+};
+const PRE='Pre-Construction', FND='Foundation', FRM='Framing', RI='Rough-Ins', EXT='Exterior Finishes',
+      DWI='Drywall/Insulation', INT='Interior Finishes', FIN='Final Finishes';
+const TEMPLATE_SEED = {
+  id: 'standard',
+  name: 'Standard',
+  tasks: [
+    ['PLAN REVIEW', PRE, 11],
+    ['BASEMENT EXCAVATION', FND, 3, 'FHE'],
+    ['FROSTWALL FOOTER', FND, 1, 'FHE'],
+    ['INSPECT FOOTERS', FND, 1],
+    ['FROST WALL BLOCK', FND, 2, 'SJ'],
+    ['STONE IN BASEMENT', FND, 1, 'FHE'],
+    ['Electric slab rough in', '', 1, 'SKY'],
+    ['SET WALLS', FND, 1],
+    ['BEAMS AND PLUMBING RI', FND, 1, 'COC'],
+    ['DECK LUMBER DELIVERY', FRM, 1, 'LEZ'],
+    ['SUB FLOOR FRAMING', FRM, 2, 'TRAIL'],
+    ['POUR BASEMENT FLOOR', FND, 1],
+    ['DIG GARAGE FOOTERS', FND, 1, 'FHE'],
+    ['GARAGE AND PORCH BLOCK', FND, 2, 'SJ'],
+    ['BACK FILL BASEMENT', FND, 1, 'FHE'],
+    ['LUMBER DELIVERY', '', 1, 'LEZ'],
+    ['FRAME', FRM, 8, 'TRAIL'],
+    ['TRUSSES', FRM, 1],
+    ['Window and door delivery', '', 1, 'LEZ'],
+    ['SHINGLE DELIVERY', EXT, 1, 'ZIM'],
+    ['MEASURE KITCHEN', '', 1, 'RHODA'],
+    ['PLUMBING RI', RI, 2, 'COC'],
+    ['HVAC RI', RI, 4, 'AMERI'],
+    ['LATERIALS', FND, 1, 'COC', 'FHE'],
+    ['POUR GARAGE SLAB', EXT, 1],
+    ['Electrical plans', '', 1, 'YALE'],
+    ['ELECTRICAL RI', RI, 3, 'SKY'],
+    ['FIREPLACE INSTALL', RI, 1, 'H2'],
+    ['SIDING INSTALL', EXT, 7, 'KMH'],
+    ['FIRE CAULK', DWI, 1, 'STEALTH'],
+    ['FRAMING INSPECTION', EXT, 1, 'COC'],
+    ['WALL INSULATION', DWI, 2, 'STEALTH'],
+    ['DRYWALL', DWI, 10, 'FRD'],
+    ['ENERGY STAR INSPECTION', DWI, 1, 'EA'],
+    ['CEILING INSULATION', DWI, 1, 'STEALTH'],
+    ['Exterior Masonry', '', 5, 'ACHEY'],
+    ['GARAGE DOOR INSTALL', DWI, 1],
+    ['Fireplace mantle & surround install', INT, 1, 'H2'],
+    ['TRIM DELIVERY', INT, 1, 'LEZ'],
+    ['TRIM INSTALL', INT, 3],
+    ['PAINTING', INT, 5, 'SERGE'],
+    ['Light delivery', '', 1, 'SY'],
+    ['ELECTRICAL FINISH OUT', INT, 2, 'SKY'],
+    ['HVAC FINISH OUT', INT, 2, 'AMERI'],
+    ['HARD FLOORS', INT, 4, 'DS'],
+    ['KITCHEN DELIVERY', INT, 1, 'RHODA'],
+    ['KITCHEN INSTALL', INT, 2, 'ENGEL'],
+    ['Trim and railing finish out', '', 1],
+    ['COUNTERTOP TEMPLATE', INT, 1, 'LAPP'],
+    ['PLUMBING FINISH OUT', FIN, 1, 'COC'],
+    ['CLOSET SHELVES', INT, 1, 'AS'],
+    ['Fireplace cleaning & start up', INT, 1, 'H2'],
+    ['DW TOUCH UP', FIN, 1, 'FRD'],
+    ['COUNTER TOPS INSTALLED', INT, 1, 'LAPP', 'RHODA'],
+    ['CARPET', FIN, 2, 'DANA'],
+    ['BACKSPLASH', INT, 1, 'DS'],
+    ['TOUCH UP', FIN, 4, 'SERGE'],
+    ['APPLIANCES', FIN, 1, 'LTV'],
+    ['ENERGY STAR', FIN, 1, 'EA'],
+    ['CLEANING', FIN, 1, 'HSC'],
+    ['MOVE IN', FIN, 1],
+  ]
+};
+function slug(s){ return String(s).toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let jobs = [];        // from the Job Production Schedule (read-only here)
+let schedules = [];   // build-schedules: one per house, doc id = job id
+let templates = [];   // each is an ordered list of tasks picked from the task list
+let taskLib = [];     // schedule-tasks: the master task list (usual days + who usually does it)
+let subs = [];        // vendors: subcontractors and suppliers
+let openScheduleId = null;
+let houseView = 'calendar';   // 'calendar' or 'list'
+let calMonth = null;          // 'YYYY-MM' being shown; null = pick a sensible month for the open house
+let openTaskId = null;        // task shown in the schedule item popup
+let openTemplateId = null;
+let editingSubId = null;
+let seededThisSession = false;
+
+let db = null, jobsCol = null, schedCol = null, templatesCol = null, tasksCol = null, subsCol = null;
+
+/* ============================================================
+   SMALL HELPERS
+   ============================================================ */
+const $ = id => document.getElementById(id);
+function esc(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function fmtDate(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${m}/${d}/${y.slice(2)}`;
+}
+function todayIso(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function newId(){ return db.collection('_').doc().id; }
+function subName(id){ const s = subs.find(x=>x.id===id); return s ? s.name : null; }
+function libTask(id){ return taskLib.find(x=>x.id===id) || null; }
+function sameIds(a, b){ return a.length === b.length && a.every((x,i)=>x === b[i]); }
+
+// A template row is just "which task" plus anything this template does differently.
+// This fills in the rest from the master task list.
+function resolveTemplateRow(row){
+  const lib = libTask(row.taskId);
+  const libSubIds = lib && Array.isArray(lib.subIds) ? lib.subIds : [];
+  const libDuration = lib ? Math.max(1, parseInt(lib.duration, 10) || 1) : 1;
+  return {
+    taskId: row.taskId,
+    missing: !lib,
+    title: lib ? lib.title : 'Task removed from the Tasks tab',
+    phase: lib ? lib.phase : '',
+    duration: row.duration != null ? Math.max(1, parseInt(row.duration, 10) || 1) : libDuration,
+    subIds: Array.isArray(row.subIds) ? row.subIds : libSubIds,
+    libDuration, libSubIds,
+  };
+}
+function setSyncStatus(state){
+  $('syncDot').classList.toggle('offline', state==='offline');
+  $('syncLabel').textContent = state==='offline' ? 'Offline' : (state==='saving' ? 'Saving…' : 'Synced');
+}
+function jobLabel(j){
+  return [j.community, j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ');
+}
+
+/* ============================================================
+   WORKING-DAY MATH
+   Dates are handled as plain YYYY-MM-DD in UTC so daylight-saving changes
+   can never shift a day. Working days are Monday–Friday.
+   ============================================================ */
+const DAY_MS = 86400000;
+function isoToMs(iso){ const [y,m,d] = iso.split('-').map(Number); return Date.UTC(y, m-1, d); }
+function msToIso(ms){ return new Date(ms).toISOString().slice(0,10); }
+function isWorkday(ms){ const wd = new Date(ms).getUTCDay(); return wd!==0 && wd!==6; }
+function snapToWorkday(iso){ let ms = isoToMs(iso); while(!isWorkday(ms)) ms += DAY_MS; return msToIso(ms); }
+
+// How many working days after the schedule's first day a date falls (0 = the first day).
+function workdayIndex(startIso, iso){
+  let a = isoToMs(snapToWorkday(startIso));
+  const b = isoToMs(snapToWorkday(iso));
+  let i = 0;
+  while(a < b){ a += DAY_MS; if(isWorkday(a)) i++; }
+  return i;
+}
+
+// Lay the tasks out one after another. Each task starts the working day after the
+// one above it ends; a task's "lag" nudges that later (+) or earlier (-, an overlap).
+// Returns new task objects with startIdx/endIdx/start/end filled in.
+function layoutTasks(startIso, tasks){
+  const positioned = [];
+  let cursor = 0;
+  for(const t of tasks){
+    const duration = Math.max(1, parseInt(t.duration, 10) || 1);
+    const startIdx = Math.max(0, cursor + (parseInt(t.lag, 10) || 0));
+    const endIdx = startIdx + duration - 1;
+    cursor = endIdx + 1;
+    positioned.push({ ...t, duration, startIdx, endIdx });
+  }
+  const span = positioned.reduce((m,t)=>Math.max(m, t.endIdx+1), 0);
+  // one pass over the calendar to turn working-day numbers into dates
+  const dates = [];
+  if(startIso){
+    let ms = isoToMs(snapToWorkday(startIso));
+    for(let i=0; i<span; i++){
+      dates.push(msToIso(ms));
+      do{ ms += DAY_MS; } while(!isWorkday(ms));
+    }
+  }
+  positioned.forEach(t=>{ t.start = dates[t.startIdx] || ''; t.end = dates[t.endIdx] || ''; });
+  return { tasks: positioned, span, projectedEnd: span ? (dates[span-1] || '') : '' };
+}
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+function showLoginGate(){ $('loginGate').classList.remove('hidden'); $('appShell').classList.add('locked'); }
+function showApp(user){
+  $('loginGate').classList.add('hidden');
+  $('appShell').classList.remove('locked');
+  $('currentUserEmail').textContent = user.email || '';
+}
+function doLogin(){
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const errBox = $('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){
+    errBox.textContent = 'Enter both an email and a password.';
+    errBox.classList.add('show');
+    return;
+  }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(err.code)
+      ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show');
+  });
+}
+$('loginSubmitBtn').addEventListener('click', doLogin);
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
+
+firebase.initializeApp(firebaseConfig);
+db = firebase.firestore();
+jobsCol = db.collection('jobs');
+schedCol = db.collection('build-schedules');
+templatesCol = db.collection('schedule-templates');
+tasksCol = db.collection('schedule-tasks');
+subsCol = db.collection('subs');
+
+firebase.auth().onAuthStateChanged(user=>{
+  // Homeowners using the public request form are signed in anonymously — they are not staff.
+  if(user && !user.isAnonymous){
+    showApp(user);
+    if(!seededThisSession){ seededThisSession = true; seedIfEmpty(); }
+    attachListeners();
+  } else {
+    showLoginGate();
+  }
+});
+window.addEventListener('online', ()=>setSyncStatus('idle'));
+window.addEventListener('offline', ()=>setSyncStatus('offline'));
+
+/* ============================================================
+   DATA: seed, listeners, writes
+   ============================================================ */
+function listenerError(label){
+  return err=>{
+    console.error(label+' listener error', err);
+    if(err && err.code === 'permission-denied') $('accessNotice').classList.add('show');
+    setSyncStatus('offline');
+  };
+}
+
+async function seedIfEmpty(){
+  try{
+    const snap = await subsCol.limit(1).get();
+    if(snap.empty){
+      const batch = db.batch();
+      Object.values(SUB).forEach(name=>{
+        batch.set(subsCol.doc(slug(name)), { name, trade:'', contact:'', email:'', phone:'' });
+      });
+      await batch.commit();
+    }
+  } catch(e){ console.error('Subs seed failed', e); }
+  try{
+    const snap = await tasksCol.limit(1).get();
+    if(snap.empty){
+      const batch = db.batch();
+      TEMPLATE_SEED.tasks.forEach(([title, phase, duration, ...subKeys], i)=>{
+        batch.set(tasksCol.doc(slug(title)), { title, phase, duration, subIds: subKeys.map(k=>slug(SUB[k])), order: i+1 });
+      });
+      await batch.commit();
+    }
+  } catch(e){ console.error('Task list seed failed', e); }
+  try{
+    const snap = await templatesCol.limit(1).get();
+    if(snap.empty){
+      await templatesCol.doc(TEMPLATE_SEED.id).set({
+        name: TEMPLATE_SEED.name,
+        isDefault: true,   // used by every development that doesn't have its own template
+        communities: [],
+        // just the order — days and vendors come from the task list
+        tasks: TEMPLATE_SEED.tasks.map(([title])=>({ taskId: slug(title), duration: null, subIds: null })),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  } catch(e){ console.error('Template seed failed', e); }
+}
+
+let listenersAttached = false;
+function attachListeners(){
+  if(listenersAttached) return;
+  listenersAttached = true;
+  jobsCol.onSnapshot(s=>{
+    jobs = s.docs.map(d=>({ id:d.id, ...d.data() }));
+    jobsLoaded = true;
+    renderAll(); handlePendingHouse(); setSyncStatus('idle');
+  }, listenerError('jobs'));
+  schedCol.onSnapshot(s=>{
+    schedules = s.docs.map(d=>({ id:d.id, ...d.data() }));
+    schedulesLoaded = true;
+    renderAll(); handlePendingHouse(); setSyncStatus('idle');
+  }, listenerError('build-schedules'));
+  templatesCol.onSnapshot(s=>{
+    templates = s.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    if(!templates.some(t=>t.id===openTemplateId)) openTemplateId = templates.length ? templates[0].id : null;
+    renderAll(); setSyncStatus('idle');
+  }, listenerError('schedule-templates'));
+  tasksCol.onSnapshot(s=>{
+    taskLib = s.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.order||0) - (b.order||0) || (a.title||'').localeCompare(b.title||''));
+    renderAll(); setSyncStatus('idle');
+  }, listenerError('schedule-tasks'));
+  subsCol.onSnapshot(s=>{
+    subs = s.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.name||'').localeCompare(b.name||'', undefined, {sensitivity:'base'}));
+    renderAll(); setSyncStatus('idle');
+  }, listenerError('subs'));
+}
+
+async function save(promise){
+  setSyncStatus('saving');
+  try{ await promise; return true; }
+  catch(e){
+    console.error(e);
+    if(e && e.code === 'permission-denied') $('accessNotice').classList.add('show');
+    alert('Could not save — check your connection and try again.');
+    return false;
+  }
+}
+
+// Strip the fields that are worked out on the fly before saving a task.
+function storedTask(t, withDates){
+  const out = {
+    title: (t.title||'').trim(),
+    phase: t.phase || '',
+    duration: Math.max(1, parseInt(t.duration, 10) || 1),
+    subIds: Array.isArray(t.subIds) ? t.subIds : [],
+  };
+  if(withDates){
+    out.id = t.id || newId();
+    out.taskId = t.taskId || '';   // which task on the Tasks tab this came from ('' = added just for this house)
+    out.notes = t.notes || '';
+    out.lag = parseInt(t.lag, 10) || 0;
+    out.start = t.start || '';
+    out.end = t.end || '';
+    out.status = t.status || 'draft';
+    // one confirmation per assigned sub: 'pending' | 'confirmed' | 'declined'
+    out.confirm = {};
+    out.subIds.forEach(id=>{ out.confirm[id] = (t.confirm && t.confirm[id]) || 'pending'; });
+  }
+  return out;
+}
+
+function confirmCounts(t){
+  const c = { confirmed:0, declined:0, pending:0 };
+  (t.subIds||[]).forEach(id=>{ c[(t.confirm && t.confirm[id]) || 'pending']++; });
+  return c;
+}
+
+// Save a house schedule. Dates are worked out and stored on each task so the
+// sub-facing views built later can read them without redoing the math.
+function saveSchedule(sched, tasks, startDate){
+  const laid = layoutTasks(startDate, tasks);
+  const { id, ...rest } = sched;
+  // A sub's answer was for specific dates. If a task's dates moved since it was last
+  // saved, anyone who had answered goes back to "pending" so they get asked again.
+  const before = {};
+  (sched.tasks||[]).forEach(t=>{ if(t.id) before[t.id] = t; });
+  const stored = laid.tasks.map(t=>{
+    const out = storedTask(t, true);
+    const prev = before[out.id];
+    if(prev && (prev.start !== out.start || prev.end !== out.end)){
+      Object.keys(out.confirm).forEach(subId=>{ out.confirm[subId] = 'pending'; });
+    }
+    return out;
+  });
+  return save(schedCol.doc(id).set({
+    ...rest,
+    startDate,
+    tasks: stored,
+    projectedEnd: laid.projectedEnd,
+    updatedAt: new Date().toISOString(),
+  }));
+}
+// Save a template. Days and vendors are only stored when they differ from the usual
+// ones on the Tasks tab, so a change there keeps flowing through to this template.
+function saveTemplate(tpl, rows){
+  const { id, ...rest } = tpl;
+  return save(templatesCol.doc(id).set({
+    ...rest,
+    tasks: rows.map(t=>{
+      const lib = libTask(t.taskId);
+      const duration = Math.max(1, parseInt(t.duration, 10) || 1);
+      const subIds = Array.isArray(t.subIds) ? t.subIds : [];
+      return {
+        taskId: t.taskId,
+        duration: lib && duration === Math.max(1, parseInt(lib.duration, 10) || 1) ? null : duration,
+        subIds: lib && sameIds(subIds, lib.subIds || []) ? null : subIds,
+      };
+    }),
+    updatedAt: new Date().toISOString(),
+  }));
+}
+function saveLibTask(t){
+  return save(tasksCol.doc(t.id).set({
+    title: (t.title||'').trim(),
+    phase: t.phase || '',
+    duration: Math.max(1, parseInt(t.duration, 10) || 1),
+    subIds: Array.isArray(t.subIds) ? t.subIds : [],
+    order: t.order || 0,
+  }));
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+// Re-rendering replaces the inputs, so remember which one had focus and put it back.
+function keepingFocus(fn){
+  const el = document.activeElement;
+  const key = el && el.dataset && el.dataset.field ? { scope: el.closest('tbody') && el.closest('tbody').id, idx: el.dataset.idx, field: el.dataset.field } : null;
+  fn();
+  if(key && key.scope){
+    const again = document.querySelector(`#${key.scope} [data-idx="${key.idx}"][data-field="${key.field}"]`);
+    if(again) again.focus();
+  }
+}
+
+function renderAll(){
+  keepingFocus(()=>{
+    renderHouses();
+    renderHouseDetail();
+    renderTemplates();
+    renderLibrary();
+    renderSubs();
+  });
+  $('statHouses').textContent = $('badgeHouses').textContent = schedules.length;
+  $('statTemplates').textContent = $('badgeTemplates').textContent = templates.length;
+  $('badgeTasks').textContent = taskLib.length;
+  $('statSubs').textContent = $('badgeSubs').textContent = subs.length;
+}
+
+function jobFor(sched){ return jobs.find(j=>j.id===sched.id) || null; }
+// Live job details win; the copy saved on the schedule is the fallback if the job was removed.
+function houseInfo(sched){
+  const j = jobFor(sched) || {};
+  return {
+    community: j.community || sched.community || '',
+    lot: j.lot || sched.lot || '',
+    client: j.client || sched.client || '',
+    address: j.address || sched.address || '',
+    model: j.model || sched.model || '',
+    move: j.move || '',
+    settle: j.settle || '',
+  };
+}
+
+// A home is "active" until it settles.
+function isActiveJob(j){ return !j.settle || j.settle >= todayIso(); }
+
+// The front door of this page: every active home, whether or not its schedule has been started.
+function renderHouses(){
+  const showAll = $('showFinished').checked;
+  const q = $('houseSearch').value.trim().toLowerCase();
+  let rows = jobs.filter(j=>showAll || isActiveJob(j)).map(j=>({ id: j.id, sched: schedules.find(s=>s.id===j.id) || null, info: null, job: j }));
+  // schedules whose job has since been removed from the production schedule
+  if(showAll) schedules.filter(s=>!jobs.some(j=>j.id===s.id)).forEach(s=>rows.push({ id: s.id, sched: s, job: null }));
+  rows.forEach(r=>{
+    r.info = r.sched ? houseInfo(r.sched) : {
+      community: r.job.community||'', lot: r.job.lot||'', client: r.job.client||'', address: r.job.address||'',
+      model: r.job.model||'', move: r.job.move||'', settle: r.job.settle||'',
+    };
+  });
+  if(q) rows = rows.filter(r=>[r.info.community, r.info.lot, r.info.client, r.info.address, r.info.model].join(' ').toLowerCase().includes(q));
+  // soonest to settle first; homes with no settle date yet go last
+  rows.sort((a,b)=>(a.info.settle||'9999').localeCompare(b.info.settle||'9999') || String(a.info.lot).localeCompare(String(b.info.lot)));
+
+  $('housesEmpty').style.display = rows.length ? 'none' : 'block';
+  $('housesBody').innerHTML = rows.map(r=>{
+    const h = r.info, s = r.sched;
+    const late = s && h.move && s.projectedEnd && s.projectedEnd > h.move;
+    return `<tr data-id="${esc(r.id)}">
+      <td><span class="tag" style="background:${communityColor(h.community)}">${esc(h.community||'—')}</span></td>
+      <td class="mono">${esc(h.lot)}</td>
+      <td><strong>${esc(h.client||'—')}</strong><div class="muted small">${esc(h.address)}</div></td>
+      <td>${esc(h.model)}</td>
+      <td>${s ? `<span class="pill going">Scheduled</span>` : `<span class="pill todo">Start schedule</span>`}</td>
+      <td class="mono">${s ? fmtDate(s.startDate) : '<span class="muted">—</span>'}</td>
+      <td class="mono ${late?'late':''}">${s ? fmtDate(s.projectedEnd) : '<span class="muted">—</span>'}</td>
+      <td class="mono muted">${fmtDate(h.move) || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function subOptions(excludeIds){
+  return subs.filter(s=>!excludeIds.includes(s.id)).map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+}
+
+// One editable row. mode is:
+//   'schedule' — a task on a house (has dates, a timeline bar and notes)
+//   'template' — a task in a template (name and phase are fixed; days/vendor only if different from usual)
+//   'library'  — a task on the Tasks tab (the usual days and vendor)
+function taskRowHtml(t, idx, mode, span){
+  const subIds = Array.isArray(t.subIds) ? t.subIds : [];
+  const chips = subIds.map(id=>{
+    const name = subName(id);
+    return `<span class="chip${name?'':' missing'}">${esc(name || 'Removed sub')}<button type="button" data-act="rm-sub" data-idx="${idx}" data-sub="${esc(id)}" title="Remove">&times;</button></span>`;
+  }).join('');
+  const addSub = `<select class="cell-input add-sub" data-act="add-sub" data-idx="${idx}" data-field="addsub" title="Assign a subcontractor">
+      <option value="">${subIds.length ? '+ Add' : 'Unassigned'}</option>${subOptions(subIds)}</select>`;
+  const phaseKnown = !t.phase || PHASES.includes(t.phase);
+  const phaseOpts = `<option value="">—</option>`
+    + PHASES.map(p=>`<option${p===t.phase?' selected':''}>${esc(p)}</option>`).join('')
+    + (phaseKnown ? '' : `<option selected>${esc(t.phase)}</option>`);
+  const color = PHASE_COLORS[t.phase] || '#b9b4a5';
+
+  let dateCells = '';
+  if(mode === 'schedule'){
+    const lag = parseInt(t.lag, 10) || 0;
+    const lagNote = lag === 0 ? '' : `<div><span class="lag-note" title="This task was moved by hand">${lag>0 ? `+${lag}d gap` : `${-lag}d overlap`}<button type="button" data-act="clear-lag" data-idx="${idx}" title="Put it back right after the task above">&times;</button></span></div>`;
+    const left = span ? (t.startIdx/span)*100 : 0;
+    const width = span ? (t.duration/span)*100 : 0;
+    dateCells = `
+      <td><input type="date" class="cell-input date" data-idx="${idx}" data-field="start" value="${esc(t.start)}">${lagNote}</td>
+      <td class="end-cell">${fmtDate(t.end)}</td>
+      <td class="bar-cell"><div class="bar-track"><div class="bar-fill" style="left:${left.toFixed(2)}%; width:${width.toFixed(2)}%; background:${color};"></div></div></td>`;
+  }
+
+  // the handle for reordering — the Tasks tab is a plain list, so it has none
+  const moveCell = mode === 'library' ? '' : `
+      <span class="grip" draggable="true" data-idx="${idx}" title="Drag to reorder"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg></span>
+      <span class="move-btns">
+        <button type="button" class="icon-btn" data-act="up" data-idx="${idx}" title="Move up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 15l6-6 6 6"/></svg></button>
+        <button type="button" class="icon-btn" data-act="down" data-idx="${idx}" title="Move down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button>
+      </span>`;
+
+  // in a template the name and phase belong to the Tasks tab, so they're shown, not edited
+  const isTpl = mode === 'template';
+  const titleCell = isTpl
+    ? `<div class="static-title${t.missing ? ' late' : ''}">${esc(t.title)}</div>`
+    : `<input type="text" class="cell-input" data-idx="${idx}" data-field="title" value="${esc(t.title)}" placeholder="Task name">`;
+  const phaseCell = isTpl
+    ? `<div class="static-phase"><span class="phase-dot" style="background:${color};"></span>${esc(t.phase || '—')}</div>`
+    : `<div style="display:flex; align-items:center;"><span class="phase-dot" style="background:${color};"></span><select class="cell-input" data-idx="${idx}" data-field="phase">${phaseOpts}</select></div>`;
+  const durTag = isTpl && !t.missing && t.duration !== t.libDuration
+    ? `<div><span class="lag-note" title="This template uses different days than the usual ${t.libDuration} set on the Tasks tab">usual ${t.libDuration}<button type="button" data-act="reset-dur" data-idx="${idx}" title="Go back to the usual">&times;</button></span></div>` : '';
+  const subTag = isTpl && !t.missing && !sameIds(subIds, t.libSubIds)
+    ? `<span class="lag-note" title="This template uses a different vendor than the usual one set on the Tasks tab">different from usual<button type="button" data-act="reset-subs" data-idx="${idx}" title="Go back to the usual">&times;</button></span>` : '';
+
+  let endCells = '';
+  if(mode === 'library'){
+    const used = templates.filter(tpl=>(tpl.tasks||[]).some(r=>r.taskId===t.id)).length;
+    endCells = `<td class="mono muted" style="white-space:nowrap;">${used} template${used===1?'':'s'}</td>`;
+  }
+  const noteBtn = mode === 'schedule'
+    ? `<button type="button" class="icon-btn${t.notes ? ' has-note' : ''}" data-act="open" data-idx="${idx}" title="${t.notes ? esc(t.notes) : 'Notes and confirmations'}"><svg width="15" height="15" viewBox="0 0 24 24" fill="${t.notes ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></button>` : '';
+
+  return `<tr data-idx="${idx}">
+    <td style="white-space:nowrap;">${moveCell}</td>
+    <td class="num">${idx+1}</td>
+    <td class="c-title">${titleCell}</td>
+    <td class="c-phase">${phaseCell}</td>
+    <td><input type="number" min="1" step="1" class="cell-input days" data-idx="${idx}" data-field="duration" value="${esc(t.duration)}">${durTag}</td>
+    <td class="c-subs"><div class="subs-cell">${chips}${addSub}${subTag}</div></td>
+    ${dateCells}
+    ${endCells}
+    <td style="white-space:nowrap;">${noteBtn}<button type="button" class="icon-btn del" data-act="delete" data-idx="${idx}" title="Remove this task"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button></td>
+  </tr>`;
+}
+
+function openSchedule(){ return schedules.find(s=>s.id===openScheduleId) || null; }
+
+function renderHouseDetail(){
+  const sched = openSchedule();
+  $('housesList').style.display = sched ? 'none' : 'block';
+  $('houseDetail').style.display = sched ? 'block' : 'none';
+  if(!sched) return;
+
+  const h = houseInfo(sched);
+  const laid = layoutTasks(sched.startDate, sched.tasks || []);
+  $('hdTitle').textContent = [h.community, h.lot ? 'Lot '+h.lot : '', h.client].filter(Boolean).join(' · ') || 'House';
+  $('hdHomeLink').href = 'house.html?id=' + encodeURIComponent(sched.id);
+  $('hdSub').textContent = [h.address, h.model, sched.templateName ? 'Template: '+sched.templateName : ''].filter(Boolean).join('  ·  ');
+  if(document.activeElement !== $('hdStart')) $('hdStart').value = sched.startDate || '';
+  const late = h.move && laid.projectedEnd && laid.projectedEnd > h.move;
+  $('hdEnd').textContent = fmtDate(laid.projectedEnd) || '—';
+  $('hdEnd').className = 'v' + (late ? ' late' : (h.move && laid.projectedEnd ? ' ok' : ''));
+  $('hdMove').textContent = fmtDate(h.move) || '—';
+  $('hdDays').textContent = laid.span || '—';
+
+  document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('active', b.dataset.view===houseView));
+  const isCal = houseView === 'calendar';
+  $('calView').style.display = isCal ? 'block' : 'none';
+  $('calNav').style.display = isCal ? 'flex' : 'none';
+  $('calLegend').style.display = isCal ? 'flex' : 'none';
+  $('listView').style.display = isCal ? 'none' : 'block';
+  if(isCal) renderCalendar(sched, laid);
+  else $('scheduleBody').innerHTML = laid.tasks.map((t,i)=>taskRowHtml(t, i, 'schedule', laid.span)).join('');
+  renderTaskModal(sched, laid, h);
+}
+
+/* ---- calendar: one month, tasks drawn as bars across the days they cover ---- */
+function barColor(t){ return PHASE_COLORS[t.phase] || '#8a8f94'; }
+
+function renderCalendar(sched, laid){
+  if(!calMonth){
+    // open on today's month if the build is under way, otherwise on the month it starts
+    const today = todayIso();
+    const first = laid.tasks.length ? laid.tasks[0].start : '';
+    calMonth = (first && today >= first && today <= laid.projectedEnd ? today : (sched.startDate || today)).slice(0,7);
+  }
+  const [y, m] = calMonth.split('-').map(Number);
+  const monthStart = Date.UTC(y, m-1, 1);
+  const monthEnd = Date.UTC(y, m, 0);
+  $('calLabel').textContent = new Date(monthStart).toLocaleDateString(undefined, { month:'long', year:'numeric', timeZone:'UTC' });
+
+  const today = todayIso();
+  let weekStart = monthStart - new Date(monthStart).getUTCDay()*DAY_MS; // back up to Sunday
+  let html = '';
+  while(weekStart <= monthEnd){
+    const days = Array.from({length:7}, (_,i)=>msToIso(weekStart + i*DAY_MS));
+    // the part of each task that falls in this week, stacked into rows so bars never overlap
+    const segs = [];
+    laid.tasks.forEach((t, idx)=>{
+      if(!t.start || t.end < days[0] || t.start > days[6]) return;
+      segs.push({
+        t, idx,
+        // a task running over the weekend stops at Friday and picks up again on Monday
+        from: t.start < days[0] ? 1 : days.indexOf(t.start),
+        to: t.end > days[6] ? 5 : days.indexOf(t.end),
+        fromPrev: t.start < days[0], toNext: t.end > days[6],
+      });
+    });
+    const lanes = [];
+    segs.forEach(s=>{
+      let lane = lanes.findIndex(end=>end < s.from);
+      if(lane === -1){ lane = lanes.length; lanes.push(-1); }
+      lanes[lane] = s.to;
+      s.lane = lane;
+    });
+
+    const dayCells = days.map((iso, i)=>{
+      const inMonth = iso.slice(0,7) === calMonth;
+      const cls = ['cal-day', (i===0||i===6) ? 'weekend' : '', inMonth ? '' : 'other', iso===today ? 'today' : ''].filter(Boolean).join(' ');
+      return `<div class="${cls}" data-date="${iso}" style="grid-column:${i+1};"><span class="n">${Number(iso.slice(8))}</span></div>`;
+    }).join('');
+    const bars = segs.map(s=>{
+      const c = confirmCounts(s.t);
+      const mark = (c.declined ? '✕ ' : ((s.t.subIds||[]).length && !c.pending ? '✓ ' : '')) + (s.t.notes ? '✎ ' : '');
+      const names = (s.t.subIds||[]).map(id=>subName(id)).filter(Boolean).join(', ');
+      const tip = `${s.t.title} — ${fmtDate(s.t.start)}${s.t.end!==s.t.start ? ' to '+fmtDate(s.t.end) : ''}${names ? ' — '+names : ''}${s.t.notes ? '\nNote: '+s.t.notes : ''}`;
+      return `<button type="button" draggable="true" class="cal-bar${s.fromPrev?' from-prev':''}${s.toNext?' to-next':''}" data-idx="${s.idx}"
+        style="grid-column:${s.from+1} / ${s.to+2}; grid-row:${s.lane+2}; background:${barColor(s.t)};" title="${esc(tip)}">${mark}${esc(s.t.title || 'Untitled task')}</button>`;
+    }).join('');
+    html += `<div class="cal-week" style="grid-template-rows:30px repeat(${lanes.length}, 25px) minmax(8px,1fr);">${dayCells}${bars}</div>`;
+    weekStart += 7*DAY_MS;
+  }
+  $('calWeeks').innerHTML = html;
+
+  const used = PHASES.filter(p=>laid.tasks.some(t=>t.phase===p));
+  $('calLegend').innerHTML = used.map(p=>`<span><span class="phase-dot" style="background:${PHASE_COLORS[p]};"></span>${esc(p)}</span>`).join('');
+}
+
+/* ---- schedule item popup: dates, who's assigned, and whether they've confirmed ---- */
+const CONFIRM_LABELS = { pending:'Pending', confirmed:'Confirmed', declined:'Declined' };
+
+function renderTaskModal(sched, laid, h){
+  const overlay = $('taskOverlay');
+  if(!overlay.classList.contains('show')) return;
+  const t = laid.tasks.find(x=>x.id===openTaskId);
+  if(!t){ overlay.classList.remove('show'); openTaskId = null; return; }
+
+  $('tkHouse').textContent = [h.community, h.lot ? 'Lot '+h.lot : '', h.client].filter(Boolean).join(' · ');
+  $('tkTitle').textContent = t.title || 'Untitled task';
+  const body = $('tkBody');
+  const active = document.activeElement;
+  if(active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && body.contains(active)) return; // don't yank a field out from under someone typing
+
+  const c = confirmCounts(t);
+  const subRows = (t.subIds||[]).map(id=>{
+    const status = (t.confirm && t.confirm[id]) || 'pending';
+    const s = subs.find(x=>x.id===id);
+    const contact = s ? [s.contact, s.phone, s.email].filter(Boolean).join(' · ') : '';
+    return `<div class="confirm-row">
+      <div><div class="who">${esc(s ? s.name : 'Removed sub')}</div>${contact ? `<div class="muted small">${esc(contact)}</div>` : ''}</div>
+      <div class="confirm-btns">${Object.keys(CONFIRM_LABELS).map(k=>
+        `<button type="button" data-confirm="${k}" data-sub="${esc(id)}" class="${k===status ? 'on-'+k : ''}">${CONFIRM_LABELS[k]}</button>`).join('')}</div>
+    </div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="muted small" style="margin-bottom:14px;"><span class="phase-dot" style="background:${barColor(t)};"></span>${esc(t.phase || 'No phase')}</div>
+    <div class="tk-grid">
+      <div><label for="tkStart">Start date</label><input type="date" id="tkStart" value="${esc(t.start)}"></div>
+      <div><label for="tkDays">Work days</label><input type="number" id="tkDays" min="1" step="1" value="${esc(t.duration)}"></div>
+      <div><label>End date</label><div class="v mono">${fmtDate(t.end) || '—'}</div></div>
+    </div>
+    <label>Sub confirmations</label>
+    ${(t.subIds||[]).length
+      ? `<div class="confirm-summary"><span class="c-yes">✓ ${c.confirmed} confirmed</span><span class="c-no">✕ ${c.declined} declined</span><span class="c-wait">… ${c.pending} pending</span></div>${subRows}
+         <div class="hint">Subs can't answer for themselves yet, so set this by hand when they confirm by phone or text. If the dates change afterwards it goes back to Pending.</div>`
+      : `<div class="muted" style="font-size:13.5px;">Nobody is assigned to this task. Assign a vendor in the List view.</div>`}
+    <label for="tkNotes" style="margin-top:20px;">Notes for this house</label>
+    <textarea class="tk-notes" id="tkNotes" placeholder="Anything specific to this task on this house…">${esc(t.notes || '')}</textarea>`;
+}
+
+function openTemplate(){ return templates.find(t=>t.id===openTemplateId) || null; }
+
+function renderTemplates(){
+  const sel = $('templateSelect');
+  sel.innerHTML = templates.map(t=>`<option value="${esc(t.id)}"${t.id===openTemplateId?' selected':''}>${esc(templateLabel(t))}</option>`).join('');
+  const tpl = openTemplate();
+  renderTemplateDevelopments(tpl);
+  ['renameTemplateBtn','copyTemplateBtn','deleteTemplateBtn','tplAddSelect'].forEach(id=>{ $(id).disabled = !tpl; });
+  sel.style.display = templates.length ? '' : 'none';
+  $('templateEmpty').style.display = tpl ? 'none' : 'block';
+  $('tplAddSelect').innerHTML = '<option value="">+ Add a task to this template…</option>'
+    + taskLib.map(t=>`<option value="${esc(t.id)}">${esc(t.title || 'Untitled task')}</option>`).join('');
+  if(!tpl){ $('templateBody').innerHTML = ''; $('templateSummary').textContent = ''; return; }
+  const rows = (tpl.tasks || []).map(resolveTemplateRow);
+  const days = rows.reduce((s,t)=>s + (t.missing ? 0 : t.duration), 0);
+  $('templateSummary').textContent = `${rows.length} tasks · ${days} working days (about ${Math.round(days/5)} weeks)`;
+  $('templateBody').innerHTML = rows.map((t,i)=>taskRowHtml(t, i, 'template', 0)).join('');
+}
+
+/* ---- which developments a template is for ----
+   A template can be tied to specific developments (say, the Cliffs). Every other
+   development uses the one marked as the default, so one schedule covers them all. */
+function defaultTemplate(){ return templates.find(t=>t.isDefault) || templates[0] || null; }
+function templateForCommunity(code){
+  return templates.find(t=>(t.communities||[]).includes(code)) || defaultTemplate();
+}
+function templateLabel(t){
+  const bits = [];
+  if(defaultTemplate() === t) bits.push('all other developments');
+  if((t.communities||[]).length) bits.push(t.communities.join(', '));
+  return (t.name || 'Untitled') + (bits.length ? ' — ' + bits.join(' + ') : '');
+}
+function knownCommunities(){
+  const codes = new Set(Object.keys(COMMUNITY_COLORS));
+  jobs.forEach(j=>{ if(j.community) codes.add(j.community); });
+  templates.forEach(t=>(t.communities||[]).forEach(c=>codes.add(c)));
+  return [...codes].sort();
+}
+function renderTemplateDevelopments(tpl){
+  const row = $('tplDevRow');
+  if(!tpl){ row.innerHTML = ''; return; }
+  const isDefault = defaultTemplate() === tpl;
+  const btns = knownCommunities().map(code=>{
+    const on = (tpl.communities||[]).includes(code);
+    const other = on ? null : templates.find(t=>t !== tpl && (t.communities||[]).includes(code));
+    return `<button type="button" class="dev-btn${on?' on':''}" data-community="${esc(code)}"${on ? ` style="background:${communityColor(code)};"` : ''}
+      title="${on ? 'Houses in '+esc(code)+' use this template. Click to send them back to the default.' : (other ? esc(code)+' currently uses “'+esc(other.name||'Untitled')+'”. Click to use this template instead.' : 'Click to give '+esc(code)+' its own schedule using this template.')}">${esc(code)}${other ? ` <span class="elsewhere">(${esc(other.name||'Untitled')})</span>` : ''}</button>`;
+  }).join('');
+  row.innerHTML = `<span>Used for:</span>
+    <button type="button" class="dev-btn${isDefault?' on':''}" data-default="1"${isDefault ? ' style="background:var(--navy);"' : ''}
+      title="${isDefault ? 'This is the schedule for every development that doesn’t have its own.' : 'Make this the schedule for every development that doesn’t have its own.'}">All other developments</button>
+    ${btns}`;
+}
+
+// The Tasks tab can be narrowed by search or phase; the rows shown keep pointing at the right task.
+let libraryShown = [];
+function renderLibrary(){
+  const phaseSel = $('taskPhaseFilter');
+  const curPhase = phaseSel.value;
+  phaseSel.innerHTML = '<option value="">All phases</option>' + PHASES.map(p=>`<option>${esc(p)}</option>`).join('') + '<option value="__none">No phase set</option>';
+  phaseSel.value = curPhase;
+  const q = $('taskSearch').value.trim().toLowerCase();
+  libraryShown = taskLib.filter(t=>{
+    if(curPhase === '__none' ? !!t.phase : (curPhase && t.phase !== curPhase)) return false;
+    if(q){
+      const hay = [t.title, t.phase, ...(t.subIds||[]).map(id=>subName(id)||'')].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  $('libraryEmpty').style.display = libraryShown.length ? 'none' : 'block';
+  $('libraryBody').innerHTML = libraryShown.map((t,i)=>taskRowHtml(t, i, 'library', 0)).join('');
+}
+
+// which tasks each vendor is the usual choice for
+function usualTasksFor(subId){
+  return taskLib.filter(t=>(t.subIds||[]).includes(subId)).map(t=>t.title);
+}
+
+function renderSubs(){
+  const q = $('subSearch').value.trim().toLowerCase();
+  const rows = subs.filter(s=>!q || [s.name, s.trade, s.contact, s.email, s.phone].join(' ').toLowerCase().includes(q));
+  $('subsEmpty').style.display = rows.length ? 'none' : 'block';
+  $('subsBody').innerHTML = rows.map(s=>{
+    const does = usualTasksFor(s.id);
+    return `<tr data-id="${esc(s.id)}">
+      <td><strong>${esc(s.name)}</strong>${s.notes ? `<div class="muted small">${esc(s.notes)}</div>` : ''}</td>
+      <td>${esc(s.trade) || '<span class="muted">—</span>'}</td>
+      <td>${esc(s.contact) || '<span class="muted">—</span>'}</td>
+      <td>${esc(s.email) || '<span class="muted">—</span>'}</td>
+      <td class="mono">${esc(s.phone) || '<span class="muted">—</span>'}</td>
+      <td class="muted small" title="${esc(does.join(', '))}">${does.length ? esc(does.slice(0,3).join(', ')) + (does.length > 3 ? ` +${does.length-3} more` : '') : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ============================================================
+   TASK EDITING (shared by the house schedule and the template editor)
+   ============================================================ */
+// ctx describes which list is being edited and how to save it.
+function scheduleCtx(){
+  const sched = openSchedule();
+  if(!sched) return null;
+  return {
+    mode: 'schedule',
+    tasks: layoutTasks(sched.startDate, sched.tasks || []).tasks,
+    startDate: sched.startDate,
+    commit(tasks){ return saveSchedule(sched, tasks, sched.startDate); },
+  };
+}
+function templateCtx(){
+  const tpl = openTemplate();
+  if(!tpl) return null;
+  return {
+    mode: 'template',
+    tasks: (tpl.tasks || []).map(resolveTemplateRow),
+    commit(tasks){ return saveTemplate(tpl, tasks); },
+  };
+}
+// The Tasks tab: each row is its own record, so only the row that changed is saved.
+function libraryCtx(){
+  return {
+    mode: 'library',
+    tasks: libraryShown.map(t=>({ ...t })),
+    commit(tasks, change){
+      if(!change || !change.task) return;
+      return change.act === 'delete' ? save(tasksCol.doc(change.task.id).delete()) : saveLibTask(change.task);
+    },
+  };
+}
+
+function moveTask(tasks, from, to){
+  if(from === to || from < 0 || to < 0 || from >= tasks.length || to >= tasks.length) return false;
+  const [t] = tasks.splice(from, 1);
+  tasks.splice(to, 0, t);
+  return true;
+}
+
+// Put a task on a chosen date. The move is stored as a gap (or overlap) relative to
+// the task above it, so everything below keeps following along. A blank date clears it.
+function setTaskStart(ctx, idx, iso){
+  const t = ctx.tasks[idx];
+  if(!iso){ t.lag = 0; return; }
+  const natural = idx > 0 ? ctx.tasks[idx-1].endIdx + 1 : 0; // where it would start on its own
+  t.lag = workdayIndex(ctx.startDate, iso) - natural;
+}
+
+function wireTaskTable(tbodyId, getCtx){
+  const tbody = $(tbodyId);
+
+  tbody.addEventListener('change', e=>{
+    const el = e.target;
+    const ctx = getCtx();
+    if(!ctx) return;
+    const idx = Number(el.dataset.idx);
+    const t = ctx.tasks[idx];
+    if(!t) return;
+
+    if(el.dataset.act === 'add-sub'){
+      if(!el.value) return;
+      t.subIds = [...(t.subIds||[]), el.value];
+    } else if(el.dataset.field === 'title'){
+      t.title = el.value;
+    } else if(el.dataset.field === 'phase'){
+      t.phase = el.value;
+    } else if(el.dataset.field === 'duration'){
+      t.duration = Math.max(1, parseInt(el.value, 10) || 1);
+    } else if(el.dataset.field === 'start'){
+      setTaskStart(ctx, idx, el.value);
+    } else {
+      return;
+    }
+    ctx.commit(ctx.tasks, { task: t, act: 'edit' });
+  });
+
+  tbody.addEventListener('click', e=>{
+    const btn = e.target.closest('[data-act]');
+    if(!btn || btn.tagName === 'SELECT') return;
+    const ctx = getCtx();
+    if(!ctx) return;
+    const idx = Number(btn.dataset.idx);
+    const t = ctx.tasks[idx];
+    if(!t) return;
+    const act = btn.dataset.act;
+
+    if(act === 'open'){ openTaskPopup(t.id); return; }
+    if(act === 'rm-sub'){ t.subIds = (t.subIds||[]).filter(id=>id !== btn.dataset.sub); }
+    else if(act === 'clear-lag'){ t.lag = 0; }
+    else if(act === 'reset-dur'){ t.duration = t.libDuration; }
+    else if(act === 'reset-subs'){ t.subIds = t.libSubIds; }
+    else if(act === 'up'){ if(!moveTask(ctx.tasks, idx, idx-1)) return; }
+    else if(act === 'down'){ if(!moveTask(ctx.tasks, idx, idx+1)) return; }
+    else if(act === 'delete'){
+      const name = t.title || 'this task';
+      let msg = `Remove "${name}" from this ${ctx.mode === 'schedule' ? 'house schedule' : 'template'}?`;
+      if(ctx.mode === 'library'){
+        const used = templates.filter(tpl=>(tpl.tasks||[]).some(r=>r.taskId===t.id)).length;
+        msg = `Delete "${name}" from the task list?` + (used ? `\n\nIt is in ${used} template${used===1?'':'s'} and will be left out of new house schedules. Houses already scheduled keep it.` : '');
+      }
+      if(!confirm(msg)) return;
+      ctx.tasks.splice(idx, 1);
+    }
+    else return;
+    ctx.commit(ctx.tasks, { task: t, act });
+  });
+
+  /* drag a row by its handle to reorder */
+  let dragFrom = null;
+  const clearMarks = ()=>tbody.querySelectorAll('.drop-above,.drop-below,.dragging').forEach(r=>r.classList.remove('drop-above','drop-below','dragging'));
+  tbody.addEventListener('dragstart', e=>{
+    const grip = e.target.closest('.grip');
+    if(!grip){ e.preventDefault(); return; }
+    dragFrom = Number(grip.dataset.idx);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(dragFrom));
+    const row = grip.closest('tr');
+    e.dataTransfer.setDragImage(row, 20, 16);
+    setTimeout(()=>row.classList.add('dragging'), 0);
+  });
+  tbody.addEventListener('dragover', e=>{
+    if(dragFrom === null) return;
+    const row = e.target.closest('tr[data-idx]');
+    if(!row) return;
+    e.preventDefault();
+    const rect = row.getBoundingClientRect();
+    const below = e.clientY > rect.top + rect.height/2;
+    tbody.querySelectorAll('.drop-above,.drop-below').forEach(r=>r.classList.remove('drop-above','drop-below'));
+    row.classList.add(below ? 'drop-below' : 'drop-above');
+  });
+  tbody.addEventListener('drop', e=>{
+    if(dragFrom === null) return;
+    const row = e.target.closest('tr[data-idx]');
+    if(!row) return;
+    e.preventDefault();
+    const rect = row.getBoundingClientRect();
+    const below = e.clientY > rect.top + rect.height/2;
+    let to = Number(row.dataset.idx) + (below ? 1 : 0);
+    if(dragFrom < to) to--; // the list is one shorter once the dragged row is lifted out
+    const ctx = getCtx();
+    const from = dragFrom;
+    dragFrom = null;
+    clearMarks();
+    if(ctx && moveTask(ctx.tasks, from, to)) ctx.commit(ctx.tasks);
+  });
+  tbody.addEventListener('dragend', ()=>{ dragFrom = null; clearMarks(); });
+}
+wireTaskTable('scheduleBody', scheduleCtx);
+wireTaskTable('templateBody', templateCtx);
+wireTaskTable('libraryBody', libraryCtx);
+
+function openTaskPopup(taskId){
+  openTaskId = taskId;
+  $('taskOverlay').classList.add('show');
+  renderAll();
+}
+
+function addBlankTask(ctx){
+  if(!ctx) return;
+  ctx.tasks.push({ title:'', phase:'', duration:1, subIds:[] });
+  ctx.commit(ctx.tasks);
+}
+/* ---- calendar view: switch views, change month, click a task, drag a task to a new day ---- */
+$('viewToggle').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-view]');
+  if(!b) return;
+  houseView = b.dataset.view;
+  renderAll();
+});
+function shiftMonth(n){
+  const [y, m] = (calMonth || todayIso().slice(0,7)).split('-').map(Number);
+  calMonth = msToIso(Date.UTC(y, m-1+n, 1)).slice(0,7);
+  renderAll();
+}
+$('calPrev').addEventListener('click', ()=>shiftMonth(-1));
+$('calNext').addEventListener('click', ()=>shiftMonth(1));
+$('calToday').addEventListener('click', ()=>{ calMonth = todayIso().slice(0,7); renderAll(); });
+
+(function(){
+  const weeks = $('calWeeks');
+  let dragIdx = null;
+  const clearDrop = ()=>weeks.querySelectorAll('.drop,.dragging').forEach(el=>el.classList.remove('drop','dragging'));
+  // a bar sits on top of the day cells, so find the day under the pointer by position
+  const dayAt = e=>{
+    const direct = e.target.closest('.cal-day');
+    if(direct) return direct;
+    const week = e.target.closest('.cal-week');
+    if(!week) return null;
+    return [...week.querySelectorAll('.cal-day')].find(d=>{ const r = d.getBoundingClientRect(); return e.clientX >= r.left && e.clientX < r.right; }) || null;
+  };
+
+  weeks.addEventListener('click', e=>{
+    const bar = e.target.closest('.cal-bar');
+    if(!bar) return;
+    const ctx = scheduleCtx();
+    const t = ctx && ctx.tasks[Number(bar.dataset.idx)];
+    if(!t) return;
+    openTaskId = t.id;
+    $('taskOverlay').classList.add('show');
+    renderAll();
+  });
+  weeks.addEventListener('dragstart', e=>{
+    const bar = e.target.closest('.cal-bar');
+    if(!bar) return;
+    dragIdx = Number(bar.dataset.idx);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(dragIdx));
+    setTimeout(()=>bar.classList.add('dragging'), 0);
+  });
+  weeks.addEventListener('dragover', e=>{
+    if(dragIdx === null) return;
+    const day = dayAt(e);
+    if(!day) return;
+    e.preventDefault();
+    weeks.querySelectorAll('.drop').forEach(el=>el.classList.remove('drop'));
+    day.classList.add('drop');
+  });
+  weeks.addEventListener('drop', e=>{
+    if(dragIdx === null) return;
+    const day = dayAt(e);
+    const idx = dragIdx;
+    dragIdx = null;
+    clearDrop();
+    if(!day) return;
+    e.preventDefault();
+    const ctx = scheduleCtx();
+    if(!ctx || !ctx.tasks[idx]) return;
+    setTaskStart(ctx, idx, day.dataset.date);
+    ctx.commit(ctx.tasks);
+  });
+  weeks.addEventListener('dragend', ()=>{ dragIdx = null; clearDrop(); });
+})();
+
+/* ---- schedule item popup ---- */
+$('tkBody').addEventListener('change', e=>{
+  const ctx = scheduleCtx();
+  if(!ctx) return;
+  const idx = ctx.tasks.findIndex(t=>t.id===openTaskId);
+  if(idx === -1) return;
+  if(e.target.id === 'tkStart'){ setTaskStart(ctx, idx, e.target.value); }
+  else if(e.target.id === 'tkDays'){ ctx.tasks[idx].duration = Math.max(1, parseInt(e.target.value, 10) || 1); }
+  else if(e.target.id === 'tkNotes'){ ctx.tasks[idx].notes = e.target.value.trim(); }
+  else return;
+  e.target.blur(); // let the popup refresh with the new dates
+  ctx.commit(ctx.tasks);
+});
+$('tkBody').addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-confirm]');
+  if(!btn) return;
+  const ctx = scheduleCtx();
+  if(!ctx) return;
+  const t = ctx.tasks.find(x=>x.id===openTaskId);
+  if(!t) return;
+  t.confirm = { ...(t.confirm||{}), [btn.dataset.sub]: btn.dataset.confirm };
+  ctx.commit(ctx.tasks);
+});
+
+$('addScheduleTaskBtn').addEventListener('click', ()=>addBlankTask(scheduleCtx()));
+$('tplAddSelect').addEventListener('change', e=>{
+  const ctx = templateCtx();
+  const taskId = e.target.value;
+  e.target.value = '';
+  if(!ctx || !libTask(taskId)) return;
+  ctx.tasks.push(resolveTemplateRow({ taskId }));
+  ctx.commit(ctx.tasks);
+});
+
+/* ---- Tasks tab ---- */
+$('taskSearch').addEventListener('input', renderLibrary);
+$('taskPhaseFilter').addEventListener('change', renderLibrary);
+$('addLibTaskBtn').addEventListener('click', async ()=>{
+  const title = (prompt('Name of the new task:') || '').trim();
+  if(!title) return;
+  const order = taskLib.reduce((m,t)=>Math.max(m, t.order||0), 0) + 1;
+  $('taskSearch').value = '';
+  $('taskPhaseFilter').value = '';
+  await saveLibTask({ id: newId(), title, phase:'', duration:1, subIds:[], order });
+  const rows = $('libraryBody').querySelectorAll('tr');
+  if(rows.length) rows[rows.length-1].scrollIntoView({ block:'center' });
+});
+$('subSearch').addEventListener('input', renderSubs);
+
+/* ============================================================
+   HOUSES: list, start a schedule, house header
+   ============================================================ */
+// Open a home: straight into its schedule if it has one, otherwise offer to start it.
+function openHouse(id){
+  if(schedules.some(s=>s.id===id)){
+    openScheduleId = id;
+    calMonth = null;
+    renderAll();
+    window.scrollTo(0, 0);
+  } else if(jobs.some(j=>j.id===id)){
+    openStartModal(id);
+  }
+}
+$('housesBody').addEventListener('click', e=>{
+  const row = e.target.closest('tr[data-id]');
+  if(row) openHouse(row.dataset.id);
+});
+$('houseSearch').addEventListener('input', renderHouses);
+$('showFinished').addEventListener('change', renderHouses);
+
+// Arriving from a home's page (construction.html?house=…) jumps straight to that home.
+let pendingHouseId = new URLSearchParams(location.search).get('house');
+let jobsLoaded = false, schedulesLoaded = false;
+function handlePendingHouse(){
+  if(!pendingHouseId || !jobsLoaded || !schedulesLoaded) return;
+  const id = pendingHouseId;
+  pendingHouseId = null;
+  openHouse(id);
+}
+$('backToHouses').addEventListener('click', ()=>{ openScheduleId = null; renderAll(); });
+
+$('hdStart').addEventListener('change', e=>{
+  const sched = openSchedule();
+  if(!sched || !e.target.value) return;
+  const start = snapToWorkday(e.target.value);
+  e.target.value = start;
+  saveSchedule(sched, sched.tasks || [], start);
+});
+
+$('deleteScheduleBtn').addEventListener('click', async ()=>{
+  const sched = openSchedule();
+  if(!sched) return;
+  const h = houseInfo(sched);
+  if(!confirm(`Delete the build schedule for ${[h.community, h.lot ? 'Lot '+h.lot : '', h.client].filter(Boolean).join(' · ') || 'this house'}?\n\nThe house stays on the Job Production Schedule. This cannot be undone.`)) return;
+  openScheduleId = null;
+  await save(schedCol.doc(sched.id).delete());
+});
+
+function openOverlay(id){ $(id).classList.add('show'); }
+function closeOverlay(id){ $(id).classList.remove('show'); }
+document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click', ()=>closeOverlay(b.dataset.close)));
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click', e=>{ if(e.target===o) o.classList.remove('show'); }));
+
+function openStartModal(jobId){
+  const taken = new Set(schedules.map(s=>s.id));
+  // newest move-in dates first, so the houses about to start are at the top
+  const open = jobs.filter(j=>!taken.has(j.id)).sort((a,b)=>(b.settle||'').localeCompare(a.settle||''));
+  $('st_job').innerHTML = open.length
+    ? open.map(j=>`<option value="${esc(j.id)}">${esc(jobLabel(j) || 'Unnamed job')}${j.model ? ' — '+esc(j.model) : ''}${j.settle ? ' (settles '+fmtDate(j.settle)+')' : ''}</option>`).join('')
+    : '<option value="">No houses without a schedule</option>';
+  if(jobId && open.some(j=>j.id===jobId)) $('st_job').value = jobId;
+  $('st_template').innerHTML = templates.map(t=>`<option value="${esc(t.id)}">${esc(templateLabel(t))}</option>`).join('');
+  $('startError').classList.remove('show');
+  fillStartDate();
+  openOverlay('startOverlay');
+}
+// When a house is picked: default the start date, and pick the template its development uses.
+function fillStartDate(){
+  const job = jobs.find(j=>j.id===$('st_job').value);
+  $('st_start').value = snapToWorkday((job && job.fndn) || todayIso());
+  const tpl = job ? templateForCommunity(job.community) : defaultTemplate();
+  if(tpl) $('st_template').value = tpl.id;
+}
+$('st_job').addEventListener('change', fillStartDate);
+
+$('startSaveBtn').addEventListener('click', async ()=>{
+  const errBox = $('startError');
+  errBox.classList.remove('show');
+  const job = jobs.find(j=>j.id===$('st_job').value);
+  const tpl = templates.find(t=>t.id===$('st_template').value);
+  const start = $('st_start').value;
+  if(!job || !tpl || !start){
+    errBox.textContent = !job ? 'Pick a house.' : (!tpl ? 'Pick a template (create one on the Templates tab first).' : 'Pick a start date.');
+    errBox.classList.add('show');
+    return;
+  }
+  const sched = {
+    id: job.id,
+    // a copy of the house details, kept in case the job is later removed from the production schedule
+    community: job.community||'', lot: job.lot||'', client: job.client||'', address: job.address||'', model: job.model||'',
+    templateId: tpl.id, templateName: tpl.name||'',
+    createdAt: new Date().toISOString(),
+  };
+  // copy the template's tasks — from here on this house's schedule is its own
+  const tasks = (tpl.tasks||[]).map(resolveTemplateRow).filter(t=>!t.missing).map(t=>({
+    id: newId(), taskId: t.taskId, title: t.title, phase: t.phase, duration: t.duration, subIds: [...t.subIds],
+    notes: '', lag: 0, status: 'draft',
+  }));
+  closeOverlay('startOverlay');
+  if(await saveSchedule(sched, tasks, snapToWorkday(start))){
+    openScheduleId = job.id;
+    calMonth = null;
+    renderAll();
+    window.scrollTo(0, 0);
+  }
+});
+
+/* ============================================================
+   TEMPLATES
+   ============================================================ */
+$('templateSelect').addEventListener('change', e=>{ openTemplateId = e.target.value; renderAll(); });
+$('tplDevRow').addEventListener('click', async e=>{
+  const btn = e.target.closest('.dev-btn');
+  const tpl = openTemplate();
+  if(!btn || !tpl) return;
+  const stamp = new Date().toISOString();
+  if(btn.dataset.default){
+    if(defaultTemplate() === tpl) return; // there always has to be a default — pick another template to move it
+    const batch = db.batch();
+    templates.forEach(t=>batch.update(templatesCol.doc(t.id), { isDefault: t.id === tpl.id, updatedAt: stamp }));
+    await save(batch.commit());
+    return;
+  }
+  const code = btn.dataset.community;
+  const batch = db.batch();
+  if((tpl.communities||[]).includes(code)){
+    batch.update(templatesCol.doc(tpl.id), { communities: tpl.communities.filter(c=>c !== code), updatedAt: stamp });
+  } else {
+    // a development can only follow one template, so take it off any other
+    templates.filter(t=>t.id !== tpl.id && (t.communities||[]).includes(code)).forEach(t=>{
+      batch.update(templatesCol.doc(t.id), { communities: t.communities.filter(c=>c !== code), updatedAt: stamp });
+    });
+    batch.update(templatesCol.doc(tpl.id), { communities: [...(tpl.communities||[]), code].sort(), updatedAt: stamp });
+  }
+  await save(batch.commit());
+});
+$('newTemplateBtn').addEventListener('click', async ()=>{
+  const name = (prompt('Name for the new template (for example a model or community name):') || '').trim();
+  if(!name) return;
+  const id = newId();
+  openTemplateId = id;
+  await save(templatesCol.doc(id).set({ name, tasks: [], updatedAt: new Date().toISOString() }));
+});
+$('renameTemplateBtn').addEventListener('click', ()=>{
+  const tpl = openTemplate();
+  if(!tpl) return;
+  const name = (prompt('Template name:', tpl.name||'') || '').trim();
+  if(!name || name === tpl.name) return;
+  save(templatesCol.doc(tpl.id).update({ name, updatedAt: new Date().toISOString() }));
+});
+$('copyTemplateBtn').addEventListener('click', async ()=>{
+  const tpl = openTemplate();
+  if(!tpl) return;
+  const name = (prompt('Name for the copy:', (tpl.name||'Template') + ' (copy)') || '').trim();
+  if(!name) return;
+  const id = newId();
+  openTemplateId = id;
+  await save(templatesCol.doc(id).set({ name, tasks: (tpl.tasks||[]).map(r=>({ ...r })), updatedAt: new Date().toISOString() }));
+});
+$('deleteTemplateBtn').addEventListener('click', ()=>{
+  const tpl = openTemplate();
+  if(!tpl) return;
+  if(!confirm(`Delete the template "${tpl.name||'Untitled'}"?\n\nHouse schedules already built from it are not affected. This cannot be undone.`)) return;
+  openTemplateId = null;
+  save(templatesCol.doc(tpl.id).delete());
+});
+
+/* ============================================================
+   SUBCONTRACTORS
+   ============================================================ */
+function openSubModal(id){
+  editingSubId = id || null;
+  const s = id ? subs.find(x=>x.id===id) : null;
+  $('subModalTitle').textContent = s ? 'Edit Subcontractor' : 'Add Subcontractor';
+  $('sb_name').value = s ? s.name||'' : '';
+  $('sb_trade').value = s ? s.trade||'' : '';
+  $('sb_contact').value = s ? s.contact||'' : '';
+  $('sb_email').value = s ? s.email||'' : '';
+  $('sb_phone').value = s ? s.phone||'' : '';
+  $('sb_notes').value = s ? s.notes||'' : '';
+  const does = s ? usualTasksFor(s.id) : [];
+  $('sb_usedFor').textContent = does.length ? `Usually does: ${does.join(', ')}. Change that on the Tasks tab.` : '';
+  $('subDeleteBtn').style.display = s ? '' : 'none';
+  $('subError').classList.remove('show');
+  openOverlay('subOverlay');
+}
+$('addSubBtn').addEventListener('click', ()=>openSubModal(null));
+$('subsBody').addEventListener('click', e=>{
+  const row = e.target.closest('tr[data-id]');
+  if(row) openSubModal(row.dataset.id);
+});
+$('subSaveBtn').addEventListener('click', async ()=>{
+  const name = $('sb_name').value.trim();
+  if(!name){
+    $('subError').textContent = 'Enter the company name.';
+    $('subError').classList.add('show');
+    return;
+  }
+  const id = editingSubId || newId();
+  closeOverlay('subOverlay');
+  await save(subsCol.doc(id).set({
+    name,
+    trade: $('sb_trade').value.trim(),
+    contact: $('sb_contact').value.trim(),
+    email: $('sb_email').value.trim(),
+    phone: $('sb_phone').value.trim(),
+    notes: $('sb_notes').value.trim(),
+  }));
+});
+$('subDeleteBtn').addEventListener('click', async ()=>{
+  const s = subs.find(x=>x.id===editingSubId);
+  if(!s) return;
+  const usual = usualTasksFor(s.id).length;
+  const inHouses = schedules.reduce((n,sc)=>n + (sc.tasks||[]).filter(t=>(t.subIds||[]).includes(s.id)).length, 0);
+  if(!confirm(`Delete ${s.name}?` + ((usual + inHouses) ? `\n\nThey are the usual choice for ${usual} task${usual===1?'':'s'} and are on ${inHouses} task${inHouses===1?'':'s'} of houses already scheduled. Those will show "Removed sub" until someone else is assigned.` : ''))) return;
+  closeOverlay('subOverlay');
+  await save(subsCol.doc(s.id).delete());
+});
+
+/* ============================================================
+   TABS
+   ============================================================ */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  ['houses','templates','tasks','subs'].forEach(n=>$('panel-'+n).classList.toggle('active', n===name));
+}
+document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('Service worker registration failed', err));
+  });
+}
+</script>
+</body>
+</html>

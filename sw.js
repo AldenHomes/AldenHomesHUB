@@ -11,14 +11,17 @@
    - Everything else (Firestore, Storage, sign-in, QR images) is
      left completely alone.
    ============================================================ */
-const CACHE = 'alden-hub-v1';
+const CACHE = 'alden-hub-v3';
 
 const SHELL = [
   'index.html',
   'schedule.html',
   'service.html',
   'packets.html',
+  'construction.html',
+  'house.html',
   'manifest.webmanifest',
+  'icons/logo.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',
