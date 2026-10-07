@@ -461,10 +461,10 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
       updates.push({ id: d.id, text: n.text || '', at: n.at || '', photos: (Array.isArray(n.photos) ? n.photos : []).filter(u=>typeof u === 'string').slice(0, 12) });
     });
     updates.sort((a, b)=>(b.at || '').localeCompare(a.at || ''));
-    // The calendar: each step and its dates, once the schedule has been sent out (a draft is still
-    // being worked on, so it isn't shown). Plain step names and dates only — no subcontractors.
+    // The calendar: each step and its dates, as soon as the home has a schedule — draft or sent
+    // (the owner's choice, 2026-10-07). Plain step names and dates only — no subcontractors.
     const sched = schedDoc.exists ? schedDoc.data() : null;
-    const schedule = sched && sched.sentAt
+    const schedule = sched
       ? (sched.tasks || []).filter(t=>t.start && t.end).map(t=>({ id: t.id || '', title: plainTitle(t.title), phase: t.phase || '', start: t.start, end: t.end, done: !!t.done }))
       : null;
     // Change orders the office has sent — never drafts. The buyer sees what's being changed
