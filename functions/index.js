@@ -1348,7 +1348,61 @@ async function flagLongWaits(snap, today){
   }
 }
 
+/* Reminders people set on a note (the little bell on a home's Notes): `reminders: { uid: 'YYYY-MM-DD' }`,
+   with `remindNext` = the earliest one still waiting. On the morning it's due, the note goes back
+   on that person's bell marked as a reminder, they're emailed, and the reminder is cleared. */
+async function sendNoteReminders(today){
+  const snap = await db.collection('notes').where('remindNext', '>', '').where('remindNext', '<=', today).get();
+  if(snap.empty) return;
+  const nodemailer = require('nodemailer');
+  const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: MAIL_USER.value(), pass: GMAIL_APP_PASSWORD.value().replace(/\s+/g, '') } });
+  const site = 'https://aldenhomes.github.io/AldenHomesHUB/';
+  const font = 'font-family:Arial,Helvetica,sans-serif;';
+  let sent = 0;
+  for(const doc of snap.docs){
+    const note = doc.data();
+    const reminders = note.reminders || {};
+    const due = Object.keys(reminders).filter(uid=>reminders[uid] && reminders[uid] <= today);
+    const left = Object.keys(reminders).filter(uid=>!due.includes(uid) && reminders[uid]).map(uid=>reminders[uid]).sort();
+    const now = new Date().toISOString();
+    // back on their bell as unread, and the reminder itself is used up
+    const patch = { remindNext: left[0] || '', lastAt: now };
+    due.forEach(uid=>{
+      patch['reminders.' + uid] = admin.firestore.FieldValue.delete();
+      patch['reminded.' + uid] = today;
+      patch['readBy.' + uid] = false;
+    });
+    if(due.length) patch.watchers = admin.firestore.FieldValue.arrayUnion(...due);
+    try{ await doc.ref.update(patch); }
+    catch(err){ logger.error('Could not update a note after its reminder', { note: doc.id, error: String(err) }); continue; }
+
+    const house = note.houseId ? (note.houseLabel || 'a home') : 'the punch list';
+    const link = note.houseId ? `${site}house.html?id=${encodeURIComponent(note.houseId)}#notes` : `${site}punch.html`;
+    const who = (note.by && note.by.name) || 'Someone';
+    const html = `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f4ef"><tr><td align="center" style="padding:24px 12px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;" bgcolor="#ffffff">
+    <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes Hub<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">Your reminder</span></td></tr>
+    <tr><td style="padding:22px 24px 6px;${font}font-size:15px;line-height:1.5;color:#33363a;">You asked to be reminded today about this note from <strong>${esc(who)}</strong> on <strong>${esc(house)}</strong>:</td></tr>
+    <tr><td style="padding:8px 24px 4px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#faf8f2" style="padding:14px 16px;border-left:4px solid #c98a2b;${font}font-size:15px;line-height:1.55;color:#33363a;">${esc(note.text || '').replace(/\n/g, '<br>')}</td></tr></table></td></tr>
+    <tr><td style="padding:16px 24px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:16px 12px;${font}font-size:17px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">Open the note &rarr;</a></td></tr></table></td></tr>
+    <tr><td style="padding:10px 24px 24px;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(link)}</td></tr>
+  </table></td></tr></table>`;
+    const text = `You asked to be reminded today about this note from ${who} on ${house}:\n\n${note.text || ''}\n\nOpen the note: ${link}`;
+    for(const uid of due){
+      try{
+        const user = await admin.auth().getUser(uid);
+        if(!user.email || user.disabled) continue;
+        await transport.sendMail({ from: `"Alden Homes Hub" <${MAIL_USER.value()}>`, to: user.email, subject: `Reminder: note on ${house}`, text, html });
+        sent++;
+      } catch(err){ logger.error('Could not email a note reminder', { uid, error: String(err) }); }
+    }
+  }
+  logger.info('Note reminders sent', { sent });
+}
+
 if(EMAIL_ON) exports.dailyFollowUp = onSchedule({ schedule: 'every day 07:00', timeZone: TIME_ZONE, secrets: [GMAIL_APP_PASSWORD] }, async ()=>{
+  // reminders people set for themselves go out whatever else happens below
+  try{ await sendNoteReminders(todayIso()); } catch(err){ logger.error('Note reminders failed', { error: String(err) }); }
   await flagLongWaits(await db.collection('build-schedules').get(), todayIso());
   const settings = await notifySettings();
   if(settings.paused){ logger.info('Emails are switched off on the Admin Settings page — nothing sent.'); return; }

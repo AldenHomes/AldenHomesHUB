@@ -159,6 +159,15 @@
   .note.todo.high:not(.done){box-shadow:inset 3px 0 0 var(--danger);}
   .note.todo.done .note-text{text-decoration:line-through; color:var(--ink-soft);}
   .todo-tag{background:#fdf0dc; color:#96661a; font-weight:700; border-radius:20px; padding:0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.3px;}
+  /* the little bell on a note: remind me about this on a day I pick */
+  .note-head .bell-mini{margin-left:auto; flex:none; border:none; background:transparent; color:var(--ink-soft); cursor:pointer; padding:3px 6px; border-radius:3px; line-height:0;}
+  .note-head .bell-mini:hover{background:#fdf0dc; color:#96661a;}
+  .note-head .bell-mini.on{color:var(--amber);}
+  .note-head .bell-mini + .x-btn{margin-left:0;}
+  .remind-row{display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:8px; font-size:12.5px; color:var(--ink-soft);}
+  .remind-row button{border:1px solid var(--steel-line); background:var(--paper-2); color:var(--navy); border-radius:20px; padding:5px 11px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .remind-row button:hover{background:#e9e5da;}
+  .remind-set{display:inline-flex; align-items:center; gap:6px; margin-top:8px; background:#fdf0dc; color:#96661a; font-weight:700; font-size:12.5px; border-radius:20px; padding:3px 11px;}
   /* comments under a note */
   .replies{margin-top:8px;}
   .reply{margin:0 0 8px 2px; padding:7px 0 1px 12px; border-left:3px solid #e2ddd0;}
@@ -308,6 +317,7 @@
               </div>
             </div>
             <div id="notesList"></div>
+            <input type="date" id="remindDate" style="position:fixed; left:50%; top:40%; width:1px; height:1px; opacity:0; pointer-events:none; border:none; padding:0;" tabindex="-1" aria-hidden="true">
           </div>
         </div>
 
@@ -725,6 +735,46 @@ function noteHtml(text){
   return html;
 }
 
+/* ---- reminders on a note ----
+   Anyone can set themselves a reminder on any note: `reminders: { uid: 'YYYY-MM-DD' }`.
+   `remindNext` is the earliest date still waiting, so the server can find due ones quickly.
+   On that morning (with the 7:00 follow-up) the server puts the note back on the person's
+   bell as a reminder, emails them, and clears it. */
+let remindOpenId = null;   // the note whose reminder choices are showing
+function isoPlus(days){ const d = new Date(); d.setDate(d.getDate() + days); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function remindHtml(n){
+  const mine = (n.reminders || {})[myUid()] || '';
+  if(remindOpenId === n.id){
+    // "next week" = the coming Monday
+    const toMonday = ((8 - new Date().getDay()) % 7) || 7;
+    return `<div class="remind-row"><span>Remind me:</span>
+      <button type="button" data-remind-on="${esc(n.id)}" data-date="${isoPlus(1)}">Tomorrow</button>
+      <button type="button" data-remind-on="${esc(n.id)}" data-date="${isoPlus(3)}">In 3 days</button>
+      <button type="button" data-remind-on="${esc(n.id)}" data-date="${isoPlus(toMonday)}">Monday</button>
+      <button type="button" data-remind-pick="${esc(n.id)}">Pick a date…</button>
+      ${mine ? `<button type="button" data-remind-on="${esc(n.id)}" data-date="">Remove reminder</button>` : ''}
+      <button type="button" data-remind-close style="border-color:transparent;">Cancel</button>
+    </div>`;
+  }
+  return mine ? `<div><span class="remind-set">&#128276; You'll be reminded ${esc(fmtDate(mine))}, in the morning</span></div>` : '';
+}
+async function setReminder(noteId, date){
+  const note = notes.find(x=>x.id === noteId);
+  const uid = myUid();
+  if(!note || !uid) return;
+  // the earliest reminder anyone still has on this note
+  const all = { ...(note.reminders || {}) };
+  if(date) all[uid] = date; else delete all[uid];
+  const next = Object.values(all).filter(Boolean).sort()[0] || '';
+  remindOpenId = null;
+  try{
+    await db.collection('notes').doc(noteId).update({
+      ['reminders.' + uid]: date ? date : firebase.firestore.FieldValue.delete(),
+      remindNext: next,
+    });
+  } catch(err){ console.error(err); renderNotes(); alert('Could not save the reminder — check your connection and try again.'); }
+}
+
 /* ---- comments on a note ----
    Kept on the note itself as `replies: [{ id, text, by:{uid,name}, at, notify:[uid] }]`.
    A comment notifies everyone already in the conversation — the person who wrote the note,
@@ -789,8 +839,10 @@ function renderNotes(){
     : notes.length ? notes.map(n=>`<div class="note${(n.mentions||[]).includes(me) ? ' for-me' : ''}${n.todo ? ' todo' + (n.done ? ' done' : '') + (n.priority === 'high' ? ' high' : '') : ''}">
         ${n.todo ? `<button type="button" class="todo-check${n.done ? ' on' : ''}" data-todo="${esc(n.id)}" title="${n.done ? 'Not done after all' : 'Check this off the punch list'}">${n.done ? '&#10003;' : ''}</button><div>` : ''}
         <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>${n.todo ? `<span class="todo-tag">Punch list</span>${n.priority === 'high' && !n.done ? '<span class="todo-tag" style="background:var(--danger); color:#fff;">High priority</span>' : ''}${n.due ? `<span>due ${esc(fmtDate(n.due))}</span>` : ''}${n.done && n.doneBy && n.doneBy.name ? `<span>done by ${esc(n.doneBy.name)}</span>` : ''}` : ''}
+          <button type="button" class="bell-mini${(n.reminders || {})[me] ? ' on' : ''}" data-remind="${esc(n.id)}" title="${(n.reminders || {})[me] ? 'You have a reminder set on this note. Click to change it.' : 'Remind me about this note'}" aria-label="Remind me about this note"><svg width="16" height="16" viewBox="0 0 24 24" fill="${(n.reminders || {})[me] ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg></button>
           ${n.by && n.by.uid === me ? `<button type="button" class="x-btn" data-delete-note="${esc(n.id)}" title="Delete this note">&times;</button>` : ''}</div>
         <div class="note-text">${noteHtml(n.text || '')}</div>
+        ${remindHtml(n)}
         ${(n.photos || []).length ? `<div class="note-photos">${n.photos.map(url=>`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Photo from the sub" loading="lazy"></a>`).join('')}</div>` : ''}
         ${repliesHtml(n)}
         ${n.todo ? '</div>' : ''}
@@ -861,7 +913,32 @@ $('notesList').addEventListener('keydown', e=>{
 });
 $('notesList').addEventListener('focusin', e=>{ if(e.target.matches('[data-reply-input]')) replyFocus = true; });
 $('notesList').addEventListener('focusout', e=>{ if(e.target.matches('[data-reply-input]')){ replyFocus = false; setTimeout(closeMentionMenu, 150); } });
+$('remindDate').addEventListener('change', e=>{
+  const today = isoPlus(0);
+  if(!remindPickId || !e.target.value) return;
+  if(e.target.value <= today){ alert('Pick a day after today.'); return; }
+  setReminder(remindPickId, e.target.value);
+});
+let remindPickId = '';
 $('notesList').addEventListener('click', async e=>{
+  const bell = e.target.closest('[data-remind]');
+  if(bell){ remindOpenId = remindOpenId === bell.dataset.remind ? null : bell.dataset.remind; renderNotes(); return; }
+  if(e.target.closest('[data-remind-close]')){ remindOpenId = null; renderNotes(); return; }
+  const on = e.target.closest('[data-remind-on]');
+  if(on){ setReminder(on.dataset.remindOn, on.dataset.date); return; }
+  const pick = e.target.closest('[data-remind-pick]');
+  if(pick){
+    remindPickId = pick.dataset.remindPick;
+    $('remindDate').value = '';
+    $('remindDate').min = isoPlus(1);
+    // open the device's own date picker; older browsers get a simple box to type into
+    try{ $('remindDate').showPicker(); }
+    catch(err){
+      const typed = (prompt('Remind me on (year-month-day, e.g. ' + isoPlus(7) + '):') || '').trim();
+      if(/^\d{4}-\d{2}-\d{2}$/.test(typed) && typed > isoPlus(0)) setReminder(remindPickId, typed);
+    }
+    return;
+  }
   const opener = e.target.closest('[data-reply-open]');
   if(opener){ replyOpenId = opener.dataset.replyOpen; replyDraft = ''; replyFocus = true; renderNotes(); return; }
   const sender = e.target.closest('[data-reply-send]');

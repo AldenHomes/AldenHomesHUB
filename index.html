@@ -510,7 +510,7 @@ function renderBell(){
   const lastReply = n=>{ const r = (n.replies || [])[(n.replies || []).length - 1]; return r && (r.at || '') >= (n.lastAt || '') ? r : null; };
   document.getElementById('bellList').innerHTML = bellNotes.length ? bellNotes.map(n=>`
     <a class="bell-item${bellUnread(n) ? ' unread' : ''}" data-note="${escHtml(n.id)}" href="${bellLink(n)}">
-      <div class="who">${bellUnread(n) ? '<span class="dot"></span>' : ''}${BELL_KINDS[n.kind] ? `<span class="kind ${escHtml(n.kind)}">${BELL_KINDS[n.kind]}</span>` : ''}${n.todo ? `<span class="kind subWaiting">${n.done ? 'Done' : 'To do'}</span>` : ''}<strong>${escHtml(((lastReply(n) || n).by || {}).name || 'Someone')}</strong> ${lastReply(n) ? 'commented' : ''} on ${escHtml(n.houseLabel || 'a home')} · ${escHtml(bellTime((lastReply(n) || n).at))}</div>
+      <div class="who">${bellUnread(n) ? '<span class="dot"></span>' : ''}${BELL_KINDS[n.kind] ? `<span class="kind ${escHtml(n.kind)}">${BELL_KINDS[n.kind]}</span>` : ''}${n.todo ? `<span class="kind subWaiting">${n.done ? 'Done' : 'To do'}</span>` : ''}${!lastReply(n) && n.reminded && n.reminded[bellUid] ? '<span class="kind subWaiting">Reminder</span>' : ''}<strong>${escHtml(((lastReply(n) || n).by || {}).name || 'Someone')}</strong> ${lastReply(n) ? 'commented' : ''} on ${escHtml(n.houseLabel || 'a home')} · ${escHtml(bellTime((lastReply(n) || n).at))}</div>
       <div class="txt">${escHtml((lastReply(n) || n).text || '')}</div>
     </a>`).join('') : '<div class="bell-empty">Nothing yet. Notes that @mention you show up here, along with subs who decline a job or send a note.</div>';
 }
