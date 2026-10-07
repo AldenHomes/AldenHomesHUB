@@ -150,6 +150,14 @@
   .note-head .x-btn{margin-left:auto;}
   .note-text{font-size:14px; line-height:1.55; margin-top:4px; white-space:pre-wrap; word-break:break-word;}
   .note-text .at{background:#eef0e8; color:var(--rust-2); font-weight:700; border-radius:3px; padding:0 4px;}
+  /* a note that is also a punch list item: a box to check it off */
+  .note.todo{display:flex; gap:12px; align-items:flex-start;}
+  .note.todo > div:last-child{flex:1; min-width:0;}
+  .todo-check{flex:none; width:26px; height:26px; margin-top:2px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px; font-weight:800; line-height:1; padding:0;}
+  .todo-check:hover{border-color:var(--good);}
+  .todo-check.on{background:var(--good); border-color:var(--good);}
+  .note.todo.done .note-text{text-decoration:line-through; color:var(--ink-soft);}
+  .todo-tag{background:#fdf0dc; color:#96661a; font-weight:700; border-radius:20px; padding:0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.3px;}
   .note.for-me{background:#fdf6ea; margin:0 -20px; padding-left:20px; padding-right:20px;}
   .owner-login{margin-top:16px; padding-top:14px; border-top:1px solid #ece8dd; font-size:13px; color:var(--ink-soft); line-height:1.7;}
   .owner-login strong{color:var(--ink);}
@@ -270,7 +278,7 @@
           </div>
           <div class="card-body">
             <div class="note-compose">
-              <textarea id="noteText" placeholder="Add a note about this home…  Type @ to notify someone on the team."></textarea>
+              <textarea id="noteText" placeholder="Add a note about this home…  Type @ to notify someone, or @todo to put it on the punch list."></textarea>
               <div class="mention-menu" id="mentionMenu"></div>
               <div class="note-actions">
                 <span class="muted" id="noteHint" style="font-size:12px;"></span>
@@ -697,15 +705,17 @@ function noteHtml(text){
 function renderNotes(){
   $('noteCount').textContent = notes.length ? `(${notes.length})` : '';
   const me = myUid();
-  $('noteHint').textContent = staff.length ? 'Type @ to notify someone — they get it on their hub and by email.' : '';
+  $('noteHint').innerHTML = (staff.length ? 'Type @ to notify someone — they get it on their hub and by email. ' : '') + 'Type @todo to add it to the <a href="punch.html" style="color:inherit;">punch list</a>.';
   $('noteAddBtn').disabled = notesState !== 'ready';
   $('notesList').innerHTML = notesState === 'blocked'
     ? '<div class="note muted">Notes can\'t be saved yet — the database security rules need the notes collection added.</div>'
     : notesState === 'loading' ? ''
-    : notes.length ? notes.map(n=>`<div class="note${(n.mentions||[]).includes(me) ? ' for-me' : ''}">
-        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>
+    : notes.length ? notes.map(n=>`<div class="note${(n.mentions||[]).includes(me) ? ' for-me' : ''}${n.todo ? ' todo' + (n.done ? ' done' : '') : ''}">
+        ${n.todo ? `<button type="button" class="todo-check${n.done ? ' on' : ''}" data-todo="${esc(n.id)}" title="${n.done ? 'Not done after all' : 'Check this off the punch list'}">${n.done ? '&#10003;' : ''}</button><div>` : ''}
+        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>${n.todo ? `<span class="todo-tag">Punch list</span>${n.done && n.doneBy && n.doneBy.name ? `<span>done by ${esc(n.doneBy.name)}</span>` : ''}` : ''}
           ${n.by && n.by.uid === me ? `<button type="button" class="x-btn" data-delete-note="${esc(n.id)}" title="Delete this note">&times;</button>` : ''}</div>
         <div class="note-text">${noteHtml(n.text || '')}</div>
+        ${n.todo ? '</div>' : ''}
       </div>`).join('')
     : '<div class="note muted">No notes on this home yet.</div>';
 
@@ -727,10 +737,14 @@ function markNotesRead(){
 }
 
 $('noteAddBtn').addEventListener('click', async ()=>{
-  const text = $('noteText').value.trim();
+  const typed = $('noteText').value.trim();
+  // "@todo" anywhere in the note puts it on the punch list; the word itself isn't kept
+  const todo = /(^|\s)@to-?do\b:?/i.test(typed);
+  const text = todo ? typed.replace(/(^|\s)@to-?do\b:?/ig, '$1').replace(/[ \t]{2,}/g, ' ').trim() : typed;
   if(!text || !job) return;
   const user = firebase.auth().currentUser;
-  const mentioned = mentionsIn(text).filter(s=>s.uid !== user.uid);
+  // on a punch list item, tagging yourself is how you give it to yourself
+  const mentioned = mentionsIn(text).filter(s=>todo || s.uid !== user.uid);
   $('noteAddBtn').disabled = true;
   try{
     await db.collection('notes').add({
@@ -742,6 +756,7 @@ $('noteAddBtn').addEventListener('click', async ()=>{
       by: { uid: user.uid, name: staffName(), email: user.email || '' },
       at: new Date().toISOString(),
       readBy: {},
+      ...(todo ? { todo: true, done: false } : {}),
     });
     $('noteText').value = '';
     closeMentionMenu();
@@ -749,6 +764,18 @@ $('noteAddBtn').addEventListener('click', async ()=>{
   $('noteAddBtn').disabled = false;
 });
 $('notesList').addEventListener('click', async e=>{
+  const check = e.target.closest('[data-todo]');
+  if(check){
+    const n = notes.find(x=>x.id === check.dataset.todo);
+    const user = firebase.auth().currentUser;
+    if(!n || !user) return;
+    try{
+      await db.collection('notes').doc(n.id).update(n.done
+        ? { done: false, doneAt: '', doneBy: null }
+        : { done: true, doneAt: new Date().toISOString(), doneBy: { uid: user.uid, name: staffName() } });
+    } catch(err){ console.error(err); alert('Could not save — check your connection and try again.'); }
+    return;
+  }
   const btn = e.target.closest('[data-delete-note]');
   if(!btn || !confirm('Delete this note? This cannot be undone.')) return;
   try{ await db.collection('notes').doc(btn.dataset.deleteNote).delete(); }
@@ -763,21 +790,23 @@ function updateMentionMenu(){
   const before = box.value.slice(0, box.selectionStart);
   // an "@" at the start of a word, plus whatever has been typed after it (names can have spaces)
   const m = /(^|\s)@([^@\n]{0,40})$/.exec(before);
-  if(!m || !staff.length){ closeMentionMenu(); return; }
+  if(!m){ closeMentionMenu(); return; }
   const typed = m[2].toLowerCase();
+  const offerTodo = 'todo'.startsWith(typed.replace('-', '')) && !/(^|\s)@to-?do\b/i.test(box.value.replace(m[0], ''));
   // The list opens the moment "@" is typed and narrows with each letter. Names that
   // start with what's typed come first, then anything containing it (name or email).
   const starts = staff.filter(s=>s.name.toLowerCase().startsWith(typed));
   const contains = staff.filter(s=>!starts.includes(s) && (s.name.toLowerCase().includes(typed) || s.email.toLowerCase().includes(typed)));
   const matches = [...starts, ...contains].slice(0, 8);
-  if(!matches.length){ closeMentionMenu(); return; }
+  if(!matches.length && !offerTodo){ closeMentionMenu(); return; }
   mentionStart = before.length - m[2].length - 1;
-  $('mentionMenu').innerHTML = matches.map((s,i)=>`<button type="button" class="${i===0?'on':''}" data-uid="${esc(s.uid)}">${esc(s.name)}<small>${esc(s.email)}</small></button>`).join('');
+  $('mentionMenu').innerHTML = (offerTodo ? `<button type="button" class="on" data-uid="__todo">todo<small>put this note on the punch list</small></button>` : '')
+    + matches.map((s,i)=>`<button type="button" class="${i===0 && !offerTodo?'on':''}" data-uid="${esc(s.uid)}">${esc(s.name)}<small>${esc(s.email)}</small></button>`).join('');
   $('mentionMenu').style.top = (box.offsetTop + box.offsetHeight + 2) + 'px';
   $('mentionMenu').classList.add('show');
 }
 function pickMention(uid){
-  const s = staff.find(x=>x.uid === uid);
+  const s = uid === '__todo' ? { name: 'todo' } : staff.find(x=>x.uid === uid);
   const box = $('noteText');
   if(!s || mentionStart < 0) return;
   const insert = '@' + s.name + ' ';

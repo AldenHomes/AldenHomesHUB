@@ -718,10 +718,12 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   // A staff note opens the home; something from a sub opens that job on the schedule,
   // which is where another vendor can be picked.
   const fromSub = ['subDeclined', 'subNote', 'subWaiting'].includes(note.kind);
-  const link = fromSub
-    ? `${site}construction.html?house=${encodeURIComponent(note.houseId || '')}&task=${encodeURIComponent(note.taskId || '')}`
+  // a punch list item (a note with todo: true) given to someone opens the punch list
+  const link = note.todo ? `${site}punch.html`
+    : fromSub ? `${site}construction.html?house=${encodeURIComponent(note.houseId || '')}&task=${encodeURIComponent(note.taskId || '')}`
     : `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
-  const wording = {
+  const where = note.houseId ? ` for <strong>${esc(house)}</strong>` : '';
+  const wording = note.todo ? { heading: 'Punch list item for you', subject: `Punch list: ${String(note.text || '').slice(0, 60)}`, lead: `<strong>${esc(who)}</strong> added a punch list item for you${where}:`, plain: `${who} added a punch list item for you${note.houseId ? ' for ' + house : ''}:`, button: 'Open the punch list' } : {
     subDeclined: { heading: 'A sub declined a job', subject: `Declined: ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> declined a job on <strong>${esc(house)}</strong>:`, plain: `${who} declined a job on ${house}:`, button: 'Open this job' },
     subNote: { heading: 'Note from a sub', subject: `Note from ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> sent a note about <strong>${esc(house)}</strong>:`, plain: `${who} sent a note about ${house}:`, button: 'Open this job' },
     subWaiting: { heading: 'Still waiting on a sub', subject: `Still waiting on an answer — ${house}`, lead: `A job on <strong>${esc(house)}</strong> has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, plain: `A job on ${house} has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, button: 'Open this job' },

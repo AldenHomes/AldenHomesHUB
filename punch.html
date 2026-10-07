@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | Punch List</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  .titlebar{background:var(--paper-2); padding:20px clamp(16px,4vw,40px); border-bottom:4px solid var(--rust);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;}
+  .brand-mark{height:40px; flex:none; display:flex; align-items:center;}
+  .brand-mark img{height:100%; width:auto; display:block;}
+  h1{font-size:clamp(19px,2.4vw,24px); margin:0; font-weight:700; color:var(--navy);}
+  .subtitle{font-size:12px; color:var(--ink-soft); margin-top:3px; letter-spacing:.6px; text-transform:uppercase;}
+  .titlebar-stats{display:flex; gap:22px;}
+  .stat{text-align:center;}
+  .stat .n{font-size:22px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace;}
+  .stat .l{font-size:10px; color:var(--ink-soft); letter-spacing:.6px; text-transform:uppercase; margin-top:3px;}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+  .sync-badge{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-soft); font-family:"Courier New",monospace;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.offline{background:var(--danger);}
+  .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
+  .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
+
+  .wrap{max-width:880px; margin:0 auto; padding:22px clamp(14px,4vw,40px) 60px;}
+  .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
+  .back-link:hover{color:var(--navy);}
+  .btn{padding:11px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-primary:hover{background:var(--navy-2);}
+  .btn:disabled{opacity:.5; cursor:default;}
+  input[type=text], input[type=password], select{padding:11px 11px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; color:var(--ink); background:#fff; font-family:inherit; min-width:0;}
+  input:focus, select:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+
+  /* add an item */
+  .add{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-top:4px solid var(--rust); padding:16px; margin-bottom:16px;}
+  .add-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .add-row #newText{flex:1 1 100%;}
+  .add-row select{flex:1 1 170px;}
+  .add-row .btn{flex:0 0 auto;}
+  .hint{font-size:12.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
+
+  .filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .filters input{flex:1 1 200px;}
+  .filters select{flex:0 1 200px;}
+
+  /* the list: grouped by home, each item one big tap target */
+  .group{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); margin-bottom:14px; overflow:hidden;}
+  .group-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 14px; background:#f3f5ee; border-bottom:1px solid #dfe3d3; font-size:14px; font-weight:700; color:var(--rust-2);}
+  .group-head a{color:inherit; text-decoration:none;}
+  .group-head a:hover{text-decoration:underline;}
+  .group-head .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; color:var(--ink-soft);}
+  .item{display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-top:1px solid #f1ede3;}
+  .item:first-of-type{border-top:none;}
+  .check{flex:none; width:28px; height:28px; margin-top:1px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff; font-size:17px; font-weight:800; line-height:1; padding:0;}
+  .check:hover{border-color:var(--good);}
+  .check.on{background:var(--good); border-color:var(--good);}
+  .item-main{flex:1; min-width:0;}
+  .item-text{font-size:15.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word;}
+  .item.done .item-text{text-decoration:line-through; color:var(--ink-soft);}
+  .item-meta{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+  .who{display:inline-block; background:#eef0e8; color:var(--rust-2); font-weight:700; border-radius:20px; padding:1px 9px; margin-right:6px;}
+  .who.me{background:#fdf0dc; color:#96661a;}
+  .x-btn{flex:none; border:none; background:none; color:#b9b4a5; font-size:20px; line-height:1; cursor:pointer; padding:2px 4px;}
+  .x-btn:hover{color:var(--danger);}
+  .empty{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:36px 20px; text-align:center; color:var(--ink-soft); font-size:14.5px;}
+  .done-toggle{display:flex; align-items:center; gap:8px; width:100%; margin:22px 0 10px; padding:12px 14px; background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit; text-align:left;}
+  .done-toggle .arrow{display:inline-block; transition:transform .15s; font-size:11px;}
+  .done-toggle.open .arrow{transform:rotate(90deg);}
+  .done-toggle .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
+  .notice{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:13.5px; padding:11px 13px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .notice.show{display:block;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-gate.hidden{display:none;}
+  .auth-card{width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;}
+  .auth-card .brand{margin-bottom:22px; pointer-events:none;}
+  .auth-card h2{margin:0; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .auth-field input{width:100%;}
+  .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .auth-error.show{display:block;}
+  .auth-card .btn-primary{width:100%;}
+  .app-shell.locked{display:none;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  @media (max-width:640px){ .titlebar-stats{display:none;} }
+</style>
+</head>
+<body>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div><h2>Punch List</h2></div>
+    </div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="auth-error" id="loginError"></div>
+    <div class="auth-field">
+      <label for="loginEmail">Email</label>
+      <input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+  <div class="titlebar">
+    <a class="brand" href="index.html" title="Back to Alden Homes Hub">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div>
+        <h1>Punch List</h1>
+        <div class="subtitle">To-dos for the crew</div>
+      </div>
+    </a>
+    <div class="titlebar-stats">
+      <div class="stat"><div class="n" id="statOpen">0</div><div class="l">Open</div></div>
+      <div class="stat"><div class="n" id="statMine">0</div><div class="l">Mine</div></div>
+    </div>
+    <div class="titlebar-account">
+      <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+      <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; Back to the hub</a>
+    <div class="notice" id="blockedNotice">The punch list couldn't be loaded. Check your connection and reload the page.</div>
+
+    <!-- Add an item -->
+    <div class="add">
+      <div class="add-row">
+        <input type="text" id="newText" placeholder="What needs doing?  e.g. Touch up paint in the foyer" maxlength="500" autocomplete="off">
+        <select id="newHome" aria-label="Which home"></select>
+        <select id="newWho" aria-label="Who it's for"></select>
+        <button class="btn btn-primary" id="addBtn">Add item</button>
+      </div>
+      <div class="hint">The home and the person are optional. You can also add an item from a home's page: type <strong>@todo</strong> in a note there.</div>
+    </div>
+
+    <div class="filters">
+      <input type="text" id="search" placeholder="Search items or homes…">
+      <select id="whoFilter" aria-label="Whose items"></select>
+    </div>
+
+    <div id="openList"></div>
+
+    <button type="button" class="done-toggle" id="doneToggle"><span class="arrow">&#9654;</span> Done <span class="n" id="doneCount">0</span></button>
+    <div id="doneList" style="display:none;"></div>
+
+    <footer>Alden Homes internal tools — everyone on the team sees the same list.</footer>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+
+/* ============================================================
+   PUNCH LIST
+   A punch list item is a note with `todo: true`, kept with the other notes (the `notes`
+   collection). That way an item typed on a home's page as "@todo …" and an item added
+   here are the same thing, it shows on that home's Notes, and giving it to someone uses
+   the same "mentions" the bell and the notification email already understand.
+     { todo:true, text, houseId ('' = not tied to a home), houseLabel, mentions:[uid],
+       mentionNames:[name], done, doneAt, doneBy:{uid,name}, by:{uid,name,email}, at, readBy }
+   ============================================================ */
+const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
+let items = [];
+let jobs = [];
+let staff = [];           // everyone with a hub login: { uid, email, name }
+let doneOpen = false;
+let whoFilter = '';       // '' = everyone, 'me', 'nobody', or a uid
+
+const $ = id => document.getElementById(id);
+function esc(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function setSyncStatus(state){
+  $('syncDot').classList.toggle('offline', state==='offline');
+  $('syncLabel').textContent = state==='offline' ? 'Offline' : (state==='saving' ? 'Saving…' : 'Synced');
+}
+function me(){ return firebase.auth().currentUser; }
+function myName(){
+  const u = me();
+  const known = u && staff.find(s=>s.uid === u.uid);
+  return known ? known.name : (u ? (u.displayName || String(u.email || '').split('@')[0]) : '');
+}
+function homeLabel(j){ return [j.community, j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') || 'Unnamed home'; }
+function isActive(j){ return !j.settle || j.settle >= new Date().toISOString().slice(0, 10); }
+function shortWhen(iso){
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+}
+
+/* ---- sign-in ---- */
+function showLoginGate(){ $('loginGate').classList.remove('hidden'); $('appShell').classList.add('locked'); }
+function showApp(user){
+  $('loginGate').classList.add('hidden');
+  $('appShell').classList.remove('locked');
+  $('currentUserEmail').textContent = user.email || '';
+}
+function doLogin(){
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const errBox = $('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){
+    errBox.textContent = 'Enter both an email and a password.';
+    errBox.classList.add('show');
+    return;
+  }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(err.code)
+      ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show');
+  });
+}
+$('loginSubmitBtn').addEventListener('click', doLogin);
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const notesCol = db.collection('notes');
+let listening = false;
+
+firebase.auth().onAuthStateChanged(user=>{
+  // Homeowners using the public request form are signed in anonymously — they are not staff.
+  if(user && !user.isAnonymous){
+    showApp(user);
+    if(listening) return;
+    listening = true;
+    notesCol.where('todo', '==', true).onSnapshot(s=>{
+      items = s.docs.map(d=>({ id: d.id, ...d.data() }));
+      $('blockedNotice').classList.remove('show');
+      render(); setSyncStatus('idle');
+    }, err=>{ console.error('punch list listener error', err); $('blockedNotice').classList.add('show'); setSyncStatus('offline'); });
+    db.collection('jobs').onSnapshot(s=>{ jobs = s.docs.map(d=>({ id: d.id, ...d.data() })); renderPickers(); render(); },
+      err=>console.error('jobs listener error', err));
+    loadStaff();
+  } else {
+    showLoginGate();
+  }
+});
+window.addEventListener('online', ()=>setSyncStatus('idle'));
+window.addEventListener('offline', ()=>setSyncStatus('offline'));
+
+async function loadStaff(){
+  try{
+    const token = await me().getIdToken();
+    const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ action:'staff' }) });
+    if(!res.ok) throw new Error('staff list ' + res.status);
+    staff = (await res.json()).staff || [];
+  } catch(err){ console.error('Could not load the team list', err); staff = []; }
+  renderPickers(); render();
+}
+
+/* ---- the pickers: which home, who it's for ---- */
+function renderPickers(){
+  const keep = (id, html)=>{ const el = $(id), v = el.value; el.innerHTML = html; if([...el.options].some(o=>o.value === v)) el.value = v; };
+  // homes still being built first, then finished ones — an in-house job can be on either
+  const sorted = jobs.slice().sort((a,b)=>homeLabel(a).localeCompare(homeLabel(b), 'en', { numeric:true }));
+  const opt = j=>`<option value="${esc(j.id)}">${esc(homeLabel(j))}</option>`;
+  const active = sorted.filter(isActive), finished = sorted.filter(j=>!isActive(j));
+  keep('newHome', `<option value="">No home (general)</option>`
+    + (active.length ? `<optgroup label="Active homes">${active.map(opt).join('')}</optgroup>` : '')
+    + (finished.length ? `<optgroup label="Finished homes">${finished.map(opt).join('')}</optgroup>` : ''));
+  keep('newWho', `<option value="">For anyone</option>` + staff.map(s=>`<option value="${esc(s.uid)}">For ${esc(s.name)}</option>`).join(''));
+  keep('whoFilter', `<option value="">Everyone's items</option><option value="me">Just mine</option><option value="nobody">Not given to anyone</option>`
+    + staff.map(s=>`<option value="${esc(s.uid)}">${esc(s.name)}</option>`).join(''));
+}
+
+/* ---- the list ---- */
+function itemHtml(t){
+  const uid = me() ? me().uid : '';
+  const names = (t.mentions || []).map((id, i)=>{
+    const s = staff.find(x=>x.uid === id);
+    return `<span class="who${id === uid ? ' me' : ''}">${esc(s ? s.name : ((t.mentionNames || [])[i] || 'Someone'))}</span>`;
+  }).join('');
+  const meta = t.done
+    ? `Done${t.doneBy && t.doneBy.name ? ' by ' + esc(t.doneBy.name) : ''}${t.doneAt ? ' · ' + esc(shortWhen(t.doneAt)) : ''}`
+    : `Added${t.by && t.by.name ? ' by ' + esc(t.by.name) : ''}${t.at ? ' · ' + esc(shortWhen(t.at)) : ''}`;
+  return `<div class="item${t.done ? ' done' : ''}">
+    <button type="button" class="check${t.done ? ' on' : ''}" data-check="${esc(t.id)}" aria-label="${t.done ? 'Mark as not done' : 'Mark as done'}" title="${t.done ? 'Not done after all' : 'Done'}">${t.done ? '&#10003;' : ''}</button>
+    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${names}${meta}</div></div>
+    <button type="button" class="x-btn" data-delete="${esc(t.id)}" title="Delete this item">&times;</button>
+  </div>`;
+}
+// Items grouped by home; items with no home come first as "General".
+function groupsHtml(list){
+  const groups = [];
+  list.forEach(t=>{
+    const key = t.houseId || '';
+    let g = groups.find(x=>x.key === key);
+    if(!g){
+      const job = jobs.find(j=>j.id === key);
+      g = { key, label: key ? (job ? homeLabel(job) : (t.houseLabel || 'A home')) : 'General', items: [] };
+      groups.push(g);
+    }
+    g.items.push(t);
+  });
+  groups.sort((a,b)=>(a.key === '' ? -1 : b.key === '' ? 1 : a.label.localeCompare(b.label, 'en', { numeric:true })));
+  return groups.map(g=>`<div class="group">
+    <div class="group-head">${g.key ? `<a href="house.html?id=${encodeURIComponent(g.key)}#notes" title="Open this home">${esc(g.label)} &rarr;</a>` : `<span>${esc(g.label)}</span>`}<span class="n">${g.items.length}</span></div>
+    ${g.items.map(itemHtml).join('')}
+  </div>`).join('');
+}
+function render(){
+  const uid = me() ? me().uid : '';
+  const q = $('search').value.trim().toLowerCase();
+  const shown = items.filter(t=>{
+    const mine = (t.mentions || []);
+    if(whoFilter === 'me' && !mine.includes(uid)) return false;
+    if(whoFilter === 'nobody' && mine.length) return false;
+    if(whoFilter && !['me','nobody'].includes(whoFilter) && !mine.includes(whoFilter)) return false;
+    if(q){
+      const job = jobs.find(j=>j.id === t.houseId);
+      if(![t.text, t.houseLabel, job ? homeLabel(job) + ' ' + (job.address || '') : '', (t.mentionNames || []).join(' ')].join(' ').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+  const open = shown.filter(t=>!t.done).sort((a,b)=>(a.at||'').localeCompare(b.at||''));   // oldest first
+  const done = shown.filter(t=>t.done).sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||'')).slice(0, 200);
+
+  $('statOpen').textContent = items.filter(t=>!t.done).length;
+  $('statMine').textContent = items.filter(t=>!t.done && (t.mentions || []).includes(uid)).length;
+  $('openList').innerHTML = open.length ? groupsHtml(open)
+    : `<div class="empty">${items.some(t=>!t.done) ? 'No open items match.' : 'Nothing on the punch list. Add the first item above.'}</div>`;
+  const show = doneOpen || (!!q && done.length > 0);
+  $('doneCount').textContent = done.length;
+  $('doneToggle').classList.toggle('open', show);
+  $('doneList').style.display = show ? 'block' : 'none';
+  $('doneList').innerHTML = done.length ? groupsHtml(done) : '<div class="empty">Nothing checked off yet.</div>';
+}
+$('search').addEventListener('input', render);
+$('whoFilter').addEventListener('change', e=>{ whoFilter = e.target.value; render(); });
+$('doneToggle').addEventListener('click', ()=>{ doneOpen = !$('doneToggle').classList.contains('open'); render(); });
+
+/* ---- add / check off / delete ---- */
+async function addItem(){
+  const text = $('newText').value.trim();
+  const user = me();
+  if(!text || !user) return;
+  const job = jobs.find(j=>j.id === $('newHome').value) || null;
+  const who = staff.find(s=>s.uid === $('newWho').value) || null;
+  $('addBtn').disabled = true;
+  setSyncStatus('saving');
+  try{
+    await notesCol.add({
+      todo: true, done: false,
+      text,
+      houseId: job ? job.id : '',
+      houseLabel: job ? homeLabel(job) : 'General',
+      mentions: who ? [who.uid] : [],
+      mentionNames: who ? [who.name] : [],
+      by: { uid: user.uid, name: myName(), email: user.email || '' },
+      at: new Date().toISOString(),
+      readBy: {},
+    });
+    $('newText').value = '';
+    $('newText').focus();
+  } catch(err){ console.error(err); alert('Could not save the item — check your connection and try again.'); setSyncStatus('idle'); }
+  $('addBtn').disabled = false;
+}
+$('addBtn').addEventListener('click', addItem);
+$('newText').addEventListener('keydown', e=>{ if(e.key === 'Enter') addItem(); });
+
+document.addEventListener('click', async e=>{
+  const check = e.target.closest('[data-check]');
+  if(check){
+    const t = items.find(x=>x.id === check.dataset.check);
+    const user = me();
+    if(!t || !user) return;
+    setSyncStatus('saving');
+    try{
+      await notesCol.doc(t.id).update(t.done
+        ? { done: false, doneAt: '', doneBy: null }
+        : { done: true, doneAt: new Date().toISOString(), doneBy: { uid: user.uid, name: myName() } });
+    } catch(err){ console.error(err); alert('Could not save — check your connection and try again.'); setSyncStatus('idle'); }
+    return;
+  }
+  const del = e.target.closest('[data-delete]');
+  if(del){
+    const t = items.find(x=>x.id === del.dataset.delete);
+    if(!t || !confirm(`Delete "${t.text}"?\n\nTo keep a record that it was finished, check it off instead.`)) return;
+    try{ await notesCol.doc(t.id).delete(); }
+    catch(err){ console.error(err); alert('Could not delete — check your connection and try again.'); }
+  }
+});
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('Service worker registration failed', err));
+  });
+}
+</script>
+</body>
+</html>
