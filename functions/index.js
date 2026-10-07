@@ -813,7 +813,7 @@ How to answer: the reader is office staff reading on a phone, not a technical pe
 If they ask for something you have no way to do — moving schedule dates, emailing a sub, changing a service request — say you can't do that from here yet, and mention where in the hub it's done if you know (Construction Schedules, Service Center, Punch List, Admin Settings).`;
 
 // Everything the assistant is told up front: who is asking, the team, and every home.
-async function assistantContext(who){
+async function assistantContext(who, page){
   const [jobsSnap, list] = await Promise.all([db.collection('jobs').get(), admin.auth().listUsers(1000)]);
   const today = todayIso();
   const jobs = jobsSnap.docs.map(d=>({ id: d.id, ...d.data() }));
@@ -824,9 +824,13 @@ async function assistantContext(who){
     j.settle ? (j.settle < today ? `settled ${j.settle}` : `settles ${j.settle}`) : 'no settlement date',
   ].filter(Boolean).join(' | ');
   const active = jobs.filter(j=>!j.settle || j.settle >= today), finished = jobs.filter(j=>j.settle && j.settle < today);
+  const onHome = page && typeof page.homeId === 'string' && page.homeId ? jobs.find(j=>j.id === page.homeId) || null : null;
   const facts = [
     `Today is ${niceDate(today)}, ${today}.`,
     `The person speaking is ${me.name} (uid ${me.uid}). "Me", "myself" or "I" means them.`,
+    // the assistant is on every page; on a home's page they can just say "here"
+    onHome ? `They have the home ${jobLabel(onHome)} (id=${onHome.id}) open on their screen right now. "Here", "this home", "this house" or "this job" means that home, and if they don't name a home at all, assume they mean it.`
+           : 'They do not have a particular home open on their screen, so they need to say which home they mean.',
     '', 'The team (name, uid):', ...staff.map(s=>`- ${s.name} | ${s.uid}`),
     '', `Homes being built (${active.length}):`, ...active.map(j=>'- ' + homeLine(j)),
     '', `Finished homes (${finished.length}):`, ...finished.map(j=>'- ' + homeLine(j)),
@@ -960,7 +964,7 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
     const who = await staffFromRequest(req);
     if(!who){ res.status(401).json({ error: 'sign-in' }); return; }
     const body = req.body || {};
-    const ctx = await assistantContext(who);
+    const ctx = await assistantContext(who, body.context);
 
     // The person pressed Confirm: do what was proposed.
     if(body.action === 'run'){
