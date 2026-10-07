@@ -3,8 +3,11 @@
   "description": "Server side of the Alden Homes Hub: the subcontractor portal and schedule emails.",
   "private": true,
   "main": "index.js",
-  "engines": { "node": "22" },
+  "engines": {
+    "node": "22"
+  },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "firebase-admin": "^12.6.0",
     "firebase-functions": "^6.0.1",
     "nodemailer": "^6.9.15"

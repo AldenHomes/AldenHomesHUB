@@ -699,6 +699,331 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
 });
 
 /* ============================================================
+   hubAssistant — "press the button and say it".
+
+   A staff member speaks or types a request on the hub ("add a note to AP 40 saying
+   drywall is complete and tag Chase"). The words come here, and Claude works out what
+   they mean using the list of homes and the team.
+
+   Two rules keep it safe:
+   • Claude can only do the handful of things defined below. Looking things up happens
+     straight away. Anything that CHANGES something is not done here — it is handed back
+     to the hub as a proposal, shown to the person with Confirm / Cancel.
+   • Only when they press Confirm does the hub call back with action "run", and the
+     change is saved under that person's name.
+
+   Switched on with ENABLE_ASSISTANT=1 in functions/.env once the ANTHROPIC_API_KEY
+   secret exists (same idea as ENABLE_EMAIL).
+   ============================================================ */
+const ASSISTANT_ON = process.env.ENABLE_ASSISTANT === '1';
+const ANTHROPIC_API_KEY = ASSISTANT_ON ? defineSecret('ANTHROPIC_API_KEY') : null;
+const ASSISTANT_MODEL = 'claude-opus-5-5';
+
+// Which home a service request is about — the same rules as service.html and house.html.
+function addrKey(a){
+  const m = String(a || '').toLowerCase().replace(/[.,#]/g, ' ').match(/(\d+)\s+([a-z0-9]+)/);
+  return m ? m[1] + ' ' + m[2] : '';
+}
+function lotKey(l){ return String(l == null ? '' : l).toLowerCase().replace(/lot|#|\s/g, ''); }
+function homeForRequest(r, jobs){
+  if(r.houseId) return jobs.find(j=>j.id === r.houseId) || null;
+  const a = addrKey(r.address), lot = lotKey(r.lot);
+  const byAddr = a ? jobs.filter(j=>addrKey(j.address) === a) : [];
+  if(byAddr.length === 1) return byAddr[0];
+  const byLot = lot ? jobs.filter(j=>lotKey(j.lot) === lot) : [];
+  if(byAddr.length > 1){ const both = byAddr.filter(j=>byLot.includes(j)); return both.length === 1 ? both[0] : null; }
+  return byLot.length === 1 ? byLot[0] : null;
+}
+function jobLabel(j){ return [j.community, j.lot ? 'Lot ' + j.lot : '', j.client].filter(Boolean).join(' · ') || 'Unnamed home'; }
+
+const str = { type: 'string' };
+const ASSISTANT_TOOLS = [
+  { name: 'get_home', strict: true,
+    description: 'Look up everything about one home: its dates, its build schedule (each job, its dates, the vendor, whether they approved, whether it is done), open punch list items, recent notes and service requests. Use it before answering a question about a specific home.',
+    input_schema: { type: 'object', properties: { home_id: { ...str, description: 'The id of the home, from the list of homes.' } }, required: ['home_id'], additionalProperties: false } },
+  { name: 'list_punch_items', strict: true,
+    description: 'List the open punch list items (to-dos for the in-house crew) across every home, with each item\'s id, text, home and who it is for.',
+    input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
+  { name: 'list_service_requests', strict: true,
+    description: 'List service requests from homeowners. "open" = new and in progress; "all" also includes completed ones.',
+    input_schema: { type: 'object', properties: { which: { type: 'string', enum: ['open', 'all'] } }, required: ['which'], additionalProperties: false } },
+  { name: 'add_note', strict: true,
+    description: 'Propose adding a note to a home. It is shown to the user to confirm; it is not saved until they do.',
+    input_schema: { type: 'object', properties: {
+      home_id: { ...str, description: 'The id of the home the note is about.' },
+      text: { ...str, description: 'The note, as a clean sentence. Do not include @names — list people in notify_user_ids instead.' },
+      notify_user_ids: { type: 'array', items: str, description: 'uids of team members to tag and notify. Empty if nobody was named.' },
+    }, required: ['home_id', 'text', 'notify_user_ids'], additionalProperties: false } },
+  { name: 'add_punch_item', strict: true,
+    description: 'Propose adding an item to the punch list. It is shown to the user to confirm; it is not saved until they do.',
+    input_schema: { type: 'object', properties: {
+      text: { ...str, description: 'What needs doing, short and clear.' },
+      home_id: { ...str, description: 'The id of the home it is for, or an empty string if it is not about a particular home.' },
+      assign_user_ids: { type: 'array', items: str, description: 'uids of the team members it is for. Empty if nobody was named.' },
+    }, required: ['text', 'home_id', 'assign_user_ids'], additionalProperties: false } },
+  { name: 'complete_punch_item', strict: true,
+    description: 'Propose checking an item off the punch list. Find the item id with list_punch_items or get_home first. Shown to the user to confirm.',
+    input_schema: { type: 'object', properties: { item_id: { ...str, description: 'The id of the punch list item.' } }, required: ['item_id'], additionalProperties: false } },
+];
+const ASSISTANT_WRITES = ['add_note', 'add_punch_item', 'complete_punch_item'];
+
+const ASSISTANT_RULES = `You are the assistant built into the Alden Homes Hub, the internal tool the office staff of a home builder use to run their jobs. People press a button and speak, so what you receive is speech turned into text. Expect slips: lot numbers and names can come through slightly wrong ("a p forty", "AP40", "lot fourty"), and a first name may be spelled differently from the team list.
+
+Finding the home: match what was said against the list of homes below by community code and lot number, by the buyer's name, or by the address. "AP 40" means community AP, lot 40. If exactly one home fits, use it. If two fit equally well, or nothing fits, ask which home they mean and offer the closest ones — a note saved to the wrong home is worse than a quick question.
+
+Finding the person: match first names against the team list. If a name could be two people, ask.
+
+Changing things: you cannot save anything yourself. Calling add_note, add_punch_item or complete_punch_item puts the action on the person's screen with Confirm and Cancel buttons, and it only happens if they press Confirm. So when the request is clear, call the tool straight away rather than asking "shall I?" first, then tell them in one short sentence what is waiting for them to confirm. Never say something was saved or done.
+
+Wording: for a note or a punch list item, write what the person said as a clean sentence — capital letter, full stop, obvious speech-to-text slips fixed — without adding anything they didn't say. Leave the people out of the text; they go in the list of ids and the hub adds the tags.
+
+Questions: answer from the lists below, or look the home up with get_home when the answer needs its schedule, notes, punch list or service history. If the information isn't there, say so plainly.
+
+How to answer: the reader is office staff reading on a phone, not a technical person. Keep it to a sentence or two in plain words, no formatting symbols, with dates written like "Tue, Oct 20". Refer to homes the way the staff do ("AP Lot 40, Smith"), never by id.
+
+If they ask for something you have no way to do — moving schedule dates, emailing a sub, changing a service request — say you can't do that from here yet, and mention where in the hub it's done if you know (Construction Schedules, Service Center, Punch List, Admin Settings).`;
+
+// Everything the assistant is told up front: who is asking, the team, and every home.
+async function assistantContext(who){
+  const [jobsSnap, list] = await Promise.all([db.collection('jobs').get(), admin.auth().listUsers(1000)]);
+  const today = todayIso();
+  const jobs = jobsSnap.docs.map(d=>({ id: d.id, ...d.data() }));
+  const staff = list.users.filter(u=>u.email && !u.disabled).map(u=>({ uid: u.uid, name: staffName(u), email: u.email }));
+  const me = staff.find(s=>s.uid === who.uid) || { uid: who.uid, name: String(who.email || '').split('@')[0] || 'Someone', email: who.email || '' };
+  const homeLine = j=>[
+    `id=${j.id}`, j.community || '?', j.lot ? `Lot ${j.lot}` : 'no lot', j.client || 'no buyer name', j.address || 'no address', j.model || '',
+    j.settle ? (j.settle < today ? `settled ${j.settle}` : `settles ${j.settle}`) : 'no settlement date',
+  ].filter(Boolean).join(' | ');
+  const active = jobs.filter(j=>!j.settle || j.settle >= today), finished = jobs.filter(j=>j.settle && j.settle < today);
+  const facts = [
+    `Today is ${niceDate(today)}, ${today}.`,
+    `The person speaking is ${me.name} (uid ${me.uid}). "Me", "myself" or "I" means them.`,
+    '', 'The team (name, uid):', ...staff.map(s=>`- ${s.name} | ${s.uid}`),
+    '', `Homes being built (${active.length}):`, ...active.map(j=>'- ' + homeLine(j)),
+    '', `Finished homes (${finished.length}):`, ...finished.map(j=>'- ' + homeLine(j)),
+  ].join('\n');
+  return { jobs, staff, me, today, facts };
+}
+
+// The look-ups the assistant can run by itself. Each returns plain text for it to read.
+async function assistantLookup(name, input, ctx){
+  if(name === 'get_home'){
+    const job = ctx.jobs.find(j=>j.id === input.home_id);
+    if(!job) return 'There is no home with that id. Use an id from the list of homes.';
+    const [schedDoc, notesSnap, reqSnap, subsSnap] = await Promise.all([
+      db.collection('build-schedules').doc(job.id).get(),
+      db.collection('notes').where('houseId', '==', job.id).get(),
+      db.collection('service-requests').get(),
+      db.collection('subs').get(),
+    ]);
+    const subName = {}; subsSnap.forEach(d=>{ subName[d.id] = d.data().name || 'Unnamed vendor'; });
+    const notes = notesSnap.docs.map(d=>({ id: d.id, ...d.data() })).sort((a, b)=>(b.at || '').localeCompare(a.at || ''));
+    const sched = schedDoc.exists ? schedDoc.data() : null;
+    return JSON.stringify({
+      home: jobLabel(job), address: job.address || '', model: job.model || '', buyer_phone: job.phone || '', buyer_email: job.email || '',
+      dates: { foundation: job.fndn || '', walk_through: job.walk || '', move_in: job.move || '', settlement: job.settle || '' },
+      schedule: !sched ? 'No build schedule yet.' : {
+        sent_to_subs: !!sched.sentAt, projected_finish: sched.projectedEnd || '',
+        jobs: (sched.tasks || []).filter(t=>t.start).map(t=>({
+          job: t.title || '', start: t.start, end: t.end, done: !!t.done,
+          vendors: (t.subIds || []).map(id=>`${subName[id] || 'Removed vendor'} (${({ confirmed: 'approved', declined: 'declined' })[(t.confirm || {})[id]] || 'no answer yet'})`),
+        })),
+      },
+      open_punch_items: notes.filter(n=>n.todo && !n.done).map(n=>({ item_id: n.id, text: n.text || '', for: n.mentionNames || [] })),
+      recent_notes: notes.filter(n=>!n.todo).slice(0, 10).map(n=>({ when: (n.at || '').slice(0, 10), by: (n.by && n.by.name) || '', text: n.text || '' })),
+      service_requests: reqSnap.docs.map(d=>d.data()).filter(r=>{ const h = homeForRequest(r, ctx.jobs); return h && h.id === job.id; })
+        .map(r=>({ submitted: (r.submittedAt || '').slice(0, 10), status: r.status === 'sent' ? 'complete' : (r.status || 'new'), assigned_to: r.vendorName || '', description: r.description || '' })),
+    });
+  }
+  if(name === 'list_punch_items'){
+    const snap = await db.collection('notes').where('todo', '==', true).get();
+    const open = snap.docs.map(d=>({ id: d.id, ...d.data() })).filter(n=>!n.done);
+    return JSON.stringify(open.map(n=>({ item_id: n.id, text: n.text || '', home: n.houseId ? (n.houseLabel || '') : 'General (no home)', for: n.mentionNames || [], added: (n.at || '').slice(0, 10) })));
+  }
+  if(name === 'list_service_requests'){
+    const snap = await db.collection('service-requests').get();
+    const rows = snap.docs.map(d=>d.data()).filter(r=>input.which === 'all' || r.status !== 'sent');
+    return JSON.stringify(rows.map(r=>{ const h = homeForRequest(r, ctx.jobs); return {
+      name: r.name || '', address: r.address || '', lot: r.lot || '', home: h ? jobLabel(h) : '', submitted: (r.submittedAt || '').slice(0, 10),
+      status: r.status === 'sent' ? 'complete' : (r.status || 'new'), assigned_to: r.vendorName || '', description: r.description || '' }; }));
+  }
+  return 'Unknown tool.';
+}
+
+// Check a proposed change against the real data, and describe it in words for the Confirm box.
+// Returns { action, summary } or { error } (the error is read back to the assistant).
+async function assistantCheck(name, input, ctx){
+  const people = ids=>[...new Set(Array.isArray(ids) ? ids : [])].map(uid=>ctx.staff.find(s=>s.uid === uid));
+  if(name === 'add_note'){
+    const job = ctx.jobs.find(j=>j.id === input.home_id);
+    const text = cleanText(input.text, 2000);
+    const who = people(input.notify_user_ids);
+    if(!job) return { error: 'There is no home with that id.' };
+    if(!text) return { error: 'The note has no text.' };
+    if(who.includes(undefined)) return { error: 'One of those uids is not on the team list.' };
+    return { action: { type: 'add_note', homeId: job.id, text, notify: who.map(s=>s.uid) },
+      summary: { title: `Add a note to ${jobLabel(job)}`, text, people: who.length ? 'Notify ' + who.map(s=>s.name).join(', ') : '' } };
+  }
+  if(name === 'add_punch_item'){
+    const job = input.home_id ? ctx.jobs.find(j=>j.id === input.home_id) : null;
+    const text = cleanText(input.text, 500);
+    const who = people(input.assign_user_ids);
+    if(input.home_id && !job) return { error: 'There is no home with that id. Use an empty string for no home.' };
+    if(!text) return { error: 'The item has no text.' };
+    if(who.includes(undefined)) return { error: 'One of those uids is not on the team list.' };
+    return { action: { type: 'add_punch_item', homeId: job ? job.id : '', text, assign: who.map(s=>s.uid) },
+      summary: { title: `Add to the punch list${job ? ' for ' + jobLabel(job) : ''}`, text, people: who.length ? 'For ' + who.map(s=>s.name).join(', ') : '' } };
+  }
+  if(name === 'complete_punch_item'){
+    const doc = typeof input.item_id === 'string' && input.item_id ? await db.collection('notes').doc(input.item_id).get() : null;
+    if(!doc || !doc.exists || !doc.data().todo) return { error: 'There is no punch list item with that id.' };
+    if(doc.data().done) return { error: 'That item is already checked off.' };
+    return { action: { type: 'complete_punch_item', itemId: doc.id },
+      summary: { title: 'Check off the punch list', text: doc.data().text || '', people: doc.data().houseId ? (doc.data().houseLabel || '') : '' } };
+  }
+  return { error: 'Unknown tool.' };
+}
+
+// Carry out a change the person confirmed. Checked again here, since it arrives from the browser.
+async function assistantRun(action, ctx){
+  const now = new Date().toISOString();
+  const by = { uid: ctx.me.uid, name: ctx.me.name, email: ctx.me.email, via: 'assistant' };
+  const named = ids=>ids.map(uid=>ctx.staff.find(s=>s.uid === uid).name);
+  if(action.type === 'add_note'){
+    const ok = await assistantCheck('add_note', { home_id: action.homeId, text: action.text, notify_user_ids: action.notify }, ctx);
+    if(ok.error) return ok.error;
+    const a = ok.action, job = ctx.jobs.find(j=>j.id === a.homeId);
+    // the tags go on the end of the text, the way they'd appear if it had been typed on the home's page
+    const tags = named(a.notify).map(n=>'@' + n).join(' ');
+    await db.collection('notes').add({
+      houseId: job.id, houseLabel: jobLabel(job), text: a.text + (tags ? ' ' + tags : ''),
+      mentions: a.notify.filter(uid=>uid !== ctx.me.uid), mentionNames: named(a.notify.filter(uid=>uid !== ctx.me.uid)), by, at: now, readBy: {},
+    });
+    return '';
+  }
+  if(action.type === 'add_punch_item'){
+    const ok = await assistantCheck('add_punch_item', { home_id: action.homeId, text: action.text, assign_user_ids: action.assign }, ctx);
+    if(ok.error) return ok.error;
+    const a = ok.action, job = a.homeId ? ctx.jobs.find(j=>j.id === a.homeId) : null;
+    await db.collection('notes').add({
+      todo: true, done: false, text: a.text, houseId: job ? job.id : '', houseLabel: job ? jobLabel(job) : 'General',
+      mentions: a.assign, mentionNames: named(a.assign), by, at: now, readBy: {},
+    });
+    return '';
+  }
+  if(action.type === 'complete_punch_item'){
+    const ok = await assistantCheck('complete_punch_item', { item_id: action.itemId }, ctx);
+    if(ok.error) return ok.error;
+    await db.collection('notes').doc(ok.action.itemId).update({ done: true, doneAt: now, doneBy: { uid: ctx.me.uid, name: ctx.me.name } });
+    return '';
+  }
+  return 'That is not something the assistant can do.';
+}
+
+if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 5, timeoutSeconds: 120, secrets: [ANTHROPIC_API_KEY] }, async (req, res)=>{
+  if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
+  try{
+    const who = await staffFromRequest(req);
+    if(!who){ res.status(401).json({ error: 'sign-in' }); return; }
+    const body = req.body || {};
+    const ctx = await assistantContext(who);
+
+    // The person pressed Confirm: do what was proposed.
+    if(body.action === 'run'){
+      const actions = Array.isArray(body.actions) ? body.actions.slice(0, 10) : [];
+      const results = [];
+      for(const a of actions){
+        const problem = await assistantRun(a || {}, ctx);
+        results.push({ ok: !problem, problem });
+      }
+      logger.info('Assistant actions run', { by: ctx.me.name, actions: actions.map(a=>a && a.type), failed: results.filter(r=>!r.ok).length });
+      res.json({ results });
+      return;
+    }
+
+    if(body.action !== 'ask'){ res.status(400).json({ error: 'action' }); return; }
+    const text = cleanText(body.text, 1000);
+    if(!text){ res.status(400).json({ error: 'text' }); return; }
+    // a little of the conversation so far, so "no, I meant lot 41" makes sense
+    const history = (Array.isArray(body.history) ? body.history : []).slice(-6)
+      .filter(h=>h && ['user', 'assistant'].includes(h.role) && typeof h.text === 'string' && h.text.trim())
+      .map(h=>({ role: h.role, content: h.text.slice(0, 1500) }));
+    while(history.length && history[0].role !== 'user') history.shift();
+    const messages = [...history, { role: 'user', content: text }];
+
+    const sdk = require('@anthropic-ai/sdk');
+    const Anthropic = sdk.Anthropic || sdk.default || sdk;
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value().trim() });
+    const request = {
+      model: ASSISTANT_MODEL,
+      max_tokens: 16000,
+      // short spoken commands: quick answers matter more than deep deliberation
+      output_config: { effort: 'low' },
+      // the instructions never change, so they can be cached; the lists of homes and people follow
+      system: [{ type: 'text', text: ASSISTANT_RULES, cache_control: { type: 'ephemeral' } }, { type: 'text', text: ctx.facts }],
+      tools: ASSISTANT_TOOLS,
+    };
+    // If Claude's safety checks ever decline a request, let the service retry it on its fallback
+    // model instead of failing. If this account can't use that option, carry on without it.
+    let useFallbacks = true;
+    const callClaude = async ()=>{
+      if(useFallbacks){
+        try{
+          return await client.beta.messages.create({ ...request, messages, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+        } catch(err){
+          if(!(err instanceof Anthropic.BadRequestError)) throw err;
+          logger.warn('Assistant: fallback option not accepted, continuing without it', { message: err.message });
+          useFallbacks = false;
+        }
+      }
+      return client.messages.create({ ...request, messages });
+    };
+
+    const proposed = [];
+    let reply = '', tokensIn = 0, tokensOut = 0;
+    for(let turn = 0; turn < 6; turn++){
+      const response = await callClaude();
+      tokensIn += (response.usage.input_tokens || 0) + (response.usage.cache_read_input_tokens || 0) + (response.usage.cache_creation_input_tokens || 0);
+      tokensOut += response.usage.output_tokens || 0;
+      reply = response.content.filter(b=>b.type === 'text').map(b=>b.text).join('\n').trim() || reply;
+      if(response.stop_reason === 'refusal'){ reply = 'Sorry, I can\'t help with that one.'; break; }
+      if(response.stop_reason === 'pause_turn'){ messages.push({ role: 'assistant', content: response.content }); continue; }
+      if(response.stop_reason !== 'tool_use') break;
+
+      messages.push({ role: 'assistant', content: response.content });
+      const results = [];
+      for(const block of response.content.filter(b=>b.type === 'tool_use')){
+        let content, isError = false;
+        try{
+          if(ASSISTANT_WRITES.includes(block.name)){
+            const checked = await assistantCheck(block.name, block.input || {}, ctx);
+            if(checked.error){ content = checked.error; isError = true; }
+            else {
+              proposed.push({ ...checked.action, summary: checked.summary });
+              content = 'This is now on the person\'s screen with Confirm and Cancel. It has NOT been saved yet.';
+            }
+          } else {
+            content = await assistantLookup(block.name, block.input || {}, ctx);
+          }
+        } catch(err){
+          logger.error('Assistant tool failed', { tool: block.name, error: String(err) });
+          content = 'That look-up failed.'; isError = true;
+        }
+        results.push({ type: 'tool_result', tool_use_id: block.id, content, ...(isError ? { is_error: true } : {}) });
+      }
+      messages.push({ role: 'user', content: results });
+    }
+    logger.info('Assistant request', { by: ctx.me.name, tokensIn, tokensOut, proposed: proposed.map(p=>p.type) });
+    res.json({ reply: reply || (proposed.length ? 'Here is what I\'ll do once you confirm.' : 'Sorry, I didn\'t catch that. Could you say it another way?'), actions: proposed });
+  } catch(err){
+    logger.error('hubAssistant failed', { error: String(err), status: err && err.status });
+    // a status here means Claude's service answered with an error (bad key, out of credit, busy)
+    if(err && err.status) res.status(502).json({ error: 'ai', status: err.status });
+    else res.status(500).json({ error: 'server' });
+  }
+});
+
+/* ============================================================
    onNoteCreated — someone was @mentioned in a note on a home.
    Email each person mentioned, at the address they sign in to the hub with.
    (The "emails to subs" switch on Admin Settings doesn't affect this — these go to staff.)
