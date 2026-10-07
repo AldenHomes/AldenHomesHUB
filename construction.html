@@ -203,6 +203,11 @@
   .tk-grid .v{font-size:15px; padding:9px 0;}
   .tk-grid input{width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; color:var(--ink); background:#fff;}
   .tk-grid input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .import-preview{background:#faf8f2; border:1px solid var(--steel-line); border-radius:var(--radius); padding:12px 14px; font-size:13.5px; line-height:1.6;}
+  .import-preview strong{color:var(--navy);}
+  .import-preview .warn{color:#96661a;}
+  .import-preview .ok{color:var(--good); font-weight:700;}
+  .import-preview .bad{color:var(--danger); font-weight:700;}
   .confirm-summary{display:flex; gap:14px; font-size:13.5px; font-weight:700; margin:2px 0 10px;}
   .confirm-summary .c-yes{color:var(--good);} .confirm-summary .c-no{color:var(--danger);} .confirm-summary .c-wait{color:var(--amber);}
   .confirm-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:9px 0; border-top:1px solid #ece8dd;}
@@ -362,6 +367,7 @@ html, body{max-width:100%; overflow-x:clip;}
             <input type="text" id="houseSearch" placeholder="Search name, lot, address, model…" autofocus>
           </div>
           <label class="check-label"><input type="checkbox" id="showFinished"> Show finished homes</label>
+          <button type="button" class="btn btn-ghost" id="importBtn" title="Bring a house's schedule over from a BuilderTrend Excel file">Import from BuilderTrend</button>
         </div>
         <div class="table-wrap clickable">
           <table>
@@ -533,6 +539,32 @@ html, body{max-width:100%; overflow-x:clip;}
 </div>
 
 <!-- Start schedule modal -->
+<!-- Import a house's schedule from a BuilderTrend "Schedule - List" Excel export -->
+<div class="overlay" id="importOverlay">
+  <div class="modal">
+    <div class="modal-head"><h2>Import from BuilderTrend</h2><button class="modal-close" data-close="importOverlay">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-error" id="importError"></div>
+      <div class="field">
+        <label for="im_file">The Excel file</label>
+        <input type="file" id="im_file" accept=".xlsx">
+        <div class="muted small" style="margin-top:5px;">In BuilderTrend, open the job's schedule in List view and export it to Excel. One file per house.</div>
+      </div>
+      <div class="field">
+        <label for="im_job">Which home is it for?</label>
+        <select id="im_job"></select>
+        <div class="muted small" style="margin-top:5px;">Homes come from the Job Production Schedule. If the home isn't listed, add it there first.</div>
+      </div>
+      <div id="im_preview" class="import-preview" style="display:none;"></div>
+      <label class="check-label" id="im_addVendorsRow" style="display:none; margin-top:12px; align-items:flex-start; white-space:normal; line-height:1.45;"><input type="checkbox" id="im_addVendors" checked> <span id="im_addVendorsText"></span></label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close="importOverlay">Cancel</button>
+      <button class="btn btn-primary" id="importSaveBtn" disabled>Import this schedule</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="startOverlay">
   <div class="modal">
     <div class="modal-head"><h2>Start a House Schedule</h2><button class="modal-close" data-close="startOverlay">&times;</button></div>
@@ -2210,6 +2242,248 @@ $('startSaveBtn').addEventListener('click', async ()=>{
     renderAll();
     window.scrollTo(0, 0);
   }
+});
+
+/* ============================================================
+   IMPORT FROM BUILDERTREND
+   Reads a "Schedule - List" Excel export and builds that house's schedule here with the same
+   jobs, dates, vendors, finished jobs and vendor answers.
+
+   BuilderTrend ties jobs together with "predecessors" (job 14 starts when job 12 finishes,
+   job 15 starts two days after job 14 starts...). Those become this hub's own links, so the
+   schedule keeps behaving the same way when a date is moved. Then every job's dates are
+   checked against the file and nudged until the hub's own date maths lands each job exactly
+   where BuilderTrend has it — and the result of that check is shown before anything is saved.
+   ============================================================ */
+let importPlan = null;   // what the chosen file would become, worked out before saving
+function loadScript(src){
+  return new Promise((resolve, reject)=>{
+    const el = document.createElement('script');
+    el.src = src; el.onload = resolve; el.onerror = ()=>reject(new Error('could not load ' + src));
+    document.head.appendChild(el);
+  });
+}
+function vendorKey(name){ return String(name || '').toUpperCase().replace(/&/g, 'AND').replace(/[^A-Z0-9]+/g, ' ').trim(); }
+// Excel keeps a date as a day number; a text date is read as written.
+function excelDate(v){
+  if(typeof v === 'number' && isFinite(v)) return msToIso(Date.UTC(1899, 11, 30) + Math.round(v) * DAY_MS);
+  const d = new Date(v);
+  return isNaN(d) ? '' : d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function lastWorkday(iso){ let ms = isoToMs(iso); while(!isWorkday(ms)) ms -= DAY_MS; return msToIso(ms); }
+
+async function readBuilderTrendFile(file){
+  if(!window.XLSX) await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+  const book = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  const grid = XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1, raw: true, defval: '' });
+  const headAt = grid.findIndex(r=>r.some(c=>String(c).trim().toLowerCase() === 'title') && r.some(c=>String(c).trim().toLowerCase() === 'start'));
+  if(headAt < 0) throw new Error('not-a-schedule');
+  const col = {};
+  grid[headAt].forEach((c, i)=>{ col[String(c).trim().toLowerCase()] = i; });
+  const need = ['title', 'start', 'end'];
+  if(need.some(k=>!(k in col))) throw new Error('not-a-schedule');
+  const get = (r, name)=>name in col ? r[col[name]] : '';
+  const rows = grid.slice(headAt + 1).filter(r=>String(get(r, 'title')).trim() && get(r, 'start') !== '').map((r, i)=>({
+    id: String(get(r, 'id #') || i + 1).trim(),
+    title: String(get(r, 'title')).trim(),
+    done: ['1', 'true', 'yes'].includes(String(get(r, 'complete')).trim().toLowerCase()),
+    phase: String(get(r, 'phase')).trim(),
+    start: excelDate(get(r, 'start')), end: excelDate(get(r, 'end')),
+    who: String(get(r, 'assigned to')).trim(),
+    accepted: Number(get(r, 'accepted')) || 0, declined: Number(get(r, 'declined')) || 0,
+    pred: String(get(r, 'pred 1 id')).trim(), predType: String(get(r, 'pred 1 type')).trim().toUpperCase(), predLag: Number(get(r, 'pred 1 lag')) || 0,
+    pred2: String(get(r, 'pred 2 id')).trim(),
+  })).filter(r=>r.start && r.end);
+  if(!rows.length) throw new Error('not-a-schedule');
+  // the first line of the sheet names the job: "Schedule - List - AP #383 Bray (exported on …)"
+  const heading = String((grid[0] || [])[0] || '').replace(/^Schedule\s*-\s*List\s*-\s*/i, '').replace(/\s*\(exported.*$/i, '').trim();
+  return { heading, rows };
+}
+
+// Split BuilderTrend's "Assigned To" into vendors we already have and names we don't.
+// (Names can contain commas themselves — "HARVEY ACHEY CONSTRUCTION, LLC" — so known vendors are looked for first.)
+function splitVendors(text){
+  let rest = ' ' + vendorKey(text) + ' ';
+  const raw = String(text || '');
+  const known = [];
+  subs.slice().sort((a, b)=>(b.name || '').length - (a.name || '').length).forEach(v=>{
+    const key = vendorKey(v.name);
+    if(key && rest.includes(' ' + key + ' ')){ known.push(v); rest = rest.replace(' ' + key + ' ', ' , '); }
+  });
+  // what's left, in the original wording
+  const unknown = [];
+  raw.split(',').map(p=>p.trim()).filter(Boolean).forEach(part=>{
+    if(/^(llc|inc|inc\.|co|co\.|ltd|llp|corp)$/i.test(part)){ if(unknown.length) unknown[unknown.length - 1] += ', ' + part; return; }
+    const key = vendorKey(part);
+    if(!key || known.some(v=>{ const k = vendorKey(v.name); return k === key || k.startsWith(key + ' ') || k.includes(' ' + key + ' ') || k.endsWith(' ' + key); })) return;
+    unknown.push(part);
+  });
+  known.sort((a, b)=>vendorKey(raw).indexOf(vendorKey(a.name)) - vendorKey(raw).indexOf(vendorKey(b.name)));
+  return { known, unknown };
+}
+
+// Turn the file into this hub's kind of schedule, without saving anything.
+function planImport(data){
+  const notes = [];
+  const startDate = snapToWorkday(data.rows.map(r=>r.start).sort()[0]);
+  const idFor = {};
+  data.rows.forEach(r=>{ idFor[r.id] = newId(); });
+  const newVendors = [];
+  let weekend = 0, extraLinks = 0;
+  const tasks = data.rows.map(r=>{
+    // the hub only schedules Monday to Friday
+    const start = snapToWorkday(r.start);
+    let end = r.end < start ? start : lastWorkday(r.end);
+    if(end < start) end = start;
+    if(start !== r.start || end !== r.end) weekend++;
+    if(r.pred2) extraLinks++;
+    const v = splitVendors(r.who);
+    v.unknown.forEach(name=>{ if(!newVendors.some(x=>vendorKey(x) === vendorKey(name))) newVendors.push(name); });
+    const lib = taskLib.find(t=>vendorKey(t.title) === vendorKey(r.title));
+    const count = v.known.length + v.unknown.length;
+    const answer = count && r.accepted >= count ? 'confirmed' : (count && r.declined >= count ? 'declined' : 'pending');
+    return {
+      id: idFor[r.id], taskId: lib ? lib.id : '', title: r.title, phase: PHASES.includes(r.phase) ? r.phase : (lib ? lib.phase || '' : ''),
+      duration: workdayIndex(start, end) + 1, subIds: v.known.map(x=>x.id), _newVendors: v.unknown, _answer: answer,
+      notes: '', lag: 0, status: 'draft',
+      link: r.pred && idFor[r.pred] && r.pred !== r.id ? { to: idFor[r.pred], type: r.predType.startsWith('S') ? 'start' : 'finish', lag: r.predLag } : null,
+      done: r.done, doneAt: r.done ? end + 'T17:00:00.000Z' : '', doneBy: '',
+      _want: { start, end },
+    };
+  });
+
+  // Make the hub's own date maths put every job on BuilderTrend's dates. A job is only adjusted once
+  // the job it depends on is already right, so each fix sticks.
+  const want = {}; tasks.forEach(t=>{ want[t.id] = t._want; });
+  const off = laid=>laid.filter(t=>t.start !== want[t.id].start);
+  for(let pass = 0; pass < tasks.length * 6; pass++){
+    const laid = layoutTasks(startDate, tasks).tasks;
+    const wrong = off(laid);
+    if(!wrong.length) break;
+    const right = new Set(laid.filter(t=>t.start === want[t.id].start).map(t=>t.id));
+    const mainLine = laid.filter(t=>!t.anchor);
+    const ready = wrong.find(t=>t.anchor ? right.has(t.anchor.id) : mainLine.slice(0, mainLine.indexOf(t)).every(p=>right.has(p.id))) || wrong[0];
+    const diff = workdayIndex(startDate, want[ready.id].start) - workdayIndex(startDate, ready.start);
+    const mine = tasks.find(t=>t.id === ready.id);
+    if(ready.anchor) mine.link = { ...mine.link, lag: (parseInt(mine.link.lag, 10) || 0) + diff };
+    else { mine.link = null; mine.lag = (parseInt(mine.lag, 10) || 0) + diff; }
+  }
+  const final = layoutTasks(startDate, tasks);
+  const mismatched = final.tasks.filter(t=>t.start !== want[t.id].start || t.end !== want[t.id].end)
+    .map(t=>`${t.title}: BuilderTrend ${fmtDate(want[t.id].start)}, here ${fmtDate(t.start)}`);
+  if(weekend) notes.push(`${weekend} job${weekend === 1 ? ' has' : 's have'} a weekend date in BuilderTrend; the hub only schedules Monday to Friday, so ${weekend === 1 ? 'it was' : 'they were'} moved to the nearest working day.`);
+  if(extraLinks) notes.push(`${extraLinks} job${extraLinks === 1 ? ' has' : 's have'} a second predecessor in BuilderTrend. The hub links a job to one other job, so the first is kept. The dates still match.`);
+  return {
+    heading: data.heading, startDate, tasks, newVendors, notes, mismatched,
+    first: data.rows.map(r=>r.start).sort()[0], last: data.rows.map(r=>r.end).sort().pop(),
+    done: tasks.filter(t=>t.done).length,
+    accepted: tasks.filter(t=>t._answer === 'confirmed').length,
+    linked: final.tasks.filter(t=>t.anchor).length,
+    noVendor: tasks.filter(t=>!t.subIds.length && !t._newVendors.length).length,
+  };
+}
+
+function renderImport(){
+  const p = importPlan;
+  $('importSaveBtn').disabled = !p || !$('im_job').value;
+  $('im_preview').style.display = p ? 'block' : 'none';
+  $('im_addVendorsRow').style.display = p && p.newVendors.length ? 'flex' : 'none';
+  if(!p) return;
+  const has = schedules.some(x=>x.id === $('im_job').value);
+  $('im_addVendorsText').textContent = `Add ${p.newVendors.length} vendor${p.newVendors.length === 1 ? '' : 's'} that ${p.newVendors.length === 1 ? "isn't" : "aren't"} in the hub yet: ${p.newVendors.join('; ')}`;
+  $('im_preview').innerHTML = `<strong>${esc(p.heading || 'This file')}</strong><br>
+    ${p.tasks.length} jobs, ${esc(fmtDate(p.first))} to ${esc(fmtDate(p.last))} · ${p.done} already done · ${p.accepted} accepted by vendors · ${p.linked} tied to another job<br>
+    ${p.mismatched.length
+      ? `<span class="bad">${p.mismatched.length} job${p.mismatched.length === 1 ? '' : 's'} would NOT land on BuilderTrend's dates:</span><br>${p.mismatched.slice(0, 8).map(esc).join('<br>')}`
+      : `<span class="ok">&#10003; Checked: all ${p.tasks.length} jobs land on the same dates as BuilderTrend.</span>`}
+    ${p.noVendor ? `<br>${p.noVendor} job${p.noVendor === 1 ? ' has' : 's have'} nobody assigned in BuilderTrend.` : ''}
+    ${p.notes.map(x=>`<br><span class="warn">${esc(x)}</span>`).join('')}
+    ${has ? '<br><span class="bad">This home already has a schedule here. Importing will replace it.</span>' : ''}
+    <br><span class="muted">It comes in as a draft: subs can't see it and nobody is emailed until you press “Send to subs”.</span>`;
+}
+
+$('importBtn').addEventListener('click', ()=>{
+  importPlan = null;
+  $('im_file').value = '';
+  $('importError').classList.remove('show');
+  const label = j=>[j.community, j.lot ? 'Lot ' + j.lot : '', j.client].filter(Boolean).join(' · ') || 'Unnamed home';
+  $('im_job').innerHTML = '<option value="">Pick a home…</option>' + jobs.slice().sort((a, b)=>label(a).localeCompare(label(b), 'en', { numeric: true }))
+    .map(j=>`<option value="${esc(j.id)}">${esc(label(j))}${schedules.some(x=>x.id === j.id) ? ' (has a schedule)' : ''}</option>`).join('');
+  renderImport();
+  openOverlay('importOverlay');
+});
+$('im_job').addEventListener('change', renderImport);
+$('im_file').addEventListener('change', async e=>{
+  const picked = e.target.files[0];
+  const errBox = $('importError');
+  errBox.classList.remove('show');
+  importPlan = null;
+  renderImport();
+  if(!picked) return;
+  try{
+    const data = await readBuilderTrendFile(picked);
+    importPlan = planImport(data);
+    // "AP #383 Bray" → the home in community AP with lot 383, if there is exactly one
+    const m = /^([A-Za-z]+)\s*#\s*(\w+)/.exec(data.heading || '');
+    if(m){
+      const hits = jobs.filter(j=>String(j.community || '').toUpperCase() === m[1].toUpperCase() && String(j.lot || '').trim().toUpperCase() === m[2].toUpperCase());
+      if(hits.length === 1) $('im_job').value = hits[0].id;
+    }
+  } catch(err){
+    console.error(err);
+    errBox.textContent = err.message === 'not-a-schedule'
+      ? 'That doesn\'t look like a BuilderTrend schedule export. It needs the Title, Start and End columns from the schedule\'s List view.'
+      : 'That file couldn\'t be read. Make sure it\'s the Excel (.xlsx) export, and check your connection.';
+    errBox.classList.add('show');
+  }
+  renderImport();
+});
+$('importSaveBtn').addEventListener('click', async ()=>{
+  const p = importPlan;
+  const job = jobs.find(j=>j.id === $('im_job').value);
+  if(!p || !job) return;
+  if(schedules.some(x=>x.id === job.id) && !confirm('This home already has a schedule in the hub.\n\nReplace it with the one from BuilderTrend? The current one is lost, and subs will stop seeing it until you send the new one.')) return;
+  $('importSaveBtn').disabled = true;
+  $('importSaveBtn').textContent = 'Importing…';
+  try{
+    // vendors the hub doesn't have yet
+    const idByName = {};
+    if(p.newVendors.length && $('im_addVendors').checked){
+      const batch = db.batch();
+      p.newVendors.forEach(name=>{
+        const id = newId();
+        idByName[vendorKey(name)] = id;
+        batch.set(subsCol.doc(id), { name, trade: '', contact: '', email: '', phone: '' });
+      });
+      if(!(await save(batch.commit()))) throw new Error('vendors');
+    }
+    const tasks = p.tasks.map(t=>{
+      const { _newVendors, _answer, _want, ...task } = t;
+      task.subIds = [...task.subIds, ..._newVendors.map(name=>idByName[vendorKey(name)]).filter(Boolean)];
+      task.confirm = {};
+      task.subIds.forEach(id=>{ task.confirm[id] = _answer; });
+      return task;
+    });
+    const sched = {
+      id: job.id,
+      community: job.community || '', lot: job.lot || '', client: job.client || '', address: job.address || '', model: job.model || '',
+      templateId: '', templateName: 'Imported from BuilderTrend',
+      importedFrom: { source: 'BuilderTrend', heading: p.heading || '', at: new Date().toISOString() },
+      createdAt: new Date().toISOString(),
+    };
+    if(!(await saveSchedule(sched, tasks, p.startDate))) throw new Error('save');
+    closeOverlay('importOverlay');
+    openScheduleId = job.id;
+    calMonth = null;
+    renderAll();
+    window.scrollTo(0, 0);
+  } catch(err){
+    console.error(err);
+    $('importError').textContent = 'The import didn\'t finish. Check your connection and try again.';
+    $('importError').classList.add('show');
+  }
+  $('importSaveBtn').textContent = 'Import this schedule';
+  renderImport();
 });
 
 /* ============================================================
