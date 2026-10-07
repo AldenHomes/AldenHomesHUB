@@ -183,17 +183,17 @@ html, body{max-width:100%; overflow-x:clip;}
 
       <div class="setting">
         <div class="txt">
-          <div class="name">Remind about jobs starting within</div>
-          <div class="what">A sub who hasn't answered only gets reminders once the job is this close. Further-off jobs wait quietly.</div>
+          <div class="name">Remind a sub who hasn't answered after</div>
+          <div class="what">A sub is asked once. If they still haven't approved or declined after this many days, they get one reminder, and another after the same wait. There are no daily reminders.</div>
         </div>
-        <input type="number" id="leadDays" min="1" max="120" step="1"> <span class="unit">days</span>
+        <input type="number" id="remindAfterDays" min="1" max="90" step="1"> <span class="unit">days</span>
       </div>
-      <div class="setting">
+      <div class="setting" style="align-items:flex-start;">
         <div class="txt">
-          <div class="name">Wait between reminders</div>
-          <div class="what">How long to leave an unanswered request before asking again.</div>
+          <div class="name">Note added to every schedule email</div>
+          <div class="what">Shown in a highlighted box near the top of each email to subs. Clear the box to send emails without a note.</div>
         </div>
-        <input type="number" id="reminderDays" min="1" max="30" step="1"> <span class="unit">days</span>
+        <textarea id="emailNote" maxlength="600" style="flex:1 1 300px; min-height:84px; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; line-height:1.45; color:var(--ink); font-family:inherit; resize:vertical;"></textarea>
       </div>
       <div class="setting">
         <div class="txt">
@@ -204,7 +204,7 @@ html, body{max-width:100%; overflow-x:clip;}
       </div>
 
       <div class="fact">
-        Emails are sent from <code>aldenhomesserver@gmail.com</code> as “Alden Homes Scheduling”. The daily follow-up runs at 7:00 a.m. and only covers houses that have been sent to subs.
+        Emails are sent from <code>aldenhomesserver@gmail.com</code> as “Alden Homes Scheduling”. Each morning at 7:00 a.m. the hub checks houses that have been sent to subs. It emails a sub when their dates have moved or they've been added to a job, and reminds them only after the wait set above.
       </div>
     </div>
 
@@ -240,7 +240,9 @@ const firebaseConfig = {
 /* Notification settings live in one record: settings/notifications.
    The server reads it every time it is about to email anyone, so a change here
    takes effect immediately — nothing needs redeploying. */
-const DEFAULTS = { paused: false, leadDays: 14, reminderDays: 3, replyTo: '' };
+// (the testing note is what goes out until someone changes or clears it here — the server has the same wording)
+const TESTING_NOTE = 'Please note: we are in a testing phase with this new system, so these jobs are currently still running in BuilderTrend as well.';
+const DEFAULTS = { paused: false, remindAfterDays: 21, replyTo: '' };
 let settings = null;   // null until loaded
 
 const $ = id => document.getElementById(id);
@@ -358,12 +360,12 @@ function render(){
   $('emailSwitch').setAttribute('aria-checked', String(on));
   $('emailState').textContent = on ? 'Emails are ON' : 'Emails are OFF';
   $('emailWhat').textContent = on
-    ? 'Pressing “Send to subs” on a house emails every sub on it, and the morning follow-up runs.'
+    ? 'Pressing “Send to subs” on a house emails every sub on it. After that, subs are emailed when their dates move, and reminded only if they haven\'t answered after the wait below.'
     : 'Nobody is emailed. “Send to subs” still shares the house so subs can see it from their link, but no emails go out and the morning follow-up is skipped.';
   // don't overwrite a box someone is typing in
   const set = (id, v)=>{ if(document.activeElement !== $(id)) $(id).value = v; };
-  set('leadDays', settings.leadDays);
-  set('reminderDays', settings.reminderDays);
+  set('remindAfterDays', settings.remindAfterDays);
+  set('emailNote', typeof settings.emailNote === 'string' ? settings.emailNote : TESTING_NOTE);
   set('replyTo', settings.replyTo || '');
 }
 
@@ -395,8 +397,8 @@ function numberSetting(id, key, min, max){
     save({ [key]: n });
   });
 }
-numberSetting('leadDays', 'leadDays', 1, 120);
-numberSetting('reminderDays', 'reminderDays', 1, 30);
+numberSetting('remindAfterDays', 'remindAfterDays', 1, 90);
+$('emailNote').addEventListener('change', e=>save({ emailNote: e.target.value.trim() }));
 /* ============================================================
    TEAM — a name for each hub login
    The list of logins and their names is kept with the logins themselves, which only

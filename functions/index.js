@@ -10,9 +10,9 @@
    2. onScheduleSend — when the office presses "Send to subs" on a house, every sub on
                        that house is emailed their jobs straight away.
 
-   3. dailyFollowUp  — each morning: re-asks subs whose dates changed, asks anyone newly
-                       added to a house, and reminds subs who haven't answered about
-                       work that's coming up soon. Also tells the office about any job
+   3. dailyFollowUp  — each morning: emails subs whose dates changed, asks anyone newly
+                       added to a house, and reminds a sub only if they still haven't
+                       answered three weeks after they were asked. Also tells the office about any job
                        a sub has left unanswered for three weeks.
 
    The database security rules stay staff-only. Everything a sub can do goes
@@ -57,10 +57,11 @@ const TIME_ZONE = 'America/New_York';
 // Only the hub itself (and a local preview while developing) may call the portal from a browser.
 const ALLOWED_ORIGINS = ['https://aldenhomes.github.io', /^http:\/\/localhost(:\d+)?$/];
 
-// Reminders: only nag about work starting within this many days, and not more often than this.
-// Staff can change these in the database at settings/notifications.
-const DEFAULT_LEAD_DAYS = 14;
-const DEFAULT_REMINDER_DAYS = 3;
+// Reminders: a sub who hasn't answered is only reminded once this many days have gone by since
+// they were last asked (and again after the same wait). Set on Admin Settings (settings/notifications).
+const DEFAULT_REMIND_AFTER_DAYS = 21;
+// A line added to every schedule email to subs, until the office clears it on Admin Settings.
+const DEFAULT_EMAIL_NOTE = 'Please note: we are in a testing phase with this new system, so these jobs are currently still running in BuilderTrend as well.';
 
 // The Gmail account the emails go out from. Its app password is stored as a secret
 // (never in this file): firebase functions:secrets:set GMAIL_APP_PASSWORD
@@ -539,7 +540,7 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
 /* ============================================================
    Emailing subs
    ============================================================ */
-function buildEmail(sub, items, link, kind){
+function buildEmail(sub, items, link, kind, note){
   const lines = items.map(i=>({
     title: i.t.title,
     when: i.t.start === i.t.end ? niceDate(i.t.start) : `${niceDate(i.t.start)} – ${niceDate(i.t.end)}`,
@@ -566,7 +567,7 @@ function buildEmail(sub, items, link, kind){
     intro = `Alden Homes has you scheduled for the following${oneHouse ? ' at ' + oneHouse : ''}. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`;
   }
   const text = [
-    `Hi ${sub.name || ''},`, '', intro, '',
+    `Hi ${sub.name || ''},`, '', intro, '', ...(note ? [note, ''] : []),
     ...lines.map(l=>`- ${l.title} — ${l.when}${l.was ? ` (moved — was ${l.was})` : ''}\n  ${l.where}${l.address ? ' — ' + l.address : ''}`),
     '', `Approve or decline here (no login needed): ${link}`, '', 'Thank you,', 'Alden Homes',
   ].join('\n');
@@ -578,6 +579,7 @@ function buildEmail(sub, items, link, kind){
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;" bgcolor="#ffffff">
     <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">${kind === 'reminder' ? 'Reminder — jobs waiting on your answer' : (kind === 'changed' ? 'Schedule update' : 'Jobs to confirm')}</span></td></tr>
     <tr><td style="padding:22px 24px 4px;${font}font-size:15px;line-height:1.5;color:#33363a;">Hi ${esc(sub.name || '')},<br><br>${esc(intro)}</td></tr>
+    ${note ? `<tr><td style="padding:12px 24px 2px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#fdf0dc" style="padding:11px 14px;border-left:4px solid #c98a2b;${font}font-size:14px;line-height:1.5;color:#33363a;">${esc(note).replace(/\n/g, '<br>')}</td></tr></table></td></tr>` : ''}
     <tr><td style="padding:10px 24px 4px;">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         ${lines.map(l=>`<tr><td style="padding:13px 0;border-top:1px solid #e2ddd0;${font}color:#33363a;">
@@ -605,8 +607,9 @@ async function notifySettings(){
   const s = doc.exists ? doc.data() : {};
   return {
     paused: !!s.paused,
-    leadDays: Number(s.leadDays) > 0 ? Number(s.leadDays) : DEFAULT_LEAD_DAYS,
-    reminderDays: Number(s.reminderDays) > 0 ? Number(s.reminderDays) : DEFAULT_REMINDER_DAYS,
+    remindAfterDays: Number(s.remindAfterDays) > 0 ? Number(s.remindAfterDays) : DEFAULT_REMIND_AFTER_DAYS,
+    // never set = the testing note; saved as empty = no note
+    emailNote: typeof s.emailNote === 'string' ? s.emailNote.trim().slice(0, 600) : DEFAULT_EMAIL_NOTE,
     replyTo: typeof s.replyTo === 'string' ? s.replyTo.trim() : '',
   };
 }
@@ -639,7 +642,7 @@ async function emailSubs(bySub, kind, settings){
     }
     const items = bySub[subId].sort((a, b)=>a.t.start.localeCompare(b.t.start));
     // "Send again" after dates were moved is a date-change email, not a brand-new request
-    const mail = buildEmail(sub, items, `${PORTAL_URL}?k=${encodeURIComponent(sub.linkToken)}`, kind === 'new' && items.some(i=>i.was) ? 'changed' : kind);
+    const mail = buildEmail(sub, items, `${PORTAL_URL}?k=${encodeURIComponent(sub.linkToken)}`, kind === 'new' && items.some(i=>i.was) ? 'changed' : kind, settings && settings.emailNote);
     try{
       await transport.sendMail({ from, replyTo, to: recipients, subject: mail.subject, text: mail.text, html: mail.html });
       outcome.emailed.push(sub.name || subId);
@@ -1426,12 +1429,11 @@ if(EMAIL_ON) exports.dailyFollowUp = onSchedule({ schedule: 'every day 07:00', t
   await flagLongWaits(await db.collection('build-schedules').get(), todayIso());
   const settings = await notifySettings();
   if(settings.paused){ logger.info('Emails are switched off on the Admin Settings page — nothing sent.'); return; }
-  const { leadDays, reminderDays } = settings;
+  const { remindAfterDays } = settings;
   const today = todayIso();
-  const horizon = addDaysIso(today, leadDays);
 
   const changed = {};   // never asked about these dates (new on the house, or the dates moved)
-  const reminders = {}; // asked, no answer, and the work is coming up soon
+  const reminders = {}; // asked, and still no answer three weeks (remindAfterDays) later
   const snap = await db.collection('build-schedules').get();
   snap.forEach(doc=>{
     const sched = doc.data();
@@ -1444,7 +1446,7 @@ if(EMAIL_ON) exports.dailyFollowUp = onSchedule({ schedule: 'every day 07:00', t
         const item = { houseId: doc.id, sched, t, was: movedFrom(t, subId) };
         if(!asked || asked.start !== t.start || asked.end !== t.end){
           (changed[subId] = changed[subId] || []).push(item);
-        } else if(t.start <= horizon && daysBetween((asked.at || '').slice(0, 10) || today, today) >= reminderDays){
+        } else if(daysBetween((asked.at || '').slice(0, 10) || today, today) >= remindAfterDays){
           (reminders[subId] = reminders[subId] || []).push(item);
         }
       });
