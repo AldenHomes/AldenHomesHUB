@@ -158,11 +158,12 @@ async function staffWanting(kind){
     .filter(u=>u.email && !u.disabled && prefs[u.uid] && prefs[u.uid][kind] === true)
     .map(u=>u.uid);
 }
-async function notifyStaff(kind, { houseId, sched, taskId, by, text }){
+async function notifyStaff(kind, { houseId, sched, taskId, by, text, photos }){
   const mentions = await staffWanting(kind);
   // saved even if nobody has switched this kind on, so it's still on the home's notes
   await db.collection('notes').add({
     houseId, houseLabel: houseName(sched), text, by, mentions, kind, taskId: taskId || '',
+    ...(photos && photos.length ? { photos } : {}),
     at: new Date().toISOString(), readBy: {},
   });
 }
@@ -253,12 +254,22 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
     }
 
     // A note to the office about one of their jobs — a question, or asking to slide the dates.
+    // It can carry photos they've just added to that job ("can you look at this?").
     if(body.action === 'note'){
-      const text = cleanText(body.text, 1000);
-      if(!text){ res.status(400).json({ error: 'text' }); return; }
+      const typed = cleanText(body.text, 1000);
+      const fileIds = (Array.isArray(body.fileIds) ? body.fileIds : []).filter(id=>typeof id === 'string' && id).slice(0, 6);
+      if(!typed && !fileIds.length){ res.status(400).json({ error: 'text' }); return; }
       const sched = await houseForSub(body.houseId, sub.id);
       const t = sched && (sched.tasks || []).find(x=>x.id === body.taskId && (x.subIds || []).includes(sub.id));
       if(!t){ res.status(404).json({ error: 'not-yours' }); return; }
+      // only photos this sub added to this house count — a made-up id is simply ignored
+      const photos = [];
+      for(const id of fileIds){
+        const f = await db.collection('house-files').doc(id).get();
+        const d = f.exists ? f.data() : null;
+        if(d && d.kind === 'photo' && d.houseId === body.houseId && d.by && d.by.type === 'sub' && d.by.id === sub.id && d.url) photos.push(d.url);
+      }
+      const text = typed || `Sent ${photos.length === 1 ? 'a photo' : photos.length + ' photos'} for you to look at.`;
       // every note emails the office, so one link can't send more than a handful an hour
       const hourAgo = new Date(Date.now() - 3600000).toISOString();
       const recent = (Array.isArray(sub.noteLog) ? sub.noteLog : []).filter(at=>at > hourAgo);
@@ -268,6 +279,7 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
         houseId: body.houseId, sched, taskId: t.id,
         by: { type: 'sub', id: sub.id, name: sub.name || 'A subcontractor' },
         text: `About ${t.title || 'a job'} — ${whenText(t)}:\n${text}`,
+        photos,
       });
       res.json({ ok: true });
       return;
@@ -457,7 +469,8 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
     // Progress: how far along, which phase, what's happening now and what's next — no sub names.
     // how many photos were posted against each task, so finished steps can show their pictures
     const photosPerTask = {};
-    filesSnap.forEach(d=>{ const f = d.data(); if(f.kind === 'photo' && f.taskId) photosPerTask[f.taskId] = (photosPerTask[f.taskId] || 0) + 1; });
+    // A buyer only ever sees the photos the office has picked for them ("Show to customer" on the home's page).
+    filesSnap.forEach(d=>{ const f = d.data(); if(f.kind === 'photo' && f.shared === true && f.taskId) photosPerTask[f.taskId] = (photosPerTask[f.taskId] || 0) + 1; });
 
     let progress = null;
     if(schedDoc.exists){
@@ -489,7 +502,7 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
       const f = d.data();
       if(f.kind === 'folder'){ if(f.name) folders.push(f.name); }
       else if(f.kind === 'plan') plans.push({ id: d.id, name: f.name || 'Plan', url: f.url || '', at: f.uploadedAt || '' });
-      else photos.push({ id: d.id, url: f.url || '', folder: f.folder || '', caption: f.caption || '', taskId: f.taskId || '', at: f.uploadedAt || '' });
+      else if(f.shared === true) photos.push({ id: d.id, url: f.url || '', folder: f.folder || '', caption: f.caption || '', taskId: f.taskId || '', at: f.uploadedAt || '' });
     });
     photos.sort((a, b)=>(b.at || '').localeCompare(a.at || '')); // newest first
     plans.sort((a, b)=>(a.name || '').localeCompare(b.name || ''));
@@ -516,6 +529,8 @@ function buildEmail(sub, items, link, kind){
     when: i.t.start === i.t.end ? niceDate(i.t.start) : `${niceDate(i.t.start)} – ${niceDate(i.t.end)}`,
     where: houseName(i.sched),
     address: i.sched.address || '',
+    // the dates they were told before, when this job has been moved
+    was: i.was ? (i.was.start === i.was.end ? niceDate(i.was.start) : `${niceDate(i.was.start)} – ${niceDate(i.was.end)}`) : '',
   }));
   const n = lines.length;
   const oneHouse = new Set(items.map(i=>i.houseId)).size === 1 ? houseName(items[0].sched) : '';
@@ -524,15 +539,19 @@ function buildEmail(sub, items, link, kind){
     subject = n === 1 ? `Reminder — please confirm: ${lines[0].title}, ${lines[0].when}` : `Reminder — ${n} Alden Homes jobs still need your answer`;
     intro = `We haven't heard back on the following. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`;
   } else if(kind === 'changed'){
-    subject = n === 1 ? `Date change — please confirm: ${lines[0].title}, ${lines[0].when}` : `Schedule update — ${n} Alden Homes jobs to confirm`;
-    intro = `The schedule below is new or has changed. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`;
+    const moved = lines.filter(l=>l.was).length;
+    subject = n === 1 ? `${moved ? 'Dates moved' : 'New job'} — please confirm: ${lines[0].title}, ${lines[0].when}`
+      : (moved ? `Dates moved — ${n} Alden Homes jobs to confirm` : `Schedule update — ${n} Alden Homes jobs to confirm`);
+    intro = moved === n ? `The dates for the ${n === 1 ? 'job' : 'jobs'} below have moved. Please approve or decline the new dates — you can also send us a note if you have a question or need different dates.`
+      : moved ? `Some of the dates below have moved, and some jobs are new. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`
+      : `The schedule below is new. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`;
   } else {
     subject = oneHouse ? `Alden Homes schedule — ${oneHouse} (${n} job${n === 1 ? '' : 's'} to confirm)` : `Alden Homes — ${n} jobs to confirm`;
     intro = `Alden Homes has you scheduled for the following${oneHouse ? ' at ' + oneHouse : ''}. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`;
   }
   const text = [
     `Hi ${sub.name || ''},`, '', intro, '',
-    ...lines.map(l=>`- ${l.title} — ${l.when}\n  ${l.where}${l.address ? ' — ' + l.address : ''}`),
+    ...lines.map(l=>`- ${l.title} — ${l.when}${l.was ? ` (moved — was ${l.was})` : ''}\n  ${l.where}${l.address ? ' — ' + l.address : ''}`),
     '', `Approve or decline here (no login needed): ${link}`, '', 'Thank you,', 'Alden Homes',
   ].join('\n');
   // Built from plain tables with the colours set on the cells, which is what email apps
@@ -548,6 +567,7 @@ function buildEmail(sub, items, link, kind){
         ${lines.map(l=>`<tr><td style="padding:13px 0;border-top:1px solid #e2ddd0;${font}color:#33363a;">
           <div style="font-size:16px;font-weight:bold;color:#4B4F54;">${esc(l.title)}</div>
           <div style="font-size:15px;font-weight:bold;padding-top:3px;">${esc(l.when)}</div>
+          ${l.was ? `<div style="font-size:13px;color:#b3452f;padding-top:3px;">Moved &mdash; was ${esc(l.was)}</div>` : ''}
           <div style="font-size:13px;color:#6b6f72;padding-top:3px;">${esc(l.where)}${l.address ? '<br>' + esc(l.address) : ''}</div></td></tr>`).join('')}
       </table>
     </td></tr>
@@ -602,7 +622,8 @@ async function emailSubs(bySub, kind, settings){
       await doc.ref.update({ linkToken: sub.linkToken });
     }
     const items = bySub[subId].sort((a, b)=>a.t.start.localeCompare(b.t.start));
-    const mail = buildEmail(sub, items, `${PORTAL_URL}?k=${encodeURIComponent(sub.linkToken)}`, kind);
+    // "Send again" after dates were moved is a date-change email, not a brand-new request
+    const mail = buildEmail(sub, items, `${PORTAL_URL}?k=${encodeURIComponent(sub.linkToken)}`, kind === 'new' && items.some(i=>i.was) ? 'changed' : kind);
     try{
       await transport.sendMail({ from, replyTo, to: recipients, subject: mail.subject, text: mail.text, html: mail.html });
       outcome.emailed.push(sub.name || subId);
@@ -613,6 +634,12 @@ async function emailSubs(bySub, kind, settings){
     }
   }
   return outcome;
+}
+
+// If a sub was already told dates for this job and the job has since moved, the dates they were told.
+function movedFrom(t, subId){
+  const asked = t.asked && t.asked[subId];
+  return asked && asked.start && (asked.start !== t.start || asked.end !== t.end) ? { start: asked.start, end: asked.end } : null;
 }
 
 // Note on each task which dates each sub was asked about, and when — so they aren't asked
@@ -1054,16 +1081,19 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
     subWaiting: { heading: 'Still waiting on a sub', subject: `Still waiting on an answer — ${house}`, lead: `A job on <strong>${esc(house)}</strong> has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, plain: `A job on ${house} has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, button: 'Open this job' },
   }[note.kind] || { heading: 'New note for you', subject: `New note for you on ${house}`, lead: `<strong>${esc(who)}</strong> mentioned you in a note on <strong>${esc(house)}</strong>:`, plain: `${who} mentioned you in a note on ${house}:`, button: 'Open this home' };
   const optOut = fromSub ? `You can switch these off in the hub: ${site}admin.html` : '';
+  // photos a sub sent with their note
+  const notePhotos = (Array.isArray(note.photos) ? note.photos : []).filter(u=>typeof u === 'string' && /^https:\/\//.test(u)).slice(0, 6);
   const font = 'font-family:Arial,Helvetica,sans-serif;';
   const html = `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f4ef"><tr><td align="center" style="padding:24px 12px;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;" bgcolor="#ffffff">
     <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes Hub<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">${wording.heading}</span></td></tr>
     <tr><td style="padding:22px 24px 6px;${font}font-size:15px;line-height:1.5;color:#33363a;">${wording.lead}</td></tr>
     <tr><td style="padding:8px 24px 4px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#faf8f2" style="padding:14px 16px;border-left:4px solid #A3AA83;${font}font-size:15px;line-height:1.55;color:#33363a;">${esc(note.text || '').replace(/\n/g, '<br>')}</td></tr></table></td></tr>
+    ${notePhotos.length ? `<tr><td style="padding:10px 24px 0;">${notePhotos.map(url=>`<a href="${esc(url)}"><img src="${esc(url)}" width="150" alt="Photo" style="width:150px;max-width:46%;height:auto;border:0;margin:0 6px 6px 0;"></a>`).join('')}</td></tr>` : ''}
     <tr><td style="padding:16px 24px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:16px 12px;${font}font-size:17px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">${wording.button} &rarr;</a></td></tr></table></td></tr>
     <tr><td style="padding:10px 24px 24px;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(link)}${optOut ? '<br><br>' + esc(optOut) : ''}</td></tr>
   </table></td></tr></table>`;
-  const text = `${wording.plain}\n\n${note.text || ''}\n\n${wording.button}: ${link}${optOut ? '\n\n' + optOut : ''}`;
+  const text = `${wording.plain}\n\n${note.text || ''}${notePhotos.length ? '\n\nPhotos:\n' + notePhotos.join('\n') : ''}\n\n${wording.button}: ${link}${optOut ? '\n\n' + optOut : ''}`;
 
   for(const uid of uids){
     try{
@@ -1237,7 +1267,7 @@ if(EMAIL_ON) exports.onScheduleSend = onDocumentWritten({ document: 'build-sched
     if(!t.id || !t.start || t.done || t.end < today) return;
     (t.subIds || []).forEach(subId=>{
       if(((t.confirm && t.confirm[subId]) || 'pending') !== 'pending') return;
-      (bySub[subId] = bySub[subId] || []).push({ houseId, sched: after, t });
+      (bySub[subId] = bySub[subId] || []).push({ houseId, sched: after, t, was: movedFrom(t, subId) });
     });
   });
 
@@ -1327,7 +1357,7 @@ if(EMAIL_ON) exports.dailyFollowUp = onSchedule({ schedule: 'every day 07:00', t
       (t.subIds || []).forEach(subId=>{
         if(((t.confirm && t.confirm[subId]) || 'pending') !== 'pending') return;
         const asked = t.asked && t.asked[subId];
-        const item = { houseId: doc.id, sched, t };
+        const item = { houseId: doc.id, sched, t, was: movedFrom(t, subId) };
         if(!asked || asked.start !== t.start || asked.end !== t.end){
           (changed[subId] = changed[subId] || []).push(item);
         } else if(t.start <= horizon && daysBetween((asked.at || '').slice(0, 10) || today, today) >= reminderDays){

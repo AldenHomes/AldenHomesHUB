@@ -191,6 +191,16 @@
   .photo:hover .move, .photo .move:focus{opacity:1;}
   .photo .move option{color:#33363a; background:#fff;}
   @media (hover:none){ .photo .move{opacity:1;} }
+  /* whether the customer sees this photo on their page: off unless switched on */
+  .photo .share{position:absolute; top:4px; right:34px; border:none; border-radius:3px; padding:3px 7px; font-size:10.5px; font-weight:700; cursor:pointer; font-family:inherit; background:rgba(20,20,22,.6); color:#fff;}
+  .photo .share.on{background:var(--good);}
+  .photo.shared{outline:3px solid var(--good); outline-offset:-3px;}
+  .share-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:12.5px; color:var(--ink-soft); margin:2px 0 4px;}
+  .share-bar button{border:1px solid var(--steel-line); background:var(--paper-2); color:var(--navy); border-radius:var(--radius); padding:5px 10px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .share-bar button:hover{background:#e9e5da;}
+  .note-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .note-photos a{display:block; width:92px; height:92px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--steel-line);}
+  .note-photos img{width:100%; height:100%; object-fit:cover; display:block;}
   .folder-row{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
   .fchip{border:1px solid var(--steel-line); background:var(--paper-2); color:var(--ink-soft); border-radius:20px; padding:5px 12px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;}
   .fchip:hover{border-color:var(--navy); color:var(--navy);}
@@ -380,6 +390,7 @@
           <div class="card-body">
             <div class="folder-row" id="folderRow" style="display:none;"></div>
             <div class="muted" style="font-size:12.5px; min-height:16px;"><span id="uploadTarget"></span> <span id="uploadNote"></span></div>
+            <div class="share-bar" id="shareBar"></div>
             <div class="photo-grid" id="photoGrid"></div>
           </div>
         </div>
@@ -779,6 +790,7 @@ function renderNotes(){
         <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>${n.todo ? `<span class="todo-tag">Punch list</span>${n.done && n.doneBy && n.doneBy.name ? `<span>done by ${esc(n.doneBy.name)}</span>` : ''}` : ''}
           ${n.by && n.by.uid === me ? `<button type="button" class="x-btn" data-delete-note="${esc(n.id)}" title="Delete this note">&times;</button>` : ''}</div>
         <div class="note-text">${noteHtml(n.text || '')}</div>
+        ${(n.photos || []).length ? `<div class="note-photos">${n.photos.map(url=>`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Photo from the sub" loading="lazy"></a>`).join('')}</div>` : ''}
         ${repliesHtml(n)}
         ${n.todo ? '</div>' : ''}
       </div>`).join('')
@@ -1299,6 +1311,14 @@ function renderFiles(){
     + (currentFolder !== ALL && currentFolder !== '' ? `<button type="button" class="fchip del" id="deleteFolderBtn" title="Remove this folder. Its photos are kept and go back to 'Not in a folder'.">Remove folder</button>` : '');
   $('uploadTarget').textContent = currentFolder !== ALL && currentFolder !== '' ? `New photos go into “${currentFolder}”.` : '';
 
+  // The customer's page only shows photos picked here. Subs always see every photo.
+  const sharedCount = allPhotos.filter(f=>f.shared).length;
+  const hidden = photos.filter(f=>!f.shared).length, showing = photos.filter(f=>f.shared).length;
+  $('shareBar').style.display = filesState === 'ready' && allPhotos.length ? 'flex' : 'none';
+  $('shareBar').innerHTML = `<span>The customer sees <strong>${sharedCount}</strong> of ${allPhotos.length} photo${allPhotos.length === 1 ? '' : 's'} — only the ones marked “Customer”. Subs see all of them.</span>`
+    + (hidden ? `<button type="button" id="shareAllBtn">Show these ${hidden} to the customer</button>` : '')
+    + (showing ? `<button type="button" id="hideAllBtn">Hide these ${showing} from the customer</button>` : '');
+
   const moveOptions = f=>`<option value="">Move to…</option>`
     + ((f.folder || '') !== '' ? `<option value="__none">Not in a folder</option>` : '')
     + folders.filter(n=>n !== (f.folder || '')).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
@@ -1307,8 +1327,9 @@ function renderFiles(){
     : photos.length ? photos.map(f=>{
         const by = (f.by && f.by.name) || 'Alden Homes';
         const detail = [f.taskTitle, f.uploadedAt ? fmtDate(f.uploadedAt.slice(0,10)) : '', currentFolder === ALL && f.folder ? f.folder : ''].filter(Boolean).join(' · ');
-        return `<div class="photo">
+        return `<div class="photo${f.shared ? ' shared' : ''}">
           <a href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="" loading="lazy"></a>
+          <button type="button" class="share${f.shared ? ' on' : ''}" data-share="${esc(f.id)}" title="${f.shared ? 'The customer can see this photo. Click to hide it from them.' : 'The customer can NOT see this photo. Click to show it on their page.'}">${f.shared ? '&#10003; Customer' : 'Show customer'}</button>
           <div class="who" title="${esc(by + (detail ? ' · ' + detail : ''))}"><strong>${esc(by)}</strong>${detail ? `<br>${esc(detail)}` : ''}</div>
           <button type="button" class="x-btn" data-delete="${esc(f.id)}" title="Remove">&times;</button>
           ${folders.length ? `<select class="move" data-move="${esc(f.id)}" title="Move this photo to a folder">${moveOptions(f)}</select>` : ''}
@@ -1354,6 +1375,33 @@ document.getElementById('folderRow').addEventListener('click', async e=>{
       currentFolder = ALL;
     } catch(err){ console.error(err); alert('Could not remove the folder — check your connection and try again.'); }
   }
+});
+// show / hide one photo on the customer's page
+document.getElementById('photoGrid').addEventListener('click', async e=>{
+  const btn = e.target.closest('[data-share]');
+  if(!btn) return;
+  const f = files.find(x=>x.id === btn.dataset.share);
+  if(!f) return;
+  try{ await db.collection('house-files').doc(f.id).update({ shared: !f.shared, sharedAt: f.shared ? '' : new Date().toISOString() }); }
+  catch(err){ console.error(err); alert('Could not save — check your connection and try again.'); }
+});
+// show / hide every photo in view (the open folder, or all of them)
+document.getElementById('shareBar').addEventListener('click', async e=>{
+  const show = !!e.target.closest('#shareAllBtn');
+  if(!show && !e.target.closest('#hideAllBtn')) return;
+  const inView = files.filter(f=>f.kind === 'photo' && (currentFolder === ALL || (f.folder || '') === currentFolder) && !!f.shared !== show);
+  if(!inView.length) return;
+  const where = currentFolder === ALL ? '' : (currentFolder === '' ? ' that aren\'t in a folder' : ` in “${currentFolder}”`);
+  if(!confirm(show ? `Show ${inView.length} photo${inView.length === 1 ? '' : 's'}${where} to the customer?\n\nThey will appear on the customer's page straight away.`
+                   : `Hide ${inView.length} photo${inView.length === 1 ? '' : 's'}${where} from the customer?`)) return;
+  try{
+    const now = new Date().toISOString();
+    for(let i = 0; i < inView.length; i += 400){
+      const batch = db.batch();
+      inView.slice(i, i + 400).forEach(f=>batch.update(db.collection('house-files').doc(f.id), { shared: show, sharedAt: show ? now : '' }));
+      await batch.commit();
+    }
+  } catch(err){ console.error(err); alert('Could not save — check your connection and try again.'); }
 });
 document.getElementById('photoGrid').addEventListener('change', async e=>{
   const sel = e.target.closest('select[data-move]');

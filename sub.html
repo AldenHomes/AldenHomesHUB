@@ -73,6 +73,11 @@
   .sheet label{display:block; font-size:14.5px; font-weight:700; margin-top:16px;}
   .sheet textarea{display:block; width:100%; min-height:110px; margin-top:7px; padding:11px 12px; border:2px solid var(--steel-line); border-radius:8px; font-size:16px; line-height:1.45; color:var(--ink); font-family:inherit; resize:vertical;}
   .sheet textarea:focus{outline:none; border-color:var(--navy);}
+  .sheet-photos{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px;}
+  .sheet-photos .thumb{position:relative; width:64px; height:64px; border-radius:8px; overflow:hidden; background:#ece8dd;}
+  .sheet-photos .thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .sheet-photos .thumb button{position:absolute; top:0; right:0; width:22px; height:22px; border:none; background:rgba(20,20,22,.7); color:#fff; font-size:15px; line-height:1; cursor:pointer; padding:0;}
+  .sheet-photos label{display:inline-flex; align-items:center; gap:6px; padding:11px 14px; border:2px dashed var(--steel-line); border-radius:8px; font-size:15px; font-weight:700; color:var(--navy); cursor:pointer;}
   .sheet .sheet-err{color:var(--danger); font-size:14px; margin-top:8px; min-height:18px;}
 
   .state{text-align:center; padding:60px 20px; color:var(--ink-soft); font-size:16px; line-height:1.6;}
@@ -291,6 +296,10 @@
     <div class="about" id="sheetAbout"></div>
     <label for="sheetText" id="sheetLabel"></label>
     <textarea id="sheetText" maxlength="1000"></textarea>
+    <div class="sheet-photos" id="sheetPhotos" style="display:none;">
+      <span id="sheetThumbs" style="display:contents;"></span>
+      <label>+ Add a photo<input type="file" id="sheetPhotoInput" accept="image/*" multiple style="display:none;"></label>
+    </div>
     <div class="sheet-err" id="sheetErr"></div>
     <div class="btn-row" style="margin-top:6px;">
       <button type="button" class="btn btn-plain" id="sheetCancel">Cancel</button>
@@ -401,7 +410,7 @@ async function demoApi(action, extra){
     demoState.files[extra.houseId].unshift(f);
     return { file: f };
   }
-  if(action === 'note') return { ok: true };
+  if(action === 'note') return { ok: true, photos: (extra.fileIds || []).length };
   const t = demoState.tasks.find(x=>x.houseId===extra.houseId && x.taskId===extra.taskId);
   if(action === 'respond'){ t.answer = extra.answer; t.declineNote = extra.answer === 'declined' ? (extra.note || '') : ''; }
   if(action === 'done') t.done = extra.done !== false;
@@ -465,7 +474,7 @@ function jobCard(t, kind){
   const happening = t.start <= today && t.end >= today;
 
   // a note to the office about this job — it shows on their hub and is emailed to them
-  const noteBtn = `<button type="button" class="note-btn" data-note ${key}>Send a note to Alden Homes<small>Have a question, or need different dates?</small></button>`;
+  const noteBtn = `<button type="button" class="note-btn" data-note ${key}>Send a note or photo to Alden Homes<small>Have a question, need different dates, or want us to look at something?</small></button>`;
 
   let chip = '', buttons = '';
   if(kind === 'ask'){
@@ -707,11 +716,18 @@ document.body.addEventListener('click', async e=>{
 });
 
 /* ---- the box for declining a job (reason optional) or sending the office a note ---- */
-let sheet = null;   // { mode: 'decline' | 'note', task }
+let sheet = null;   // { mode: 'decline' | 'note', task, photos: [dataUrl] }
+function renderSheetPhotos(){
+  $('sheetThumbs').innerHTML = (sheet ? sheet.photos : []).map((url, i)=>
+    `<span class="thumb"><img src="${esc(url)}" alt="Photo ${i+1}"><button type="button" data-drop-photo="${i}" aria-label="Remove this photo">&times;</button></span>`).join('');
+}
 function openSheet(mode, t){
-  sheet = { mode, task: t };
+  sheet = { mode, task: t, photos: [] };
+  // a note can carry photos ("can you look at this?"); declining can't
+  $('sheetPhotos').style.display = mode === 'note' ? 'flex' : 'none';
+  renderSheetPhotos();
   const decline = mode === 'decline';
-  $('sheetTitle').textContent = decline ? 'Decline this job?' : 'Send a note to Alden Homes';
+  $('sheetTitle').textContent = decline ? 'Decline this job?' : 'Send a note or photo to Alden Homes';
   $('sheetAbout').textContent = `${t.title} · ${whenText(t)} · ${houseLabel(t.house || {})}`;
   $('sheetLabel').textContent = decline ? 'Why, or what dates would work? (optional)' : 'Your note';
   $('sheetText').value = '';
@@ -729,7 +745,7 @@ $('sheetSend').addEventListener('click', async ()=>{
   if(!sheet) return;
   const { mode, task: t } = sheet;
   const text = $('sheetText').value.trim();
-  if(mode === 'note' && !text){ $('sheetErr').textContent = 'Type your note first.'; return; }
+  if(mode === 'note' && !text && !sheet.photos.length){ $('sheetErr').textContent = 'Type your note, or add a photo, first.'; return; }
   $('sheetErr').textContent = '';
   $('sheetSend').disabled = true;
   try{
@@ -740,16 +756,45 @@ $('sheetSend').addEventListener('click', async ()=>{
       render();
       toast('Declined. Alden Homes has been told.');
     } else {
-      await api('note', { houseId: t.houseId, taskId: t.taskId, text });
+      // photos go up first (they're saved to this job like any other photo), then the note points at them
+      const photos = sheet.photos.slice(), fileIds = [];
+      for(let i = 0; i < photos.length; i++){
+        $('sheetSend').textContent = `Uploading photo ${i+1} of ${photos.length}…`;
+        const data = await api('addPhoto', { houseId: t.houseId, taskId: t.taskId, folder: '', dataUrl: photos[i] });
+        if(data.file && data.file.id) fileIds.push(data.file.id);
+        if(house && house.id === t.houseId && data.file){ house.files.unshift(data.file); renderHouse(); }
+      }
+      $('sheetSend').textContent = 'Sending…';
+      await api('note', { houseId: t.houseId, taskId: t.taskId, text, fileIds });
       closeSheet();
-      toast('Note sent to Alden Homes. Thank you!');
+      toast(photos.length ? `Note and ${photos.length === 1 ? 'photo' : photos.length + ' photos'} sent to Alden Homes. Thank you!` : 'Note sent to Alden Homes. Thank you!');
     }
   } catch(err){
     console.error(err);
     $('sheetSend').disabled = false;
+    $('sheetSend').textContent = mode === 'decline' ? 'Decline job' : 'Send note';
     if(err.badLink){ closeSheet(); show('stateBad'); return; }
     $('sheetErr').textContent = 'That didn\'t send. Check your connection and try again, or call the office.';
   }
+});
+
+// photos picked for a note: shrunk on the phone straight away, sent when the note is sent
+$('sheetPhotoInput').addEventListener('change', async e=>{
+  const picked = Array.from(e.target.files || []);
+  e.target.value = '';
+  if(!sheet) return;
+  for(const file of picked){
+    if(sheet.photos.length >= 6){ $('sheetErr').textContent = 'Six photos is the most one note can carry.'; break; }
+    try{ sheet.photos.push(await shrinkPhoto(file)); }
+    catch(err){ console.error(err); $('sheetErr').textContent = 'One of those couldn\'t be read as a photo.'; }
+    renderSheetPhotos();
+  }
+});
+$('sheetThumbs').addEventListener('click', e=>{
+  const btn = e.target.closest('[data-drop-photo]');
+  if(!btn || !sheet) return;
+  sheet.photos.splice(Number(btn.dataset.dropPhoto), 1);
+  renderSheetPhotos();
 });
 
 $('notifySeg').addEventListener('click', async e=>{

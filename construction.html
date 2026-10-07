@@ -1415,7 +1415,7 @@ function renderSendBar(sched){
     const bits = [`${(last.emailed||[]).length} emailed`];
     if((last.skipped||[]).length) bits.push(`no email address for: ${last.skipped.join(', ')}`);
     if((last.failed||[]).length) bits.push(`couldn't send to: ${last.failed.join(', ')}`);
-    $('sendNote').textContent = bits.join(' · ') + '. Date changes after this are re-sent automatically the next morning.';
+    $('sendNote').textContent = bits.join(' · ') + '. If you move dates after this, the subs on those jobs are emailed the new dates the next morning at 7:00 — or press “Send again” to tell them right away.';
   } else {
     $('sendTitle').textContent = 'Not sent to subs yet';
     $('sendNote').textContent = 'This schedule is a draft — subs can\'t see it. ' + (emailsPaused

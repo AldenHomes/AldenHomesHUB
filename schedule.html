@@ -2519,7 +2519,12 @@ function renderLots(){
         <td data-label="Lot" class="mono">${l.lot||''}</td>
         <td data-label="Address">${l.address||''}</td>
         <td data-label="Foundation / Garage" class="muted">${l.garageType||''}</td>
-        <td data-label="Premium" class="mono muted">${l.premium?('$'+l.premium):''}</td>
+        <td data-label="Premium" class="mono muted">${(()=>{
+          // show whole-dollar amounts with commas ($12,500); anything that isn't a plain number is left as typed
+          const raw = String(l.premium == null ? '' : l.premium).trim();
+          const num = Number(raw.replace(/[$,\s]/g, ''));
+          return !raw ? '' : (raw.replace(/[$,\s]/g, '') !== '' && isFinite(num) ? '$' + num.toLocaleString('en-US') : raw);
+        })()}</td>
         <td data-label="Acreage" class="mono muted">${l.acreage||''}</td>
         <td data-label="">
           <div class="row-actions">
