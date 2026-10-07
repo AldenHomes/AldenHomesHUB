@@ -19,7 +19,7 @@
    ============================================================ */
 const { onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onDocumentWritten, onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { defineSecret, defineString } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
@@ -486,6 +486,93 @@ async function recordAsked(asked, extraByHouse){
     });
   }
 }
+
+/* ============================================================
+   hubApi — things the staff pages need that only the server can do.
+   Every call must carry the signed-in staff member's Firebase ID token.
+   ============================================================ */
+async function staffFromRequest(req){
+  const m = /^Bearer (.+)$/.exec(req.get('Authorization') || '');
+  if(!m) return null;
+  try{
+    const who = await admin.auth().verifyIdToken(m[1]);
+    // homeowners using the public service form are signed in anonymously — they are not staff
+    if(!who.firebase || who.firebase.sign_in_provider === 'anonymous') return null;
+    return who;
+  } catch(err){ return null; }
+}
+function staffName(user){
+  return user.displayName || String(user.email || '').split('@')[0] || 'Someone';
+}
+
+exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (req, res)=>{
+  if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
+  try{
+    const who = await staffFromRequest(req);
+    if(!who){ res.status(401).json({ error: 'sign-in' }); return; }
+    const body = req.body || {};
+
+    // Everyone with a hub login, for the @ menu in notes.
+    if(body.action === 'staff'){
+      const list = await admin.auth().listUsers(1000);
+      const staff = list.users
+        .filter(u=>u.email && !u.disabled)
+        .map(u=>({ uid: u.uid, email: u.email, name: staffName(u) }));
+      // Two logins can share a name (the same person at two email addresses, say).
+      // Add the email's domain to those so each one can be @mentioned on its own.
+      const seen = {};
+      staff.forEach(s=>{ const k = s.name.toLowerCase(); seen[k] = (seen[k] || 0) + 1; });
+      staff.forEach(s=>{ if(seen[s.name.toLowerCase()] > 1) s.name = `${s.name} (${s.email.split('@')[1] || s.email})`; });
+      staff.sort((a, b)=>a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+      res.json({ staff });
+      return;
+    }
+    res.status(400).json({ error: 'action' });
+  } catch(err){
+    logger.error('hubApi failed', err);
+    res.status(500).json({ error: 'server' });
+  }
+});
+
+/* ============================================================
+   onNoteCreated — someone was @mentioned in a note on a home.
+   Email each person mentioned, at the address they sign in to the hub with.
+   (The "emails to subs" switch on Admin Settings doesn't affect this — these go to staff.)
+   ============================================================ */
+if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteId}', secrets: [GMAIL_APP_PASSWORD] }, async event=>{
+  const note = event.data.data();
+  const author = (note.by && note.by.uid) || '';
+  const uids = [...new Set(Array.isArray(note.mentions) ? note.mentions : [])].filter(uid=>uid && uid !== author);
+  if(!uids.length) return;
+
+  const nodemailer = require('nodemailer');
+  const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: MAIL_USER.value(), pass: GMAIL_APP_PASSWORD.value().replace(/\s+/g, '') } });
+  const from = `"Alden Homes Hub" <${MAIL_USER.value()}>`;
+  const who = (note.by && note.by.name) || 'Someone';
+  const house = note.houseLabel || 'a home';
+  const link = `https://aldenhomes.github.io/AldenHomesHUB/house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
+  const font = 'font-family:Arial,Helvetica,sans-serif;';
+  const html = `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f4ef"><tr><td align="center" style="padding:24px 12px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;" bgcolor="#ffffff">
+    <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes Hub<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">New note for you</span></td></tr>
+    <tr><td style="padding:22px 24px 6px;${font}font-size:15px;line-height:1.5;color:#33363a;"><strong>${esc(who)}</strong> mentioned you in a note on <strong>${esc(house)}</strong>:</td></tr>
+    <tr><td style="padding:8px 24px 4px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#faf8f2" style="padding:14px 16px;border-left:4px solid #A3AA83;${font}font-size:15px;line-height:1.55;color:#33363a;">${esc(note.text || '').replace(/\n/g, '<br>')}</td></tr></table></td></tr>
+    <tr><td style="padding:16px 24px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:16px 12px;${font}font-size:17px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">Open this home &rarr;</a></td></tr></table></td></tr>
+    <tr><td style="padding:10px 24px 24px;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(link)}</td></tr>
+  </table></td></tr></table>`;
+  const text = `${who} mentioned you in a note on ${house}:\n\n${note.text || ''}\n\nOpen this home: ${link}`;
+
+  for(const uid of uids){
+    try{
+      const user = await admin.auth().getUser(uid);
+      if(!user.email || user.disabled) continue;
+      await transport.sendMail({ from, to: user.email, subject: `New note for you on ${house}`, text, html });
+      logger.info('Emailed a note mention', { to: user.email, house });
+    } catch(err){
+      logger.error('Could not email a note mention', { uid, error: String(err) });
+    }
+  }
+});
 
 /* ============================================================
    onScheduleSend — the office pressed "Send to subs" on a house

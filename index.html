@@ -60,6 +60,27 @@
 
   .wrap{max-width:1320px; margin:0 auto; padding: 40px clamp(16px,4vw,40px) 60px;}
 
+  /* notification bell: notes where someone @mentioned you */
+  .bell-wrap{position:relative;}
+  .bell-btn{position:relative; background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); width:34px; height:30px; border-radius:var(--radius); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;}
+  .bell-btn:hover{background:#f3f1ea; color:var(--navy);}
+  .bell-btn.has{color:var(--navy); border-color:var(--amber);}
+  .bell-count{position:absolute; top:-7px; right:-7px; min-width:18px; height:18px; padding:0 5px; border-radius:10px; background:var(--danger); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center;}
+  .bell-panel{display:none; position:absolute; right:0; top:38px; z-index:60; width:min(360px, calc(100vw - 32px)); background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); box-shadow:0 12px 32px rgba(30,32,34,.2);}
+  .bell-panel.show{display:block;}
+  .bell-head{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #ece8dd; font-size:14px; color:var(--navy);}
+  .bell-clear{background:none; border:none; color:var(--ink-soft); font-size:12px; text-decoration:underline; cursor:pointer; padding:0;}
+  #bellList{max-height:min(60vh, 440px); overflow-y:auto;}
+  .bell-item{display:block; padding:11px 14px; border-bottom:1px solid #f1ede3; text-decoration:none; color:inherit; cursor:pointer;}
+  .bell-item:last-child{border-bottom:none;}
+  .bell-item:hover{background:#faf8f2;}
+  .bell-item.unread{background:#fdf6ea;}
+  .bell-item .who{font-size:12.5px; color:var(--ink-soft);}
+  .bell-item .who strong{color:var(--navy);}
+  .bell-item .txt{font-size:13.5px; line-height:1.45; margin-top:3px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .bell-item .dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--amber); margin-right:6px; vertical-align:1px;}
+  .bell-empty{padding:22px 14px; text-align:center; color:var(--ink-soft); font-size:13px;}
+
   /* tools on the left, the list of active homes on the right */
   .hub-cols{display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:24px; align-items:start;}
   @media (max-width:900px){ .hub-cols{grid-template-columns:1fr;} }
@@ -207,6 +228,16 @@
         <span id="syncLabel">Synced</span>
       </div>
       <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <div class="bell-wrap">
+        <button class="bell-btn" id="bellBtn" title="Notes for you" aria-label="Notes for you">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+          <span class="bell-count" id="bellCount" style="display:none;"></span>
+        </button>
+        <div class="bell-panel" id="bellPanel">
+          <div class="bell-head"><strong>Notes for you</strong><button class="bell-clear" id="bellClear">Mark all read</button></div>
+          <div id="bellList"></div>
+        </div>
+      </div>
       <button class="signout-btn" id="installBtn" style="display:none;">Install app</button>
       <a class="signout-btn" href="admin.html" style="text-decoration:none;" title="Admin settings">Settings</a>
       <button class="signout-btn" id="signOutBtn">Sign out</button>
@@ -367,6 +398,7 @@ if(!FIREBASE_CONFIGURED){
       attachServiceStatsListener(db);
       attachPacketsStatsListener(db);
       attachConstructionStatsListener(db);
+      attachBell(db, user);
     } else {
       showLoginGate();
     }
@@ -403,6 +435,60 @@ function attachScheduleStatsListener(db){
     setSyncStatus('idle');
   }, err=>{ console.error('jobs listener error', err); setSyncStatus('offline'); });
 }
+
+/* ---- Notification bell: notes on a home where someone @mentioned you ---- */
+let bellNotes = [];
+let bellUid = '';
+let bellDb = null;
+function attachBell(db, user){
+  if(bellDb) return;
+  bellDb = db; bellUid = user.uid;
+  db.collection('notes').where('mentions', 'array-contains', user.uid).onSnapshot(s=>{
+    bellNotes = s.docs.map(d=>({ id: d.id, ...d.data() })).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0, 40);
+    renderBell();
+  }, err=>{ console.error('notes listener error', err); /* the bell just stays empty; the rest of the hub is fine */ });
+}
+function bellUnread(n){ return !(n.readBy && n.readBy[bellUid]); }
+function bellTime(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const mins = Math.round((Date.now() - d.getTime()) / 60000);
+  if(mins < 1) return 'just now';
+  if(mins < 60) return mins + ' min ago';
+  if(mins < 1440) return Math.round(mins/60) + ' hr ago';
+  return d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+}
+function renderBell(){
+  const unread = bellNotes.filter(bellUnread).length;
+  const count = document.getElementById('bellCount');
+  count.textContent = unread > 9 ? '9+' : unread;
+  count.style.display = unread ? '' : 'none';
+  document.getElementById('bellBtn').classList.toggle('has', unread > 0);
+  document.getElementById('bellClear').style.display = unread ? '' : 'none';
+  document.getElementById('bellList').innerHTML = bellNotes.length ? bellNotes.map(n=>`
+    <a class="bell-item${bellUnread(n) ? ' unread' : ''}" data-note="${escHtml(n.id)}" href="house.html?id=${encodeURIComponent(n.houseId || '')}#notes">
+      <div class="who">${bellUnread(n) ? '<span class="dot"></span>' : ''}<strong>${escHtml((n.by && n.by.name) || 'Someone')}</strong> on ${escHtml(n.houseLabel || 'a home')} · ${escHtml(bellTime(n.at))}</div>
+      <div class="txt">${escHtml(n.text || '')}</div>
+    </a>`).join('') : '<div class="bell-empty">Nothing yet. When someone @mentions you in a note on a home, it shows up here.</div>';
+}
+function markBellRead(ids){
+  if(!bellDb || !ids.length) return Promise.resolve();
+  const batch = bellDb.batch();
+  ids.forEach(id=>batch.update(bellDb.collection('notes').doc(id), new firebase.firestore.FieldPath('readBy', bellUid), true));
+  return batch.commit().catch(err=>console.error('Could not mark notes read', err));
+}
+document.getElementById('bellBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  document.getElementById('bellPanel').classList.toggle('show');
+});
+document.getElementById('bellClear').addEventListener('click', ()=>markBellRead(bellNotes.filter(bellUnread).map(n=>n.id)));
+document.getElementById('bellList').addEventListener('click', e=>{
+  const item = e.target.closest('.bell-item');
+  if(item) markBellRead([item.dataset.note]); // opening a note counts as reading it
+});
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.bell-wrap')) document.getElementById('bellPanel').classList.remove('show');
+});
 
 /* ---- Active homes list (right side) ---- */
 let activeHomes = [];

@@ -90,6 +90,22 @@
   .btn-primary:hover{background:var(--navy-2);}
   .btn-ghost{background:transparent; color:var(--navy); border-color:var(--steel-line);}
   .btn-ghost:hover{background:#e9e5da;}
+  .note-compose{position:relative; margin-bottom:6px;}
+  .note-compose textarea{width:100%; min-height:74px; resize:vertical; padding:10px 12px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; line-height:1.5; color:var(--ink); background:#fff; font-family:inherit;}
+  .note-compose textarea:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .note-actions{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px;}
+  .mention-menu{display:none; position:absolute; left:8px; z-index:5; min-width:220px; max-height:220px; overflow-y:auto; background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); box-shadow:0 8px 24px rgba(30,32,34,.18);}
+  .mention-menu.show{display:block;}
+  .mention-menu button{display:block; width:100%; text-align:left; border:none; background:none; padding:9px 12px; font-size:13.5px; cursor:pointer; font-family:inherit; color:var(--ink);}
+  .mention-menu button:hover, .mention-menu button.on{background:#eef0e8;}
+  .mention-menu small{color:var(--ink-soft); margin-left:6px;}
+  .note{padding:13px 0; border-top:1px solid #ece8dd;}
+  .note-head{display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:var(--ink-soft);}
+  .note-head strong{font-size:13.5px; color:var(--navy);}
+  .note-head .x-btn{margin-left:auto;}
+  .note-text{font-size:14px; line-height:1.55; margin-top:4px; white-space:pre-wrap; word-break:break-word;}
+  .note-text .at{background:#eef0e8; color:var(--rust-2); font-weight:700; border-radius:3px; padding:0 4px;}
+  .note.for-me{background:#fdf6ea; margin:0 -20px; padding-left:20px; padding-right:20px;}
   .owner-login{margin-top:16px; padding-top:14px; border-top:1px solid #ece8dd; font-size:13px; color:var(--ink-soft); line-height:1.7;}
   .owner-login strong{color:var(--ink);}
   .owner-login .code{font-family:"Courier New",monospace; font-weight:700; color:var(--navy); background:#eef0e8; border-radius:3px; padding:1px 6px;}
@@ -201,6 +217,25 @@
       </div>
 
       <div class="cards">
+        <!-- Notes: the team's running conversation about this home. @someone to notify them. -->
+        <div class="card wide" id="notesCard">
+          <div class="card-head">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+            <h3>Notes <span class="muted" id="noteCount" style="font-size:12px; font-weight:400;"></span></h3>
+          </div>
+          <div class="card-body">
+            <div class="note-compose">
+              <textarea id="noteText" placeholder="Add a note about this home…  Type @ to notify someone on the team."></textarea>
+              <div class="mention-menu" id="mentionMenu"></div>
+              <div class="note-actions">
+                <span class="muted" id="noteHint" style="font-size:12px;"></span>
+                <button type="button" class="btn btn-primary" id="noteAddBtn">Add note</button>
+              </div>
+            </div>
+            <div id="notesList"></div>
+          </div>
+        </div>
+
         <!-- Build schedule -->
         <div class="card">
           <div class="card-head">
@@ -403,6 +438,14 @@ function attachListeners(){
     render();
   }, err=>{ console.error('build-schedule listener error', err); schedState = 'blocked'; render(); });
 
+  db.collection('notes').where('houseId', '==', houseId).onSnapshot(s=>{
+    notes = s.docs.map(d=>({ id: d.id, ...d.data() })).sort((a,b)=>(b.at||'').localeCompare(a.at||''));
+    notesState = 'ready';
+    render();
+    markNotesRead();
+  }, err=>{ console.error('notes listener error', err); notesState = 'blocked'; render(); });
+  loadStaff();
+
   db.collection('settings').doc('home-links').onSnapshot(doc=>{
     homeLinks = doc.exists ? doc.data() : {};
     render();
@@ -446,10 +489,162 @@ function render(){
       <div class="v${iso ? (label==='Settlement' && settleIn!==null && settleIn>=0 && settleIn<=14 ? ' soon' : '') : ' none'}">${fmtDate(iso) || 'not set'}</div></div>`).join('');
 
   renderOwnerLogin();
+  renderNotes();
   renderSchedule();
   renderOrders();
   renderFiles();
 }
+
+/* ============================================================
+   NOTES — the team's running conversation about this home.
+   Typing @name notifies that person: the note shows under the bell on their hub,
+   and the server emails them at the address they sign in with.
+   ============================================================ */
+const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
+let notes = [];
+let notesState = 'loading';   // 'loading' | 'ready' | 'blocked'
+let staff = [];               // everyone with a hub login: { uid, email, name }
+let scrolledToNotes = false;
+
+async function loadStaff(){
+  try{
+    const token = await firebase.auth().currentUser.getIdToken();
+    const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ action:'staff' }) });
+    if(!res.ok) throw new Error('staff list ' + res.status);
+    staff = (await res.json()).staff || [];
+  } catch(err){ console.error('Could not load the team list for @mentions', err); staff = []; }
+  render();
+}
+function myUid(){ const u = firebase.auth().currentUser; return u ? u.uid : ''; }
+function noteTime(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  return d.toLocaleDateString(undefined, { month:'short', day:'numeric' }) + ', ' + d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+}
+// longest names first, so "@Sam Lapp" isn't mistaken for "@Sam"
+function staffByNameLength(){ return staff.slice().sort((a,b)=>b.name.length - a.name.length); }
+function mentionsIn(text){
+  const lower = text.toLowerCase();
+  return staffByNameLength().filter(s=>lower.includes('@' + s.name.toLowerCase()));
+}
+function noteHtml(text){
+  let html = esc(text);
+  staffByNameLength().forEach(s=>{
+    const at = esc('@' + s.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    html = html.replace(new RegExp(at, 'gi'), m=>`<span class="at">${m}</span>`);
+  });
+  return html;
+}
+
+function renderNotes(){
+  $('noteCount').textContent = notes.length ? `(${notes.length})` : '';
+  const me = myUid();
+  $('noteHint').textContent = staff.length ? 'Type @ to notify someone — they get it on their hub and by email.' : '';
+  $('noteAddBtn').disabled = notesState !== 'ready';
+  $('notesList').innerHTML = notesState === 'blocked'
+    ? '<div class="note muted">Notes can\'t be saved yet — the database security rules need the notes collection added.</div>'
+    : notesState === 'loading' ? ''
+    : notes.length ? notes.map(n=>`<div class="note${(n.mentions||[]).includes(me) ? ' for-me' : ''}">
+        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong><span>${esc(noteTime(n.at))}</span>
+          ${n.by && n.by.uid === me ? `<button type="button" class="x-btn" data-delete-note="${esc(n.id)}" title="Delete this note">&times;</button>` : ''}</div>
+        <div class="note-text">${noteHtml(n.text || '')}</div>
+      </div>`).join('')
+    : '<div class="note muted">No notes on this home yet.</div>';
+
+  // arriving from the bell (house.html?id=…#notes) lands on the notes
+  if(!scrolledToNotes && location.hash === '#notes' && notesState === 'ready'){
+    scrolledToNotes = true;
+    $('notesCard').scrollIntoView({ block:'start' });
+  }
+}
+
+// Opening the home counts as reading the notes that mention you, so the bell clears.
+function markNotesRead(){
+  const me = myUid();
+  const unread = notes.filter(n=>(n.mentions||[]).includes(me) && !(n.readBy && n.readBy[me]));
+  if(!me || !unread.length) return;
+  const batch = db.batch();
+  unread.forEach(n=>batch.update(db.collection('notes').doc(n.id), new firebase.firestore.FieldPath('readBy', me), true));
+  batch.commit().catch(err=>console.error('Could not mark notes read', err));
+}
+
+$('noteAddBtn').addEventListener('click', async ()=>{
+  const text = $('noteText').value.trim();
+  if(!text || !job) return;
+  const user = firebase.auth().currentUser;
+  const mentioned = mentionsIn(text).filter(s=>s.uid !== user.uid);
+  $('noteAddBtn').disabled = true;
+  try{
+    await db.collection('notes').add({
+      houseId,
+      houseLabel: [job.community, job.lot ? 'Lot ' + job.lot : '', job.client].filter(Boolean).join(' · '),
+      text,
+      mentions: mentioned.map(s=>s.uid),
+      mentionNames: mentioned.map(s=>s.name),
+      by: { uid: user.uid, name: staffName(), email: user.email || '' },
+      at: new Date().toISOString(),
+      readBy: {},
+    });
+    $('noteText').value = '';
+    closeMentionMenu();
+  } catch(err){ console.error(err); alert('Could not save the note — check your connection and try again.'); }
+  $('noteAddBtn').disabled = false;
+});
+$('notesList').addEventListener('click', async e=>{
+  const btn = e.target.closest('[data-delete-note]');
+  if(!btn || !confirm('Delete this note? This cannot be undone.')) return;
+  try{ await db.collection('notes').doc(btn.dataset.deleteNote).delete(); }
+  catch(err){ console.error(err); alert('Could not delete the note — check your connection and try again.'); }
+});
+
+/* ---- the @ menu: type @ and a few letters, pick a person ---- */
+let mentionStart = -1;   // where the "@" being typed sits in the text
+function closeMentionMenu(){ $('mentionMenu').classList.remove('show'); mentionStart = -1; }
+function updateMentionMenu(){
+  const box = $('noteText');
+  const before = box.value.slice(0, box.selectionStart);
+  const m = /(^|\s)@([^\s@]*)$/.exec(before);
+  if(!m || !staff.length){ closeMentionMenu(); return; }
+  const typed = m[2].toLowerCase();
+  const matches = staff.filter(s=>s.name.toLowerCase().includes(typed) || s.email.toLowerCase().includes(typed)).slice(0, 8);
+  if(!matches.length){ closeMentionMenu(); return; }
+  mentionStart = before.length - m[2].length - 1;
+  $('mentionMenu').innerHTML = matches.map((s,i)=>`<button type="button" class="${i===0?'on':''}" data-uid="${esc(s.uid)}">${esc(s.name)}<small>${esc(s.email)}</small></button>`).join('');
+  $('mentionMenu').style.top = (box.offsetTop + box.offsetHeight + 2) + 'px';
+  $('mentionMenu').classList.add('show');
+}
+function pickMention(uid){
+  const s = staff.find(x=>x.uid === uid);
+  const box = $('noteText');
+  if(!s || mentionStart < 0) return;
+  const insert = '@' + s.name + ' ';
+  box.value = box.value.slice(0, mentionStart) + insert + box.value.slice(box.selectionStart);
+  const caret = mentionStart + insert.length;
+  closeMentionMenu();
+  box.focus();
+  box.setSelectionRange(caret, caret);
+}
+$('noteText').addEventListener('input', updateMentionMenu);
+$('noteText').addEventListener('keydown', e=>{
+  if(!$('mentionMenu').classList.contains('show')) return;
+  if(e.key === 'Enter' || e.key === 'Tab'){
+    e.preventDefault();
+    pickMention($('mentionMenu').querySelector('button.on').dataset.uid);
+  } else if(e.key === 'Escape'){
+    closeMentionMenu();
+  } else if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+    e.preventDefault();
+    const items = [...$('mentionMenu').querySelectorAll('button')];
+    const i = items.findIndex(b=>b.classList.contains('on'));
+    items[i].classList.remove('on');
+    items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].classList.add('on');
+  }
+});
+$('mentionMenu').addEventListener('mousedown', e=>{
+  const b = e.target.closest('button[data-uid]');
+  if(b){ e.preventDefault(); pickMention(b.dataset.uid); }
+});
+$('noteText').addEventListener('blur', ()=>setTimeout(closeMentionMenu, 150));
 
 /* ---- this home's buyer page ----
    No login for the buyer: each home has its own private link. The link codes are kept
