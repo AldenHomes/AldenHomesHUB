@@ -385,19 +385,30 @@ function buildEmail(sub, items, link, kind){
     ...lines.map(l=>`- ${l.title} — ${l.when}\n  ${l.where}${l.address ? ' — ' + l.address : ''}`),
     '', `Confirm here (no login needed): ${link}`, '', 'Thank you,', 'Alden Homes',
   ].join('\n');
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#33363a;max-width:560px;">
-    <p>Hi ${esc(sub.name || '')},</p>
-    <p>${esc(intro)}</p>
-    <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:14px 0;">
-      ${lines.map(l=>`<tr><td style="padding:11px 0;border-top:1px solid #e2ddd0;">
-        <div style="font-weight:bold;">${esc(l.title)}</div>
-        <div>${esc(l.when)}</div>
-        <div style="color:#6b6f72;font-size:13px;">${esc(l.where)}${l.address ? ' — ' + esc(l.address) : ''}</div></td></tr>`).join('')}
-    </table>
-    <p><a href="${esc(link)}" style="display:inline-block;background:#4B4F54;color:#ffffff;text-decoration:none;font-weight:bold;padding:13px 22px;border-radius:4px;">Confirm my jobs</a></p>
-    <p style="color:#6b6f72;font-size:13px;">No login needed — this link is just for you. It also shows all your Alden Homes jobs.</p>
-    <p>Thank you,<br>Alden Homes</p>
-  </div>`;
+  // Built from plain tables with the colours set on the cells, which is what email apps
+  // (Gmail, Outlook, phone mail) render reliably. The button is a full-width block so it's
+  // easy to hit with a thumb, and the link is also written out in case a mail app hides buttons.
+  const font = 'font-family:Arial,Helvetica,sans-serif;';
+  const html = `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f4ef"><tr><td align="center" style="padding:24px 12px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;" bgcolor="#ffffff">
+    <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">${kind === 'reminder' ? 'Reminder — jobs waiting on your answer' : (kind === 'changed' ? 'Schedule update' : 'Jobs to confirm')}</span></td></tr>
+    <tr><td style="padding:22px 24px 4px;${font}font-size:15px;line-height:1.5;color:#33363a;">Hi ${esc(sub.name || '')},<br><br>${esc(intro)}</td></tr>
+    <tr><td style="padding:10px 24px 4px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        ${lines.map(l=>`<tr><td style="padding:13px 0;border-top:1px solid #e2ddd0;${font}color:#33363a;">
+          <div style="font-size:16px;font-weight:bold;color:#4B4F54;">${esc(l.title)}</div>
+          <div style="font-size:15px;font-weight:bold;padding-top:3px;">${esc(l.when)}</div>
+          <div style="font-size:13px;color:#6b6f72;padding-top:3px;">${esc(l.where)}${l.address ? '<br>' + esc(l.address) : ''}</div></td></tr>`).join('')}
+      </table>
+    </td></tr>
+    <tr><td style="padding:14px 24px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:17px 12px;${font}font-size:18px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">Confirm my jobs &rarr;</a></td></tr></table>
+    </td></tr>
+    <tr><td style="padding:10px 24px 0;${font}font-size:13px;line-height:1.5;color:#6b6f72;">No login needed — this link is just for you. It also shows all your Alden Homes jobs, with plans and photos for each house.</td></tr>
+    <tr><td style="padding:10px 24px 0;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(link)}</td></tr>
+    <tr><td style="padding:20px 24px 24px;${font}font-size:15px;color:#33363a;">Thank you,<br>Alden Homes</td></tr>
+  </table>
+  </td></tr></table>`;
   return { subject, text, html };
 }
 
