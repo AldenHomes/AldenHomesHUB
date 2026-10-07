@@ -100,7 +100,19 @@
   .status-btn.active-new{border-color:var(--amber); color:var(--amber); background:#fbeee0;}
   .status-btn.active-in-progress{border-color:#3b5a8a; color:#3b5a8a; background:#e6ecf5;}
   .status-btn.active-sent{border-color:var(--good); color:var(--good); background:#eaf1ec;}
-  .modal-foot{padding:16px 24px 22px; display:flex; justify-content:flex-end; gap:10px;}
+  .modal-foot{padding:16px 24px 22px; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;}
+  .head-actions{display:flex; align-items:center; gap:10px;}
+  .edit-link{background:none; border:none; padding:0; margin-left:8px; font-size:11.5px; font-weight:700; color:var(--rust-2); text-decoration:underline; cursor:pointer; text-transform:none; letter-spacing:0; font-family:inherit;}
+  .btn-small{padding:7px 12px; font-size:12.5px;}
+  .home-link{font-weight:700; color:var(--rust-2); text-decoration:none;}
+  .home-link:hover{text-decoration:underline;}
+  .sub-line{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  /* finished requests drop into their own section below, which opens and closes */
+  .done-toggle{display:flex; align-items:center; gap:8px; width:100%; margin:26px 0 10px; padding:12px 14px; background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit; text-align:left;}
+  .done-toggle:hover{background:#faf8f2;}
+  .done-toggle .arrow{display:inline-block; transition:transform .15s; font-size:11px;}
+  .done-toggle.open .arrow{transform:rotate(90deg);}
+  .done-toggle .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
 
   /* Auth gate */
   .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
@@ -203,13 +215,11 @@
         <input type="text" id="searchBox" placeholder="Search name, address, lot…">
       </div>
       <select class="filter" id="statusFilter">
-        <option value="">All Statuses</option>
+        <option value="">All Open</option>
         <option value="new">New</option>
         <option value="in-progress">In Progress</option>
-        <option value="sent">Sent to BuilderTrend</option>
       </select>
       <button class="btn btn-ghost" id="copyLinkBtn">Copy Customer Link</button>
-      <button class="btn btn-ghost" id="cleanupBtn" title="Deletes photos from requests already marked Sent, or older than 90 days">Clean Up Old Photos</button>
       <button class="btn btn-primary" id="addRequestBtn">+ Add Request</button>
     </div>
 
@@ -226,7 +236,26 @@
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
-    <div class="empty" id="emptyState" style="display:none;">No requests match your search.</div>
+    <div class="empty" id="emptyState" style="display:none;">No open requests match.</div>
+
+    <!-- Completed requests: out of the way, but one click to see -->
+    <button type="button" class="done-toggle" id="doneToggle"><span class="arrow">&#9654;</span> Completed <span class="n" id="doneCount">0</span></button>
+    <div id="doneWrap" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>Completed</th>
+            <th>Name</th>
+            <th>Address / Lot</th>
+            <th>Phone</th>
+            <th>Photos</th>
+            <th>Submitted</th>
+          </tr>
+        </thead>
+        <tbody id="doneBody"></tbody>
+      </table>
+      <div class="empty" id="doneEmpty" style="display:none;">No completed requests match.</div>
+    </div>
 
     <footer>Share the customer link from anywhere — no login required for homeowners to submit a request.</footer>
   </div>
@@ -237,7 +266,10 @@
   <div class="modal">
     <div class="modal-head">
       <h2 id="modalTitle">Request</h2>
-      <button class="modal-close" id="closeModal">&times;</button>
+      <div class="head-actions">
+        <button class="btn btn-ghost btn-small" id="copyInfoBtn" title="Copy this request's details, ready to paste into an email">Copy</button>
+        <button class="modal-close" id="closeModal">&times;</button>
+      </div>
     </div>
     <div class="modal-body">
       <div class="detail-grid">
@@ -247,9 +279,18 @@
         <div class="detail-item"><label>Submitted</label><div id="d_submitted"></div></div>
         <div class="detail-item detail-full"><label>Address</label><div id="d_address"></div></div>
         <div class="detail-item"><label>Lot #</label><div id="d_lot"></div></div>
+        <div class="detail-item"><label>Home in the hub</label><div id="d_home"></div></div>
         <div class="detail-item detail-full">
-          <label>Description</label>
+          <label>Description <button type="button" class="edit-link" id="descEditBtn">Edit</button></label>
           <div class="desc-box" id="d_description"></div>
+          <div id="descEdit" style="display:none;">
+            <textarea id="descText" style="min-height:130px;"></textarea>
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+              <button type="button" class="btn btn-ghost btn-small" id="descCancel">Cancel</button>
+              <button type="button" class="btn btn-primary btn-small" id="descSave">Save description</button>
+            </div>
+          </div>
+          <div class="muted" id="descNote" style="font-size:12px; margin-top:6px;"></div>
         </div>
         <div class="detail-item detail-full" id="d_photosWrap" style="display:none;">
           <label>Photos</label>
@@ -260,12 +301,25 @@
       <div class="status-actions">
         <button class="status-btn" data-status="new">New</button>
         <button class="status-btn" data-status="in-progress">In Progress</button>
-        <button class="status-btn" data-status="sent">Sent to BuilderTrend</button>
+        <button class="status-btn" data-status="sent">Complete</button>
+      </div>
+      <div class="muted" id="d_completed" style="font-size:12.5px; margin-top:8px;"></div>
+
+      <div class="row2" style="margin-top:20px;">
+        <div class="field">
+          <label for="d_vendor">Assigned to a vendor</label>
+          <select id="d_vendor"></select>
+        </div>
+        <div class="field">
+          <label for="d_homeSelect">Link to a home</label>
+          <select id="d_homeSelect"></select>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" id="deleteBtn" style="color:#a8451a; border-color:#e3b5a0;">Delete</button>
       <div style="flex:1;"></div>
+      <button class="btn btn-ghost" id="pdfBtn">Export PDF</button>
       <button class="btn btn-ghost" id="closeBtn">Close</button>
     </div>
   </div>
@@ -310,7 +364,7 @@
         <select id="ar_status">
           <option value="new">New</option>
           <option value="in-progress">In Progress</option>
-          <option value="sent">Sent to BuilderTrend</option>
+          <option value="sent">Complete</option>
         </select>
       </div>
       <div class="field">
@@ -350,12 +404,42 @@ let requests = [];
 let editingId = null;
 let sortKey = 'submittedAt';
 let sortDir = 'desc';
-let cleanupRanThisSession = false;
 
-// Photos are deleted automatically once a request is marked "Sent to BuilderTrend"
-// (they've already served their purpose by then), and as a safety net, any request
-// sitting untouched past this many days gets its photos cleared regardless of status.
-const PHOTO_RETENTION_DAYS = 90;
+// Photos are kept for good — they're the service history for the home. To keep storage in
+// check they are shrunk on the phone or computer before they're uploaded (see shrinkPhoto).
+let jobs = [];      // every home in the hub, so a request can be tied to the home it's about
+let vendors = [];   // the Vendors list from Construction Schedules
+let doneOpen = false;
+// arriving from a home's page (service.html?open=ID) opens that request's card
+let pendingOpenId = new URLSearchParams(location.search).get('open');
+
+function esc(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+/* ============================================================
+   WHICH HOME IS A REQUEST ABOUT?
+   Worked out from the lot number and the address the homeowner typed. The address is
+   compared by house number + street name only ("1012 stanford"), so "Drive" vs "Dr."
+   or a missing town doesn't matter. Staff can override it on the card (r.houseId:
+   a home's id, or 'none' for "not one of ours"). house.html uses the same rules.
+   ============================================================ */
+function addrKey(a){
+  const m = String(a||'').toLowerCase().replace(/[.,#]/g, ' ').match(/(\d+)\s+([a-z0-9]+)/);
+  return m ? m[1] + ' ' + m[2] : '';
+}
+function lotKey(l){ return String(l==null?'':l).toLowerCase().replace(/lot|#|\s/g, ''); }
+function homeFor(r){
+  if(r.houseId) return jobs.find(j=>j.id===r.houseId) || null;
+  const a = addrKey(r.address), lot = lotKey(r.lot);
+  const byAddr = a ? jobs.filter(j=>addrKey(j.address)===a) : [];
+  if(byAddr.length === 1) return byAddr[0];
+  const byLot = lot ? jobs.filter(j=>lotKey(j.lot)===lot) : [];
+  if(byAddr.length > 1){ const both = byAddr.filter(j=>byLot.includes(j)); return both.length === 1 ? both[0] : null; }
+  // lot numbers repeat between communities, so a lot on its own only counts if just one home has it
+  return byLot.length === 1 ? byLot[0] : null;
+}
+function homeLabel(j){ return [j.community, j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') || 'Unnamed home'; }
 
 let db = null;
 let storage = null;
@@ -413,7 +497,8 @@ if(!FIREBASE_CONFIGURED){
   requestsCol = db.collection('service-requests');
 
   firebase.auth().onAuthStateChanged(user=>{
-    if(user){
+    // homeowners using the public request form are signed in anonymously — they are not staff
+    if(user && !user.isAnonymous){
       showApp(user);
       attachListener();
     } else {
@@ -424,50 +509,23 @@ if(!FIREBASE_CONFIGURED){
   window.addEventListener('offline', ()=>setSyncStatus('offline'));
 }
 
+let listening = false;
 function attachListener(){
+  if(listening) return;
+  listening = true;
+  db.collection('jobs').onSnapshot(s=>{ jobs = s.docs.map(d=>({ id: d.id, ...d.data() })); render(); refreshCard(); },
+    err=>console.error('jobs listener error', err));
+  db.collection('subs').onSnapshot(s=>{
+    vendors = s.docs.map(d=>({ id: d.id, ...d.data() })).sort((a,b)=>(a.name||'').localeCompare(b.name||'', 'en', { sensitivity:'base' }));
+    render(); refreshCard();
+  }, err=>console.error('vendors listener error', err));
   requestsCol.onSnapshot(snapshot=>{
     requests = snapshot.docs.map(d=>({ id: d.id, ...d.data() }));
     render();
+    refreshCard();
+    if(pendingOpenId && requests.some(r=>r.id===pendingOpenId)){ const id = pendingOpenId; pendingOpenId = null; openModal(id); }
     setSyncStatus('idle');
-    if(!cleanupRanThisSession){
-      cleanupRanThisSession = true;
-      cleanupOldPhotos();
-    }
   }, err=>{ console.error('requests listener error', err); setSyncStatus('offline'); });
-}
-
-/* ============================================================
-   PHOTO CLEANUP — keeps Storage usage in check.
-   Photos are cleared the moment a request is marked "Sent to BuilderTrend"
-   (see the status button handler below). This is a best-effort safety net
-   for anything that never gets marked, running once per admin session.
-   ============================================================ */
-async function clearPhotosForRequest(id){
-  const r = requests.find(x=>x.id===id);
-  if(!r || r.photosCleared || !r.photoUrls || r.photoUrls.length===0) return;
-  for(const url of r.photoUrls){
-    try{ await storage.refFromURL(url).delete(); }
-    catch(e){ console.warn('Could not delete a photo (it may already be gone):', e); }
-  }
-  try{
-    await requestsCol.doc(id).update({
-      photoUrls: [], photosCleared: true, photosClearedAt: new Date().toISOString()
-    });
-  } catch(e){ console.error('Could not update request after clearing photos', e); }
-}
-
-async function cleanupOldPhotos(){
-  const cutoff = Date.now() - PHOTO_RETENTION_DAYS*24*60*60*1000;
-  const stale = requests.filter(r=>{
-    if(r.photosCleared || !r.photoUrls || r.photoUrls.length===0) return false;
-    if(r.status === 'sent') return true;
-    const submitted = r.submittedAt ? new Date(r.submittedAt).getTime() : null;
-    return submitted && submitted < cutoff;
-  });
-  for(const r of stale){
-    await clearPhotosForRequest(r.id);
-  }
-  return stale.length;
 }
 
 function fmtDateTime(iso){
@@ -478,51 +536,60 @@ function fmtDateTime(iso){
          d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
 function statusLabel(s){
-  return s==='in-progress' ? 'In Progress' : s==='sent' ? 'Sent to BuilderTrend' : 'New';
+  return s==='in-progress' ? 'In Progress' : s==='sent' ? 'Complete' : 'New';   // 'sent' is the stored value for Complete
 }
 function statusClass(s){
   return s==='in-progress' ? 'status-in-progress' : s==='sent' ? 'status-sent' : 'status-new';
 }
 
+const PHOTO_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+function requestRow(r, done){
+  const status = r.status || 'new';
+  const photoCount = (r.photoUrls||[]).length;
+  const home = homeFor(r);
+  const vendor = r.vendorId ? (vendors.find(v=>v.id===r.vendorId) || { name: r.vendorName }) : null;
+  return `<tr data-id="${esc(r.id)}">
+    <td data-label="${done ? 'Completed' : 'Status'}">${done
+      ? `<span class="mono muted">${esc(fmtDateTime(r.completedAt).split(' ')[0] || '—')}</span>`
+      : `<span class="status-badge ${statusClass(status)}">${statusLabel(status)}</span>`}</td>
+    <td data-label="Name">${esc(r.name||'')}${vendor && vendor.name ? `<div class="sub-line">Assigned: ${esc(vendor.name)}</div>` : ''}</td>
+    <td data-label="Address / Lot">${esc(r.address||'')}${r.lot ? ` <span class="muted">(Lot ${esc(r.lot)})</span>` : ''}${home ? `<div class="sub-line">${esc(homeLabel(home))}</div>` : ''}</td>
+    <td data-label="Phone" class="mono">${esc(r.phone||'')}</td>
+    <td data-label="Photos">${photoCount ? `<span class="photo-count">${PHOTO_ICON} ${photoCount}</span>` : r.photosCleared ? '<span class="muted" title="Removed by the old automatic clean-up">Cleared</span>' : '<span class="muted">—</span>'}</td>
+    <td data-label="Submitted" class="mono muted">${esc(fmtDateTime(r.submittedAt))}</td>
+  </tr>`;
+}
+
 function render(){
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
   const statusF = document.getElementById('statusFilter').value;
+  const matches = r=>{
+    if(!q) return true;
+    const home = homeFor(r);
+    return [r.name, r.address, r.lot, r.phone, r.vendorName, home ? homeLabel(home) : ''].join(' ').toLowerCase().includes(q);
+  };
+  const isDone = r=>r.status === 'sent';
 
-  let rows = requests.filter(r=>{
-    if(statusF && (r.status||'new')!==statusF) return false;
-    if(q){
-      const hay = [r.name, r.address, r.lot, r.phone].join(' ').toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
-    return true;
-  });
-
+  // open requests on top
+  const rows = requests.filter(r=>!isDone(r) && matches(r) && (!statusF || (r.status||'new')===statusF));
   rows.sort((a,b)=>{
     let av = a[sortKey]||'', bv = b[sortKey]||'';
     if(av<bv) return sortDir==='asc'? -1: 1;
     if(av>bv) return sortDir==='asc'? 1: -1;
     return 0;
   });
+  document.getElementById('tableBody').innerHTML = rows.map(r=>requestRow(r, false)).join('');
+  document.getElementById('emptyState').style.display = rows.length ? 'none' : 'block';
 
-  const tbody = document.getElementById('tableBody');
-  const empty = document.getElementById('emptyState');
-  if(rows.length===0){
-    tbody.innerHTML = ''; empty.style.display = 'block';
-  } else {
-    empty.style.display = 'none';
-    tbody.innerHTML = rows.map(r=>{
-      const status = r.status || 'new';
-      const photoCount = (r.photoUrls||[]).length;
-      return `<tr data-id="${r.id}">
-        <td data-label="Status"><span class="status-badge ${statusClass(status)}">${statusLabel(status)}</span></td>
-        <td data-label="Name">${r.name||''}</td>
-        <td data-label="Address / Lot">${r.address||''}${r.lot ? ` <span class="muted">(Lot ${r.lot})</span>` : ''}</td>
-        <td data-label="Phone" class="mono">${r.phone||''}</td>
-        <td data-label="Photos">${photoCount ? `<span class="photo-count"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> ${photoCount}</span>` : r.photosCleared ? '<span class="muted" title="Photos removed after send / retention window">Cleared</span>' : '<span class="muted">—</span>'}</td>
-        <td data-label="Submitted" class="mono muted">${fmtDateTime(r.submittedAt)}</td>
-      </tr>`;
-    }).join('');
-  }
+  // completed ones below, newest finished first; a search opens the section if it finds any there
+  const done = requests.filter(r=>isDone(r) && matches(r))
+    .sort((a,b)=>(b.completedAt||b.submittedAt||'').localeCompare(a.completedAt||a.submittedAt||''));
+  const show = doneOpen || (!!q && done.length > 0);
+  document.getElementById('doneCount').textContent = done.length;
+  document.getElementById('doneToggle').classList.toggle('open', show);
+  document.getElementById('doneWrap').style.display = show ? 'block' : 'none';
+  document.getElementById('doneBody').innerHTML = done.map(r=>requestRow(r, true)).join('');
+  document.getElementById('doneEmpty').style.display = done.length ? 'none' : 'block';
 
   document.getElementById('statTotal').textContent = requests.length;
   document.getElementById('statNew').textContent = requests.filter(r=>(r.status||'new')==='new').length;
@@ -544,10 +611,11 @@ document.getElementById('headerRow').addEventListener('click', e=>{
 });
 document.getElementById('searchBox').addEventListener('input', render);
 document.getElementById('statusFilter').addEventListener('change', render);
-document.getElementById('tableBody').addEventListener('click', e=>{
+['tableBody','doneBody'].forEach(id=>document.getElementById(id).addEventListener('click', e=>{
   const row = e.target.closest('tr[data-id]');
   if(row) openModal(row.dataset.id);
-});
+}));
+document.getElementById('doneToggle').addEventListener('click', ()=>{ doneOpen = !document.getElementById('doneToggle').classList.contains('open'); render(); });
 
 document.getElementById('copyLinkBtn').addEventListener('click', ()=>{
   const url = new URL('request.html', window.location.href).toString();
@@ -559,20 +627,30 @@ document.getElementById('copyLinkBtn').addEventListener('click', ()=>{
   }).catch(()=>{ prompt('Copy this link:', url); });
 });
 
-document.getElementById('cleanupBtn').addEventListener('click', async ()=>{
-  const btn = document.getElementById('cleanupBtn');
-  const original = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Cleaning up…';
-  try{
-    const count = await cleanupOldPhotos();
-    btn.textContent = count > 0 ? `Cleared ${count} request${count===1?'':'s'}` : 'Nothing to clean up';
-  } catch(e){
-    console.error(e);
-    btn.textContent = 'Error — try again';
-  }
-  setTimeout(()=>{ btn.textContent = original; btn.disabled = false; }, 2200);
-});
+/* A phone photo is several MB. Shrink it to a sensible size first (longest side 1600px, JPEG),
+   which is still plenty to see the problem and is roughly a tenth of the space.
+   If the picture can't be read (an unusual format), the original is uploaded as it is. */
+function shrinkPhoto(file){
+  const asIs = { blob: file, name: file.name, type: file.type };
+  return new Promise(resolve=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(blob=>{
+          URL.revokeObjectURL(url);
+          resolve(blob && blob.size < file.size ? { blob, name: file.name.replace(/\.[^.]*$/, '') + '.jpg', type: 'image/jpeg' } : asIs);
+        }, 'image/jpeg', 0.82);
+      } catch(e){ URL.revokeObjectURL(url); resolve(asIs); }
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(asIs); };
+    img.src = url;
+  });
+}
 
 /* ---- Add Request modal (manual entry) ---- */
 const addRequestOverlay = document.getElementById('addRequestOverlay');
@@ -631,9 +709,11 @@ document.getElementById('addRequestSave').addEventListener('click', async ()=>{
     let photoUrls = [];
     if(arSelectedFiles.length){
       btn.textContent = 'Uploading photos…';
-      photoUrls = await Promise.all(arSelectedFiles.map((file, i)=>{
-        const ref = storage.ref().child(`service-photos/${requestId}/${i}-${file.name}`);
-        return ref.put(file).then(()=>ref.getDownloadURL());
+      photoUrls = await Promise.all(arSelectedFiles.map(async (file, i)=>{
+        const small = await shrinkPhoto(file);
+        const ref = storage.ref().child(`service-photos/${requestId}/${i}-${small.name}`);
+        await ref.put(small.blob, { contentType: small.type || 'image/jpeg' });
+        return ref.getDownloadURL();
       }));
     }
 
@@ -642,6 +722,7 @@ document.getElementById('addRequestSave').addEventListener('click', async ()=>{
       name, phone, email, address, lot, description,
       photoUrls, status,
       submittedAt: new Date().toISOString(),
+      ...(status === 'sent' ? { completedAt: new Date().toISOString() } : {}),
     });
 
     closeAddRequestModal();
@@ -667,17 +748,38 @@ function openModal(id){
   document.getElementById('d_submitted').textContent = fmtDateTime(r.submittedAt) || '—';
   document.getElementById('d_address').textContent = r.address || '—';
   document.getElementById('d_lot').textContent = r.lot || '—';
+  // the home this is about: worked out from the lot and address, or picked by hand below
+  const home = homeFor(r);
+  document.getElementById('d_home').innerHTML = home
+    ? `<a class="home-link" href="house.html?id=${encodeURIComponent(home.id)}">${esc(homeLabel(home))} &rarr;</a>`
+    : `<span class="muted">${r.houseId === 'none' ? 'Not linked' : 'No match found'}</span>`;
+  const auto = homeFor({ ...r, houseId: '' });
+  document.getElementById('d_homeSelect').innerHTML =
+    `<option value="">Match automatically${auto ? ' — ' + esc(homeLabel(auto)) : ' (none found)'}</option><option value="none">Not linked to a home</option>`
+    + jobs.slice().sort((a,b)=>homeLabel(a).localeCompare(homeLabel(b), 'en', { numeric:true }))
+        .map(j=>`<option value="${esc(j.id)}">${esc(homeLabel(j))}${j.address ? ' — ' + esc(j.address) : ''}</option>`).join('');
+  document.getElementById('d_homeSelect').value = r.houseId && (r.houseId === 'none' || jobs.some(j=>j.id===r.houseId)) ? r.houseId : '';
+  // a vendor who has since been deleted still shows by the name saved with the request
+  const gone = r.vendorId && !vendors.some(v=>v.id===r.vendorId);
+  document.getElementById('d_vendor').innerHTML = '<option value="">Nobody yet</option>'
+    + (gone ? `<option value="${esc(r.vendorId)}">${esc(r.vendorName || 'Removed vendor')}</option>` : '')
+    + vendors.map(v=>`<option value="${esc(v.id)}">${esc(v.name || 'Unnamed')}</option>`).join('');
+  document.getElementById('d_vendor').value = r.vendorId || '';
+  document.getElementById('d_completed').textContent = r.status === 'sent' && r.completedAt ? 'Completed ' + fmtDateTime(r.completedAt) : '';
   document.getElementById('d_description').textContent = r.description || '';
+  showDescEdit(false);
+  document.getElementById('descNote').textContent = r.descriptionEditedAt
+    ? 'Edited ' + fmtDateTime(r.descriptionEditedAt) + (r.descriptionEditedBy ? ' by ' + r.descriptionEditedBy : '') + '. The homeowner\'s original wording is kept with the request.' : '';
 
   const photos = r.photoUrls || [];
   const photosWrap = document.getElementById('d_photosWrap');
   if(photos.length){
     document.getElementById('d_photos').innerHTML = photos.map(url=>
-      `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" loading="lazy"></a>`
+      `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" loading="lazy"></a>`
     ).join('');
     photosWrap.style.display = 'block';
   } else if(r.photosCleared){
-    document.getElementById('d_photos').innerHTML = `<span class="muted" style="font-size:13px;">Photos were removed automatically after this request was marked sent (or aged past ${PHOTO_RETENTION_DAYS} days).</span>`;
+    document.getElementById('d_photos').innerHTML = `<span class="muted" style="font-size:13px;">The photos on this request were removed by the old automatic clean-up, before photos were kept.</span>`;
     photosWrap.style.display = 'block';
   } else {
     photosWrap.style.display = 'none';
@@ -691,6 +793,13 @@ function openModal(id){
   overlay.classList.add('show');
 }
 function closeModal(){ overlay.classList.remove('show'); editingId = null; }
+// keep an open card up to date when the data behind it changes — but not while a list on it is being used
+function refreshCard(){
+  if(!editingId || !overlay.classList.contains('show')) return;
+  if(document.activeElement && document.activeElement.tagName === 'SELECT' && overlay.contains(document.activeElement)) return;
+  if(document.getElementById('descEdit').style.display !== 'none') return; // someone is in the middle of editing the description
+  if(requests.some(r=>r.id===editingId)) openModal(editingId); else closeModal();
+}
 document.getElementById('closeModal').addEventListener('click', closeModal);
 document.getElementById('closeBtn').addEventListener('click', closeModal);
 overlay.addEventListener('click', e=>{ if(e.target===overlay) closeModal(); });
@@ -702,13 +811,201 @@ document.querySelectorAll('.status-btn').forEach(btn=>{
     document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active-'+b.dataset.status));
     btn.classList.add('active-'+btn.dataset.status);
     try{
-      await requestsCol.doc(editingId).update({ status: btn.dataset.status });
-      if(btn.dataset.status === 'sent'){
-        await clearPhotosForRequest(editingId);
-      }
+      // Complete drops it into the Completed section below; any other status brings it back up
+      const was = (requests.find(r=>r.id===editingId) || {}).status;
+      const patch = { status: btn.dataset.status };
+      if(btn.dataset.status === 'sent'){ if(was !== 'sent') patch.completedAt = new Date().toISOString(); }
+      else patch.completedAt = '';
+      await requestsCol.doc(editingId).update(patch);
     }
     catch(e){ console.error(e); alert('Could not update status — check your connection.'); }
   });
+});
+
+/* ---- edit the description (e.g. to tidy it up before sending it to a vendor) ---- */
+function showDescEdit(on){
+  document.getElementById('descEdit').style.display = on ? 'block' : 'none';
+  document.getElementById('d_description').style.display = on ? 'none' : 'block';
+  document.getElementById('descEditBtn').style.display = on ? 'none' : '';
+}
+document.getElementById('descEditBtn').addEventListener('click', ()=>{
+  const r = requests.find(x=>x.id===editingId);
+  if(!r) return;
+  document.getElementById('descText').value = r.description || '';
+  showDescEdit(true);
+  document.getElementById('descText').focus();
+});
+document.getElementById('descCancel').addEventListener('click', ()=>showDescEdit(false));
+document.getElementById('descSave').addEventListener('click', async ()=>{
+  const r = requests.find(x=>x.id===editingId);
+  if(!r) return;
+  const text = document.getElementById('descText').value.trim();
+  if(text === (r.description || '')){ showDescEdit(false); return; }
+  if(!text){ alert('The description can\'t be empty.'); return; }
+  const user = firebase.auth().currentUser;
+  const patch = {
+    description: text,
+    descriptionEditedAt: new Date().toISOString(),
+    descriptionEditedBy: user ? (user.displayName || String(user.email || '').split('@')[0]) : '',
+  };
+  // the first time it's changed, keep what the homeowner actually wrote
+  if(r.descriptionOriginal == null) patch.descriptionOriginal = r.description || '';
+  setSyncStatus('saving');
+  try{
+    await requestsCol.doc(editingId).update(patch);
+    showDescEdit(false);
+    refreshCard();
+  } catch(err){ console.error(err); alert('Could not save the description — check your connection.'); }
+});
+
+/* ---- assign a vendor / link to a home ---- */
+document.getElementById('d_vendor').addEventListener('change', async e=>{
+  if(!editingId) return;
+  const v = vendors.find(x=>x.id===e.target.value);
+  e.target.blur();
+  setSyncStatus('saving');
+  try{ await requestsCol.doc(editingId).update({ vendorId: v ? v.id : '', vendorName: v ? (v.name || '') : '', vendorAssignedAt: v ? new Date().toISOString() : '' }); }
+  catch(err){ console.error(err); alert('Could not save the vendor — check your connection.'); }
+});
+document.getElementById('d_homeSelect').addEventListener('change', async e=>{
+  if(!editingId) return;
+  const value = e.target.value;
+  e.target.blur();
+  setSyncStatus('saving');
+  try{ await requestsCol.doc(editingId).update({ houseId: value }); }
+  catch(err){ console.error(err); alert('Could not save the home — check your connection.'); }
+});
+
+/* ---- copy the card's details, ready to paste into an email ---- */
+function requestText(r){
+  const home = homeFor(r);
+  return [
+    r.name || '',
+    r.phone ? 'Phone: ' + r.phone : '',
+    r.email ? 'Email: ' + r.email : '',
+    r.address ? 'Address: ' + r.address : '',
+    r.lot ? 'Lot #: ' + r.lot : '',
+    home && home.community ? 'Community: ' + home.community : '',
+    r.submittedAt ? 'Submitted: ' + fmtDateTime(r.submittedAt) : '',
+  ].filter(Boolean).join('\n') + (r.description ? '\n\n' + r.description : '');
+}
+document.getElementById('copyInfoBtn').addEventListener('click', ()=>{
+  const r = requests.find(x=>x.id===editingId);
+  if(!r) return;
+  const btn = document.getElementById('copyInfoBtn');
+  const text = requestText(r);
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent = 'Copied!';
+    setTimeout(()=>{ btn.textContent = 'Copy'; }, 1500);
+  }).catch(()=>{ prompt('Copy this:', text); });
+});
+
+/* ---- export the card as a PDF (the PDF tool is only downloaded the first time it's needed) ---- */
+function loadScript(src){
+  return new Promise((resolve, reject)=>{
+    const el = document.createElement('script');
+    el.src = src; el.onload = resolve; el.onerror = ()=>reject(new Error('could not load ' + src));
+    document.head.appendChild(el);
+  });
+}
+// A picture as a JPEG the PDF can hold. Fails quietly (returns null) if the picture can't be read.
+function imageData(url, max){
+  return new Promise(resolve=>{
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = ()=>{
+      try{
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        resolve({ data: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height });
+      } catch(e){ resolve(null); }
+    };
+    img.onerror = ()=>resolve(null);
+    img.src = url;
+  });
+}
+async function buildRequestPdf(r){
+  if(!window.jspdf) await loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+  const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 54;
+  let y = M;
+  const room = h=>{ if(y + h > H - M){ doc.addPage(); y = M; } };
+  const label = text=>{ doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(107, 111, 114); doc.text(text.toUpperCase(), M, y); };
+  const body = ()=>{ doc.setFont('helvetica', 'normal'); doc.setFontSize(11.5); doc.setTextColor(51, 54, 58); };
+
+  const logo = document.querySelector('.brand-mark img');
+  const logoImg = logo ? await imageData(logo.src, 400) : null;
+  if(logoImg) doc.addImage(logoImg.data, 'JPEG', M, y, 90, 90 * logoImg.h / logoImg.w);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(75, 79, 84);
+  doc.text('Service Request', W - M, y + 16, { align: 'right' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(107, 111, 114);
+  doc.text(statusLabel(r.status || 'new') + (r.status === 'sent' && r.completedAt ? ' ' + fmtDateTime(r.completedAt) : ''), W - M, y + 32, { align: 'right' });
+  y += 58;
+  doc.setDrawColor(163, 170, 131); doc.setLineWidth(2); doc.line(M, y, W - M, y);
+  y += 26;
+
+  const home = homeFor(r);
+  const vendor = r.vendorId ? ((vendors.find(v=>v.id===r.vendorId) || {}).name || r.vendorName) : '';
+  [
+    ['Name', r.name], ['Phone', r.phone], ['Email', r.email], ['Address', r.address], ['Lot #', r.lot],
+    ['Home', home ? homeLabel(home) : ''], ['Submitted', fmtDateTime(r.submittedAt)], ['Assigned to', vendor],
+  ].filter(f=>f[1]).forEach(([name, value])=>{
+    body();
+    const lines = doc.splitTextToSize(String(value), W - M*2 - 100);
+    room(lines.length * 15 + 6);
+    label(name);
+    body();
+    doc.text(lines, M + 100, y);
+    y += lines.length * 15 + 6;
+  });
+
+  y += 10;
+  room(30); label('Description'); y += 16;
+  body();
+  doc.splitTextToSize(r.description || '—', W - M*2).forEach(line=>{ room(16); doc.text(line, M, y); y += 16; });
+
+  // photos, two across — one that can't be read is skipped and mentioned at the end
+  const photos = r.photoUrls || [];
+  if(photos.length){
+    y += 14;
+    room(30); label('Photos'); y += 12;
+    const cellW = (W - M*2 - 12) / 2, cellH = cellW * 0.75;
+    let col = 0, missed = 0;
+    for(const url of photos){
+      const img = await imageData(url, 1100);
+      if(!img){ missed++; continue; }
+      if(col === 0) room(cellH + 12);
+      const fit = Math.min(cellW / img.w, cellH / img.h);
+      doc.addImage(img.data, 'JPEG', M + col * (cellW + 12), y, img.w * fit, img.h * fit);
+      if(col === 1){ y += cellH + 12; col = 0; } else col = 1;
+    }
+    if(col === 1) y += cellH + 12;
+    if(missed){
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(10); doc.setTextColor(107, 111, 114);
+      room(24);
+      doc.text(missed + (missed === 1 ? ' photo' : ' photos') + ' could not be added - open the request in the hub to see ' + (missed === 1 ? 'it.' : 'them.'), M, y + 10);
+    }
+  }
+  const safe = t=>String(t || '').replace(/[^A-Za-z0-9 _-]/g, '').trim();
+  return { doc, name: ['Service request', safe(r.name), r.lot ? 'Lot ' + safe(r.lot) : ''].filter(Boolean).join(' - ') + '.pdf' };
+}
+document.getElementById('pdfBtn').addEventListener('click', async ()=>{
+  const r = requests.find(x=>x.id===editingId);
+  if(!r) return;
+  const btn = document.getElementById('pdfBtn');
+  btn.disabled = true; btn.textContent = 'Making PDF…';
+  try{
+    const made = await buildRequestPdf(r);
+    made.doc.save(made.name);
+  } catch(err){
+    console.error(err);
+    alert('Could not make the PDF — check your connection and try again.');
+  }
+  btn.disabled = false; btn.textContent = 'Export PDF';
 });
 
 document.getElementById('deleteBtn').addEventListener('click', async ()=>{

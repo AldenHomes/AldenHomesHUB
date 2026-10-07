@@ -193,6 +193,31 @@ firebase.auth().signInAnonymously().catch(err=>{
   document.getElementById('submitBtn').disabled = true;
 });
 
+/* A phone photo is several MB. Shrink it first (longest side 1600px, JPEG): still plenty to
+   see the problem, roughly a tenth of the space, and much quicker to send on a phone signal.
+   If the picture can't be read (an unusual format), the original is uploaded as it is. */
+function shrinkPhoto(file){
+  const asIs = { blob: file, name: file.name, type: file.type };
+  return new Promise(resolve=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(blob=>{
+          URL.revokeObjectURL(url);
+          resolve(blob && blob.size < file.size ? { blob, name: file.name.replace(/\.[^.]*$/, '') + '.jpg', type: 'image/jpeg' } : asIs);
+        }, 'image/jpeg', 0.82);
+      } catch(e){ URL.revokeObjectURL(url); resolve(asIs); }
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(asIs); };
+    img.src = url;
+  });
+}
+
 document.getElementById('f_photos').addEventListener('change', e=>{
   const incoming = Array.from(e.target.files);
   const room = MAX_PHOTOS - selectedFiles.length;
@@ -251,9 +276,11 @@ document.getElementById('requestForm').addEventListener('submit', async e=>{
     let photoUrls = [];
     if(selectedFiles.length){
       submitBtn.textContent = 'Uploading photos…';
-      photoUrls = await Promise.all(selectedFiles.map((file, i)=>{
-        const ref = storage.ref().child(`service-photos/${requestId}/${i}-${file.name}`);
-        return ref.put(file).then(()=>ref.getDownloadURL());
+      photoUrls = await Promise.all(selectedFiles.map(async (file, i)=>{
+        const small = await shrinkPhoto(file);
+        const ref = storage.ref().child(`service-photos/${requestId}/${i}-${small.name}`);
+        await ref.put(small.blob, { contentType: small.type || 'image/jpeg' });
+        return ref.getDownloadURL();
       }));
     }
 

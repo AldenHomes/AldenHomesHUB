@@ -103,6 +103,8 @@
   .home-sub{font-size:11.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;}
   .home-date{flex:none; text-align:right; font-family:"Courier New",monospace; font-size:11.5px; color:var(--ink-soft); line-height:1.3;}
   .home-date .soon{color:var(--amber); font-weight:700;}
+  .home-row.finished{background:#f8f6f0;}
+  .home-row.finished .home-tag{opacity:.55;}
   .homes-empty{padding:28px 18px; text-align:center; color:var(--ink-soft); font-size:13px;}
   .welcome{margin-bottom:28px;}
   .welcome h2{margin:0 0 6px; font-size:22px; color:var(--navy);}
@@ -319,10 +321,10 @@
     <aside class="homes-card">
       <div class="homes-head">
         <h3>Active Homes <span class="homes-count" id="homesCount"></span></h3>
-        <input type="text" id="homesSearch" placeholder="Search name, lot, address…">
+        <input type="text" id="homesSearch" placeholder="Search all homes, finished too…">
       </div>
       <div class="homes-list" id="homesList"></div>
-      <div class="homes-empty" id="homesEmpty" style="display:none;">No active homes match.</div>
+      <div class="homes-empty" id="homesEmpty" style="display:none;">No homes match.</div>
     </aside>
     </div>
 
@@ -424,7 +426,8 @@ function daysFromToday(iso){
 function attachScheduleStatsListener(db){
   db.collection('jobs').onSnapshot(snapshot=>{
     const jobs = snapshot.docs.map(d=>d.data());
-    activeHomes = snapshot.docs.map(d=>({ id: d.id, ...d.data() })).filter(j=>{
+    allHomes = snapshot.docs.map(d=>({ id: d.id, ...d.data() }));
+    activeHomes = allHomes.filter(j=>{
       const d = daysFromToday(j.settle);
       return d===null || d>=0; // active until it settles
     });
@@ -503,6 +506,7 @@ document.addEventListener('click', e=>{
 
 /* ---- Active homes list (right side) ---- */
 let activeHomes = [];
+let allHomes = [];   // finished homes too — the search looks through these
 const HOME_COLORS = { AP:'#3d5570', MM:'#5a7247', ML:'#8a5a3a', CL:'#6a4c93', OS:'#c1531f', ET:'#2f7d8c', NG:'#8c6b2f' };
 function escHtml(s){
   return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -514,22 +518,27 @@ function shortDate(iso){
 }
 function renderActiveHomes(){
   const q = document.getElementById('homesSearch').value.trim().toLowerCase();
-  const rows = activeHomes
-    .filter(j=>!q || [j.community, j.lot, j.client, j.address, j.model].join(' ').toLowerCase().includes(q))
-    // soonest to settle first; homes with no settle date yet go last
-    .sort((a,b)=>(a.settle||'9999').localeCompare(b.settle||'9999') || String(a.lot||'').localeCompare(String(b.lot||'')));
+  // The list shows homes still being built. Searching also finds finished ones (to get to
+  // their service history, photos and plans) — those are listed after the active matches.
+  const finished = j=>!activeHomes.includes(j);
+  const rows = (q ? allHomes : activeHomes)
+    .filter(j=>!q || [j.community, j.lot ? 'lot '+j.lot : '', j.client, j.address, j.model].join(' ').toLowerCase().includes(q))
+    // soonest to settle first; homes with no settle date yet go last. Finished homes: most recent first.
+    .sort((a,b)=>(finished(a) - finished(b))
+      || (finished(a) ? (b.settle||'').localeCompare(a.settle||'') : (a.settle||'9999').localeCompare(b.settle||'9999'))
+      || String(a.lot||'').localeCompare(String(b.lot||'')));
   document.getElementById('homesCount').textContent = activeHomes.length;
   document.getElementById('homesEmpty').style.display = rows.length ? 'none' : 'block';
   document.getElementById('homesList').innerHTML = rows.map(j=>{
     const days = daysFromToday(j.settle);
     const soon = days!==null && days<=30;
-    return `<a class="home-row" href="house.html?id=${encodeURIComponent(j.id)}">
+    return `<a class="home-row${finished(j) ? ' finished' : ''}" href="house.html?id=${encodeURIComponent(j.id)}">
       <span class="home-tag" style="background:${HOME_COLORS[j.community] || '#6b6f72'}">${escHtml(j.community || '—')}</span>
       <span class="home-main">
         <div class="home-name">${escHtml([j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') || 'Unnamed home')}</div>
         <div class="home-sub">${escHtml([j.address, j.model].filter(Boolean).join(' · '))}</div>
       </span>
-      <span class="home-date">${j.settle ? `settles<br><span class="${soon?'soon':''}">${shortDate(j.settle)}</span>` : 'no date'}</span>
+      <span class="home-date">${finished(j) ? `settled<br>${shortDate(j.settle)}` : j.settle ? `settles<br><span class="${soon?'soon':''}">${shortDate(j.settle)}</span>` : 'no date'}</span>
     </a>`;
   }).join('');
 }

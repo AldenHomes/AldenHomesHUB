@@ -291,6 +291,16 @@
           <div class="card-body"><div id="coList"></div></div>
         </div>
 
+        <!-- Service history: requests from the service center that are about this home -->
+        <div class="card wide" id="serviceCard">
+          <div class="card-head">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.5 2.5-2.1-.4-.4-2.1z"/></svg></div>
+            <h3>Service History <span class="muted" id="serviceCount" style="font-size:12px; font-weight:400;"></span></h3>
+            <a class="btn btn-ghost" href="service.html" style="margin-left:auto; padding:8px 14px;">Service center</a>
+          </div>
+          <div class="card-body"><div id="serviceList"></div></div>
+        </div>
+
         <!-- Build schedule -->
         <div class="card">
           <div class="card-head">
@@ -555,6 +565,59 @@ function attachListeners(){
     s.docs.forEach(d=>{ vendors[d.id] = d.data().name || ''; });
     render();
   }, err=>console.error('vendors listener error', err));
+
+  // Service history: every request, plus every home so a request can be matched to the right one
+  db.collection('service-requests').onSnapshot(s=>{
+    serviceRequests = s.docs.map(d=>({ id: d.id, ...d.data() }));
+    serviceState = 'ready';
+    render();
+  }, err=>{ console.error('service-requests listener error', err); serviceState = 'blocked'; render(); });
+  db.collection('jobs').onSnapshot(s=>{
+    allJobs = s.docs.map(d=>({ id: d.id, ...d.data() }));
+    render();
+  }, err=>console.error('jobs listener error', err));
+}
+
+/* ============================================================
+   SERVICE HISTORY — requests from the service center about this home.
+   A request is tied to a home by its lot number and address (house number + street
+   name), unless staff picked the home by hand on the request. Same rules as service.html.
+   ============================================================ */
+let serviceRequests = [];
+let serviceState = 'loading';   // 'loading' | 'ready' | 'blocked'
+let allJobs = [];
+function addrKey(a){
+  const m = String(a||'').toLowerCase().replace(/[.,#]/g, ' ').match(/(\d+)\s+([a-z0-9]+)/);
+  return m ? m[1] + ' ' + m[2] : '';
+}
+function lotKey(l){ return String(l==null?'':l).toLowerCase().replace(/lot|#|\s/g, ''); }
+function homeFor(r){
+  if(r.houseId) return allJobs.find(j=>j.id===r.houseId) || null;
+  const a = addrKey(r.address), lot = lotKey(r.lot);
+  const byAddr = a ? allJobs.filter(j=>addrKey(j.address)===a) : [];
+  if(byAddr.length === 1) return byAddr[0];
+  const byLot = lot ? allJobs.filter(j=>lotKey(j.lot)===lot) : [];
+  if(byAddr.length > 1){ const both = byAddr.filter(j=>byLot.includes(j)); return both.length === 1 ? both[0] : null; }
+  return byLot.length === 1 ? byLot[0] : null;
+}
+function renderService(){
+  const mine = serviceRequests.filter(r=>{ const h = homeFor(r); return h && h.id === houseId; })
+    .sort((a,b)=>(b.submittedAt||'').localeCompare(a.submittedAt||''));
+  const open = mine.filter(r=>r.status !== 'sent').length;
+  $('serviceCount').textContent = mine.length ? `(${mine.length}${open ? ` · ${open} open` : ''})` : '';
+  const label = { 'new': ['New', 'sent'], 'in-progress': ['In progress', 'draft'], 'sent': ['Complete', 'approved'] };
+  $('serviceList').innerHTML = serviceState === 'blocked' ? '<span class="muted">Service requests couldn\'t be loaded.</span>'
+    : serviceState === 'loading' ? '<span class="muted">Loading…</span>'
+    : mine.length ? mine.map(r=>{
+        const [text, cls] = label[r.status] || label['new'];
+        const vendor = r.vendorId ? (vendors[r.vendorId] || r.vendorName || '') : '';
+        const when = [r.submittedAt ? 'Submitted ' + dateTime(r.submittedAt) : '', r.status === 'sent' && r.completedAt ? 'Completed ' + dateTime(r.completedAt) : '', vendor ? 'Assigned to ' + vendor : '', r.name || ''].filter(Boolean).join(' · ');
+        return `<a class="co-row" href="service.html?open=${encodeURIComponent(r.id)}" style="text-decoration:none;">
+          <span class="co-main"><div class="co-name" style="font-weight:400; color:var(--ink); white-space:pre-wrap;">${esc(r.description || 'No description')}</div><div class="co-meta">${esc(when)}</div></span>
+          <span class="pill ${cls}">${text}</span>
+        </a>`;
+      }).join('')
+    : '<span class="muted">No service requests for this home.</span>';
 }
 
 /* ---- render ---- */
@@ -583,6 +646,7 @@ function render(){
 
   renderOwnerLogin();
   renderNotes();
+  renderService();
   renderChangeOrders();
   renderSchedule();
   renderOrders();
