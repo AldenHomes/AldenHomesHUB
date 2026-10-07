@@ -65,6 +65,14 @@
   .setting input[type=text]{width:260px; max-width:100%;}
   .setting input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
   .unit{font-size:13px; color:var(--ink-soft);}
+  .person{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:11px 0; border-top:1px solid #ece8dd;}
+  .person:first-child{border-top:none; padding-top:0;}
+  .person .email{flex:1 1 240px; font-size:14px; color:var(--ink); word-break:break-all;}
+  .person .email small{display:block; font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .person input{width:220px; max-width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
+  .person input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .person .ok{width:46px; font-size:12px; font-weight:700; color:var(--good); opacity:0; transition:opacity .2s;}
+  .person .ok.show{opacity:1;}
   .fact{font-size:13px; color:var(--ink-soft); margin-top:16px; padding-top:14px; border-top:1px solid #ece8dd; line-height:1.6;}
   .fact code{background:#eef0e8; padding:1px 6px; border-radius:2px; font-size:12.5px; color:var(--navy);}
   .saved{font-size:12.5px; font-weight:700; color:var(--good); opacity:0; transition:opacity .2s;}
@@ -171,6 +179,14 @@
       </div>
     </div>
 
+    <!-- ===================== TEAM ===================== -->
+    <div class="section">
+      <h2>Team</h2>
+      <p class="lead">Everyone with a hub login. Give each person the name the team knows them by — it's what shows on their notes and photos, and what people pick when they type @ in a note.</p>
+      <div id="teamList"><div class="note">Loading the team…</div></div>
+      <div class="fact">Logins are created and removed in the Firebase console (Authentication → Users). New logins appear here automatically.</div>
+    </div>
+
     <p class="note">Anyone who can sign in to the hub can change these settings. More settings will be added here as the hub grows.</p>
 
     <footer>Alden Homes internal tools — settings apply to everyone straight away.</footer>
@@ -248,6 +264,7 @@ firebase.auth().onAuthStateChanged(user=>{
         render();
         setSyncStatus('idle');
       }, err=>{ console.error('settings listener error', err); setSyncStatus('offline'); });
+      loadTeam();
     }
   } else {
     showLoginGate();
@@ -304,6 +321,63 @@ function numberSetting(id, key, min, max){
 }
 numberSetting('leadDays', 'leadDays', 1, 120);
 numberSetting('reminderDays', 'reminderDays', 1, 30);
+/* ============================================================
+   TEAM — a name for each hub login
+   The list of logins and their names is kept with the logins themselves, which only
+   the server can read or change, so this goes through the hub's server.
+   ============================================================ */
+const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
+let team = [];
+function esc(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+async function hubApi(body){
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify(body) });
+  if(!res.ok) throw new Error('hub server ' + res.status);
+  return res.json();
+}
+async function loadTeam(){
+  try{
+    team = ((await hubApi({ action:'staff' })).staff || []).sort((a,b)=>a.email.localeCompare(b.email));
+    renderTeam();
+  } catch(err){
+    console.error(err);
+    $('teamList').innerHTML = '<div class="note">Couldn\'t load the team just now. Check your connection and reload the page.</div>';
+  }
+}
+function renderTeam(){
+  const me = firebase.auth().currentUser;
+  $('teamList').innerHTML = team.length ? team.map(p=>`<div class="person">
+      <div class="email">${esc(p.email)}${me && me.uid === p.uid ? '<small>This is you</small>' : ''}</div>
+      <input type="text" data-uid="${esc(p.uid)}" value="${esc(p.setName || '')}" placeholder="${esc(p.email.split('@')[0])}" maxlength="40" autocomplete="off" aria-label="Name for ${esc(p.email)}">
+      <span class="ok" data-ok="${esc(p.uid)}">Saved</span>
+    </div>`).join('') : '<div class="note">No logins found.</div>';
+}
+$('teamList').addEventListener('change', async e=>{
+  const input = e.target.closest('input[data-uid]');
+  if(!input) return;
+  const person = team.find(p=>p.uid === input.dataset.uid);
+  const name = input.value.trim().replace(/\s+/g, ' ');
+  if(!person || name === (person.setName || '')) return;
+  if(/[@<>]/.test(name)){ alert('A name can\'t contain @, < or >.'); input.value = person.setName || ''; return; }
+  setSyncStatus('saving');
+  try{
+    await hubApi({ action:'setName', uid: person.uid, name });
+    person.setName = name;
+    input.value = name;
+    const ok = document.querySelector(`[data-ok="${person.uid}"]`);
+    ok.classList.add('show');
+    setTimeout(()=>ok.classList.remove('show'), 1800);
+    setSyncStatus('idle');
+  } catch(err){
+    console.error(err);
+    input.value = person.setName || '';
+    setSyncStatus('idle');
+    alert('Could not save the name — check your connection and try again.');
+  }
+});
+
 $('replyTo').addEventListener('change', e=>{
   const v = e.target.value.trim();
   if(v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ alert('That doesn\'t look like an email address.'); e.target.value = settings.replyTo || ''; return; }

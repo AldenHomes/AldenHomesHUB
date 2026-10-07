@@ -603,10 +603,15 @@ function closeMentionMenu(){ $('mentionMenu').classList.remove('show'); mentionS
 function updateMentionMenu(){
   const box = $('noteText');
   const before = box.value.slice(0, box.selectionStart);
-  const m = /(^|\s)@([^\s@]*)$/.exec(before);
+  // an "@" at the start of a word, plus whatever has been typed after it (names can have spaces)
+  const m = /(^|\s)@([^@\n]{0,40})$/.exec(before);
   if(!m || !staff.length){ closeMentionMenu(); return; }
   const typed = m[2].toLowerCase();
-  const matches = staff.filter(s=>s.name.toLowerCase().includes(typed) || s.email.toLowerCase().includes(typed)).slice(0, 8);
+  // The list opens the moment "@" is typed and narrows with each letter. Names that
+  // start with what's typed come first, then anything containing it (name or email).
+  const starts = staff.filter(s=>s.name.toLowerCase().startsWith(typed));
+  const contains = staff.filter(s=>!starts.includes(s) && (s.name.toLowerCase().includes(typed) || s.email.toLowerCase().includes(typed)));
+  const matches = [...starts, ...contains].slice(0, 8);
   if(!matches.length){ closeMentionMenu(); return; }
   mentionStart = before.length - m[2].length - 1;
   $('mentionMenu').innerHTML = matches.map((s,i)=>`<button type="button" class="${i===0?'on':''}" data-uid="${esc(s.uid)}">${esc(s.name)}<small>${esc(s.email)}</small></button>`).join('');
@@ -857,6 +862,9 @@ document.getElementById('photoGrid').addEventListener('change', async e=>{
 function staffName(){
   const user = firebase.auth().currentUser;
   if(!user) return 'Alden Homes';
+  // the name set for this login on Admin Settings → Team, once the team list has loaded
+  const me = staff.find(s=>s.uid === user.uid);
+  if(me) return me.name;
   return user.displayName || (user.email || '').split('@')[0] || 'Alden Homes';
 }
 

@@ -517,7 +517,8 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       const list = await admin.auth().listUsers(1000);
       const staff = list.users
         .filter(u=>u.email && !u.disabled)
-        .map(u=>({ uid: u.uid, email: u.email, name: staffName(u) }));
+        // name = what shows in notes and the @ menu; setName = what was typed on Admin Settings ('' if nothing yet)
+        .map(u=>({ uid: u.uid, email: u.email, name: staffName(u), setName: u.displayName || '' }));
       // Two logins can share a name (the same person at two email addresses, say).
       // Add the email's domain to those so each one can be @mentioned on its own.
       const seen = {};
@@ -525,6 +526,19 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       staff.forEach(s=>{ if(seen[s.name.toLowerCase()] > 1) s.name = `${s.name} (${s.email.split('@')[1] || s.email})`; });
       staff.sort((a, b)=>a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
       res.json({ staff });
+      return;
+    }
+
+    // Admin Settings → Team: give a login a proper name (e.g. "Blake" instead of "bam654").
+    // It's stored on the login itself, so it shows everywhere that person is named.
+    if(body.action === 'setName'){
+      const name = typeof body.name === 'string' ? body.name.trim().replace(/\s+/g, ' ').slice(0, 40) : '';
+      if(typeof body.uid !== 'string' || !body.uid){ res.status(400).json({ error: 'uid' }); return; }
+      if(/[@<>]/.test(name)){ res.status(400).json({ error: 'name' }); return; }
+      const user = await admin.auth().getUser(body.uid).catch(()=>null);
+      if(!user || !user.email){ res.status(404).json({ error: 'no-user' }); return; }
+      await admin.auth().updateUser(body.uid, { displayName: name || null });
+      res.json({ uid: body.uid, name });
       return;
     }
     res.status(400).json({ error: 'action' });
