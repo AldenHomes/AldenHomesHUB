@@ -225,6 +225,25 @@
 
   .app-shell.locked{display:none;}
   footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:36px;}
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  @media (max-width:640px){
+    /* the bell's list used to open off the left edge; now it spans the screen under the header */
+    .bell-wrap{position:static;}
+    .bell-panel{position:absolute; left:12px; right:12px; top:auto; width:auto; margin-top:8px;}
+    .titlebar{position:relative;}
+    /* My work: counts on one line that wraps, weather on its own line under it */
+    .mywork-head{flex-wrap:wrap; padding-right:4px;}
+    .mw-toggle{flex:1 1 0; padding:12px 6px 10px 14px;}
+    .mw-sum{order:3; flex:1 1 100%;}
+    .mw-arrow{margin-left:auto;}
+    .mw-now{order:3; flex:1 1 100%; padding:0 14px 10px; white-space:normal;}
+    .mw-row{flex-wrap:wrap;}
+    .mw-row .mw-main{flex:1 1 60%;}
+    .mw-go{margin-left:35px;}
+    .mw-day{flex:1 1 40%;}
+    .welcome{align-items:center;}
+  }
 </style>
 </head>
 <body>

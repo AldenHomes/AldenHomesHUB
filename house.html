@@ -258,6 +258,32 @@
   .auth-card .btn-primary{width:100%; padding:11px;}
   .app-shell.locked{display:none;}
   footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:30px;}
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  /* a note's name, date, tags and buttons wrap instead of running off the side */
+  .note-head{flex-wrap:wrap; row-gap:3px;}
+  #hContact, #hContact a, .card-body, .note-text, .co-name{overflow-wrap:anywhere;}
+  /* "Show customer" sits top-left; the folder menu drops just under it so they don't overlap */
+  .photo .share{left:4px; right:auto; top:4px;}
+  .photo .move{top:30px; max-width:calc(100% - 8px);}
+  @media (max-width:640px){
+    .card-head{flex-wrap:wrap; row-gap:8px;}
+    .card-head .btn{padding:7px 11px; font-size:12.5px;}
+    /* change orders and service history: the text gets the full width, status and amount go underneath */
+    .co-row{flex-wrap:wrap; gap:6px 12px;}
+    .co-row .co-main{flex:1 1 70%;}
+    .co-row .co-num{width:auto;}
+    .co-row .pill{margin-left:0;}
+    .co-row .co-amt{margin-left:auto;}
+    .note.for-me{margin-left:-12px; margin-right:-12px; padding-left:12px; padding-right:12px;}
+    .reply-box{flex-wrap:wrap;}
+    .reply-box input{flex:1 1 100%;}
+    .reply-box .btn{margin-left:auto;}
+    .tl-hint{display:none;}
+    .tl-arrow{margin-left:auto;}
+    .share-bar button{flex:1 1 100%;}
+    .overlay{padding:3vh 10px;}
+  }
 </style>
 </head>
 <body>

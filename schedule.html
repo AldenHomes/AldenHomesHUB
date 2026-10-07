@@ -363,6 +363,12 @@
     .titlebar-stats .n, .stat .l{color:#000;}
     body{background:#fff;}
   }
+  /* ---- phone-size fixes ---- */
+@media (max-width:640px){
+    /* the tabs used to run off the side with nothing to show there were more; now they wrap onto a second row */
+    .tabbar{flex-wrap:wrap; overflow:visible; gap:0; padding-left:6px; padding-right:6px;}
+    .tab-btn{flex:1 1 auto; justify-content:center; text-align:center; padding-left:8px; padding-right:8px;}
+  }
 </style>
 </head>
 <body>

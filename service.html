@@ -144,6 +144,16 @@
     tbody td::before{content:attr(data-label); font-weight:700; color:var(--ink-soft); font-size:11px; text-transform:uppercase;}
   }
   footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  .detail-item div{overflow-wrap:anywhere;}
+  @media (max-width:640px){
+    /* vendor and home pickers stack instead of squeezing side by side */
+    .row2{grid-template-columns:1fr;}
+    .overlay{padding:3vh 10px;}
+    .modal-foot .btn{flex:1 1 auto;}
+    .head-actions{gap:6px;}
+  }
 </style>
 </head>
 <body>

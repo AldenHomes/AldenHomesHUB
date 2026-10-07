@@ -276,6 +276,15 @@
   .auth-card .btn-primary{width:100%; padding:11px;}
   .app-shell.locked{display:none;}
   footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  @media (max-width:640px){
+    .overlay{padding:3vh 10px;}
+    .decline-box select{font-size:15px;}
+    /* the tabs used to run off the side with nothing to show there were more; now they wrap onto a second row */
+    .tabbar{flex-wrap:wrap; overflow:visible; gap:0; padding-left:6px; padding-right:6px;}
+    .tab-btn{flex:1 1 auto; justify-content:center; text-align:center; padding-left:8px; padding-right:8px;}
+  }
 </style>
 </head>
 <body>

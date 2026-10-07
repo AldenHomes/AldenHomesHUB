@@ -101,6 +101,13 @@
   .btn-primary{background:var(--navy); color:#fff; width:100%;}
   .app-shell.locked{display:none;}
   footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  @media (max-width:640px){
+    .section{padding:18px 16px;}
+    .person input, .setting input[type=text]{width:100%;}
+    .switch-row{flex-wrap:wrap;}
+  }
 </style>
 </head>
 <body>

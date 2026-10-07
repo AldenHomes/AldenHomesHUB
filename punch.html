@@ -123,6 +123,15 @@
   .app-shell.locked{display:none;}
   footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
   @media (max-width:640px){ .titlebar-stats{display:none;} }
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  .item-text, .group-head{overflow-wrap:anywhere;}
+  @media (max-width:640px){
+    .add-row select{flex:1 1 100%;}
+    .add-row .btn{flex:1 1 100%;}
+    .filters select{flex:1 1 100%;}
+    .item-tools{gap:6px 14px;}
+  }
 </style>
 </head>
 <body>
