@@ -787,7 +787,9 @@ const ASSISTANT_TOOLS = [
       text: { ...str, description: 'What needs doing, short and clear.' },
       home_id: { ...str, description: 'The id of the home it is for, or an empty string if it is not about a particular home.' },
       assign_user_ids: { type: 'array', items: str, description: 'uids of the team members it is for. Empty if nobody was named.' },
-    }, required: ['text', 'home_id', 'assign_user_ids'], additionalProperties: false } },
+      due_date: { ...str, description: 'The date it needs to be done by, as YYYY-MM-DD, worked out from today\'s date if they said something like "by Friday". An empty string if no date was mentioned.' },
+      high_priority: { type: 'boolean', description: 'True only if they said it is high priority, urgent, or similar.' },
+    }, required: ['text', 'home_id', 'assign_user_ids', 'due_date', 'high_priority'], additionalProperties: false } },
   { name: 'complete_punch_item', strict: true,
     description: 'Propose checking an item off the punch list. Find the item id with list_punch_items or get_home first. Shown to the user to confirm.',
     input_schema: { type: 'object', properties: { item_id: { ...str, description: 'The id of the punch list item.' } }, required: ['item_id'], additionalProperties: false } },
@@ -856,7 +858,7 @@ async function assistantLookup(name, input, ctx){
           vendors: (t.subIds || []).map(id=>`${subName[id] || 'Removed vendor'} (${({ confirmed: 'approved', declined: 'declined' })[(t.confirm || {})[id]] || 'no answer yet'})`),
         })),
       },
-      open_punch_items: notes.filter(n=>n.todo && !n.done).map(n=>({ item_id: n.id, text: n.text || '', for: n.mentionNames || [] })),
+      open_punch_items: notes.filter(n=>n.todo && !n.done).map(n=>({ item_id: n.id, text: n.text || '', for: n.mentionNames || [], needed_by: n.due || '', high_priority: n.priority === 'high' })),
       recent_notes: notes.filter(n=>!n.todo).slice(0, 10).map(n=>({ when: (n.at || '').slice(0, 10), by: (n.by && n.by.name) || '', text: n.text || '' })),
       service_requests: reqSnap.docs.map(d=>d.data()).filter(r=>{ const h = homeForRequest(r, ctx.jobs); return h && h.id === job.id; })
         .map(r=>({ submitted: (r.submittedAt || '').slice(0, 10), status: r.status === 'sent' ? 'complete' : (r.status || 'new'), assigned_to: r.vendorName || '', description: r.description || '' })),
@@ -865,7 +867,7 @@ async function assistantLookup(name, input, ctx){
   if(name === 'list_punch_items'){
     const snap = await db.collection('notes').where('todo', '==', true).get();
     const open = snap.docs.map(d=>({ id: d.id, ...d.data() })).filter(n=>!n.done);
-    return JSON.stringify(open.map(n=>({ item_id: n.id, text: n.text || '', home: n.houseId ? (n.houseLabel || '') : 'General (no home)', for: n.mentionNames || [], added: (n.at || '').slice(0, 10) })));
+    return JSON.stringify(open.map(n=>({ item_id: n.id, text: n.text || '', home: n.houseId ? (n.houseLabel || '') : 'General (no home)', for: n.mentionNames || [], added: (n.at || '').slice(0, 10), needed_by: n.due || '', high_priority: n.priority === 'high' })));
   }
   if(name === 'list_service_requests'){
     const snap = await db.collection('service-requests').get();
@@ -898,8 +900,12 @@ async function assistantCheck(name, input, ctx){
     if(input.home_id && !job) return { error: 'There is no home with that id. Use an empty string for no home.' };
     if(!text) return { error: 'The item has no text.' };
     if(who.includes(undefined)) return { error: 'One of those uids is not on the team list.' };
-    return { action: { type: 'add_punch_item', homeId: job ? job.id : '', text, assign: who.map(s=>s.uid) },
-      summary: { title: `Add to the punch list${job ? ' for ' + jobLabel(job) : ''}`, text, people: who.length ? 'For ' + who.map(s=>s.name).join(', ') : '' } };
+    const due = typeof input.due_date === 'string' ? input.due_date.trim() : '';
+    if(due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) return { error: 'due_date must be YYYY-MM-DD, or an empty string for no date.' };
+    const high = input.high_priority === true;
+    return { action: { type: 'add_punch_item', homeId: job ? job.id : '', text, assign: who.map(s=>s.uid), due, high },
+      summary: { title: `Add to the punch list${job ? ' for ' + jobLabel(job) : ''}`, text,
+        people: [who.length ? 'For ' + who.map(s=>s.name).join(', ') : '', due ? 'Needed by ' + niceDate(due) : '', high ? 'High priority' : ''].filter(Boolean).join(' · ') } };
   }
   if(name === 'complete_punch_item'){
     const doc = typeof input.item_id === 'string' && input.item_id ? await db.collection('notes').doc(input.item_id).get() : null;
@@ -929,11 +935,12 @@ async function assistantRun(action, ctx){
     return '';
   }
   if(action.type === 'add_punch_item'){
-    const ok = await assistantCheck('add_punch_item', { home_id: action.homeId, text: action.text, assign_user_ids: action.assign }, ctx);
+    const ok = await assistantCheck('add_punch_item', { home_id: action.homeId, text: action.text, assign_user_ids: action.assign, due_date: action.due || '', high_priority: action.high === true }, ctx);
     if(ok.error) return ok.error;
     const a = ok.action, job = a.homeId ? ctx.jobs.find(j=>j.id === a.homeId) : null;
     await db.collection('notes').add({
       todo: true, done: false, text: a.text, houseId: job ? job.id : '', houseLabel: job ? jobLabel(job) : 'General',
+      due: a.due, priority: a.high ? 'high' : '', photos: [], photoPaths: [],
       mentions: a.assign, mentionNames: named(a.assign), by, at: now, readBy: {},
     });
     return '';
@@ -1075,7 +1082,10 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
     : fromSub ? `${site}construction.html?house=${encodeURIComponent(note.houseId || '')}&task=${encodeURIComponent(note.taskId || '')}`
     : `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
   const where = note.houseId ? ` for <strong>${esc(house)}</strong>` : '';
-  const wording = note.todo ? { heading: 'Punch list item for you', subject: `Punch list: ${String(note.text || '').slice(0, 60)}`, lead: `<strong>${esc(who)}</strong> added a punch list item for you${where}:`, plain: `${who} added a punch list item for you${note.houseId ? ' for ' + house : ''}:`, button: 'Open the punch list' } : {
+  // a punch list item can be high priority and can have a date it's needed by
+  const urgent = note.priority === 'high';
+  const dueBy = /^\d{4}-\d{2}-\d{2}$/.test(note.due || '') ? `, needed by ${niceDate(note.due)}` : '';
+  const wording = note.todo ? { heading: urgent ? 'High priority punch list item' : 'Punch list item for you', subject: `${urgent ? 'HIGH PRIORITY — ' : ''}Punch list: ${String(note.text || '').slice(0, 60)}`, lead: `<strong>${esc(who)}</strong> added a ${urgent ? '<strong style="color:#b3452f;">high priority</strong> ' : ''}punch list item for you${where}${esc(dueBy)}:`, plain: `${who} added a ${urgent ? 'HIGH PRIORITY ' : ''}punch list item for you${note.houseId ? ' for ' + house : ''}${dueBy}:`, button: 'Open the punch list' } : {
     subDeclined: { heading: 'A sub declined a job', subject: `Declined: ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> declined a job on <strong>${esc(house)}</strong>:`, plain: `${who} declined a job on ${house}:`, button: 'Open this job' },
     subNote: { heading: 'Note from a sub', subject: `Note from ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> sent a note about <strong>${esc(house)}</strong>:`, plain: `${who} sent a note about ${house}:`, button: 'Open this job' },
     subWaiting: { heading: 'Still waiting on a sub', subject: `Still waiting on an answer — ${house}`, lead: `A job on <strong>${esc(house)}</strong> has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, plain: `A job on ${house} has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, button: 'Open this job' },

@@ -156,6 +156,7 @@
   .todo-check{flex:none; width:26px; height:26px; margin-top:2px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px; font-weight:800; line-height:1; padding:0;}
   .todo-check:hover{border-color:var(--good);}
   .todo-check.on{background:var(--good); border-color:var(--good);}
+  .note.todo.high:not(.done){box-shadow:inset 3px 0 0 var(--danger);}
   .note.todo.done .note-text{text-decoration:line-through; color:var(--ink-soft);}
   .todo-tag{background:#fdf0dc; color:#96661a; font-weight:700; border-radius:20px; padding:0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.3px;}
   /* comments under a note */
@@ -785,9 +786,9 @@ function renderNotes(){
   $('notesList').innerHTML = notesState === 'blocked'
     ? '<div class="note muted">Notes can\'t be saved yet — the database security rules need the notes collection added.</div>'
     : notesState === 'loading' ? ''
-    : notes.length ? notes.map(n=>`<div class="note${(n.mentions||[]).includes(me) ? ' for-me' : ''}${n.todo ? ' todo' + (n.done ? ' done' : '') : ''}">
+    : notes.length ? notes.map(n=>`<div class="note${(n.mentions||[]).includes(me) ? ' for-me' : ''}${n.todo ? ' todo' + (n.done ? ' done' : '') + (n.priority === 'high' ? ' high' : '') : ''}">
         ${n.todo ? `<button type="button" class="todo-check${n.done ? ' on' : ''}" data-todo="${esc(n.id)}" title="${n.done ? 'Not done after all' : 'Check this off the punch list'}">${n.done ? '&#10003;' : ''}</button><div>` : ''}
-        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>${n.todo ? `<span class="todo-tag">Punch list</span>${n.done && n.doneBy && n.doneBy.name ? `<span>done by ${esc(n.doneBy.name)}</span>` : ''}` : ''}
+        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>${n.todo ? `<span class="todo-tag">Punch list</span>${n.priority === 'high' && !n.done ? '<span class="todo-tag" style="background:var(--danger); color:#fff;">High priority</span>' : ''}${n.due ? `<span>due ${esc(fmtDate(n.due))}</span>` : ''}${n.done && n.doneBy && n.doneBy.name ? `<span>done by ${esc(n.doneBy.name)}</span>` : ''}` : ''}
           ${n.by && n.by.uid === me ? `<button type="button" class="x-btn" data-delete-note="${esc(n.id)}" title="Delete this note">&times;</button>` : ''}</div>
         <div class="note-text">${noteHtml(n.text || '')}</div>
         ${(n.photos || []).length ? `<div class="note-photos">${n.photos.map(url=>`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Photo from the sub" loading="lazy"></a>`).join('')}</div>` : ''}

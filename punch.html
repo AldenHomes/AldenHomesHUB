@@ -55,6 +55,25 @@
   .add-row #newText{flex:1 1 100%;}
   .add-row select{flex:1 1 170px;}
   .add-row .btn{flex:0 0 auto;}
+  .add-extras{display:flex; gap:10px 16px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:14px; color:var(--ink);}
+  .add-extras label{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
+  .add-extras input[type=date]{padding:8px 9px; font-size:14px;}
+  .add-extras input[type=checkbox]{width:18px; height:18px; accent-color:var(--danger);}
+  .pick-photo{border:1px dashed var(--steel-line); border-radius:var(--radius); padding:8px 12px; font-weight:600; color:var(--navy);}
+  /* high priority: red outline so it can't be missed */
+  .item.high{box-shadow:inset 0 0 0 2px var(--danger); background:#fff8f6;}
+  .tag{display:inline-block; border-radius:20px; padding:1px 9px; margin-right:6px; font-weight:700; font-size:11.5px;}
+  .tag.high{background:var(--danger); color:#fff;}
+  .tag.due{background:#ece8dd; color:var(--ink-soft);}
+  .tag.due.soon{background:#fdf0dc; color:#96661a;}
+  .tag.due.late{background:#fbeae4; color:var(--danger);}
+  .item-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .item-photos a{display:block; width:76px; height:76px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--steel-line);}
+  .item-photos img{width:100%; height:100%; object-fit:cover; display:block;}
+  .item-tools{display:flex; gap:14px; flex-wrap:wrap; margin-top:7px;}
+  .item-tools button{background:none; border:none; padding:0; font-size:12.5px; font-weight:700; color:var(--rust-2); cursor:pointer; font-family:inherit;}
+  .item-tools button:hover{text-decoration:underline;}
+  .item-tools button.warn{color:var(--danger);}
   .hint{font-size:12.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
 
   .filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
@@ -160,7 +179,13 @@
         <select id="newWho" aria-label="Who it's for"></select>
         <button class="btn btn-primary" id="addBtn">Add item</button>
       </div>
-      <div class="hint">The home and the person are optional. You can also add an item from a home's page: type <strong>@todo</strong> in a note there.</div>
+      <div class="add-extras">
+        <label>Needed by <input type="date" id="newDue"></label>
+        <label><input type="checkbox" id="newHigh"> High priority</label>
+        <label class="pick-photo">+ Add photo<input type="file" id="newPhotos" accept="image/*" multiple style="display:none;"></label>
+        <span class="muted" id="newPhotoNote" style="color:var(--ink-soft); font-size:13px;"></span>
+      </div>
+      <div class="hint">The home, the person, the date, the photo and the priority are all optional. You can also add an item from a home's page: type <strong>@todo</strong> in a note there.</div>
     </div>
 
     <div class="filters">
@@ -174,12 +199,16 @@
     <div id="doneList" style="display:none;"></div>
 
     <footer>Alden Homes internal tools — everyone on the team sees the same list.</footer>
+    <!-- shared by every item's "Set date" and "Add photo" -->
+    <input type="date" id="dueEdit" style="position:fixed; left:50%; top:40%; width:1px; height:1px; opacity:0; pointer-events:none; border:none; padding:0;" tabindex="-1" aria-hidden="true">
+    <input type="file" id="photoEdit" accept="image/*" multiple style="display:none;">
   </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -199,7 +228,8 @@ const firebaseConfig = {
    here are the same thing, it shows on that home's Notes, and giving it to someone uses
    the same "mentions" the bell and the notification email already understand.
      { todo:true, text, houseId ('' = not tied to a home), houseLabel, mentions:[uid],
-       mentionNames:[name], done, doneAt, doneBy:{uid,name}, by:{uid,name,email}, at, readBy }
+       mentionNames:[name], done, doneAt, doneBy:{uid,name}, by:{uid,name,email}, at, readBy,
+       due ('YYYY-MM-DD' or ''), priority ('high' or ''), photos:[url], photoPaths:[storage path] }
    ============================================================ */
 const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
 let items = [];
@@ -293,6 +323,57 @@ async function loadStaff(){
   renderPickers(); render();
 }
 
+/* ---- needed-by dates ---- */
+function todayIso(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function dueTag(t){
+  if(!t.due) return '';
+  const [y, m, d] = t.due.split('-').map(Number);
+  const when = new Date(y, m-1, d);
+  const days = Math.round((when - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000);
+  const nice = when.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+  if(t.done) return `<span class="tag due">Was due ${esc(nice)}</span>`;
+  const cls = days < 0 ? ' late' : days <= 1 ? ' soon' : '';
+  const label = days < 0 ? `Overdue — was due ${nice}` : days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `Due ${nice}`;
+  return `<span class="tag due${cls}">${esc(label)}</span>`;
+}
+
+/* ---- photos: shrunk on this device first (1600px JPEG), then stored with the hub's other photos ---- */
+function shrinkPhoto(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(b=>b ? resolve(b) : reject(new Error('could not shrink photo')), 'image/jpeg', 0.82);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('unreadable photo')); };
+    img.src = url;
+  });
+}
+// Upload photos for one item. Returns { urls, paths } for the ones that made it, and how many didn't.
+async function uploadPhotos(fileList, itemId, houseId, startAt){
+  const urls = [], paths = [];
+  let failed = 0;
+  const picked = Array.from(fileList || []).slice(0, 6);
+  for(let i = 0; i < picked.length; i++){
+    try{
+      const blob = await shrinkPhoto(picked[i]);
+      // kept in the same place as a home's photos, so the storage rules already cover it
+      const path = `houses/${houseId || 'punch-list'}/photos/punch-${itemId}-${(startAt || 0) + i}-${Date.now()}.jpg`;
+      const stored = firebase.storage().ref().child(path);
+      await stored.put(blob, { contentType: 'image/jpeg' });
+      urls.push(await stored.getDownloadURL());
+      paths.push(path);
+    } catch(err){ console.error('photo upload failed', err); failed++; }
+  }
+  return { urls, paths, failed };
+}
+
 /* ---- the pickers: which home, who it's for ---- */
 function renderPickers(){
   const keep = (id, html)=>{ const el = $(id), v = el.value; el.innerHTML = html; if([...el.options].some(o=>o.value === v)) el.value = v; };
@@ -318,9 +399,17 @@ function itemHtml(t){
   const meta = t.done
     ? `Done${t.doneBy && t.doneBy.name ? ' by ' + esc(t.doneBy.name) : ''}${t.doneAt ? ' · ' + esc(shortWhen(t.doneAt)) : ''}`
     : `Added${t.by && t.by.name ? ' by ' + esc(t.by.name) : ''}${t.at ? ' · ' + esc(shortWhen(t.at)) : ''}`;
-  return `<div class="item${t.done ? ' done' : ''}">
+  const high = t.priority === 'high';
+  const photos = (t.photos || []).map(url=>`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Photo" loading="lazy"></a>`).join('');
+  const tools = t.done ? '' : `<div class="item-tools">
+      <button type="button" data-due="${esc(t.id)}">${t.due ? 'Change date' : 'Set a date'}</button>
+      ${t.due ? `<button type="button" data-due-clear="${esc(t.id)}">Remove date</button>` : ''}
+      <button type="button" data-photo="${esc(t.id)}">Add photo</button>
+      <button type="button" class="${high ? '' : 'warn'}" data-priority="${esc(t.id)}">${high ? 'Not high priority' : 'Mark high priority'}</button>
+    </div>`;
+  return `<div class="item${t.done ? ' done' : ''}${high && !t.done ? ' high' : ''}">
     <button type="button" class="check${t.done ? ' on' : ''}" data-check="${esc(t.id)}" aria-label="${t.done ? 'Mark as not done' : 'Mark as done'}" title="${t.done ? 'Not done after all' : 'Done'}">${t.done ? '&#10003;' : ''}</button>
-    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${names}${meta}</div></div>
+    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${high && !t.done ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${names}${meta}</div>${photos ? `<div class="item-photos">${photos}</div>` : ''}${tools}</div>
     <button type="button" class="x-btn" data-delete="${esc(t.id)}" title="Delete this item">&times;</button>
   </div>`;
 }
@@ -337,6 +426,8 @@ function groupsHtml(list){
     }
     g.items.push(t);
   });
+  const rank = t=>(t.priority === 'high' ? '0' : '1') + (t.due || '9999-99-99') + (t.at || '');
+  groups.forEach(g=>{ if(g.items.every(t=>!t.done)) g.items.sort((a,b)=>rank(a).localeCompare(rank(b))); });
   groups.sort((a,b)=>(a.key === '' ? -1 : b.key === '' ? 1 : a.label.localeCompare(b.label, 'en', { numeric:true })));
   return groups.map(g=>`<div class="group">
     <div class="group-head">${g.key ? `<a href="house.html?id=${encodeURIComponent(g.key)}#notes" title="Open this home">${esc(g.label)} &rarr;</a>` : `<span>${esc(g.label)}</span>`}<span class="n">${g.items.length}</span></div>
@@ -384,8 +475,16 @@ async function addItem(){
   $('addBtn').disabled = true;
   setSyncStatus('saving');
   try{
-    await notesCol.add({
+    const ref = notesCol.doc();
+    const picked = $('newPhotos').files;
+    if(picked.length) $('addBtn').textContent = 'Uploading photo…';
+    const up = await uploadPhotos(picked, ref.id, job ? job.id : '', 0);
+    if(up.failed) alert(`${up.failed} photo${up.failed === 1 ? '' : 's'} didn't upload — the item is being saved without ${up.failed === 1 ? 'it' : 'them'}. If this keeps happening, the storage security rules may need updating.`);
+    await ref.set({
       todo: true, done: false,
+      due: $('newDue').value || '',
+      priority: $('newHigh').checked ? 'high' : '',
+      photos: up.urls, photoPaths: up.paths,
       text,
       houseId: job ? job.id : '',
       houseLabel: job ? homeLabel(job) : 'General',
@@ -396,14 +495,63 @@ async function addItem(){
       readBy: {},
     });
     $('newText').value = '';
+    $('newDue').value = ''; $('newHigh').checked = false; $('newPhotos').value = ''; $('newPhotoNote').textContent = '';
     $('newText').focus();
   } catch(err){ console.error(err); alert('Could not save the item — check your connection and try again.'); setSyncStatus('idle'); }
   $('addBtn').disabled = false;
+  $('addBtn').textContent = 'Add item';
 }
+$('newPhotos').addEventListener('change', e=>{
+  const c = e.target.files.length;
+  $('newPhotoNote').textContent = c ? `${Math.min(c, 6)} photo${c === 1 ? '' : 's'} ready${c > 6 ? ' (six is the most per item)' : ''}` : '';
+});
 $('addBtn').addEventListener('click', addItem);
 $('newText').addEventListener('keydown', e=>{ if(e.key === 'Enter') addItem(); });
 
+let editId = '';   // the item whose date or photo is being changed
+async function patchItem(id, patch){
+  setSyncStatus('saving');
+  try{ await notesCol.doc(id).update(patch); }
+  catch(err){ console.error(err); alert('Could not save — check your connection and try again.'); setSyncStatus('idle'); }
+}
+$('dueEdit').addEventListener('change', e=>{ if(editId && e.target.value) patchItem(editId, { due: e.target.value }); });
+$('photoEdit').addEventListener('change', async e=>{
+  const t = items.find(x=>x.id === editId);
+  const picked = Array.from(e.target.files || []);
+  if(!t || !picked.length){ e.target.value = ''; return; }
+  setSyncStatus('saving');
+  const up = await uploadPhotos(picked, t.id, t.houseId || '', (t.photos || []).length);
+  e.target.value = '';
+  if(up.failed) alert(`${up.failed} photo${up.failed === 1 ? '' : 's'} didn't upload. If this keeps happening, the storage security rules may need updating.`);
+  if(up.urls.length) await patchItem(t.id, { photos: [...(t.photos || []), ...up.urls], photoPaths: [...(t.photoPaths || []), ...up.paths] });
+  else setSyncStatus('idle');
+});
+
 document.addEventListener('click', async e=>{
+  const due = e.target.closest('[data-due]');
+  if(due){
+    const t = items.find(x=>x.id === due.dataset.due);
+    if(!t) return;
+    editId = t.id;
+    $('dueEdit').value = t.due || '';
+    // open the device's own date picker; older browsers get a simple box to type into
+    try{ $('dueEdit').showPicker(); }
+    catch(err){
+      const typed = (prompt('Needed by (year-month-day, e.g. 2026-10-20):', t.due || '') || '').trim();
+      if(/^\d{4}-\d{2}-\d{2}$/.test(typed)) patchItem(t.id, { due: typed });
+    }
+    return;
+  }
+  const dueClear = e.target.closest('[data-due-clear]');
+  if(dueClear){ patchItem(dueClear.dataset.dueClear, { due: '' }); return; }
+  const photo = e.target.closest('[data-photo]');
+  if(photo){ editId = photo.dataset.photo; $('photoEdit').click(); return; }
+  const pri = e.target.closest('[data-priority]');
+  if(pri){
+    const t = items.find(x=>x.id === pri.dataset.priority);
+    if(t) patchItem(t.id, { priority: t.priority === 'high' ? '' : 'high' });
+    return;
+  }
   const check = e.target.closest('[data-check]');
   if(check){
     const t = items.find(x=>x.id === check.dataset.check);
@@ -421,6 +569,9 @@ document.addEventListener('click', async e=>{
   if(del){
     const t = items.find(x=>x.id === del.dataset.delete);
     if(!t || !confirm(`Delete "${t.text}"?\n\nTo keep a record that it was finished, check it off instead.`)) return;
+    for(const path of (t.photoPaths || [])){
+      try{ await firebase.storage().ref().child(path).delete(); } catch(err){ console.warn('photo was already gone', err); }
+    }
     try{ await notesCol.doc(t.id).delete(); }
     catch(err){ console.error(err); alert('Could not delete — check your connection and try again.'); }
   }
