@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | My Work</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  .titlebar{background:var(--paper-2); padding:20px clamp(16px,4vw,40px); border-bottom:4px solid var(--rust);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;}
+  .brand-mark{height:40px; flex:none; display:flex; align-items:center;}
+  .brand-mark img{height:100%; width:auto; display:block;}
+  h1{font-size:clamp(19px,2.4vw,24px); margin:0; font-weight:700; color:var(--navy);}
+  .subtitle{font-size:12px; color:var(--ink-soft); margin-top:3px; letter-spacing:.6px; text-transform:uppercase;}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+  .sync-badge{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-soft); font-family:"Courier New",monospace;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.offline{background:var(--danger);}
+  .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
+  .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
+
+  .wrap{max-width:980px; margin:0 auto; padding:22px clamp(14px,4vw,40px) 60px;}
+  .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
+  .back-link:hover{color:var(--navy);}
+  .hello{font-size:20px; font-weight:700; color:var(--navy); margin:0 0 14px;}
+
+  /* the four numbers across the top */
+  .counts{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:16px;}
+  .count{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:12px 14px;}
+  .count .l{font-size:11.5px; color:var(--ink-soft); letter-spacing:.4px; text-transform:uppercase;}
+  .count .n{font-size:26px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace; margin-top:2px;}
+  .count.bad .n{color:var(--danger);}
+
+  .section{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-top:4px solid var(--rust); padding:16px 18px 8px; margin-bottom:16px;}
+  .section.urgent{border-top-color:var(--danger);}
+  .section h2{margin:0 0 6px; font-size:16px; color:var(--navy); display:flex; align-items:center; gap:8px;}
+  .section h2 .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
+  .section h2 a{margin-left:auto; font-size:12.5px; font-weight:600; color:var(--rust-2); text-decoration:none;}
+  .section h2 a:hover{text-decoration:underline;}
+  .two{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px;}
+  .two .section{margin-bottom:0;}
+
+  .row{display:flex; align-items:flex-start; gap:12px; padding:11px 0; border-top:1px solid #f1ede3; text-decoration:none; color:inherit;}
+  .row:first-of-type{border-top:none;}
+  a.row:hover .t{text-decoration:underline;}
+  .row .main{flex:1; min-width:0;}
+  .row .t{font-size:15px; line-height:1.4; word-break:break-word;}
+  .row .m{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+  .row .go{flex:none; align-self:center; font-size:12.5px; font-weight:700; color:var(--rust-2); white-space:nowrap; text-decoration:none; border:1px solid var(--steel-line); border-radius:var(--radius); padding:6px 11px; background:#fff;}
+  .row .go:hover{background:#e9e5da;}
+  .check{flex:none; width:26px; height:26px; margin-top:1px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; padding:0;}
+  .check:hover{border-color:var(--good);}
+  .ic{flex:none; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; margin-top:1px;}
+  .ic.red{background:#fbeae4; color:var(--danger);}
+  .ic.amber{background:#fdf0dc; color:#96661a;}
+  .ic.plain{background:#eef0e8; color:var(--rust-2);}
+  .tag{display:inline-block; border-radius:20px; padding:1px 9px; margin-right:6px; font-weight:700; font-size:11.5px;}
+  .tag.high{background:var(--danger); color:#fff;}
+  .tag.late{background:#fbeae4; color:var(--danger);}
+  .tag.soon{background:#fdf0dc; color:#96661a;}
+  .tag.due{background:#ece8dd; color:var(--ink-soft);}
+  .tag.new{background:#fdf0dc; color:#96661a;}
+  .none{padding:14px 0 16px; color:var(--ink-soft); font-size:14px;}
+  .allclear{background:#eaf1ec; border:1px solid #c5dccb; color:var(--good); font-weight:700; border-radius:var(--radius); padding:14px 16px; margin-bottom:16px; font-size:15px;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-gate.hidden{display:none;}
+  .auth-card{width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;}
+  .auth-card .brand{margin-bottom:22px; pointer-events:none;}
+  .auth-card h2{margin:0; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .auth-field input{width:100%; padding:10px 11px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; font-family:inherit;}
+  .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .auth-error.show{display:block;}
+  .btn{padding:11px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-primary{background:var(--navy); color:#fff; width:100%;}
+  .app-shell.locked{display:none;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  @media (max-width:720px){ .counts{grid-template-columns:repeat(2,minmax(0,1fr));} .two{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div><h2>My Work</h2></div>
+    </div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="auth-error" id="loginError"></div>
+    <div class="auth-field">
+      <label for="loginEmail">Email</label>
+      <input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+  <div class="titlebar">
+    <a class="brand" href="index.html" title="Back to Alden Homes Hub">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div>
+        <h1>My Work</h1>
+        <div class="subtitle">Everything waiting on you</div>
+      </div>
+    </a>
+    <div class="titlebar-account">
+      <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+      <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; Back to the hub</a>
+    <p class="hello" id="hello"></p>
+
+    <div class="counts">
+      <div class="count"><div class="l">My punch items</div><div class="n" id="cPunch">–</div></div>
+      <div class="count"><div class="l">New for me</div><div class="n" id="cNotes">–</div></div>
+      <div class="count" id="cVendorBox"><div class="l">Need a vendor</div><div class="n" id="cVendor">–</div></div>
+      <div class="count" id="cLateBox"><div class="l">Overdue</div><div class="n" id="cLate">–</div></div>
+    </div>
+
+    <div id="attention"></div>
+
+    <div class="two">
+      <div class="section">
+        <h2>My punch list <span class="n" id="punchCount">0</span><a href="punch.html">Open the punch list &rarr;</a></h2>
+        <div id="punchList"></div>
+      </div>
+      <div class="section">
+        <h2>Notes and comments for me <span class="n" id="notesCount">0</span></h2>
+        <div id="notesList"></div>
+      </div>
+    </div>
+
+    <footer>Only you see this page this way — everyone gets their own.</footer>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+
+/* ============================================================
+   MY WORK — one person's to-do, gathered from the rest of the hub.
+   Nothing is stored for this page; it only reads what already exists:
+     • punch list items given to me            (notes with todo:true, mentions has me)
+     • notes that tag me, and comments on notes I'm part of, that I haven't opened yet
+     • reminders I set that have come due       (notes with reminded[me], still unread)
+     • jobs a sub declined that still need a vendor — only for people who switched on
+       "A sub declines a job" in Admin Settings → My notifications
+   ============================================================ */
+const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
+let mine = { mentions: [], watchers: [] };   // notes that tag me / notes I'm following
+let schedules = [];
+let jobs = [];
+let subs = {};
+let staff = [];
+let wantsDeclines = false;
+
+const $ = id => document.getElementById(id);
+function esc(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function setSyncStatus(state){
+  $('syncDot').classList.toggle('offline', state==='offline');
+  $('syncLabel').textContent = state==='offline' ? 'Offline' : (state==='saving' ? 'Saving…' : 'Synced');
+}
+function me(){ return firebase.auth().currentUser; }
+function myName(){
+  const u = me();
+  const known = u && staff.find(s=>s.uid === u.uid);
+  return known ? known.name : (u ? (u.displayName || String(u.email || '').split('@')[0]) : '');
+}
+function todayIso(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function niceDay(iso){
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+}
+function daysUntil(iso){
+  const [y, m, d] = iso.split('-').map(Number);
+  return Math.round((new Date(y, m-1, d) - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000);
+}
+function ago(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const mins = Math.round((Date.now() - d.getTime()) / 60000);
+  if(mins < 1) return 'just now';
+  if(mins < 60) return mins + ' min ago';
+  if(mins < 1440) return Math.round(mins/60) + ' hr ago';
+  return d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+}
+function homeLabel(j){ return [j.community, j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') || 'A home'; }
+function whereOf(n){
+  const job = jobs.find(j=>j.id === n.houseId);
+  return n.houseId ? (job ? homeLabel(job) : (n.houseLabel || 'A home')) : 'General';
+}
+
+/* ---- sign-in ---- */
+function showLoginGate(){ $('loginGate').classList.remove('hidden'); $('appShell').classList.add('locked'); }
+function showApp(user){
+  $('loginGate').classList.add('hidden');
+  $('appShell').classList.remove('locked');
+  $('currentUserEmail').textContent = user.email || '';
+}
+function doLogin(){
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const errBox = $('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){
+    errBox.textContent = 'Enter both an email and a password.';
+    errBox.classList.add('show');
+    return;
+  }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(err.code)
+      ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show');
+  });
+}
+$('loginSubmitBtn').addEventListener('click', doLogin);
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let listening = false;
+
+firebase.auth().onAuthStateChanged(user=>{
+  // Homeowners using the public request form are signed in anonymously — they are not staff.
+  if(user && !user.isAnonymous){
+    showApp(user);
+    if(listening) return;
+    listening = true;
+    ['mentions', 'watchers'].forEach(field=>{
+      db.collection('notes').where(field, 'array-contains', user.uid).onSnapshot(s=>{
+        mine[field] = s.docs.map(d=>({ id: d.id, ...d.data() }));
+        render(); setSyncStatus('idle');
+      }, err=>{ console.error('notes listener error', err); setSyncStatus('offline'); });
+    });
+    db.collection('jobs').onSnapshot(s=>{ jobs = s.docs.map(d=>({ id: d.id, ...d.data() })); render(); }, err=>console.error('jobs listener error', err));
+    db.collection('subs').onSnapshot(s=>{ subs = {}; s.docs.forEach(d=>{ subs[d.id] = d.data().name || 'A vendor'; }); render(); }, err=>console.error('vendors listener error', err));
+    // declined jobs are only gathered for people who asked to hear about them
+    db.collection('settings').doc('staff-notify').onSnapshot(doc=>{
+      const prefs = doc.exists ? doc.data()[user.uid] : null;
+      wantsDeclines = !!(prefs && prefs.subDeclined === true);
+      render();
+    }, err=>console.error('notification choices listener error', err));
+    db.collection('build-schedules').onSnapshot(s=>{ schedules = s.docs.map(d=>({ id: d.id, ...d.data() })); render(); }, err=>console.error('schedules listener error', err));
+    loadStaff();
+  } else {
+    showLoginGate();
+  }
+});
+window.addEventListener('online', ()=>setSyncStatus('idle'));
+window.addEventListener('offline', ()=>setSyncStatus('offline'));
+
+async function loadStaff(){
+  try{
+    const token = await me().getIdToken();
+    const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ action:'staff' }) });
+    if(!res.ok) throw new Error('staff list ' + res.status);
+    staff = (await res.json()).staff || [];
+  } catch(err){ console.error('Could not load the team list', err); staff = []; }
+  render();
+}
+
+/* ---- gathering ---- */
+function gather(){
+  const uid = me() ? me().uid : '';
+  const today = todayIso();
+  const all = {};
+  [...mine.mentions, ...mine.watchers].forEach(n=>{ all[n.id] = n; });
+  const notes = Object.values(all);
+  const unread = n=>!(n.readBy && n.readBy[uid]);
+
+  // punch list items given to me, most pressing first
+  const rank = t=>(t.priority === 'high' ? '0' : '1') + (t.due || '9999-99-99') + (t.at || '');
+  const punch = notes.filter(n=>n.todo && !n.done && (n.mentions || []).includes(uid)).sort((a,b)=>rank(a).localeCompare(rank(b)));
+  const late = punch.filter(t=>t.due && t.due < today);
+  const dueToday = punch.filter(t=>t.due === today);
+
+  // reminders I set that have come due and I haven't opened
+  const reminders = notes.filter(n=>n.reminded && n.reminded[uid] && unread(n));
+  // everything else new for me: notes that tag me, comments on notes I'm part of, things subs sent
+  const fresh = notes.filter(n=>!n.todo && unread(n) && !reminders.includes(n))
+    .sort((a,b)=>(b.lastAt || b.at || '').localeCompare(a.lastAt || a.at || ''));
+  // punch items where the newest thing is someone's comment I haven't seen
+  const punchComments = notes.filter(n=>n.todo && unread(n) && (n.replies || []).length && (n.watchers || []).includes(uid));
+
+  // jobs a sub declined that still have nobody else on them
+  const declined = [];
+  if(wantsDeclines) schedules.forEach(s=>{
+    if(!s.sentAt) return;
+    (s.tasks || []).forEach(t=>{
+      if(!t.start || t.done || t.end < today) return;
+      (t.subIds || []).forEach(subId=>{
+        if(((t.confirm || {})[subId]) !== 'declined') return;
+        const job = jobs.find(j=>j.id === s.id);
+        declined.push({ houseId: s.id, taskId: t.id, title: t.title || 'A job', start: t.start, end: t.end,
+          sub: subs[subId] || 'A vendor', reason: (t.confirmNote || {})[subId] || '', where: job ? homeLabel(job) : [s.community, s.lot ? 'Lot '+s.lot : '', s.client].filter(Boolean).join(' · ') });
+      });
+    });
+  });
+  declined.sort((a,b)=>a.start.localeCompare(b.start));
+  return { punch, late, dueToday, reminders, fresh: [...fresh, ...punchComments.filter(n=>!fresh.includes(n))], declined };
+}
+
+/* ---- drawing ---- */
+function dueTag(t){
+  if(!t.due) return '';
+  const days = daysUntil(t.due);
+  const cls = days < 0 ? 'late' : days <= 1 ? 'soon' : 'due';
+  const label = days < 0 ? `Overdue ${-days} day${days === -1 ? '' : 's'}` : days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'Due ' + niceDay(t.due);
+  return `<span class="tag ${cls}">${esc(label)}</span>`;
+}
+function punchRow(t){
+  return `<div class="row">
+    <button type="button" class="check" data-check="${esc(t.id)}" aria-label="Mark as done" title="Done"></button>
+    <div class="main"><div class="t">${esc(t.text || '')}</div>
+      <div class="m">${t.priority === 'high' ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${esc(whereOf(t))}</div></div>
+  </div>`;
+}
+function noteLink(n){ return n.houseId ? `house.html?id=${encodeURIComponent(n.houseId)}#notes` : 'punch.html'; }
+function subLink(n){ return `construction.html?house=${encodeURIComponent(n.houseId || '')}&task=${encodeURIComponent(n.taskId || '')}`; }
+function noteRow(n){
+  const last = (n.replies || [])[(n.replies || []).length - 1];
+  const reply = last && (last.at || '') >= (n.lastAt || '') ? last : null;
+  const fromSub = ['subDeclined', 'subNote', 'subWaiting'].includes(n.kind);
+  const who = ((reply || n).by || {}).name || 'Someone';
+  const what = reply ? `${who} commented: ${reply.text || ''}` : fromSub ? `${who}: ${n.text || ''}` : `${who}: ${n.text || ''}`;
+  return `<a class="row" href="${fromSub ? subLink(n) : noteLink(n)}" data-read="${esc(n.id)}">
+    <div class="main"><div class="t">${esc(what)}</div><div class="m">${esc(whereOf(n))} · ${esc(ago((reply || n).at))}</div></div>
+    <span class="tag new" style="align-self:center;">New</span>
+  </a>`;
+}
+
+function render(){
+  if(!me()) return;
+  const g = gather();
+  const first = (myName() || '').split(' ')[0];
+  const hour = new Date().getHours();
+  $('hello').textContent = `${hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'}${first ? ', ' + first : ''}.`;
+
+  $('cPunch').textContent = g.punch.length;
+  $('cNotes').textContent = g.fresh.length + g.reminders.length;
+  $('cVendor').textContent = wantsDeclines ? g.declined.length : '–';
+  $('cVendorBox').classList.toggle('bad', g.declined.length > 0);
+  $('cVendorBox').title = wantsDeclines ? '' : 'Switch on "A sub declines a job" in Admin Settings to see these here.';
+  $('cLate').textContent = g.late.length;
+  $('cLateBox').classList.toggle('bad', g.late.length > 0);
+
+  // "Needs attention today": overdue and due-today punch items, declined jobs, reminders
+  const urgent = [
+    ...g.late.map(punchRow), ...g.dueToday.map(punchRow),
+    ...g.declined.map(d=>`<div class="row">
+        <span class="ic red">!</span>
+        <div class="main"><div class="t">${esc(d.sub)} declined ${esc(d.title)}, ${esc(d.start === d.end ? niceDay(d.start) : niceDay(d.start) + ' – ' + niceDay(d.end))}</div>
+          <div class="m">${esc(d.where)}${d.reason ? ' · “' + esc(d.reason) + '”' : ''}</div></div>
+        <a class="go" href="${subLink(d)}">Choose vendor</a>
+      </div>`),
+    ...g.reminders.map(n=>`<a class="row" href="${noteLink(n)}" data-read="${esc(n.id)}">
+        <span class="ic amber">&#128276;</span>
+        <div class="main"><div class="t">Reminder: ${esc(n.text || '')}</div><div class="m">${esc(whereOf(n))} · note from ${esc((n.by && n.by.name) || 'someone')}</div></div>
+        <span class="go">Open</span>
+      </a>`),
+  ];
+  $('attention').innerHTML = urgent.length
+    ? `<div class="section urgent"><h2>Needs attention today <span class="n">${urgent.length}</span></h2>${urgent.join('')}</div>`
+    : (g.punch.length || g.fresh.length ? '' : '<div class="allclear">You\'re all caught up. Nothing is waiting on you.</div>');
+
+  // the rest of my punch list (what's in "needs attention" isn't repeated here)
+  const rest = g.punch.filter(t=>!g.late.includes(t) && !g.dueToday.includes(t));
+  $('punchCount').textContent = g.punch.length;
+  $('punchList').innerHTML = rest.length ? rest.map(punchRow).join('')
+    : `<div class="none">${g.punch.length ? 'Everything else of yours is in “Needs attention” above.' : 'Nothing on the punch list for you.'}</div>`;
+
+  $('notesCount').textContent = g.fresh.length;
+  $('notesList').innerHTML = g.fresh.length ? g.fresh.map(noteRow).join('') : '<div class="none">Nothing new. Notes that tag you and comments on your notes show up here until you open them.</div>';
+}
+
+/* ---- check a punch item off; opening a note counts as reading it ---- */
+document.addEventListener('click', async e=>{
+  const check = e.target.closest('[data-check]');
+  const user = me();
+  if(check && user){
+    check.disabled = true;
+    setSyncStatus('saving');
+    try{ await db.collection('notes').doc(check.dataset.check).update({ done: true, doneAt: new Date().toISOString(), doneBy: { uid: user.uid, name: myName() } }); }
+    catch(err){ console.error(err); check.disabled = false; alert('Could not save — check your connection and try again.'); setSyncStatus('idle'); }
+    return;
+  }
+  const read = e.target.closest('[data-read]');
+  if(read && user){
+    db.collection('notes').doc(read.dataset.read).update(new firebase.firestore.FieldPath('readBy', user.uid), true)
+      .catch(err=>console.error('Could not mark the note read', err));
+  }
+});
+</script>
+<script src="assistant.js"></script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('Service worker registration failed', err));
+  });
+}
+</script>
+</body>
+</html>

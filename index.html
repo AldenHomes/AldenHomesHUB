@@ -89,6 +89,47 @@
   /* tools on the left, the list of active homes on the right */
   .hub-cols{display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:24px; align-items:start;}
   @media (max-width:900px){ .hub-cols{grid-template-columns:1fr;} }
+  /* My work strip on the hub */
+  .mywork{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-left:4px solid var(--rust); margin-bottom:18px; overflow:hidden;}
+  .mywork.urgent{border-left-color:var(--danger);}
+  .mywork-head{display:flex; align-items:center; gap:6px; padding-right:8px;}
+  .mw-toggle{flex:1; min-width:0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 8px 12px 16px; background:none; border:none; cursor:pointer; font-family:inherit; text-align:left; color:var(--ink);}
+  .mywork.quiet .mw-toggle{cursor:default;}
+  .mw-now{font-size:13.5px; color:var(--ink-soft); white-space:nowrap;}
+  .mw-gear{flex:none; border:none; background:none; color:var(--ink-soft); cursor:pointer; padding:7px; border-radius:var(--radius); line-height:0;}
+  .mw-gear:hover{background:#f3f1ea; color:var(--navy);}
+  .mw-settings{padding:12px 16px 14px; border-top:1px solid #ece8dd; background:#faf8f2; font-size:14px;}
+  .mw-settings label{display:flex; align-items:center; gap:9px; padding:5px 0; margin:0; cursor:pointer; text-transform:none; letter-spacing:0; font-size:14px; font-weight:400; color:var(--ink);}
+  .mw-settings input[type=checkbox]{width:17px; height:17px; accent-color:var(--navy);}
+  .mw-settings .place{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:4px 0 2px 26px; font-size:13px; color:var(--ink-soft);}
+  .mw-settings .place input{padding:7px 9px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; width:190px;}
+  .mw-settings .place button, .mw-settings .done{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; color:var(--navy);}
+  .mw-weather{display:flex; gap:8px; flex-wrap:wrap; padding:0 16px 12px;}
+  .mw-day{flex:1 1 110px; background:#f3f5ee; border-radius:var(--radius); padding:7px 10px; font-size:12.5px; color:var(--ink-soft); line-height:1.45;}
+  .mw-day strong{display:block; color:var(--navy); font-size:13px;}
+  .mw-day .wet{color:#2f7d8c; font-weight:700;}
+  .mw-title{font-size:15px; font-weight:700; color:var(--navy);}
+  .mw-sum{flex:1; display:flex; gap:6px; flex-wrap:wrap; align-items:center; font-size:13.5px; color:var(--ink-soft);}
+  .mw-chip{border-radius:20px; padding:2px 10px; font-size:12px; font-weight:700; background:#ece8dd; color:var(--ink-soft); white-space:nowrap;}
+  .mw-chip.red{background:#fbeae4; color:var(--danger);}
+  .mw-chip.amber{background:#fdf0dc; color:#96661a;}
+  .mw-arrow{font-size:11px; color:var(--ink-soft); transition:transform .15s;}
+  .mywork.open .mw-arrow{transform:rotate(90deg);}
+  .mywork-body{padding:0 16px 10px; border-top:1px solid #ece8dd;}
+  .mw-row{display:flex; align-items:flex-start; gap:11px; padding:10px 0; border-top:1px solid #f1ede3; text-decoration:none; color:inherit;}
+  .mw-row:first-child{border-top:none;}
+  a.mw-row:hover .mw-t{text-decoration:underline;}
+  .mw-main{flex:1; min-width:0;}
+  .mw-t{font-size:14.5px; line-height:1.4; word-break:break-word;}
+  .mw-m{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .mw-check{flex:none; width:24px; height:24px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; padding:0; margin-top:1px;}
+  .mw-check:hover{border-color:var(--good);}
+  .mw-ic{flex:none; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; margin-top:1px; background:#eef0e8; color:var(--rust-2);}
+  .mw-ic.red{background:#fbeae4; color:var(--danger);}
+  .mw-ic.amber{background:#fdf0dc; color:#96661a;}
+  .mw-go{flex:none; align-self:center; font-size:12px; font-weight:700; color:var(--rust-2); border:1px solid var(--steel-line); border-radius:var(--radius); padding:5px 10px; background:#fff; white-space:nowrap; text-decoration:none;}
+  .mw-more{display:block; padding:10px 0 4px; font-size:13px; font-weight:700; color:var(--rust-2); text-decoration:none;}
+  .mw-more:hover{text-decoration:underline;}
   .homes-card{background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust);}
   .homes-head{padding:18px 18px 12px; border-bottom:1px solid #ece8dd;}
   .homes-head h3{margin:0 0 10px; font-size:16.5px; color:var(--navy);}
@@ -106,7 +147,15 @@
   .home-row.finished{background:#f8f6f0;}
   .home-row.finished .home-tag{opacity:.55;}
   .homes-empty{padding:28px 18px; text-align:center; color:var(--ink-soft); font-size:13px;}
-  .welcome{margin-bottom:28px;}
+  .welcome{margin-bottom:22px; display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap;}
+  /* choosing which apps show: tap a tile to show or hide it */
+  .tile-grid.editing .tile{cursor:pointer; position:relative;}
+  .tile-grid.editing .tile:hover{transform:none;}
+  .tile-grid.editing .tile.off{opacity:.45;}
+  .tile-grid.editing .tile::after{content:"Showing"; position:absolute; top:10px; right:10px; font-size:11px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; border-radius:20px; padding:3px 10px; background:#eaf1ec; color:var(--good);}
+  .tile-grid.editing .tile.off::after{content:"Hidden"; background:#ece8dd; color:var(--ink-soft);}
+  .edit-note{background:#fdf0dc; border:1px solid #eccba2; color:#96661a; font-size:13.5px; border-radius:var(--radius); padding:10px 14px; margin-bottom:16px; display:none;}
+  .edit-note.show{display:block;}
   .welcome h2{margin:0 0 6px; font-size:22px; color:var(--navy);}
   .welcome p{margin:0; color:var(--ink-soft); font-size:14px;}
 
@@ -254,10 +303,32 @@
 
   <div class="wrap">
     <div class="welcome">
-      <h2>Good to see you.</h2>
-      <p>Pick a tool below to get started. More will show up here as they're built.</p>
+      <div>
+        <h2>Good to see you.</h2>
+        <p id="welcomeLine">Pick a tool below to get started.</p>
+      </div>
+      <button type="button" class="signout-btn" id="editHubBtn" title="Choose which apps show on your hub">Edit my hub</button>
     </div>
 
+    <!-- My work: a strip that stays one quiet line unless something is waiting on you -->
+    <div class="mywork" id="myWork" style="display:none;">
+      <div class="mywork-head">
+        <button type="button" class="mw-toggle" id="myWorkHead" aria-expanded="false">
+          <span class="mw-title">My work</span>
+          <span class="mw-sum" id="myWorkSum"></span>
+          <span class="mw-arrow" id="myWorkArrow">&#9654;</span>
+        </button>
+        <span class="mw-now" id="myWorkNow"></span>
+        <button type="button" class="mw-gear" id="myWorkGear" title="Choose what shows here" aria-label="Choose what shows in My work">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51h0a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+      </div>
+      <div class="mw-settings" id="myWorkSettings" style="display:none;"></div>
+      <div class="mw-weather" id="myWorkWeather" style="display:none;"></div>
+      <div class="mywork-body" id="myWorkBody" style="display:none;"></div>
+    </div>
+
+    <div class="edit-note" id="editNote">Tap an app to show or hide it on <strong>your</strong> hub, then press Done. Nothing is removed — a hidden app can be turned back on here any time, and everyone else's hub stays as it is.</div>
     <div class="hub-cols">
     <div class="tile-grid">
       <a class="tile" id="scheduleTile" href="schedule.html">
@@ -422,6 +493,7 @@ if(!FIREBASE_CONFIGURED){
       attachConstructionStatsListener(db);
       attachBell(db, user);
       attachPunchStatsListener(db, user);
+      attachMyWork(db, user);
     } else {
       showLoginGate();
     }
@@ -597,6 +669,292 @@ function attachPunchStatsListener(db, user){
     document.getElementById('tileStatPunchMine').textContent = open.filter(t=>(t.mentions || []).includes(user.uid)).length;
   }, err=>{ console.error('punch list listener error', err); /* leave the tile at "—"; the rest of the hub is fine */ });
 }
+
+/* ============================================================
+   MY WORK strip — what's waiting on the signed-in person, at the top of the hub.
+   One quiet line when there's nothing; when there is something it lists it, most
+   pressing first. Open or closed is remembered on this device. The full version is
+   mywork.html, which gathers the same things the same way.
+   ============================================================ */
+const myWork = { uid: '', mentions: [], watchers: [], schedules: [], subs: {}, wantsDeclines: false, ready: false };
+
+/* ---- each person's own hub: which apps show, and what the My work strip shows ----
+   Kept per login in settings/hub-prefs as { uid: { tilesHidden:[tile id], strip:{...} } },
+   so it follows them to their phone. A copy is kept on the device too, so the hub looks
+   right straight away and still works if that record can't be read or saved. */
+const HUB_DEFAULTS = { tilesHidden: [], strip: { punch: true, notes: true, reminders: true, declined: null, weather: false, place: { name: 'Lititz, PA', lat: 40.1573, lon: -76.3069 } } };
+let hubPrefs = JSON.parse(JSON.stringify(HUB_DEFAULTS));
+function applyHubPrefs(raw){
+  const p = raw && typeof raw === 'object' ? raw : {};
+  hubPrefs = {
+    tilesHidden: Array.isArray(p.tilesHidden) ? p.tilesHidden.filter(x=>typeof x === 'string') : [],
+    strip: { ...HUB_DEFAULTS.strip, ...(p.strip && typeof p.strip === 'object' ? p.strip : {}) },
+  };
+  if(!hubPrefs.strip.place || typeof hubPrefs.strip.place.lat !== 'number') hubPrefs.strip.place = HUB_DEFAULTS.strip.place;
+  renderTiles(); renderMyWork(); loadWeather();
+}
+function saveHubPrefs(){
+  try{ localStorage.setItem('hubPrefs:' + myWork.uid, JSON.stringify(hubPrefs)); } catch(e){}
+  if(myWork.db && myWork.uid) myWork.db.collection('settings').doc('hub-prefs').set({ [myWork.uid]: hubPrefs }, { merge: true })
+    .catch(err=>console.error('Could not save hub choices to the server (kept on this device)', err));
+  renderTiles(); renderMyWork(); loadWeather();
+}
+
+/* ---- which apps show ---- */
+let editingHub = false;
+function renderTiles(){
+  const grid = document.querySelector('.tile-grid');
+  grid.classList.toggle('editing', editingHub);
+  grid.querySelectorAll('.tile').forEach(tile=>{
+    const off = hubPrefs.tilesHidden.includes(tile.id);
+    tile.classList.toggle('off', off);
+    tile.style.display = off && !editingHub ? 'none' : '';
+  });
+  document.getElementById('editHubBtn').textContent = editingHub ? 'Done' : 'Edit my hub';
+  document.getElementById('editNote').classList.toggle('show', editingHub);
+  const shown = grid.querySelectorAll('.tile:not(.off)').length;
+  document.getElementById('welcomeLine').textContent = shown ? 'Pick a tool below to get started.' : 'All your apps are hidden. Press “Edit my hub” to bring some back.';
+}
+document.getElementById('editHubBtn').addEventListener('click', ()=>{ editingHub = !editingHub; renderTiles(); });
+document.querySelector('.tile-grid').addEventListener('click', e=>{
+  if(!editingHub) return;
+  const tile = e.target.closest('.tile');
+  if(!tile) return;
+  e.preventDefault(); // while editing, a tap shows or hides the app instead of opening it
+  hubPrefs.tilesHidden = hubPrefs.tilesHidden.includes(tile.id) ? hubPrefs.tilesHidden.filter(x=>x !== tile.id) : [...hubPrefs.tilesHidden, tile.id];
+  saveHubPrefs();
+});
+
+/* ---- weather for the strip (optional): a free forecast service, no account needed ---- */
+const WEATHER_WORDS = { 0:'Clear', 1:'Mostly clear', 2:'Partly cloudy', 3:'Cloudy', 45:'Fog', 48:'Fog', 51:'Drizzle', 53:'Drizzle', 55:'Drizzle', 56:'Freezing drizzle', 57:'Freezing drizzle',
+  61:'Light rain', 63:'Rain', 65:'Heavy rain', 66:'Freezing rain', 67:'Freezing rain', 71:'Light snow', 73:'Snow', 75:'Heavy snow', 77:'Snow', 80:'Showers', 81:'Showers', 82:'Heavy showers',
+  85:'Snow showers', 86:'Snow showers', 95:'Thunderstorms', 96:'Thunderstorms', 99:'Thunderstorms' };
+let weather = null;        // { key, at, now:{temp, code}, days:[{date, hi, lo, wet, code}] }
+let weatherLoading = '';
+async function loadWeather(){
+  const st = hubPrefs.strip;
+  if(!st.weather){ weather = null; renderWeather(); return; }
+  const key = st.place.lat.toFixed(3) + ',' + st.place.lon.toFixed(3);
+  if(!weather){ try{ weather = JSON.parse(localStorage.getItem('hubWeather') || 'null'); } catch(e){} }
+  // a forecast is good for half an hour
+  if(weather && weather.key === key && Date.now() - weather.at < 30 * 60000){ renderWeather(); return; }
+  if(weatherLoading === key) return;
+  weatherLoading = key;
+  try{
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + st.place.lat + '&longitude=' + st.place.lon
+      + '&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+      + '&temperature_unit=fahrenheit&timezone=auto&forecast_days=4';
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('weather ' + res.status);
+    const d = await res.json();
+    weather = { key, at: Date.now(), now: { temp: Math.round(d.current.temperature_2m), code: d.current.weather_code },
+      days: d.daily.time.map((date, i)=>({ date, hi: Math.round(d.daily.temperature_2m_max[i]), lo: Math.round(d.daily.temperature_2m_min[i]), wet: d.daily.precipitation_probability_max[i], code: d.daily.weather_code[i] })) };
+    try{ localStorage.setItem('hubWeather', JSON.stringify(weather)); } catch(e){}
+  } catch(err){ console.error('Could not load the weather', err); if(!weather || weather.key !== key) weather = { key, failed: true, at: Date.now() }; }
+  weatherLoading = '';
+  renderWeather();
+}
+function renderWeather(){
+  const now = document.getElementById('myWorkNow'), row = document.getElementById('myWorkWeather');
+  const st = hubPrefs.strip;
+  if(!st.weather || !weather || weather.failed){
+    now.textContent = st.weather && weather && weather.failed ? 'Weather unavailable' : '';
+    row.style.display = 'none';
+    return;
+  }
+  now.textContent = weather.now.temp + '° ' + (WEATHER_WORDS[weather.now.code] || '') + ' · ' + st.place.name;
+  row.style.display = 'flex';
+  row.innerHTML = weather.days.map((d, i)=>{
+    const [y, m, dd] = d.date.split('-').map(Number);
+    const name = i === 0 ? 'Today' : new Date(y, m-1, dd).toLocaleDateString(undefined, { weekday:'short' });
+    return `<div class="mw-day"><strong>${name} · ${d.hi}° / ${d.lo}°</strong>${escHtml(WEATHER_WORDS[d.code] || '')}${d.wet != null ? ` · <span class="${d.wet >= 50 ? 'wet' : ''}">${d.wet}% rain</span>` : ''}</div>`;
+  }).join('');
+}
+
+/* ---- the gear on the strip: what shows there ---- */
+let gearOpen = false;
+function renderGear(){
+  const box = document.getElementById('myWorkSettings');
+  box.style.display = gearOpen ? 'block' : 'none';
+  if(!gearOpen){ box.innerHTML = ''; return; }
+  if(box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'text') return; // don't redraw under someone typing a town
+  const st = hubPrefs.strip;
+  const declinedOn = st.declined === null ? myWork.wantsDeclines : !!st.declined;
+  const row = (key, on, label)=>`<label><input type="checkbox" data-strip="${key}" ${on ? 'checked' : ''}> ${label}</label>`;
+  box.innerHTML = '<strong style="color:var(--navy);">Show in My work</strong>'
+    + row('punch', st.punch, 'Punch list items given to me')
+    + row('notes', st.notes, 'Notes and comments for me')
+    + row('reminders', st.reminders, 'Reminders I set')
+    + row('declined', declinedOn, 'Jobs a vendor declined that need someone else')
+    + row('weather', st.weather, 'Weather')
+    + (st.weather ? `<div class="place">For <input type="text" id="weatherPlace" value="${escHtml(st.place.name)}" placeholder="Town or ZIP code" autocomplete="off"> <button type="button" id="weatherPlaceBtn">Change</button> <span id="weatherPlaceNote"></span></div>` : '')
+    + '<div style="margin-top:10px;"><button type="button" class="done" id="gearDone">Done</button></div>';
+}
+document.getElementById('myWorkGear').addEventListener('click', ()=>{ gearOpen = !gearOpen; renderGear(); });
+document.getElementById('myWorkSettings').addEventListener('change', e=>{
+  const key = e.target.dataset && e.target.dataset.strip;
+  if(!key) return;
+  hubPrefs.strip[key] = e.target.checked;
+  saveHubPrefs();
+});
+async function changeWeatherPlace(){
+  const input = document.getElementById('weatherPlace'), note = document.getElementById('weatherPlaceNote');
+  const typed = (input.value || '').trim();
+  if(!typed) return;
+  note.textContent = 'Looking that up…';
+  try{
+    const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&name=' + encodeURIComponent(typed));
+    const hit = ((await res.json()).results || [])[0];
+    if(!hit){ note.textContent = 'Couldn\'t find that. Try a town name or a 5-digit ZIP.'; return; }
+    hubPrefs.strip.place = { name: [hit.name, hit.admin1_code || hit.admin1 || ''].filter(Boolean).join(', '), lat: hit.latitude, lon: hit.longitude };
+    input.blur();
+    saveHubPrefs();
+  } catch(err){ console.error(err); note.textContent = 'Couldn\'t look that up just now.'; }
+}
+document.getElementById('myWorkSettings').addEventListener('click', e=>{
+  if(e.target.closest('#gearDone')){ gearOpen = false; renderGear(); }
+  else if(e.target.closest('#weatherPlaceBtn')) changeWeatherPlace();
+});
+document.getElementById('myWorkSettings').addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'weatherPlace'){ e.preventDefault(); changeWeatherPlace(); } });
+function attachMyWork(db, user){
+  if(myWork.uid) return;
+  myWork.uid = user.uid; myWork.db = db; myWork.name = user.displayName || String(user.email || '').split('@')[0];
+  try{ applyHubPrefs(JSON.parse(localStorage.getItem('hubPrefs:' + user.uid) || 'null')); } catch(e){ applyHubPrefs(null); }
+  db.collection('settings').doc('hub-prefs').onSnapshot(doc=>{
+    if(doc.exists && doc.data()[user.uid]){ applyHubPrefs(doc.data()[user.uid]); try{ localStorage.setItem('hubPrefs:' + user.uid, JSON.stringify(hubPrefs)); } catch(e){} }
+  }, err=>console.error('hub choices listener error (using this device\'s copy)', err));
+  ['mentions', 'watchers'].forEach(field=>{
+    db.collection('notes').where(field, 'array-contains', user.uid).onSnapshot(s=>{
+      myWork[field] = s.docs.map(d=>({ id: d.id, ...d.data() }));
+      myWork.ready = true;
+      renderMyWork();
+    }, err=>console.error('my work notes listener error', err));
+  });
+  db.collection('subs').onSnapshot(s=>{ myWork.subs = {}; s.docs.forEach(d=>{ myWork.subs[d.id] = d.data().name || 'A vendor'; }); renderMyWork(); }, err=>console.error('my work vendors listener error', err));
+  // declined jobs are only gathered for people who asked to hear about them (Admin Settings → My notifications)
+  db.collection('settings').doc('staff-notify').onSnapshot(doc=>{
+    const prefs = doc.exists ? doc.data()[user.uid] : null;
+    myWork.wantsDeclines = !!(prefs && prefs.subDeclined === true);
+    renderMyWork();
+  }, err=>console.error('my work choices listener error', err));
+  db.collection('build-schedules').onSnapshot(s=>{ myWork.schedules = s.docs.map(d=>({ id: d.id, ...d.data() })); renderMyWork(); }, err=>console.error('my work schedules listener error', err));
+}
+function myWorkGather(){
+  const uid = myWork.uid;
+  const d = new Date(); const today = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const all = {};
+  [...myWork.mentions, ...myWork.watchers].forEach(x=>{ all[x.id] = x; });
+  const notes = Object.values(all);
+  const unread = x=>!(x.readBy && x.readBy[uid]);
+  const rank = t=>(t.priority === 'high' ? '0' : '1') + (t.due || '9999-99-99') + (t.at || '');
+  const punch = notes.filter(x=>x.todo && !x.done && (x.mentions || []).includes(uid)).sort((a,b)=>rank(a).localeCompare(rank(b)));
+  const late = punch.filter(t=>t.due && t.due < today), dueToday = punch.filter(t=>t.due === today);
+  const reminders = notes.filter(x=>x.reminded && x.reminded[uid] && unread(x));
+  const fresh = notes.filter(x=>unread(x) && !reminders.includes(x) && (!x.todo || ((x.replies || []).length && (x.watchers || []).includes(uid))))
+    .sort((a,b)=>(b.lastAt || b.at || '').localeCompare(a.lastAt || a.at || ''));
+  const declined = [];
+  if(hubPrefs.strip.declined === null ? myWork.wantsDeclines : hubPrefs.strip.declined) myWork.schedules.forEach(sc=>{
+    if(!sc.sentAt) return;
+    (sc.tasks || []).forEach(t=>{
+      if(!t.start || t.done || t.end < today) return;
+      (t.subIds || []).forEach(subId=>{
+        if(((t.confirm || {})[subId]) !== 'declined') return;
+        declined.push({ houseId: sc.id, taskId: t.id, title: t.title || 'A job', start: t.start, end: t.end, sub: myWork.subs[subId] || 'A vendor', reason: (t.confirmNote || {})[subId] || '' });
+      });
+    });
+  });
+  declined.sort((a,b)=>a.start.localeCompare(b.start));
+  return { today, punch, late, dueToday, reminders, fresh, declined };
+}
+function renderMyWork(){
+  const box = document.getElementById('myWork');
+  if(!myWork.ready){ box.style.display = 'none'; return; }
+  const g = myWorkGather();
+  // leave out whatever this person switched off with the gear
+  const st = hubPrefs.strip;
+  if(!st.punch){ g.punch = []; g.late = []; g.dueToday = []; }
+  if(!st.notes) g.fresh = [];
+  if(!st.reminders) g.reminders = [];
+  if(st.declined === false) g.declined = [];
+  renderGear(); renderWeather();
+  const where = x=>{ const j = allHomes.find(h=>h.id === x.houseId); return x.houseId ? (j ? [j.community, j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') : (x.houseLabel || 'A home')) : 'General'; };
+  const day = iso=>{ const [y, m, dd] = iso.split('-').map(Number); return new Date(y, m-1, dd).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }); };
+  const urgentCount = g.late.length + g.dueToday.length + g.declined.length + g.reminders.length;
+  const total = g.punch.length + g.fresh.length + g.declined.length + g.reminders.length;
+
+  box.style.display = '';
+  box.classList.toggle('urgent', urgentCount > 0);
+  box.classList.toggle('quiet', total === 0);
+  const chips = [
+    g.late.length ? `<span class="mw-chip red">${g.late.length} overdue</span>` : '',
+    g.dueToday.length ? `<span class="mw-chip amber">${g.dueToday.length} due today</span>` : '',
+    g.declined.length ? `<span class="mw-chip red">${g.declined.length} need${g.declined.length === 1 ? 's' : ''} a vendor</span>` : '',
+    g.reminders.length ? `<span class="mw-chip amber">${g.reminders.length} reminder${g.reminders.length === 1 ? '' : 's'}</span>` : '',
+    g.punch.length ? `<span class="mw-chip">${g.punch.length} punch item${g.punch.length === 1 ? '' : 's'}</span>` : '',
+    g.fresh.length ? `<span class="mw-chip">${g.fresh.length} new for you</span>` : '',
+  ].join('');
+  document.getElementById('myWorkSum').innerHTML = total ? chips : (st.punch || st.notes || st.reminders || st.declined ? 'Nothing is waiting on you.' : '');
+  document.getElementById('myWorkArrow').style.display = total ? '' : 'none';
+
+  // open or closed: whatever they last chose on this device; otherwise open only when something is urgent
+  let saved = null;
+  try{ saved = localStorage.getItem('hubMyWorkOpen'); } catch(e){}
+  const open = total > 0 && (saved === null ? urgentCount > 0 : saved === '1');
+  box.classList.toggle('open', open);
+  document.getElementById('myWorkHead').setAttribute('aria-expanded', String(open));
+  const body = document.getElementById('myWorkBody');
+  body.style.display = open ? 'block' : 'none';
+  if(!open){ body.innerHTML = ''; return; }
+
+  const dueTag = t=>{
+    if(!t.due) return '';
+    const [y, m, dd] = t.due.split('-').map(Number);
+    const days = Math.round((new Date(y, m-1, dd) - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000);
+    return `<span class="mw-chip ${days < 0 ? 'red' : days <= 1 ? 'amber' : ''}">${days < 0 ? 'Overdue ' + (-days) + (days === -1 ? ' day' : ' days') : days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'Due ' + escHtml(day(t.due))}</span> `;
+  };
+  const punchRow = t=>`<div class="mw-row"><button type="button" class="mw-check" data-mw-check="${escHtml(t.id)}" aria-label="Mark as done" title="Done"></button>
+      <div class="mw-main"><div class="mw-t">${escHtml(t.text || '')}</div><div class="mw-m">${t.priority === 'high' ? '<span class="mw-chip red">High priority</span> ' : ''}${dueTag(t)}${escHtml(where(t))}</div></div></div>`;
+  const noteHref = x=>['subDeclined', 'subNote', 'subWaiting'].includes(x.kind)
+    ? `construction.html?house=${encodeURIComponent(x.houseId || '')}&task=${encodeURIComponent(x.taskId || '')}`
+    : (x.houseId ? `house.html?id=${encodeURIComponent(x.houseId)}#notes` : 'punch.html');
+  const urgent = [...g.late, ...g.dueToday];
+  const rows = [
+    ...urgent.map(punchRow),
+    ...g.declined.map(x=>`<div class="mw-row"><span class="mw-ic red">!</span>
+        <div class="mw-main"><div class="mw-t">${escHtml(x.sub)} declined ${escHtml(x.title)}, ${escHtml(x.start === x.end ? day(x.start) : day(x.start) + ' – ' + day(x.end))}</div>
+          <div class="mw-m">${escHtml(where(x))}${x.reason ? ' · “' + escHtml(x.reason) + '”' : ''}</div></div>
+        <a class="mw-go" href="construction.html?house=${encodeURIComponent(x.houseId)}&task=${encodeURIComponent(x.taskId)}">Choose vendor</a></div>`),
+    ...g.reminders.map(x=>`<a class="mw-row" href="${noteHref(x)}" data-mw-read="${escHtml(x.id)}"><span class="mw-ic amber">&#128276;</span>
+        <div class="mw-main"><div class="mw-t">Reminder: ${escHtml(x.text || '')}</div><div class="mw-m">${escHtml(where(x))}</div></div><span class="mw-go">Open</span></a>`),
+    ...g.punch.filter(t=>!urgent.includes(t)).slice(0, 5).map(punchRow),
+    ...g.fresh.slice(0, 5).map(x=>{
+      const last = (x.replies || [])[(x.replies || []).length - 1];
+      const reply = last && (last.at || '') >= (x.lastAt || '') ? last : null;
+      const who = ((reply || x).by || {}).name || 'Someone';
+      return `<a class="mw-row" href="${noteHref(x)}" data-mw-read="${escHtml(x.id)}"><span class="mw-ic">&#9993;</span>
+        <div class="mw-main"><div class="mw-t">${escHtml(who)}${reply ? ' commented' : ''}: ${escHtml((reply || x).text || '')}</div><div class="mw-m">${escHtml(where(x))} · ${escHtml(bellTime((reply || x).at))}</div></div></a>`;
+    }),
+  ];
+  const hidden = total - rows.length;
+  body.innerHTML = rows.join('') + `<a class="mw-more" href="mywork.html">${hidden > 0 ? `See all ${total} in My Work` : 'Open My Work'} &rarr;</a>`;
+}
+document.getElementById('myWorkHead').addEventListener('click', ()=>{
+  const box = document.getElementById('myWork');
+  if(box.classList.contains('quiet')) return;
+  try{ localStorage.setItem('hubMyWorkOpen', box.classList.contains('open') ? '0' : '1'); } catch(e){}
+  renderMyWork();
+});
+document.getElementById('myWorkBody').addEventListener('click', e=>{
+  const check = e.target.closest('[data-mw-check]');
+  if(check && myWork.db){
+    check.disabled = true;
+    myWork.db.collection('notes').doc(check.dataset.mwCheck).update({ done: true, doneAt: new Date().toISOString(), doneBy: { uid: myWork.uid, name: myWork.name } })
+      .catch(err=>{ console.error(err); check.disabled = false; alert('Could not save — check your connection and try again.'); });
+    return;
+  }
+  const read = e.target.closest('[data-mw-read]');
+  if(read && myWork.db) myWork.db.collection('notes').doc(read.dataset.mwRead).update(new firebase.firestore.FieldPath('readBy', myWork.uid), true).catch(err=>console.error(err));
+});
 
 function attachConstructionStatsListener(db){
   db.collection('build-schedules').onSnapshot(snapshot=>{
