@@ -412,9 +412,22 @@ function buildEmail(sub, items, link, kind){
   return { subject, text, html };
 }
 
+// What the office has set on the hub's Admin Settings page (settings/notifications).
+// Read fresh every time, so switching emails off there takes effect straight away.
+async function notifySettings(){
+  const doc = await db.collection('settings').doc('notifications').get();
+  const s = doc.exists ? doc.data() : {};
+  return {
+    paused: !!s.paused,
+    leadDays: Number(s.leadDays) > 0 ? Number(s.leadDays) : DEFAULT_LEAD_DAYS,
+    reminderDays: Number(s.reminderDays) > 0 ? Number(s.reminderDays) : DEFAULT_REMINDER_DAYS,
+    replyTo: typeof s.replyTo === 'string' ? s.replyTo.trim() : '',
+  };
+}
+
 // Email each sub their list. `bySub` is { subId: [{ houseId, sched, t }] }.
 // Returns who was emailed, who was skipped (no email address) and who failed.
-async function emailSubs(bySub, kind){
+async function emailSubs(bySub, kind, settings){
   const outcome = { asked: [], emailed: [], skipped: [], failed: [] };
   const subIds = Object.keys(bySub);
   if(!subIds.length) return outcome;
@@ -423,7 +436,7 @@ async function emailSubs(bySub, kind){
   const transport = nodemailer.createTransport({ service: 'gmail', // Google shows app passwords in groups of four with spaces; strip them in case they were pasted that way.
     auth: { user: MAIL_USER.value(), pass: GMAIL_APP_PASSWORD.value().replace(/\s+/g, '') } });
   const from = `"${MAIL_NAME.value()}" <${MAIL_USER.value()}>`;
-  const replyTo = MAIL_REPLY_TO.value() || undefined;
+  const replyTo = (settings && settings.replyTo) || MAIL_REPLY_TO.value() || undefined;
 
   for(const subId of subIds){
     const doc = await db.collection('subs').doc(subId).get();
@@ -485,6 +498,16 @@ if(EMAIL_ON) exports.onScheduleSend = onDocumentWritten({ document: 'build-sched
   if(before && before.sendRequestedAt === after.sendRequestedAt) return;
 
   const houseId = event.params.houseId;
+  const settings = await notifySettings();
+  if(settings.paused){
+    // Emails are switched off on the Admin Settings page. The house is still shared with subs
+    // (they can see it from their link), but nobody is emailed — and nothing is marked as
+    // "asked", so they'll be picked up by the morning follow-up once emails are back on.
+    const now = new Date().toISOString();
+    await event.data.after.ref.update({ sentAt: now, lastSend: { at: now, emailed: [], skipped: [], failed: [], paused: true } });
+    logger.info('Schedule shared with subs, emails are switched off', { house: houseName(after) });
+    return;
+  }
   const today = todayIso();
   const bySub = {};
   (after.tasks || []).forEach(t=>{
@@ -496,7 +519,7 @@ if(EMAIL_ON) exports.onScheduleSend = onDocumentWritten({ document: 'build-sched
     });
   });
 
-  const outcome = await emailSubs(bySub, 'new');
+  const outcome = await emailSubs(bySub, 'new', settings);
   const now = new Date().toISOString();
   await recordAsked(outcome.asked, { [houseId]: {
     sentAt: now,
@@ -509,11 +532,9 @@ if(EMAIL_ON) exports.onScheduleSend = onDocumentWritten({ document: 'build-sched
    dailyFollowUp — changes, new assignments and reminders
    ============================================================ */
 if(EMAIL_ON) exports.dailyFollowUp = onSchedule({ schedule: 'every day 07:00', timeZone: TIME_ZONE, secrets: [GMAIL_APP_PASSWORD] }, async ()=>{
-  const settingsDoc = await db.collection('settings').doc('notifications').get();
-  const settings = settingsDoc.exists ? settingsDoc.data() : {};
-  if(settings.paused){ logger.info('Sending is paused in settings/notifications.'); return; }
-  const leadDays = Number(settings.leadDays) > 0 ? Number(settings.leadDays) : DEFAULT_LEAD_DAYS;
-  const reminderDays = Number(settings.reminderDays) > 0 ? Number(settings.reminderDays) : DEFAULT_REMINDER_DAYS;
+  const settings = await notifySettings();
+  if(settings.paused){ logger.info('Emails are switched off on the Admin Settings page — nothing sent.'); return; }
+  const { leadDays, reminderDays } = settings;
   const today = todayIso();
   const horizon = addDaysIso(today, leadDays);
 
@@ -538,8 +559,8 @@ if(EMAIL_ON) exports.dailyFollowUp = onSchedule({ schedule: 'every day 07:00', t
     });
   });
 
-  const a = await emailSubs(changed, 'changed');
-  const b = await emailSubs(reminders, 'reminder');
+  const a = await emailSubs(changed, 'changed', settings);
+  const b = await emailSubs(reminders, 'reminder', settings);
   await recordAsked([...a.asked, ...b.asked]);
   logger.info('Daily follow-up finished', { changes: a.emailed.length, reminders: b.emailed.length, skipped: [...a.skipped, ...b.skipped], failed: [...a.failed, ...b.failed] });
 });

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | Admin Settings</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  .titlebar{background:var(--paper-2); padding:20px clamp(16px,4vw,40px); border-bottom:4px solid var(--rust);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;}
+  .brand-mark{height:40px; flex:none; display:flex; align-items:center;}
+  .brand-mark img{height:100%; width:auto; display:block;}
+  h1{font-size:clamp(19px,2.4vw,24px); margin:0; font-weight:700; color:var(--navy);}
+  .subtitle{font-size:12px; color:var(--ink-soft); margin-top:3px; letter-spacing:.6px; text-transform:uppercase;}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+  .sync-badge{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-soft); font-family:"Courier New",monospace;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.offline{background:var(--danger);}
+  .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
+  .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
+
+  .wrap{max-width:760px; margin:0 auto; padding:22px clamp(16px,4vw,40px) 60px;}
+  .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
+  .back-link:hover{color:var(--navy);}
+  .section{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-top:4px solid var(--rust); padding:22px 24px; margin-bottom:18px;}
+  .section h2{margin:0 0 4px; font-size:18px; color:var(--navy);}
+  .section .lead{margin:0 0 18px; font-size:13.5px; color:var(--ink-soft); line-height:1.5;}
+
+  /* the big on/off switch */
+  .switch-row{display:flex; align-items:center; gap:16px; padding:14px 16px; border-radius:var(--radius); border:1px solid #c5dccb; background:#eaf1ec;}
+  .switch-row.off{border-color:#eccba2; background:#fbeee0;}
+  .switch-row .txt{flex:1;}
+  .switch-row .state{font-size:16px; font-weight:700; color:var(--good);}
+  .switch-row.off .state{color:#96661a;}
+  .switch-row .what{font-size:13px; color:var(--ink-soft); margin-top:3px; line-height:1.45;}
+  .switch{position:relative; flex:none; width:58px; height:32px; border-radius:20px; border:none; background:var(--good); cursor:pointer; transition:background .15s;}
+  .switch::after{content:""; position:absolute; top:3px; left:29px; width:26px; height:26px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:left .15s;}
+  .switch.off{background:#b9b4a5;}
+  .switch.off::after{left:3px;}
+  .switch:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  .setting{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 0; border-top:1px solid #ece8dd;}
+  .setting:first-of-type{margin-top:18px;}
+  .setting .txt{flex:1 1 280px;}
+  .setting .name{font-size:14.5px; font-weight:600; color:var(--ink);}
+  .setting .what{font-size:12.5px; color:var(--ink-soft); margin-top:3px; line-height:1.45;}
+  .setting input{padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
+  .setting input[type=number]{width:80px; text-align:center; font-family:"Courier New",monospace;}
+  .setting input[type=text]{width:260px; max-width:100%;}
+  .setting input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .unit{font-size:13px; color:var(--ink-soft);}
+  .fact{font-size:13px; color:var(--ink-soft); margin-top:16px; padding-top:14px; border-top:1px solid #ece8dd; line-height:1.6;}
+  .fact code{background:#eef0e8; padding:1px 6px; border-radius:2px; font-size:12.5px; color:var(--navy);}
+  .saved{font-size:12.5px; font-weight:700; color:var(--good); opacity:0; transition:opacity .2s;}
+  .saved.show{opacity:1;}
+  .note{font-size:12.5px; color:var(--ink-soft); line-height:1.6;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-gate.hidden{display:none;}
+  .auth-card{width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;}
+  .auth-card .brand{margin-bottom:22px; pointer-events:none;}
+  .auth-card h2{margin:0; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .auth-field input{width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
+  .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .auth-error.show{display:block;}
+  .btn{padding:11px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-primary{background:var(--navy); color:#fff; width:100%;}
+  .app-shell.locked{display:none;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+</style>
+</head>
+<body>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div><h2>Admin Settings</h2></div>
+    </div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="auth-error" id="loginError"></div>
+    <div class="auth-field">
+      <label for="loginEmail">Email</label>
+      <input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+  <div class="titlebar">
+    <a class="brand" href="index.html" title="Back to Alden Homes Hub">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div>
+        <h1>Admin Settings</h1>
+        <div class="subtitle">How the hub behaves</div>
+      </div>
+    </a>
+    <div class="titlebar-account">
+      <span class="saved" id="savedNote">Saved</span>
+      <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+      <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; Back to the hub</a>
+
+    <!-- ===================== EMAILS TO SUBS ===================== -->
+    <div class="section">
+      <h2>Emails to subcontractors</h2>
+      <p class="lead">The hub emails subs when a house is sent to them, and follows up each morning. Switch it off while you're setting up or testing schedules so nobody gets emailed by accident.</p>
+
+      <div class="switch-row" id="emailRow">
+        <div class="txt">
+          <div class="state" id="emailState">Loading…</div>
+          <div class="what" id="emailWhat"></div>
+        </div>
+        <button type="button" class="switch" id="emailSwitch" role="switch" aria-checked="true" aria-label="Emails to subcontractors"></button>
+      </div>
+
+      <div class="setting">
+        <div class="txt">
+          <div class="name">Remind about jobs starting within</div>
+          <div class="what">A sub who hasn't answered only gets reminders once the job is this close. Further-off jobs wait quietly.</div>
+        </div>
+        <input type="number" id="leadDays" min="1" max="120" step="1"> <span class="unit">days</span>
+      </div>
+      <div class="setting">
+        <div class="txt">
+          <div class="name">Wait between reminders</div>
+          <div class="what">How long to leave an unanswered request before asking again.</div>
+        </div>
+        <input type="number" id="reminderDays" min="1" max="30" step="1"> <span class="unit">days</span>
+      </div>
+      <div class="setting">
+        <div class="txt">
+          <div class="name">Replies go to</div>
+          <div class="what">Where a sub's reply lands if they hit Reply on an email. Leave blank to use the sending mailbox.</div>
+        </div>
+        <input type="text" id="replyTo" placeholder="office@example.com" autocomplete="off">
+      </div>
+
+      <div class="fact">
+        Emails are sent from <code>aldenhomesserver@gmail.com</code> as “Alden Homes Scheduling”. The daily follow-up runs at 7:00 a.m. and only covers houses that have been sent to subs.
+      </div>
+    </div>
+
+    <p class="note">Anyone who can sign in to the hub can change these settings. More settings will be added here as the hub grows.</p>
+
+    <footer>Alden Homes internal tools — settings apply to everyone straight away.</footer>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+
+/* Notification settings live in one record: settings/notifications.
+   The server reads it every time it is about to email anyone, so a change here
+   takes effect immediately — nothing needs redeploying. */
+const DEFAULTS = { paused: false, leadDays: 14, reminderDays: 3, replyTo: '' };
+let settings = null;   // null until loaded
+
+const $ = id => document.getElementById(id);
+function setSyncStatus(state){
+  $('syncDot').classList.toggle('offline', state==='offline');
+  $('syncLabel').textContent = state==='offline' ? 'Offline' : (state==='saving' ? 'Saving…' : 'Synced');
+}
+
+/* ---- sign-in ---- */
+function showLoginGate(){ $('loginGate').classList.remove('hidden'); $('appShell').classList.add('locked'); }
+function showApp(user){
+  $('loginGate').classList.add('hidden');
+  $('appShell').classList.remove('locked');
+  $('currentUserEmail').textContent = user.email || '';
+}
+function doLogin(){
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const errBox = $('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){
+    errBox.textContent = 'Enter both an email and a password.';
+    errBox.classList.add('show');
+    return;
+  }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(err.code)
+      ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show');
+  });
+}
+$('loginSubmitBtn').addEventListener('click', doLogin);
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const ref = db.collection('settings').doc('notifications');
+let listening = false;
+
+firebase.auth().onAuthStateChanged(user=>{
+  // Homeowners using the public request form are signed in anonymously — they are not staff.
+  if(user && !user.isAnonymous){
+    showApp(user);
+    if(!listening){
+      listening = true;
+      ref.onSnapshot(doc=>{
+        settings = { ...DEFAULTS, ...(doc.exists ? doc.data() : {}) };
+        render();
+        setSyncStatus('idle');
+      }, err=>{ console.error('settings listener error', err); setSyncStatus('offline'); });
+    }
+  } else {
+    showLoginGate();
+  }
+});
+window.addEventListener('online', ()=>setSyncStatus('idle'));
+window.addEventListener('offline', ()=>setSyncStatus('offline'));
+
+/* ---- render + save ---- */
+function render(){
+  if(!settings) return;
+  const on = !settings.paused;
+  $('emailRow').classList.toggle('off', !on);
+  $('emailSwitch').classList.toggle('off', !on);
+  $('emailSwitch').setAttribute('aria-checked', String(on));
+  $('emailState').textContent = on ? 'Emails are ON' : 'Emails are OFF';
+  $('emailWhat').textContent = on
+    ? 'Pressing “Send to subs” on a house emails every sub on it, and the morning follow-up runs.'
+    : 'Nobody is emailed. “Send to subs” still shares the house so subs can see it from their link, but no emails go out and the morning follow-up is skipped.';
+  // don't overwrite a box someone is typing in
+  const set = (id, v)=>{ if(document.activeElement !== $(id)) $(id).value = v; };
+  set('leadDays', settings.leadDays);
+  set('reminderDays', settings.reminderDays);
+  set('replyTo', settings.replyTo || '');
+}
+
+let savedTimer = null;
+async function save(patch){
+  setSyncStatus('saving');
+  try{
+    await ref.set({ ...patch, updatedAt: new Date().toISOString() }, { merge: true });
+    $('savedNote').classList.add('show');
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(()=>$('savedNote').classList.remove('show'), 1800);
+  } catch(err){
+    console.error(err);
+    alert('Could not save — check your connection and try again.');
+  }
+}
+
+$('emailSwitch').addEventListener('click', ()=>{
+  if(!settings) return;
+  const turningOn = settings.paused;
+  if(turningOn && !confirm('Turn emails to subs back on?\n\nFrom tomorrow morning, the follow-up will email subs about any house that was shared while emails were off, if they haven\'t answered yet.')) return;
+  save({ paused: !settings.paused });
+});
+function numberSetting(id, key, min, max){
+  $(id).addEventListener('change', e=>{
+    const n = Math.round(Number(e.target.value));
+    if(!Number.isFinite(n) || n < min || n > max){ e.target.value = settings[key]; alert(`Enter a whole number from ${min} to ${max}.`); return; }
+    e.target.value = n;
+    save({ [key]: n });
+  });
+}
+numberSetting('leadDays', 'leadDays', 1, 120);
+numberSetting('reminderDays', 'reminderDays', 1, 30);
+$('replyTo').addEventListener('change', e=>{
+  const v = e.target.value.trim();
+  if(v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ alert('That doesn\'t look like an email address.'); e.target.value = settings.replyTo || ''; return; }
+  save({ replyTo: v });
+});
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('Service worker registration failed', err));
+  });
+}
+</script>
+</body>
+</html>

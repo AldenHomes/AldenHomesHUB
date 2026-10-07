@@ -711,6 +711,7 @@ let openScheduleId = null;
 let houseView = 'calendar';   // 'calendar' or 'list'
 let calMonth = null;          // 'YYYY-MM' being shown; null = pick a sensible month for the open house
 let openTaskId = null;        // task shown in the schedule item popup
+let emailsPaused = false;     // true when emails to subs are switched off on the Admin Settings page
 let openTemplateId = null;
 let editingSubId = null;
 let seededThisSession = false;
@@ -926,6 +927,11 @@ function attachListeners(){
     if(!templates.some(t=>t.id===openTemplateId)) openTemplateId = templates.length ? templates[0].id : null;
     renderAll(); setSyncStatus('idle');
   }, listenerError('schedule-templates'));
+  // the on/off switch for emails lives on the Admin Settings page
+  db.collection('settings').doc('notifications').onSnapshot(doc=>{
+    emailsPaused = doc.exists && !!doc.data().paused;
+    renderAll();
+  }, err=>console.error('notification settings listener error', err));
   tasksCol.onSnapshot(s=>{
     taskLib = s.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.order||0) - (b.order||0) || (a.title||'').localeCompare(b.title||''));
     renderAll(); setSyncStatus('idle');
@@ -1252,6 +1258,11 @@ function renderSendBar(sched){
     $('sendTitle').textContent = 'Sending to subs…';
     $('sendNote').textContent = 'Each sub is being emailed their jobs for this house.';
     sendBarTimer = setTimeout(renderAll, 15000); // keep checking so "Sending…" can't get stuck on screen
+  } else if(sched.sentAt && sched.lastSend && sched.lastSend.paused && emailsReported(sched)){
+    $('sendTitle').textContent = `Shared with subs ${new Date(sched.sentAt).toLocaleDateString()} — no emails sent`;
+    $('sendNote').textContent = emailsPaused
+      ? 'Emails to subs are switched off in Admin Settings. Subs can see this house from their link, but nobody was notified.'
+      : 'Emails were switched off when this was shared. They\'re on again now — press Send again to email the subs, or the morning follow-up will.';
   } else if(sched.sentAt && !emailsReported(sched)){
     $('sendTitle').textContent = `Shared with subs ${new Date(sched.sentAt).toLocaleDateString()} — but no emails went out`;
     $('sendNote').textContent = 'Emailing isn\'t switched on yet. Subs can see this house from their personal link (Vendors tab → Copy), but nobody was notified.';
@@ -1264,7 +1275,9 @@ function renderSendBar(sched){
     $('sendNote').textContent = bits.join(' · ') + '. Date changes after this are re-sent automatically the next morning.';
   } else {
     $('sendTitle').textContent = 'Not sent to subs yet';
-    $('sendNote').textContent = 'This schedule is a draft — subs can\'t see it. Send it when the dates are right and each sub is emailed their jobs to confirm.';
+    $('sendNote').textContent = 'This schedule is a draft — subs can\'t see it. ' + (emailsPaused
+      ? 'Emails to subs are switched OFF in Admin Settings, so sending it now would share it without emailing anyone.'
+      : 'Send it when the dates are right and each sub is emailed their jobs to confirm.');
   }
 }
 
@@ -1824,6 +1837,7 @@ $('sendSubsBtn').addEventListener('click', async ()=>{
   if(!people.length){ alert('Nothing to send — every sub on this house has already answered, or no tasks have a sub assigned.'); return; }
   let msg = `Email ${willGet} sub${willGet===1?'':'s'} their jobs for this house so they can confirm?`;
   if(noEmail.length) msg += `\n\nThese have no email address on the Vendors tab and will be skipped:\n• ${noEmail.join('\n• ')}`;
+  if(emailsPaused) msg = 'Emails to subs are switched OFF in Admin Settings, so nobody will be emailed.\n\nShare this house with subs anyway? They would be able to see it from their link.';
   if(!confirm(msg)) return;
   const now = new Date().toISOString();
   await save(schedCol.doc(sched.id).update({ sendRequestedAt: now, sentAt: now }));
