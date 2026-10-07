@@ -639,7 +639,7 @@ function renderNotes(){
     ? '<div class="note muted">Notes can\'t be saved yet — the database security rules need the notes collection added.</div>'
     : notesState === 'loading' ? ''
     : notes.length ? notes.map(n=>`<div class="note${(n.mentions||[]).includes(me) ? ' for-me' : ''}">
-        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong><span>${esc(noteTime(n.at))}</span>
+        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>
           ${n.by && n.by.uid === me ? `<button type="button" class="x-btn" data-delete-note="${esc(n.id)}" title="Delete this note">&times;</button>` : ''}</div>
         <div class="note-text">${noteHtml(n.text || '')}</div>
       </div>`).join('')

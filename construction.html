@@ -213,6 +213,9 @@
   .confirm-btns button.on-pending{background:#fbeee0; color:var(--amber);}
   .confirm-btns button.on-confirmed{background:#eaf1ec; color:var(--good);}
   .confirm-btns button.on-declined{background:#fbeae4; color:var(--danger);}
+  .decline-box{flex:1 1 100%; background:#fbeae4; border-radius:var(--radius); padding:9px 11px;}
+  .decline-reason{font-size:13.5px; line-height:1.45; color:var(--ink); margin-bottom:8px; white-space:pre-wrap;}
+  .decline-box select{width:100%; padding:8px 9px; border:1px solid #e3b5a0; border-radius:var(--radius); font-size:13.5px; font-family:inherit; color:var(--ink); background:#fff;}
 
   /* Modal */
   .overlay{position:fixed; inset:0; background:rgba(30,32,34,.55); display:none; align-items:flex-start; justify-content:center; padding:5vh 16px; z-index:50; overflow-y:auto;}
@@ -1091,6 +1094,12 @@ function storedTask(t, withDates){
     // bookkeeping the server keeps (when each sub answered / was last asked) — carried through untouched
     if(t.confirmAt) out.confirmAt = t.confirmAt;
     if(t.asked) out.asked = t.asked;
+    if(t.waiting) out.waiting = t.waiting;
+    // the reason a sub gave when they declined — kept only while they're still on the task
+    if(t.confirmNote){
+      out.confirmNote = {};
+      out.subIds.forEach(id=>{ if(t.confirmNote[id]) out.confirmNote[id] = t.confirmNote[id]; });
+    }
   }
   return out;
 }
@@ -1115,6 +1124,7 @@ function saveSchedule(sched, tasks, startDate){
     const prev = before[out.id];
     if(prev && (prev.start !== out.start || prev.end !== out.end)){
       Object.keys(out.confirm).forEach(subId=>{ out.confirm[subId] = 'pending'; });
+      delete out.confirmNote; // a reason for declining the old dates doesn't apply to the new ones
     }
     return out;
   });
@@ -1464,7 +1474,7 @@ function renderCalendar(sched, laid){
 }
 
 /* ---- schedule item popup: dates, who's assigned, and whether they've confirmed ---- */
-const CONFIRM_LABELS = { pending:'Pending', confirmed:'Confirmed', declined:'Declined' };
+const CONFIRM_LABELS = { pending:'Pending', confirmed:'Approved', declined:'Declined' };
 
 function renderTaskModal(sched, laid, h){
   const overlay = $('taskOverlay');
@@ -1483,10 +1493,21 @@ function renderTaskModal(sched, laid, h){
     const status = (t.confirm && t.confirm[id]) || 'pending';
     const s = subs.find(x=>x.id===id);
     const contact = s ? [s.contact, s.phone, s.email].filter(Boolean).join(' · ') : '';
+    const reason = status === 'declined' && t.confirmNote && t.confirmNote[id];
+    // a sub who declined can be swapped for someone else right here
+    const others = subs.filter(x=>!(t.subIds||[]).includes(x.id)).sort((a,b)=>(a.name||'').localeCompare(b.name||'', 'en', { sensitivity:'base' }));
+    const swap = status === 'declined' ? `<div class="decline-box">
+        ${reason ? `<div class="decline-reason">“${esc(reason)}”</div>` : ''}
+        <select data-replace-sub="${esc(id)}" aria-label="Choose another vendor">
+          <option value="">Choose another vendor…</option>
+          ${others.map(x=>`<option value="${esc(x.id)}">${esc(x.name || 'Unnamed')}</option>`).join('')}
+        </select>
+      </div>` : '';
     return `<div class="confirm-row">
       <div><div class="who">${esc(s ? s.name : 'Removed sub')}</div>${contact ? `<div class="muted small">${esc(contact)}</div>` : ''}</div>
       <div class="confirm-btns">${Object.keys(CONFIRM_LABELS).map(k=>
         `<button type="button" data-confirm="${k}" data-sub="${esc(id)}" class="${k===status ? 'on-'+k : ''}">${CONFIRM_LABELS[k]}</button>`).join('')}</div>
+      ${swap}
     </div>`;
   }).join('');
 
@@ -1497,10 +1518,10 @@ function renderTaskModal(sched, laid, h){
       <div><label for="tkDays">Work days</label><input type="number" id="tkDays" min="1" step="1" value="${esc(t.duration)}"></div>
       <div><label>End date</label><div class="v mono">${fmtDate(t.end) || '—'}</div></div>
     </div>
-    <label>Sub confirmations</label>
+    <label>Sub approvals</label>
     ${(t.subIds||[]).length
-      ? `<div class="confirm-summary"><span class="c-yes">✓ ${c.confirmed} confirmed</span><span class="c-no">✕ ${c.declined} declined</span><span class="c-wait">… ${c.pending} pending</span></div>${subRows}
-         <div class="hint">Subs can't answer for themselves yet, so set this by hand when they confirm by phone or text. If the dates change afterwards it goes back to Pending.</div>`
+      ? `<div class="confirm-summary"><span class="c-yes">✓ ${c.confirmed} approved</span><span class="c-no">✕ ${c.declined} declined</span><span class="c-wait">… ${c.pending} pending</span></div>${subRows}
+         <div class="hint">Subs approve or decline from their own link. You can also set it by hand when they answer by phone or text. If the dates change afterwards it goes back to Pending. A vendor you swap in starts as Pending and is asked in the next morning's email (or press “Send again”).</div>`
       : `<div class="muted" style="font-size:13.5px;">Nobody is assigned to this task. Assign a vendor in the List view.</div>`}
     <label class="check-label" style="margin-top:20px; font-size:14px; color:var(--ink);">
       <input type="checkbox" id="tkDone" ${t.done ? 'checked' : ''}> This task is finished
@@ -1918,6 +1939,14 @@ $('tkBody').addEventListener('change', e=>{
     ctx.tasks[idx].doneAt = e.target.checked ? new Date().toISOString() : '';
     ctx.tasks[idx].doneBy = '';
   }
+  else if(e.target.dataset.replaceSub){
+    // swap the sub who declined for the vendor just picked; the new one starts as Pending
+    const t = ctx.tasks[idx], oldId = e.target.dataset.replaceSub, pickedId = e.target.value;
+    if(!pickedId || !subs.some(s=>s.id===pickedId) || (t.subIds||[]).includes(pickedId)) return;
+    t.subIds = (t.subIds||[]).map(id=>id===oldId ? pickedId : id);
+    t.confirm = { ...(t.confirm||{}), [pickedId]: 'pending' };
+    delete t.confirm[oldId];
+  }
   else return;
   e.target.blur(); // let the popup refresh with the new dates
   ctx.commit(ctx.tasks);
@@ -1930,6 +1959,7 @@ $('tkBody').addEventListener('click', e=>{
   const t = ctx.tasks.find(x=>x.id===openTaskId);
   if(!t) return;
   t.confirm = { ...(t.confirm||{}), [btn.dataset.sub]: btn.dataset.confirm };
+  if(btn.dataset.confirm !== 'declined' && t.confirmNote) delete t.confirmNote[btn.dataset.sub];
   ctx.commit(ctx.tasks);
 });
 
@@ -1980,6 +2010,7 @@ $('houseSearch').addEventListener('input', renderHouses);
 $('showFinished').addEventListener('change', renderHouses);
 
 // Arriving from a home's page (construction.html?house=…) jumps straight to that home.
+// A notification about a sub adds &task=…, which also opens that job's popup.
 let pendingHouseId = new URLSearchParams(location.search).get('house');
 let jobsLoaded = false, schedulesLoaded = false;
 function handlePendingHouse(){
@@ -1987,6 +2018,9 @@ function handlePendingHouse(){
   const id = pendingHouseId;
   pendingHouseId = null;
   openHouse(id);
+  const taskId = new URLSearchParams(location.search).get('task');
+  const sched = schedules.find(s=>s.id===id);
+  if(taskId && sched && (sched.tasks||[]).some(t=>t.id===taskId)) openTaskPopup(taskId);
 }
 $('backToHouses').addEventListener('click', ()=>{ openScheduleId = null; renderAll(); });
 

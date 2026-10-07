@@ -54,6 +54,12 @@
   .switch.off{background:#b9b4a5;}
   .switch.off::after{left:3px;}
   .switch:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+  .switch.small{width:46px; height:26px;}
+  .switch.small::after{width:20px; height:20px; left:23px;}
+  .switch.small.off::after{left:3px;}
+  .switch:disabled{opacity:.55; cursor:default;}
+  #myNotices .setting:first-of-type{margin-top:0; border-top:none; padding-top:0;}
+  .always{font-size:12px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.4px;}
 
   .setting{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 0; border-top:1px solid #ece8dd;}
   .setting:first-of-type{margin-top:18px;}
@@ -138,6 +144,13 @@
 
   <div class="wrap">
     <a class="back-link" href="index.html">&larr; Back to the hub</a>
+
+    <!-- ===================== MY NOTIFICATIONS ===================== -->
+    <div class="section" id="mine">
+      <h2>My notifications</h2>
+      <p class="lead">What the hub tells <strong>you</strong> about — on the bell and by email to the address you sign in with. These switches only change it for you; everyone sets their own. The ones about subs start off — switch on the ones you want. You're never told when a sub simply approves a job.</p>
+      <div id="myNotices"><div class="note">Loading…</div></div>
+    </div>
 
     <!-- ===================== EMAILS TO SUBS ===================== -->
     <div class="section">
@@ -264,6 +277,10 @@ firebase.auth().onAuthStateChanged(user=>{
         render();
         setSyncStatus('idle');
       }, err=>{ console.error('settings listener error', err); setSyncStatus('offline'); });
+      noticeRef.onSnapshot(doc=>{
+        myNotices = (doc.exists && doc.data()[user.uid]) || {};
+        renderNotices();
+      }, err=>{ console.error('notification choices listener error', err); $('myNotices').innerHTML = '<div class="note">Couldn\'t load your choices just now. Check your connection and reload the page.</div>'; });
       loadTeam();
     }
   } else {
@@ -272,6 +289,49 @@ firebase.auth().onAuthStateChanged(user=>{
 });
 window.addEventListener('online', ()=>setSyncStatus('idle'));
 window.addEventListener('offline', ()=>setSyncStatus('offline'));
+
+/* ============================================================
+   MY NOTIFICATIONS — what the signed-in person is told about.
+   One record, settings/staff-notify, holds everyone's choices as { uid: { kind: true } }.
+   Everything except @mentions is off until switched on. The server reads it each time
+   something happens, so a change takes effect straight away.
+   ============================================================ */
+const NOTICES = [
+  { key: 'mention', name: 'Someone @mentions me in a note', what: 'A teammate typed @ and your name in a note on a home.', locked: true },
+  { key: 'subDeclined', name: 'A sub declines a job', what: 'Includes their reason if they gave one. Opens the job so you can choose another vendor.' },
+  { key: 'subNote', name: 'A sub sends a note', what: 'A question, or asking to move the dates, sent from their link.' },
+  { key: 'subWaiting', name: 'A job has had no answer for 3 weeks', what: 'A sub was asked and still hasn\'t approved or declined after 21 days.' },
+];
+const noticeRef = db.collection('settings').doc('staff-notify');
+let myNotices = null;   // null until loaded
+function renderNotices(){
+  if(!myNotices) return;
+  $('myNotices').innerHTML = NOTICES.map(n=>{
+    const on = n.locked || myNotices[n.key] === true;
+    return `<div class="setting">
+      <div class="txt"><div class="name">${n.name}</div><div class="what">${n.what}</div></div>
+      ${n.locked ? '<span class="always">Always on</span>' : ''}
+      <button type="button" class="switch small${on ? '' : ' off'}" role="switch" aria-checked="${on}" aria-label="${n.name}" data-notice="${n.key}"${n.locked ? ' disabled' : ''}></button>
+    </div>`;
+  }).join('');
+}
+$('myNotices').addEventListener('click', async e=>{
+  const btn = e.target.closest('button[data-notice]');
+  const user = firebase.auth().currentUser;
+  if(!btn || btn.disabled || !myNotices || !user) return;
+  const turnOn = myNotices[btn.dataset.notice] !== true;
+  setSyncStatus('saving');
+  try{
+    await noticeRef.set({ [user.uid]: { [btn.dataset.notice]: turnOn } }, { merge: true });
+    $('savedNote').classList.add('show');
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(()=>$('savedNote').classList.remove('show'), 1800);
+  } catch(err){
+    console.error(err);
+    alert('Could not save — check your connection and try again.');
+  }
+  setSyncStatus('idle');
+});
 
 /* ---- render + save ---- */
 function render(){

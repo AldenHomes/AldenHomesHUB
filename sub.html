@@ -60,6 +60,20 @@
   .btn-plain{background:#fff; color:var(--navy); border:2px solid var(--steel-line);}
   .btn-dark{background:var(--navy); color:#fff;}
   .link-btn{background:none; border:none; padding:6px 2px; margin-top:8px; font-size:14px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; font-family:inherit;}
+  /* "Send a note" sits right under the answer buttons on every job */
+  .note-btn{display:block; width:100%; margin-top:10px; padding:12px 10px; background:#fff; border:2px solid var(--steel-line); border-radius:8px; font-size:15.5px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit; text-align:center;}
+  .note-btn small{display:block; font-size:13px; font-weight:400; color:var(--ink-soft); margin-top:2px;}
+  .my-reason{font-size:14.5px; color:var(--ink-soft); margin-top:10px; line-height:1.45; white-space:pre-wrap;}
+  /* the box that slides up to write a note or give a reason for declining */
+  .sheet-back{position:fixed; inset:0; background:rgba(20,20,22,.55); z-index:50; display:none; align-items:flex-end; justify-content:center;}
+  .sheet-back.show{display:flex;}
+  .sheet{background:var(--paper-2); width:100%; max-width:560px; border-radius:14px 14px 0 0; padding:20px 16px 22px; max-height:92vh; overflow-y:auto;}
+  .sheet h3{margin:0; font-size:19px; color:var(--navy);}
+  .sheet .about{font-size:14.5px; color:var(--ink-soft); margin-top:4px; line-height:1.4;}
+  .sheet label{display:block; font-size:14.5px; font-weight:700; margin-top:16px;}
+  .sheet textarea{display:block; width:100%; min-height:110px; margin-top:7px; padding:11px 12px; border:2px solid var(--steel-line); border-radius:8px; font-size:16px; line-height:1.45; color:var(--ink); font-family:inherit; resize:vertical;}
+  .sheet textarea:focus{outline:none; border-color:var(--navy);}
+  .sheet .sheet-err{color:var(--danger); font-size:14px; margin-top:8px; min-height:18px;}
 
   .state{text-align:center; padding:60px 20px; color:var(--ink-soft); font-size:16px; line-height:1.6;}
   .state strong{display:block; font-size:19px; color:var(--navy); margin-bottom:8px;}
@@ -176,7 +190,7 @@
       <div id="jobList"></div>
 
       <div id="declinedWrap" style="display:none;">
-        <h2>You said you can't make these</h2>
+        <h2>Jobs you declined</h2>
         <div id="declinedList"></div>
       </div>
     </div>
@@ -190,13 +204,13 @@
       </div>
       <div class="mini">
         <div class="mini-grid" id="miniGrid"></div>
-        <div class="legend"><span><i style="background:#eaf1ec; border:1px solid #c5dccb;"></i>Confirmed</span><span><i style="background:#fbeee0; border:1px solid #eccba2;"></i>Needs answer</span></div>
+        <div class="legend"><span><i style="background:#eaf1ec; border:1px solid #c5dccb;"></i>Approved</span><span><i style="background:#fbeee0; border:1px solid #eccba2;"></i>Needs answer</span></div>
       </div>
       <div id="monthList"></div>
     </div>
 
     <div class="prefs">
-      How should we send you jobs to confirm?
+      How should we send you jobs to approve?
       <div><div class="seg" id="notifySeg">
         <button type="button" data-notify="email">Email</button>
         <button type="button" data-notify="text">Text</button>
@@ -242,6 +256,21 @@
         </div>
         <div class="upload-note" id="uploadNote"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Write a note to the office, or give a reason when declining -->
+<div class="sheet-back" id="sheet">
+  <div class="sheet" role="dialog" aria-labelledby="sheetTitle">
+    <h3 id="sheetTitle"></h3>
+    <div class="about" id="sheetAbout"></div>
+    <label for="sheetText" id="sheetLabel"></label>
+    <textarea id="sheetText" maxlength="1000"></textarea>
+    <div class="sheet-err" id="sheetErr"></div>
+    <div class="btn-row" style="margin-top:6px;">
+      <button type="button" class="btn btn-plain" id="sheetCancel">Cancel</button>
+      <button type="button" class="btn btn-dark" id="sheetSend"></button>
     </div>
   </div>
 </div>
@@ -336,8 +365,9 @@ async function demoApi(action, extra){
     demoState.files[extra.houseId].unshift(f);
     return { file: f };
   }
+  if(action === 'note') return { ok: true };
   const t = demoState.tasks.find(x=>x.houseId===extra.houseId && x.taskId===extra.taskId);
-  if(action === 'respond') t.answer = extra.answer;
+  if(action === 'respond'){ t.answer = extra.answer; t.declineNote = extra.answer === 'declined' ? (extra.note || '') : ''; }
   if(action === 'done') t.done = extra.done !== false;
   return { task: copy(t) };
 }
@@ -398,26 +428,33 @@ function jobCard(t, kind){
   const key = `data-house="${esc(t.houseId)}" data-task="${esc(t.taskId)}"`;
   const happening = t.start <= today && t.end >= today;
 
+  // a note to the office about this job — it shows on their hub and is emailed to them
+  const noteBtn = `<button type="button" class="note-btn" data-note ${key}>Send a note to Alden Homes<small>Have a question, or need different dates?</small></button>`;
+
   let chip = '', buttons = '';
   if(kind === 'ask'){
     buttons = `<div class="btn-row">
-        <button class="btn btn-yes" data-act="confirmed" ${key}>Confirm</button>
-        <button class="btn btn-no" data-act="declined" ${key}>Can't make it</button>
-      </div>`;
+        <button class="btn btn-yes" data-act="confirmed" ${key}>Approve</button>
+        <button class="btn btn-no" data-act="declined" ${key}>Decline</button>
+      </div>
+      ${noteBtn}`;
   } else if(kind === 'job'){
     chip = t.done ? '<span class="chip finished">Done</span>'
          : happening ? '<span class="chip now">Happening now</span>'
-         : '<span class="chip confirmed">Confirmed</span>';
+         : '<span class="chip confirmed">Approved</span>';
     // photos go against this specific job, so the office and the home buyer see them with the right step
     const photoBtn = `<button class="btn btn-plain" data-add-photos ${key}>Add photos</button>`;
     buttons = t.done
       ? `<div class="btn-row">${photoBtn}</div>
          <button class="link-btn" data-act="undone" ${key}>Not finished after all? Undo</button>`
       : `<div class="btn-row"><button class="btn ${t.start <= today ? 'btn-yes' : 'btn-plain'}" data-act="done" ${key}>Mark done</button>${photoBtn}</div>
-         <button class="link-btn" data-act="declined" ${key}>Can't make it any more</button>`;
+         ${noteBtn}
+         <button class="link-btn" data-act="declined" ${key}>Can't do this job any more? Decline it</button>`;
   } else {
-    chip = '<span class="chip declined">Can\'t make it</span>';
-    buttons = `<button class="link-btn" data-act="confirmed" ${key}>I can make it after all — confirm</button>`;
+    chip = '<span class="chip declined">Declined</span>';
+    buttons = `${t.declineNote ? `<div class="my-reason">You told us: “${esc(t.declineNote)}”</div>` : ''}
+      ${noteBtn}
+      <button class="link-btn" data-act="confirmed" ${key}>I can do it after all — approve</button>`;
   }
 
   return `<div class="job ${kind==='ask'?'ask':''} ${t.done?'done':''}">
@@ -438,7 +475,7 @@ function render(){
   $('askCount').textContent = ask.length || '';
   $('askCount').style.display = ask.length ? '' : 'none';
   $('askList').innerHTML = ask.length ? ask.map(t=>jobCard(t, 'ask')).join('') : '<div class="none">Nothing waiting on you. Thanks!</div>';
-  $('jobList').innerHTML = jobs.length ? jobs.map(t=>jobCard(t, 'job')).join('') : '<div class="none">No confirmed jobs coming up.</div>';
+  $('jobList').innerHTML = jobs.length ? jobs.map(t=>jobCard(t, 'job')).join('') : '<div class="none">No approved jobs coming up.</div>';
   $('declinedWrap').style.display = declined.length ? 'block' : 'none';
   $('declinedList').innerHTML = declined.map(t=>jobCard(t, 'declined')).join('');
 
@@ -466,8 +503,8 @@ $('tabs').addEventListener('click', e=>{
    ============================================================ */
 function statusChip(t){
   if(t.done) return '<span class="chip finished">Done</span>';
-  if(t.answer === 'confirmed') return '<span class="chip confirmed">Confirmed</span>';
-  if(t.answer === 'declined') return '<span class="chip declined">Can\'t</span>';
+  if(t.answer === 'confirmed') return '<span class="chip confirmed">Approved</span>';
+  if(t.answer === 'declined') return '<span class="chip declined">Declined</span>';
   return '<span class="chip pending">Answer</span>';
 }
 
@@ -536,12 +573,20 @@ document.body.addEventListener('click', async e=>{
     return;
   }
 
+  const noter = e.target.closest('[data-note]');
+  if(noter){
+    const about = tasks.find(x=>x.houseId === noter.dataset.house && x.taskId === noter.dataset.task);
+    if(about) openSheet('note', about);
+    return;
+  }
+
   const btn = e.target.closest('[data-act]');
   if(!btn) return;
   const act = btn.dataset.act;
   const t = tasks.find(x=>x.houseId === btn.dataset.house && x.taskId === btn.dataset.task);
   if(!t) return;
-  if(act === 'declined' && !confirm(`Tell Alden Homes you can't make "${t.title}" on ${whenText(t)}?`)) return;
+  // declining asks for a reason first (optional) — the box's own button does the declining
+  if(act === 'declined'){ openSheet('decline', t); return; }
 
   $('errorBar').classList.remove('show');
   btn.disabled = true;
@@ -556,6 +601,52 @@ document.body.addEventListener('click', async e=>{
     btn.disabled = false;
     if(err.badLink){ show('stateBad'); return; }
     showError('That didn\'t save. Check your connection and try again, or call the office.');
+  }
+});
+
+/* ---- the box for declining a job (reason optional) or sending the office a note ---- */
+let sheet = null;   // { mode: 'decline' | 'note', task }
+function openSheet(mode, t){
+  sheet = { mode, task: t };
+  const decline = mode === 'decline';
+  $('sheetTitle').textContent = decline ? 'Decline this job?' : 'Send a note to Alden Homes';
+  $('sheetAbout').textContent = `${t.title} · ${whenText(t)} · ${houseLabel(t.house || {})}`;
+  $('sheetLabel').textContent = decline ? 'Why, or what dates would work? (optional)' : 'Your note';
+  $('sheetText').value = '';
+  $('sheetText').placeholder = decline ? 'e.g. Booked that week — could do the week after.' : 'e.g. Can we slide this to the following Monday?';
+  $('sheetErr').textContent = '';
+  $('sheetSend').textContent = decline ? 'Decline job' : 'Send note';
+  $('sheetSend').disabled = false;
+  $('sheet').classList.add('show');
+  if(!decline) $('sheetText').focus();
+}
+function closeSheet(){ sheet = null; $('sheet').classList.remove('show'); }
+$('sheetCancel').addEventListener('click', closeSheet);
+$('sheet').addEventListener('click', e=>{ if(e.target === $('sheet')) closeSheet(); });
+$('sheetSend').addEventListener('click', async ()=>{
+  if(!sheet) return;
+  const { mode, task: t } = sheet;
+  const text = $('sheetText').value.trim();
+  if(mode === 'note' && !text){ $('sheetErr').textContent = 'Type your note first.'; return; }
+  $('sheetErr').textContent = '';
+  $('sheetSend').disabled = true;
+  try{
+    if(mode === 'decline'){
+      const data = await api('respond', { houseId: t.houseId, taskId: t.taskId, answer: 'declined', note: text });
+      Object.assign(t, data.task);
+      closeSheet();
+      render();
+      toast('Declined. Alden Homes has been told.');
+    } else {
+      await api('note', { houseId: t.houseId, taskId: t.taskId, text });
+      closeSheet();
+      toast('Note sent to Alden Homes. Thank you!');
+    }
+  } catch(err){
+    console.error(err);
+    $('sheetSend').disabled = false;
+    if(err.badLink){ closeSheet(); show('stateBad'); return; }
+    $('sheetErr').textContent = 'That didn\'t send. Check your connection and try again, or call the office.';
   }
 });
 

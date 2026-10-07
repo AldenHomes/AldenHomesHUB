@@ -12,7 +12,8 @@
 
    3. dailyFollowUp  — each morning: re-asks subs whose dates changed, asks anyone newly
                        added to a house, and reminds subs who haven't answered about
-                       work that's coming up soon.
+                       work that's coming up soon. Also tells the office about any job
+                       a sub has left unanswered for three weeks.
 
    The database security rules stay staff-only. Everything a sub can do goes
    through the checks in this file.
@@ -118,6 +119,7 @@ function taskForSub(houseId, sched, t, subId){
     days: t.duration || 1,
     notes: t.notes || '',
     answer: (t.confirm && t.confirm[subId]) || 'pending',
+    declineNote: (t.confirmNote && t.confirmNote[subId]) || '',
     done: !!t.done,
     house: {
       community: sched.community || '',
@@ -126,6 +128,43 @@ function taskForSub(houseId, sched, t, subId){
       address: sched.address || '',
     },
   };
+}
+
+/* ============================================================
+   Telling the office about something a sub did
+   (declined a job, sent a note, or has left a job unanswered for weeks).
+
+   It is saved as a note on the home, "mentioning" every staff login that has
+   switched that kind of notice on (Admin Settings → My notifications, kept in
+   settings/staff-notify as { uid: { kind: true } } — they are off until someone turns
+   them on). From there it behaves like any
+   other note that mentions someone: it shows on their bell and is emailed to them.
+   A sub approving a job tells nobody — the office only hears about problems.
+   ============================================================ */
+const WAITING_DAYS = 21; // how long a job can sit unanswered before the office is told
+function whenText(t){
+  return t.start === t.end ? niceDate(t.start) : `${niceDate(t.start)} – ${niceDate(t.end)}`;
+}
+function cleanText(s, max){
+  return typeof s === 'string' ? s.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, max) : '';
+}
+async function staffWanting(kind){
+  const [list, prefsDoc] = await Promise.all([
+    admin.auth().listUsers(1000),
+    db.collection('settings').doc('staff-notify').get(),
+  ]);
+  const prefs = prefsDoc.exists ? prefsDoc.data() : {};
+  return list.users
+    .filter(u=>u.email && !u.disabled && prefs[u.uid] && prefs[u.uid][kind] === true)
+    .map(u=>u.uid);
+}
+async function notifyStaff(kind, { houseId, sched, taskId, by, text }){
+  const mentions = await staffWanting(kind);
+  // saved even if nobody has switched this kind on, so it's still on the home's notes
+  await db.collection('notes').add({
+    houseId, houseLabel: houseName(sched), text, by, mentions, kind, taskId: taskId || '',
+    at: new Date().toISOString(), readBy: {},
+  });
 }
 
 /* ============================================================
@@ -171,19 +210,59 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
         // the task has to exist AND be assigned to the sub this link belongs to
         if(!t || !(t.subIds || []).includes(sub.id)) return null;
         const now = new Date().toISOString();
+        let declined = null;
         if(body.action === 'respond'){
+          const was = (t.confirm && t.confirm[sub.id]) || 'pending';
           t.confirm = { ...(t.confirm || {}), [sub.id]: answer };
           t.confirmAt = { ...(t.confirmAt || {}), [sub.id]: now };
+          // a decline can carry a reason; approving clears any earlier one
+          const notes = { ...(t.confirmNote || {}) };
+          const reason = answer === 'declined' ? cleanText(body.note, 500) : '';
+          if(reason) notes[sub.id] = reason; else delete notes[sub.id];
+          t.confirmNote = notes;
+          if(answer === 'declined' && was !== 'declined') declined = { sched, title: t.title || 'a job', when: whenText(t), reason };
         } else {
           t.done = body.done !== false;
           t.doneAt = t.done ? now : '';
           t.doneBy = t.done ? sub.id : '';
         }
         tx.update(ref, { tasks, updatedAt: now });
-        return taskForSub(doc.id, sched, t, sub.id);
+        return { task: taskForSub(doc.id, sched, t, sub.id), declined };
       });
       if(!result){ res.status(404).json({ error: 'not-yours' }); return; }
-      res.json({ task: result });
+      // The office hears about a decline (with the reason, if one was given) — never about an approval.
+      if(result.declined){
+        const d = result.declined;
+        try{
+          await notifyStaff('subDeclined', {
+            houseId: body.houseId, sched: d.sched, taskId: body.taskId,
+            by: { type: 'sub', id: sub.id, name: sub.name || 'A subcontractor' },
+            text: `Declined: ${d.title} — ${d.when}` + (d.reason ? `\n“${d.reason}”` : ''),
+          });
+        } catch(err){ logger.error('Could not tell the office about a decline', err); }
+      }
+      res.json({ task: result.task });
+      return;
+    }
+
+    // A note to the office about one of their jobs — a question, or asking to slide the dates.
+    if(body.action === 'note'){
+      const text = cleanText(body.text, 1000);
+      if(!text){ res.status(400).json({ error: 'text' }); return; }
+      const sched = await houseForSub(body.houseId, sub.id);
+      const t = sched && (sched.tasks || []).find(x=>x.id === body.taskId && (x.subIds || []).includes(sub.id));
+      if(!t){ res.status(404).json({ error: 'not-yours' }); return; }
+      // every note emails the office, so one link can't send more than a handful an hour
+      const hourAgo = new Date(Date.now() - 3600000).toISOString();
+      const recent = (Array.isArray(sub.noteLog) ? sub.noteLog : []).filter(at=>at > hourAgo);
+      if(recent.length >= 10){ res.status(429).json({ error: 'slow-down' }); return; }
+      await db.collection('subs').doc(sub.id).update({ noteLog: [...recent, new Date().toISOString()] });
+      await notifyStaff('subNote', {
+        houseId: body.houseId, sched, taskId: t.id,
+        by: { type: 'sub', id: sub.id, name: sub.name || 'A subcontractor' },
+        text: `About ${t.title || 'a job'} — ${whenText(t)}:\n${text}`,
+      });
+      res.json({ ok: true });
       return;
     }
 
@@ -436,18 +515,18 @@ function buildEmail(sub, items, link, kind){
   let subject, intro;
   if(kind === 'reminder'){
     subject = n === 1 ? `Reminder — please confirm: ${lines[0].title}, ${lines[0].when}` : `Reminder — ${n} Alden Homes jobs still need your answer`;
-    intro = `We haven't heard back on the following. Please confirm, or let us know you can't make it.`;
+    intro = `We haven't heard back on the following. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`;
   } else if(kind === 'changed'){
     subject = n === 1 ? `Date change — please confirm: ${lines[0].title}, ${lines[0].when}` : `Schedule update — ${n} Alden Homes jobs to confirm`;
-    intro = `The schedule below is new or has changed. Please confirm the dates, or let us know you can't make it.`;
+    intro = `The schedule below is new or has changed. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`;
   } else {
     subject = oneHouse ? `Alden Homes schedule — ${oneHouse} (${n} job${n === 1 ? '' : 's'} to confirm)` : `Alden Homes — ${n} jobs to confirm`;
-    intro = `Alden Homes has you scheduled for the following${oneHouse ? ' at ' + oneHouse : ''}. Please confirm, or let us know you can't make it.`;
+    intro = `Alden Homes has you scheduled for the following${oneHouse ? ' at ' + oneHouse : ''}. Please approve or decline each one — you can also send us a note if you have a question or need different dates.`;
   }
   const text = [
     `Hi ${sub.name || ''},`, '', intro, '',
     ...lines.map(l=>`- ${l.title} — ${l.when}\n  ${l.where}${l.address ? ' — ' + l.address : ''}`),
-    '', `Confirm here (no login needed): ${link}`, '', 'Thank you,', 'Alden Homes',
+    '', `Approve or decline here (no login needed): ${link}`, '', 'Thank you,', 'Alden Homes',
   ].join('\n');
   // Built from plain tables with the colours set on the cells, which is what email apps
   // (Gmail, Outlook, phone mail) render reliably. The button is a full-width block so it's
@@ -466,7 +545,7 @@ function buildEmail(sub, items, link, kind){
       </table>
     </td></tr>
     <tr><td style="padding:14px 24px 0;">
-      <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:17px 12px;${font}font-size:18px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">Confirm my jobs &rarr;</a></td></tr></table>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:17px 12px;${font}font-size:18px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">Approve or decline my jobs &rarr;</a></td></tr></table>
     </td></tr>
     <tr><td style="padding:10px 24px 0;${font}font-size:13px;line-height:1.5;color:#6b6f72;">No login needed — this link is just for you. It also shows all your Alden Homes jobs, with plans and photos for each house.</td></tr>
     <tr><td style="padding:10px 24px 0;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(link)}</td></tr>
@@ -628,23 +707,35 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   const from = `"Alden Homes Hub" <${MAIL_USER.value()}>`;
   const who = (note.by && note.by.name) || 'Someone';
   const house = note.houseLabel || 'a home';
-  const link = `https://aldenhomes.github.io/AldenHomesHUB/house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
+  const site = 'https://aldenhomes.github.io/AldenHomesHUB/';
+  // A staff note opens the home; something from a sub opens that job on the schedule,
+  // which is where another vendor can be picked.
+  const fromSub = ['subDeclined', 'subNote', 'subWaiting'].includes(note.kind);
+  const link = fromSub
+    ? `${site}construction.html?house=${encodeURIComponent(note.houseId || '')}&task=${encodeURIComponent(note.taskId || '')}`
+    : `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
+  const wording = {
+    subDeclined: { heading: 'A sub declined a job', subject: `Declined: ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> declined a job on <strong>${esc(house)}</strong>:`, plain: `${who} declined a job on ${house}:`, button: 'Open this job' },
+    subNote: { heading: 'Note from a sub', subject: `Note from ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> sent a note about <strong>${esc(house)}</strong>:`, plain: `${who} sent a note about ${house}:`, button: 'Open this job' },
+    subWaiting: { heading: 'Still waiting on a sub', subject: `Still waiting on an answer — ${house}`, lead: `A job on <strong>${esc(house)}</strong> has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, plain: `A job on ${house} has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, button: 'Open this job' },
+  }[note.kind] || { heading: 'New note for you', subject: `New note for you on ${house}`, lead: `<strong>${esc(who)}</strong> mentioned you in a note on <strong>${esc(house)}</strong>:`, plain: `${who} mentioned you in a note on ${house}:`, button: 'Open this home' };
+  const optOut = fromSub ? `You can switch these off in the hub: ${site}admin.html` : '';
   const font = 'font-family:Arial,Helvetica,sans-serif;';
   const html = `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f4ef"><tr><td align="center" style="padding:24px 12px;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;" bgcolor="#ffffff">
-    <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes Hub<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">New note for you</span></td></tr>
-    <tr><td style="padding:22px 24px 6px;${font}font-size:15px;line-height:1.5;color:#33363a;"><strong>${esc(who)}</strong> mentioned you in a note on <strong>${esc(house)}</strong>:</td></tr>
+    <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes Hub<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">${wording.heading}</span></td></tr>
+    <tr><td style="padding:22px 24px 6px;${font}font-size:15px;line-height:1.5;color:#33363a;">${wording.lead}</td></tr>
     <tr><td style="padding:8px 24px 4px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#faf8f2" style="padding:14px 16px;border-left:4px solid #A3AA83;${font}font-size:15px;line-height:1.55;color:#33363a;">${esc(note.text || '').replace(/\n/g, '<br>')}</td></tr></table></td></tr>
-    <tr><td style="padding:16px 24px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:16px 12px;${font}font-size:17px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">Open this home &rarr;</a></td></tr></table></td></tr>
-    <tr><td style="padding:10px 24px 24px;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(link)}</td></tr>
+    <tr><td style="padding:16px 24px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:16px 12px;${font}font-size:17px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">${wording.button} &rarr;</a></td></tr></table></td></tr>
+    <tr><td style="padding:10px 24px 24px;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(link)}${optOut ? '<br><br>' + esc(optOut) : ''}</td></tr>
   </table></td></tr></table>`;
-  const text = `${who} mentioned you in a note on ${house}:\n\n${note.text || ''}\n\nOpen this home: ${link}`;
+  const text = `${wording.plain}\n\n${note.text || ''}\n\n${wording.button}: ${link}${optOut ? '\n\n' + optOut : ''}`;
 
   for(const uid of uids){
     try{
       const user = await admin.auth().getUser(uid);
       if(!user.email || user.disabled) continue;
-      await transport.sendMail({ from, to: user.email, subject: `New note for you on ${house}`, text, html });
+      await transport.sendMail({ from, to: user.email, subject: wording.subject, text, html });
       logger.info('Emailed a note mention', { to: user.email, house });
     } catch(err){
       logger.error('Could not email a note mention', { uid, error: String(err) });
@@ -781,7 +872,63 @@ if(EMAIL_ON) exports.onScheduleSend = onDocumentWritten({ document: 'build-sched
 /* ============================================================
    dailyFollowUp — changes, new assignments and reminders
    ============================================================ */
+// Keep track of how long each sub has had each job without answering. Returns the ones
+// that have just passed WAITING_DAYS, and whether anything on the tasks was changed.
+// The clock restarts if the job's dates move, and stops once they answer or the job is done.
+function trackWaiting(tasks, today){
+  const overdue = [];
+  let changed = false;
+  tasks.forEach(t=>{
+    if(!t.id || !t.start) return;
+    const open = !t.done && t.end >= today;
+    const isWaiting = subId=>open && (t.subIds || []).includes(subId) && ((t.confirm && t.confirm[subId]) || 'pending') === 'pending';
+    const waiting = { ...(t.waiting || {}) };
+    let touched = false;
+    Object.keys(waiting).forEach(subId=>{ if(!isWaiting(subId)){ delete waiting[subId]; touched = true; } });
+    (t.subIds || []).filter(isWaiting).forEach(subId=>{
+      const w = waiting[subId];
+      if(!w || w.start !== t.start || w.end !== t.end){
+        waiting[subId] = { start: t.start, end: t.end, since: today };
+        touched = true;
+      } else if(!w.notified && daysBetween(w.since, today) >= WAITING_DAYS){
+        waiting[subId] = { ...w, notified: today };
+        overdue.push({ t, subId, since: w.since });
+        touched = true;
+      }
+    });
+    if(touched){ t.waiting = waiting; changed = true; }
+  });
+  return { overdue, changed };
+}
+// Runs every morning whether or not emails to subs are switched on — this one is for the office.
+async function flagLongWaits(snap, today){
+  for(const doc of snap.docs){
+    if(!doc.data().sentAt) continue;
+    if(!trackWaiting(JSON.parse(JSON.stringify(doc.data().tasks || [])), today).changed) continue;
+    try{
+      const found = await db.runTransaction(async tx=>{
+        const fresh = await tx.get(doc.ref);
+        if(!fresh.exists || !fresh.data().sentAt) return null;
+        const tasks = fresh.data().tasks || [];
+        const result = trackWaiting(tasks, today);
+        if(result.changed) tx.update(doc.ref, { tasks });
+        return { sched: fresh.data(), overdue: result.overdue };
+      });
+      for(const o of (found ? found.overdue : [])){
+        const subDoc = await db.collection('subs').doc(o.subId).get();
+        const name = (subDoc.exists && subDoc.data().name) || 'A subcontractor';
+        await notifyStaff('subWaiting', {
+          houseId: doc.id, sched: found.sched, taskId: o.t.id,
+          by: { type: 'system', name: 'Hub reminder' },
+          text: `${name} still hasn't answered on ${o.t.title || 'a job'} — ${whenText(o.t)}. Waiting since ${niceDate(o.since)}.`,
+        });
+      }
+    } catch(err){ logger.error('Could not check a house for long waits', { house: doc.id, error: String(err) }); }
+  }
+}
+
 if(EMAIL_ON) exports.dailyFollowUp = onSchedule({ schedule: 'every day 07:00', timeZone: TIME_ZONE, secrets: [GMAIL_APP_PASSWORD] }, async ()=>{
+  await flagLongWaits(await db.collection('build-schedules').get(), todayIso());
   const settings = await notifySettings();
   if(settings.paused){ logger.info('Emails are switched off on the Admin Settings page — nothing sent.'); return; }
   const { leadDays, reminderDays } = settings;
