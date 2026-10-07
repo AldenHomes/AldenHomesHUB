@@ -446,11 +446,27 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
     }
 
     const today = todayIso();
-    const [schedDoc, filesSnap, coSnap] = await Promise.all([
+    const [schedDoc, filesSnap, coSnap, notesSnap] = await Promise.all([
       db.collection('build-schedules').doc(job.id).get(),
       db.collection('house-files').where('houseId', '==', job.id).get(),
       db.collection('change-orders').where('houseId', '==', job.id).get(),
+      db.collection('notes').where('houseId', '==', job.id).get(),
     ]);
+    // Updates the office chose to post for the buyer ("Show this on the homeowner's page" on a note).
+    // Only those — never the team's other notes — and without saying which staff member wrote it.
+    const updates = [];
+    notesSnap.forEach(d=>{
+      const n = d.data();
+      if(n.forBuyer !== true) return;
+      updates.push({ id: d.id, text: n.text || '', at: n.at || '', photos: (Array.isArray(n.photos) ? n.photos : []).filter(u=>typeof u === 'string').slice(0, 12) });
+    });
+    updates.sort((a, b)=>(b.at || '').localeCompare(a.at || ''));
+    // The calendar: each step and its dates, once the schedule has been sent out (a draft is still
+    // being worked on, so it isn't shown). Plain step names and dates only — no subcontractors.
+    const sched = schedDoc.exists ? schedDoc.data() : null;
+    const schedule = sched && sched.sentAt
+      ? (sched.tasks || []).filter(t=>t.start && t.end).map(t=>({ id: t.id || '', title: plainTitle(t.title), phase: t.phase || '', start: t.start, end: t.end, done: !!t.done }))
+      : null;
     // Change orders the office has sent — never drafts. The buyer sees what's being changed
     // and the price, not which subcontractor does the work.
     const changeOrders = [];
@@ -512,7 +528,7 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
       today,
       home: { name: job.client || '', community: job.community || '', address: job.address || '', model: job.model || '' },
       dates: { walk: job.walk || '', move: job.move || '', settle: job.settle || '' },
-      progress, photos, plans, folders, changeOrders,
+      progress, photos, plans, folders, changeOrders, updates: updates.slice(0, 40), schedule,
     });
   } catch(err){
     logger.error('homePortal failed', err);

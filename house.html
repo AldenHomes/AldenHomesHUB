@@ -188,6 +188,13 @@
   .tl-t{font-size:14px; line-height:1.45; word-break:break-word;}
   .tl-m{font-size:12px; color:var(--ink-soft); margin-top:1px;}
   .tl-more{display:block; margin:12px auto 2px; border:1px solid var(--steel-line); background:var(--paper-2); color:var(--navy); border-radius:var(--radius); padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;}
+  /* photos on a note, and posting a note to the homeowner */
+  .note-extras{display:flex; align-items:center; gap:8px 14px; flex-wrap:wrap; margin-top:8px;}
+  .note-photo-btn{display:inline-flex; align-items:center; border:1px dashed var(--steel-line); border-radius:var(--radius); padding:6px 11px; font-size:12.5px; font-weight:600; color:var(--navy); cursor:pointer; text-transform:none; letter-spacing:0; margin:0;}
+  .buyer-check{display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; color:var(--ink); cursor:pointer; text-transform:none; letter-spacing:0; margin:0 0 0 auto;}
+  .buyer-check input{width:17px; height:17px; accent-color:var(--good);}
+  .buyer-warn{background:#eaf1ec; border:1px solid #c5dccb; color:#2f5c3b; font-size:12.5px; line-height:1.5; border-radius:var(--radius); padding:8px 11px; margin-top:8px;}
+  .buyer-tag{background:#eaf1ec; color:var(--good); font-weight:700; border-radius:20px; padding:0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.3px;}
   /* comments under a note */
   .replies{margin-top:8px;}
   .reply{margin:0 0 8px 2px; padding:7px 0 1px 12px; border-left:3px solid #e2ddd0;}
@@ -366,6 +373,12 @@ html, body{max-width:100%; overflow-x:clip;}
             <div class="note-compose">
               <textarea id="noteText" placeholder="Add a note about this home…  Type @ to notify someone, or @todo to put it on the punch list."></textarea>
               <div class="mention-menu" id="mentionMenu"></div>
+              <div class="note-extras">
+                <label class="note-photo-btn">+ Add photo<input type="file" id="notePhotos" accept="image/*" multiple style="display:none;"></label>
+                <span class="muted" id="notePhotoNote" style="font-size:12.5px;"></span>
+                <label class="buyer-check"><input type="checkbox" id="noteForBuyer"> Show this on the homeowner's page</label>
+              </div>
+              <div class="buyer-warn" id="buyerWarn" style="display:none;">The homeowner will see this note and its photos on their page, under “Updates from Alden Homes”. Keep it to what you'd say to them directly.</div>
               <div class="note-actions">
                 <span class="muted" id="noteHint" style="font-size:12px;"></span>
                 <button type="button" class="btn btn-primary" id="noteAddBtn">Add note</button>
@@ -741,7 +754,7 @@ function timelineEvents(){
     else if(x.kind === 'subNote') add(x.at, 'notes', `${who} (subcontractor) sent a note${(x.photos || []).length ? ` with ${x.photos.length} photo${x.photos.length === 1 ? '' : 's'}` : ''}`, clip(x.text, 220));
     else if(x.kind === 'subWaiting') add(x.at, 'schedule', 'A job had no answer from a sub for three weeks', clip(x.text, 220), true);
     else if(x.todo) add(x.at, 'notes', `${who} added a punch list item: ${clip(x.text, 160)}`, [(x.mentionNames || []).length ? 'for ' + x.mentionNames.join(', ') : '', x.priority === 'high' ? 'high priority' : '', x.due ? 'needed by ' + fmtDate(x.due) : ''].filter(Boolean).join(' · '));
-    else add(x.at, 'notes', `${who} added a note: ${clip(x.text, 200)}`);
+    else add(x.at, 'notes', x.forBuyer ? `${who} posted an update for the homeowner: ${clip(x.text, 200)}` : `${who} added a note: ${clip(x.text, 200)}`, (x.photos || []).length ? `${x.photos.length} photo${x.photos.length === 1 ? '' : 's'}` : '');
     if(x.todo && x.done) add(x.doneAt, 'notes', `${(x.doneBy && x.doneBy.name) || 'Someone'} checked off: ${clip(x.text, 160)}`, 'punch list');
     (x.replies || []).forEach(r=>add(r.at, 'notes', `${(r.by && r.by.name) || 'Someone'} commented: ${clip(r.text, 200)}`, 'on “' + clip(x.text, 60) + '”'));
   });
@@ -1026,17 +1039,19 @@ function renderNotes(){
   const me = myUid();
   $('noteHint').innerHTML = (staff.length ? 'Type @ to notify someone — they get it on their hub and by email. ' : '') + 'Type @todo to add it to the <a href="punch.html" style="color:inherit;">punch list</a>.';
   $('noteAddBtn').disabled = notesState !== 'ready';
+  $('noteAddBtn').textContent = $('noteForBuyer').checked ? 'Post to homeowner' : 'Add note';
+  $('buyerWarn').style.display = $('noteForBuyer').checked ? 'block' : 'none';
   $('notesList').innerHTML = notesState === 'blocked'
     ? '<div class="note muted">Notes can\'t be saved yet — the database security rules need the notes collection added.</div>'
     : notesState === 'loading' ? ''
     : notes.length ? notes.map(n=>`<div class="note${(n.mentions||[]).includes(me) ? ' for-me' : ''}${n.todo ? ' todo' + (n.done ? ' done' : '') + (n.priority === 'high' ? ' high' : '') : ''}">
         ${n.todo ? `<button type="button" class="todo-check${n.done ? ' on' : ''}" data-todo="${esc(n.id)}" title="${n.done ? 'Not done after all' : 'Check this off the punch list'}">${n.done ? '&#10003;' : ''}</button><div>` : ''}
-        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>${n.todo ? `<span class="todo-tag">Punch list</span>${n.priority === 'high' && !n.done ? '<span class="todo-tag" style="background:var(--danger); color:#fff;">High priority</span>' : ''}${n.due ? `<span>due ${esc(fmtDate(n.due))}</span>` : ''}${n.done && n.doneBy && n.doneBy.name ? `<span>done by ${esc(n.doneBy.name)}</span>` : ''}` : ''}
+        <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>${n.forBuyer ? '<span class="buyer-tag" title="The homeowner can see this on their page">On homeowner\'s page</span>' : ''}${n.todo ? `<span class="todo-tag">Punch list</span>${n.priority === 'high' && !n.done ? '<span class="todo-tag" style="background:var(--danger); color:#fff;">High priority</span>' : ''}${n.due ? `<span>due ${esc(fmtDate(n.due))}</span>` : ''}${n.done && n.doneBy && n.doneBy.name ? `<span>done by ${esc(n.doneBy.name)}</span>` : ''}` : ''}
           <button type="button" class="bell-mini${(n.reminders || {})[me] ? ' on' : ''}" data-remind="${esc(n.id)}" title="${(n.reminders || {})[me] ? 'You have a reminder set on this note. Click to change it.' : 'Remind me about this note'}" aria-label="Remind me about this note"><svg width="16" height="16" viewBox="0 0 24 24" fill="${(n.reminders || {})[me] ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg></button>
           ${n.by && n.by.uid === me ? `<button type="button" class="x-btn" data-delete-note="${esc(n.id)}" title="Delete this note">&times;</button>` : ''}</div>
         <div class="note-text">${noteHtml(n.text || '')}</div>
         ${remindHtml(n)}
-        ${(n.photos || []).length ? `<div class="note-photos">${n.photos.map(url=>`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Photo from the sub" loading="lazy"></a>`).join('')}</div>` : ''}
+        ${(n.photos || []).length ? `<div class="note-photos">${n.photos.map(url=>`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Photo on this note" loading="lazy"></a>`).join('')}</div>` : ''}
         ${repliesHtml(n)}
         ${n.todo ? '</div>' : ''}
       </div>`).join('')
@@ -1067,7 +1082,10 @@ function markNotesRead(){
 }
 
 $('noteAddBtn').addEventListener('click', async ()=>{
-  const typed = $('noteText').value.trim();
+  const forBuyer = $('noteForBuyer').checked;
+  const picked = Array.from($('notePhotos').files || []).slice(0, 6);
+  if(forBuyer && /(^|\s)@\S/.test($('noteText').value)){ alert('Leave @ tags out of an update for the homeowner — they would see them. Untick the box to tag a teammate instead.'); return; }
+  const typed = $('noteText').value.trim() || (picked.length ? (forBuyer ? 'Here is a new photo of your home.' : 'Photo') : '');
   // "@todo" anywhere in the note puts it on the punch list; the word itself isn't kept
   const todo = /(^|\s)@to-?do\b:?/i.test(typed);
   const text = todo ? typed.replace(/(^|\s)@to-?do\b:?/ig, '$1').replace(/[ \t]{2,}/g, ' ').trim() : typed;
@@ -1077,7 +1095,29 @@ $('noteAddBtn').addEventListener('click', async ()=>{
   const mentioned = mentionsIn(text).filter(s=>todo || s.uid !== user.uid);
   $('noteAddBtn').disabled = true;
   try{
+    // Photos are saved with the home's other photos. On an update for the homeowner they are
+    // marked "Customer" as well, so they also show in the homeowner's photo section.
+    const photos = [];
+    for(let i = 0; i < picked.length; i++){
+      $('noteAddBtn').textContent = `Uploading photo ${i+1} of ${picked.length}…`;
+      const ref = db.collection('house-files').doc();
+      const blob = await shrinkPhoto(picked[i]);
+      const path = `houses/${houseId}/photos/${ref.id}-note.jpg`;
+      const stored = firebase.storage().ref().child(path);
+      await stored.put(blob, { contentType: 'image/jpeg' });
+      const url = await stored.getDownloadURL();
+      const now = new Date().toISOString();
+      await ref.set({
+        houseId, kind: 'photo', name: picked[i].name, path, url, contentType: 'image/jpeg', size: blob.size,
+        caption: '', taskId: '', taskTitle: '', phase: '', folder: '',
+        shared: forBuyer, sharedAt: forBuyer ? now : '',
+        by: { type: 'staff', id: user.uid, name: staffName() }, uploadedAt: now,
+      });
+      photos.push(url);
+    }
     await db.collection('notes').add({
+      ...(photos.length ? { photos } : {}),
+      ...(forBuyer ? { forBuyer: true } : {}),
       houseId,
       houseLabel: [job.community, job.lot ? 'Lot ' + job.lot : '', job.client].filter(Boolean).join(' · '),
       text,
@@ -1089,9 +1129,16 @@ $('noteAddBtn').addEventListener('click', async ()=>{
       ...(todo ? { todo: true, done: false } : {}),
     });
     $('noteText').value = '';
+    $('notePhotos').value = ''; $('notePhotoNote').textContent = ''; $('noteForBuyer').checked = false;
     closeMentionMenu();
-  } catch(err){ console.error(err); alert('Could not save the note — check your connection and try again.'); }
+  } catch(err){ console.error(err); alert('Could not save the note — check your connection and try again. If a photo was attached, the storage rules may not allow the upload.'); }
   $('noteAddBtn').disabled = false;
+  renderNotes();
+});
+$('noteForBuyer').addEventListener('change', renderNotes);
+$('notePhotos').addEventListener('change', e=>{
+  const c = e.target.files.length;
+  $('notePhotoNote').textContent = c ? `${Math.min(c, 6)} photo${c === 1 ? '' : 's'} ready${c > 6 ? ' (six is the most per note)' : ''}` : '';
 });
 $('notesList').addEventListener('input', e=>{
   if(!e.target.matches('[data-reply-input]')) return;

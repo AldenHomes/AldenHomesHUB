@@ -6,6 +6,10 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Jobs">
 <title>Alden Homes | My Jobs</title>
 <style>
   :root{
@@ -245,6 +249,11 @@
         <button type="button" data-notify="text">Text</button>
       </div></div>
       <div id="notifyNote" style="font-size:13px; margin-top:8px;"></div>
+      <!-- keep this page on the phone's home screen, like an app -->
+      <div id="installBox" style="display:none; margin-top:22px; padding-top:18px; border-top:1px solid #e2ddd0;">
+        <div id="installText" style="margin-bottom:10px;"></div>
+        <button class="btn btn-dark" id="installBtn" style="display:none; flex:none; width:100%; max-width:320px; margin:0 auto;">Add to my home screen</button>
+      </div>
     </div>
   </div>
 
@@ -325,7 +334,13 @@
    the hub's server, which only ever returns this one sub's jobs.
    ============================================================ */
 const API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/subPortal';
-const token = new URLSearchParams(location.search).get('k') || '';
+// The private code comes from the link. It's also remembered on this device, so the page still
+// opens to this vendor's jobs when it's started from the home screen (where there's no link to read).
+let token = new URLSearchParams(location.search).get('k') || '';
+try{
+  if(token) localStorage.setItem('alden.sub.k', token);
+  else if(!new URLSearchParams(location.search).has('demo')) token = localStorage.getItem('alden.sub.k') || '';
+} catch(e){}
 
 let me = null;      // { name, notify, hasPhone, hasEmail }
 let today = '';
@@ -530,6 +545,7 @@ function render(){
   $('main').parentNode.classList.toggle('wide', view === 'schedule'); // the calendar gets the full width on a big screen
   if(view === 'schedule') renderSchedule();
 
+  renderInstall();
   document.querySelectorAll('#notifySeg button').forEach(b=>b.classList.toggle('on', b.dataset.notify === me.notify));
   $('notifyNote').textContent = me.notify === 'text'
     ? (me.hasPhone ? 'Texting is being set up — until it\'s ready you\'ll keep getting email.' : 'We don\'t have a mobile number for you yet — call the office to add one.')
@@ -795,6 +811,38 @@ $('sheetThumbs').addEventListener('click', e=>{
   if(!btn || !sheet) return;
   sheet.photos.splice(Number(btn.dataset.dropPhoto), 1);
   renderSheetPhotos();
+});
+
+/* ---- keep this page on the phone: add it to the home screen like an app ----
+   Android and desktop browsers can do it from a button; an iPhone has to do it from Safari's
+   Share menu, so there it shows the steps instead. */
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_APP = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+let installEvent = null;
+// An iPhone saves whatever page is open, link and all. Other phones need this small file to know
+// what to open — it's left off on iPhones so they keep saving the full private link.
+if(!IS_IOS && !new URLSearchParams(location.search).has('demo')){
+  const link = document.createElement('link');
+  link.rel = 'manifest'; link.href = 'sub.webmanifest';
+  document.head.appendChild(link);
+}
+function renderInstall(){
+  const can = !IS_APP && !DEMO && (installEvent || IS_IOS);
+  $('installBox').style.display = can ? 'block' : 'none';
+  if(!can) return;
+  $('installBtn').style.display = installEvent ? 'block' : 'none';
+  $('installText').innerHTML = installEvent
+    ? 'Put this page on your home screen so your Alden Homes jobs open like an app.'
+    : 'To put this page on your home screen: tap the <strong>Share</strong> button at the bottom of Safari (the square with an arrow), then choose <strong>Add to Home Screen</strong>.';
+}
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installEvent = e; renderInstall(); });
+window.addEventListener('appinstalled', ()=>{ installEvent = null; $('installBox').style.display = 'none'; });
+$('installBtn').addEventListener('click', async ()=>{
+  if(!installEvent) return;
+  installEvent.prompt();
+  try{ await installEvent.userChoice; } catch(e){}
+  installEvent = null;
+  renderInstall();
 });
 
 $('notifySeg').addEventListener('click', async e=>{

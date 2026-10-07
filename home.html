@@ -6,6 +6,10 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My Alden Home">
 <title>Alden Homes | My Home</title>
 <style>
   :root{
@@ -120,6 +124,36 @@
   .file .s{font-size:12.5px; color:var(--ink-soft);}
   .quiet{color:var(--ink-soft); font-size:15px; line-height:1.5;}
 
+  /* updates from the office */
+  .update{border-left:5px solid var(--rust);}
+  .update .when{font-size:12.5px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; color:var(--ink-soft);}
+  .update .words{font-size:16.5px; line-height:1.5; margin-top:6px; white-space:pre-wrap; word-break:break-word;}
+  .update .photos{margin-top:12px;}
+  /* the calendar: each step is a bar across its days. Phones show Monday–Friday so the bars are readable. */
+  .cal-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .cal-nav button{border:2px solid var(--steel-line); background:#fff; border-radius:8px; width:44px; height:44px; font-size:20px; color:var(--navy); cursor:pointer;}
+  .cal-nav .m{font-size:18px; font-weight:700; color:var(--navy);}
+  .cal{border:1px solid #ece8dd; border-radius:10px; overflow:hidden;}
+  .cal-dow, .cal-week{display:grid; grid-template-columns:repeat(var(--cols),minmax(0,1fr));}
+  .cal-dow{background:var(--navy); color:#eee; font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; text-align:center;}
+  .cal-dow div{padding:9px 2px;}
+  .cal-week{border-bottom:1px solid #e2ddd0;}
+  .cal-week:last-child{border-bottom:none;}
+  .cal-day{grid-row:1 / -1; min-height:60px; padding:4px 2px; border-left:1px solid #f1ede3; font-size:12px; color:var(--ink-soft); text-align:center;}
+  .cal-day.weekend{background:#f8f6f0;}
+  .cal-day.out .n{opacity:.4;}
+  .cal-day .n{display:inline-block; min-width:22px; line-height:22px; border-radius:50%; font-weight:700;}
+  .cal-day.today .n{background:var(--navy); color:#fff;}
+  .cal-bar{z-index:1; margin:1px 2px; height:23px; line-height:23px; padding:0 6px; border:none; border-radius:4px; color:#fff; font-size:11.5px; font-weight:700; font-family:inherit; text-align:left; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cal-bar.done{opacity:.5;}
+  .cal-bar.now{box-shadow:inset 0 0 0 2px var(--navy-2);}
+  .cal-bar.from-prev{border-top-left-radius:0; border-bottom-left-radius:0; margin-left:0;}
+  .cal-bar.to-next{border-top-right-radius:0; border-bottom-right-radius:0; margin-right:0;}
+  .cal-key{display:flex; gap:6px 14px; flex-wrap:wrap; justify-content:center; font-size:12px; color:var(--ink-soft); margin-top:10px;}
+  .cal-key i{display:inline-block; width:12px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
+  .toast{position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:60; width:max-content; max-width:calc(100% - 28px); background:var(--navy-2); color:#fff; font-size:15px; font-weight:600; padding:12px 18px; border-radius:24px; box-shadow:0 6px 20px rgba(0,0,0,.3); display:none; text-align:center;}
+  .toast.show{display:block;}
+  .wrap.wide{max-width:980px;}
   .viewer{position:fixed; inset:0; background:rgba(20,20,22,.94); z-index:40; display:none; align-items:center; justify-content:center; flex-direction:column; padding:14px;}
   .viewer.show{display:flex;}
   .viewer img{max-width:100%; max-height:84vh; border-radius:4px;}
@@ -163,6 +197,12 @@
       <div class="dates" id="dates"></div>
     </div>
 
+    <!-- Updates the office has posted for this home -->
+    <div id="updatesSection" style="display:none;">
+      <h2>Updates from Alden Homes</h2>
+      <div id="updatesList"></div>
+    </div>
+
     <!-- Change orders the office has sent: review, approve and sign -->
     <div id="coSection" style="display:none;">
       <h2>Change orders <span class="count" id="coWaiting" style="display:none;"></span></h2>
@@ -171,6 +211,21 @@
 
     <h2>Progress</h2>
     <div class="card" id="progress"></div>
+
+    <!-- The build on a calendar, once the schedule has been set -->
+    <div id="calSection" style="display:none;">
+      <h2>Schedule</h2>
+      <div class="card">
+        <div class="cal-nav">
+          <button type="button" id="calPrev" aria-label="Previous month">&lsaquo;</button>
+          <div class="m" id="calLabel"></div>
+          <button type="button" id="calNext" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <div class="cal"><div class="cal-dow" id="calDow"></div><div id="calWeeks"></div></div>
+        <div class="cal-key" id="calKey"></div>
+        <div class="quiet" style="font-size:13px; margin-top:12px;">Tap a bar to see the step and its dates. Building schedules shift with weather, inspections and deliveries, so these dates are our current plan rather than a promise.</div>
+      </div>
+    </div>
 
     <h2>Photos</h2>
     <div class="card" id="photos"></div>
@@ -182,6 +237,15 @@
     <div class="card">
       <div class="quiet" style="margin-bottom:14px;">If something in your home needs attention, send us a service request and we'll follow up.</div>
       <a class="btn btn-plain" href="request.html">Send a service request</a>
+    </div>
+
+    <!-- Keep this page on the phone's home screen, like an app -->
+    <div id="installSection" style="display:none;">
+      <h2>Keep this page handy</h2>
+      <div class="card">
+        <div class="quiet" id="installText" style="margin-bottom:14px;"></div>
+        <button class="btn btn-dark" id="installBtn" style="display:none;">Add to my home screen</button>
+      </div>
     </div>
 
     <div class="quiet" style="text-align:center; font-size:13px; margin-top:20px;">This page is private to your home. Save or bookmark it to come back any time.</div>
@@ -225,6 +289,8 @@
   <div class="wrap" style="padding-top:16px;"><div class="card" id="stepPhotos"></div></div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <div class="viewer" id="viewer">
   <button type="button" id="viewerClose" aria-label="Close">&times;</button>
   <img id="viewerImg" alt="">
@@ -240,7 +306,13 @@
 const API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/homePortal';
 const params = new URLSearchParams(location.search);
 const DEMO = params.has('demo');
-const token = params.get('k') || '';
+// The private code comes from the link. It's also remembered on this device, so the page still
+// opens to this home when it's started from the home screen (where there's no link to read).
+let token = params.get('k') || '';
+try{
+  if(token) localStorage.setItem('alden.home.k', token);
+  else if(!DEMO) token = localStorage.getItem('alden.home.k') || '';
+} catch(e){}
 const ALL = '__all';
 
 let data = null;        // what the server sent back for this home
@@ -301,6 +373,17 @@ function demoData(){
       { id:'p5', url:demoPhoto(40,'First floor walls'), folder:'Framing', caption:'', taskId:'t4', at:iso(-66) },
     ],
     plans: [ { id:'f1', name:'Coleman — Floor Plans.pdf', url:'#' }, { id:'f2', name:'Site Plan — Lot 70.pdf', url:'#' } ],
+    updates: [
+      { id:'u2', at: new Date(Date.now() - 3 * 3600000).toISOString(), text:'Trim is going in this week and it looks great. Here\'s the kitchen ready for cabinets.', photos:[demoPhoto(95,'Kitchen walls')] },
+      { id:'u1', at: new Date(Date.now() - 6 * 86400000).toISOString(), text:'Drywall is finished and sanded. Painters start Monday.', photos:[] },
+    ],
+    schedule: [
+      ['Drywall', 'Drywall/Insulation', -24, -13, true], ['Ceiling insulation', 'Drywall/Insulation', -20, -20, true], ['Garage door install', 'Drywall/Insulation', -12, -12, true],
+      ['Trim delivery', 'Interior Finishes', -10, -10, true], ['Trim install', 'Interior Finishes', -3, 1, false], ['Painting', 'Interior Finishes', 2, 8, false],
+      ['Electrical finish out', 'Interior Finishes', 9, 10, false], ['HVAC finish out', 'Interior Finishes', 9, 10, false], ['Hard floors', 'Interior Finishes', 13, 16, false],
+      ['Kitchen install', 'Interior Finishes', 17, 20, false], ['Countertops installed', 'Interior Finishes', 24, 24, false], ['Carpet', 'Final Finishes', 27, 28, false],
+      ['Touch up', 'Final Finishes', 29, 34, false], ['Cleaning', 'Final Finishes', 36, 36, false],
+    ].map(([title, phase, a, b, done], i)=>({ id:'s'+i, title, phase, start: iso(a), end: iso(b), done })),
   };
 }
 
@@ -338,6 +421,9 @@ function render(){
     .map(([l, iso])=>`<div><div class="l">${l}</div><div class="v${iso ? '' : ' none'}">${iso ? esc(shortDate(iso)) : 'to be set'}</div></div>`).join('');
 
   renderChangeOrders();
+  renderUpdates();
+  renderCalendar();
+  renderInstall();
 
   /* progress */
   const p = data.progress;
@@ -387,6 +473,155 @@ function render(){
     ? data.plans.map(f=>`<a class="file" href="${esc(f.url)}" target="_blank" rel="noopener"><span class="ic">${/\.pdf$/i.test(f.name) ? 'PDF' : 'FILE'}</span><span><div class="n">${esc(f.name)}</div><div class="s">Tap to open</div></span></a>`).join('')
     : '<div class="quiet">No plans have been posted yet.</div>';
 }
+
+/* ============================================================
+   UPDATES — short notes (and photos) the office posts for this home
+   ============================================================ */
+function renderUpdates(){
+  const list = data.updates || [];
+  $('updatesSection').style.display = list.length ? 'block' : 'none';
+  $('updatesList').innerHTML = list.map(u=>{
+    const d = new Date(u.at);
+    const when = isNaN(d) ? '' : d.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+    return `<div class="card update">
+      <div class="when">${esc(when)}</div>
+      <div class="words">${esc(u.text)}</div>
+      ${(u.photos || []).length ? `<div class="photos">${u.photos.map(url=>`<a href="${esc(url)}" data-update-photo="${esc(url)}"><img src="${esc(url)}" alt="Photo of your home" loading="lazy"></a>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+$('updatesList').addEventListener('click', e=>{
+  const a = e.target.closest('a[data-update-photo]');
+  if(!a) return;
+  e.preventDefault();
+  $('viewerImg').src = a.dataset.updatePhoto;
+  $('viewerCap').textContent = '';
+  $('viewer').classList.add('show');
+});
+
+/* ============================================================
+   SCHEDULE — the build on a calendar
+   ============================================================ */
+const PHASE_COLORS = {
+  'Pre-Construction':'#8a8f94', 'Foundation':'#8a5a3a', 'Framing':'#c98a2b', 'Rough-Ins':'#2f7d8c',
+  'Exterior Finishes':'#5a7247', 'Drywall/Insulation':'#6a4c93', 'Interior Finishes':'#3d5570', 'Final Finishes':'#3f7a4e'
+};
+let calMonth = '';   // 'YYYY-MM' showing
+let calBars = [];
+function isoOf(y, m, d){ return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+// phones show Monday–Friday; wider screens show the whole week
+function calColumns(){ return window.innerWidth >= 700 ? [0,1,2,3,4,5,6] : [1,2,3,4,5]; }
+let toastTimer = null;
+function toast(msg){
+  $('toast').textContent = msg;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>$('toast').classList.remove('show'), 3500);
+}
+function renderCalendar(){
+  const steps = data.schedule || [];
+  $('calSection').style.display = steps.length ? 'block' : 'none';
+  document.querySelector('.wrap').classList.toggle('wide', steps.length > 0 && window.innerWidth >= 700);
+  if(!steps.length) return;
+  const today = data.today;
+  // open on this month while the build is under way, otherwise on the month it starts
+  if(!calMonth){
+    const first = steps.map(t=>t.start).sort()[0], last = steps.map(t=>t.end).sort().pop();
+    calMonth = (today >= first && today <= last ? today : (today < first ? first : last)).slice(0, 7);
+  }
+  const [y, m] = calMonth.split('-').map(Number);
+  $('calLabel').textContent = new Date(y, m-1, 1).toLocaleDateString(undefined, { month:'long', year:'numeric' });
+  const first = isoOf(y, m, 1), daysInMonth = new Date(y, m, 0).getDate(), last = isoOf(y, m, daysInMonth);
+  calBars = steps.slice().sort((a, b)=>a.start.localeCompare(b.start));
+  const cols = calColumns();
+  $('calDow').style.setProperty('--cols', cols.length);
+  $('calDow').innerHTML = cols.map(wd=>`<div>${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][wd]}</div>`).join('');
+  let html = '';
+  for(let d = 1 - new Date(y, m-1, 1).getDay(); d <= daysInMonth; d += 7){
+    const days = cols.map(wd=>{ const dt = new Date(y, m-1, d + wd); return isoOf(dt.getFullYear(), dt.getMonth()+1, dt.getDate()); });
+    if(days.every(iso=>iso < first || iso > last)) continue;
+    const segs = [];
+    calBars.forEach((t, idx)=>{
+      const hit = days.map((iso, i)=>(iso >= t.start && iso <= t.end && cols[i] !== 0 && cols[i] !== 6) ? i : -1).filter(i=>i !== -1);
+      if(!hit.length) return;
+      const from = hit[0], to = hit[hit.length-1];
+      segs.push({ t, idx, from, to, fromPrev: t.start < days[from], toNext: t.end > days[to] });
+    });
+    const lanes = [];
+    segs.forEach(sg=>{
+      let lane = lanes.findIndex(end=>end < sg.from);
+      if(lane === -1){ lane = lanes.length; lanes.push(-1); }
+      lanes[lane] = sg.to;
+      sg.lane = lane;
+    });
+    const dayCells = days.map((iso, i)=>
+      `<div class="cal-day${cols[i] === 0 || cols[i] === 6 ? ' weekend' : ''}${iso < first || iso > last ? ' out' : ''}${iso === today ? ' today' : ''}" style="grid-column:${i+1};"><span class="n">${Number(iso.slice(8))}</span></div>`).join('');
+    const bars = segs.map(sg=>{
+      const t = sg.t;
+      const finished = t.done || t.end < today, now = !finished && t.start <= today;
+      return `<button type="button" class="cal-bar${finished ? ' done' : now ? ' now' : ''}${sg.fromPrev ? ' from-prev' : ''}${sg.toNext ? ' to-next' : ''}" data-bar="${sg.idx}"
+        style="grid-column:${sg.from+1} / ${sg.to+2}; grid-row:${sg.lane+2}; background:${PHASE_COLORS[t.phase] || '#8a8f94'};">${finished ? '✓ ' : ''}${esc(t.title)}</button>`;
+    }).join('');
+    html += `<div class="cal-week" style="--cols:${cols.length}; grid-template-rows:28px repeat(${lanes.length}, 25px) minmax(8px,1fr);">${dayCells}${bars}</div>`;
+  }
+  $('calWeeks').innerHTML = html;
+  const used = Object.keys(PHASE_COLORS).filter(p=>steps.some(t=>t.phase === p));
+  $('calKey').innerHTML = used.map(p=>`<span><i style="background:${PHASE_COLORS[p]};"></i>${esc(p)}</span>`).join('')
+    + '<span><i style="background:#8a8f94; opacity:.5;"></i>Faded = finished</span>';
+}
+function shiftMonth(n){
+  const [y, m] = calMonth.split('-').map(Number);
+  const d = new Date(y, m-1+n, 1);
+  calMonth = isoOf(d.getFullYear(), d.getMonth()+1, 1).slice(0, 7);
+  renderCalendar();
+}
+$('calPrev').addEventListener('click', ()=>shiftMonth(-1));
+$('calNext').addEventListener('click', ()=>shiftMonth(1));
+$('calWeeks').addEventListener('click', e=>{
+  const bar = e.target.closest('[data-bar]');
+  const t = bar && calBars[Number(bar.dataset.bar)];
+  if(t) toast(`${t.title} · ${t.start === t.end ? shortDate(t.start) : shortDate(t.start) + ' – ' + shortDate(t.end)}${t.done ? ' · finished' : ''}`);
+});
+let calCols = calColumns().length;
+window.addEventListener('resize', ()=>{
+  if(calCols === calColumns().length) return;
+  calCols = calColumns().length;
+  if(data) renderCalendar();
+});
+
+/* ============================================================
+   KEEP THIS PAGE ON THE PHONE — add it to the home screen like an app.
+   Android and desktop browsers can do it from a button; an iPhone has to do it from
+   Safari's Share menu, so there it shows the steps instead.
+   ============================================================ */
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_APP = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+let installEvent = null;
+// An iPhone saves whatever page is open, link and all. Other phones need this small file to know
+// what to open — it's left off on iPhones so they keep saving the full private link.
+if(!IS_IOS && !DEMO){
+  const link = document.createElement('link');
+  link.rel = 'manifest'; link.href = 'home.webmanifest';
+  document.head.appendChild(link);
+}
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installEvent = e; if(data) renderInstall(); });
+window.addEventListener('appinstalled', ()=>{ installEvent = null; $('installSection').style.display = 'none'; });
+function renderInstall(){
+  const can = !IS_APP && !DEMO && (installEvent || IS_IOS);
+  $('installSection').style.display = can ? 'block' : 'none';
+  if(!can) return;
+  $('installBtn').style.display = installEvent ? 'block' : 'none';
+  $('installText').innerHTML = installEvent
+    ? 'Put this page on your home screen so it opens like an app — one tap, no link to find.'
+    : 'To put this page on your home screen so it opens like an app: tap the <strong>Share</strong> button at the bottom of Safari (the square with an arrow), then choose <strong>Add to Home Screen</strong>.';
+}
+$('installBtn').addEventListener('click', async ()=>{
+  if(!installEvent) return;
+  installEvent.prompt();
+  try{ await installEvent.userChoice; } catch(e){}
+  installEvent = null;
+  renderInstall();
+});
 
 /* ============================================================
    CHANGE ORDERS — review, approve and sign
