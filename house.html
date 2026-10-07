@@ -90,6 +90,51 @@
   .btn-primary:hover{background:var(--navy-2);}
   .btn-ghost{background:transparent; color:var(--navy); border-color:var(--steel-line);}
   .btn-ghost:hover{background:#e9e5da;}
+  /* change orders */
+  .co-row{display:flex; align-items:center; gap:14px; width:100%; text-align:left; background:none; border:none; border-top:1px solid #ece8dd; padding:12px 0; cursor:pointer; font-family:inherit; color:inherit;}
+  .co-row:first-child{border-top:none; padding-top:2px;}
+  .co-row:hover .co-name{text-decoration:underline;}
+  .co-num{flex:none; width:38px; font-family:"Courier New",monospace; font-weight:700; color:var(--ink-soft);}
+  .co-main{flex:1; min-width:0;}
+  .co-name{font-size:14.5px; font-weight:600; color:var(--navy);}
+  .co-meta{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .co-amt{flex:none; font-family:"Courier New",monospace; font-weight:700; font-size:14.5px; color:var(--navy);}
+  .pill{flex:none; display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; white-space:nowrap;}
+  .pill.draft{background:#ece8dd; color:var(--ink-soft);}
+  .pill.sent{background:#fbeee0; color:var(--amber);}
+  .pill.approved{background:#eaf1ec; color:var(--good);}
+  .pill.declined{background:#fbeae4; color:var(--danger);}
+  .overlay{position:fixed; inset:0; background:rgba(30,32,34,.55); display:none; align-items:flex-start; justify-content:center; padding:5vh 16px; z-index:50; overflow-y:auto;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--paper-2); width:100%; max-width:720px; border-radius:var(--radius); box-shadow:0 20px 60px rgba(0,0,0,.3); border-top:4px solid var(--rust);}
+  .modal-head{padding:20px 24px 14px; border-bottom:1px solid #ece8dd; display:flex; justify-content:space-between; align-items:flex-start; gap:12px;}
+  .modal-head h2{margin:0; font-size:18px; color:var(--navy);}
+  .modal-close{border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:22px; line-height:1;}
+  .modal-body{padding:20px 24px;}
+  .modal-body label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .modal-foot{padding:14px 24px 22px; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;}
+  .field{margin-bottom:14px;}
+  .field input, .field textarea, .co-item input, .co-item select{width:100%; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
+  .field textarea{min-height:64px; resize:vertical; line-height:1.45;}
+  .field input:focus, .field textarea:focus, .co-item input:focus, .co-item select:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .co-item{display:grid; grid-template-columns:minmax(0,1fr) 190px 120px 30px; gap:8px; margin-bottom:8px; align-items:center;}
+  .co-item .price{text-align:right; font-family:"Courier New",monospace;}
+  @media (max-width:640px){ .co-item{grid-template-columns:1fr 1fr; } .co-item .desc{grid-column:1 / -1;} }
+  .co-total{text-align:right; font-size:14px; color:var(--ink-soft); padding:12px 0 4px; border-top:1px solid #ece8dd;}
+  .co-total strong{font-size:20px; color:var(--navy); font-family:"Courier New",monospace; margin-left:10px;}
+  .co-status{border-radius:var(--radius); padding:11px 14px; font-size:13.5px; line-height:1.5; margin-bottom:16px; background:#fbeee0; border:1px solid #eccba2; color:#7a531a;}
+  .co-status.approved{background:#eaf1ec; border-color:#c5dccb; color:#2c5a39;}
+  .co-status.declined{background:#fbeae4; border-color:#f0c3ae; color:#a8451a;}
+  .signed{margin-top:16px; padding:14px 16px; border:1px solid var(--steel-line); border-radius:var(--radius); background:#faf8f2;}
+  .signed img{display:block; max-width:320px; width:100%; height:auto; background:#fff; border:1px solid var(--steel-line); border-radius:var(--radius); margin:8px 0;}
+  .signed .who{font-size:14px; color:var(--ink);}
+  .signed .fine{font-size:11.5px; color:var(--ink-soft); line-height:1.5; word-break:break-word;}
+  .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-top:12px; display:none;}
+  .auth-error.show{display:block;}
+  .btn-danger{background:transparent; color:#a8451a; border:1px solid #e3b5a0;}
+  .btn-danger:hover{background:#fbeae4;}
+  .btn:disabled{opacity:.5; cursor:default;}
+
   .note-compose{position:relative; margin-bottom:6px;}
   .note-compose textarea{width:100%; min-height:74px; resize:vertical; padding:10px 12px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; line-height:1.5; color:var(--ink); background:#fff; font-family:inherit;}
   .note-compose textarea:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
@@ -236,6 +281,16 @@
           </div>
         </div>
 
+        <!-- Change orders: extra work the buyer has to approve and sign before any sub hears about it -->
+        <div class="card wide" id="coCard">
+          <div class="card-head">
+            <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg></div>
+            <h3>Change Orders <span class="muted" id="coCount" style="font-size:12px; font-weight:400;"></span></h3>
+            <button type="button" class="btn btn-primary" id="coNewBtn" style="margin-left:auto; padding:8px 14px;">+ New change order</button>
+          </div>
+          <div class="card-body"><div id="coList"></div></div>
+        </div>
+
         <!-- Build schedule -->
         <div class="card">
           <div class="card-head">
@@ -304,6 +359,37 @@
     </div>
 
     <footer>Alden Homes internal tools — data syncs live across your team.</footer>
+  </div>
+</div>
+
+<!-- Change order: write a new one, or look back at one already sent -->
+<div class="overlay" id="coOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="muted" id="coModalSub" style="font-size:12px;"></div>
+        <h2 id="coModalTitle">New change order</h2>
+      </div>
+      <button class="modal-close" data-close-co>&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="co-status" id="coStatusBar" style="display:none;"></div>
+      <div class="field">
+        <label for="co_title">What is being changed</label>
+        <input type="text" id="co_title" placeholder="e.g. Add recessed lights in the kitchen" maxlength="120">
+      </div>
+      <label>Items</label>
+      <div class="co-items" id="coItems"></div>
+      <button type="button" class="mini-btn" id="coAddItem" style="margin:8px 0 14px 0;">+ Add another item</button>
+      <div class="field">
+        <label for="co_note">Note to the homeowner <span style="text-transform:none; font-weight:400;">(optional)</span></label>
+        <textarea id="co_note" placeholder="Anything they should know before approving…"></textarea>
+      </div>
+      <div class="co-total">Total <strong id="coTotal">$0.00</strong></div>
+      <div id="coDecision"></div>
+      <div class="auth-error" id="coError"></div>
+    </div>
+    <div class="modal-foot" id="coFoot"></div>
   </div>
 </div>
 
@@ -438,6 +524,13 @@ function attachListeners(){
     render();
   }, err=>{ console.error('build-schedule listener error', err); schedState = 'blocked'; render(); });
 
+  db.collection('change-orders').where('houseId', '==', houseId).onSnapshot(s=>{
+    changeOrders = s.docs.map(d=>({ id: d.id, ...d.data() })).sort((a,b)=>(b.number||0) - (a.number||0));
+    coState = 'ready';
+    render();
+    if(coOpenId) fillCoModal(); // keep an open change order in step (e.g. the buyer just signed it)
+  }, err=>{ console.error('change-orders listener error', err); coState = 'blocked'; render(); });
+
   db.collection('notes').where('houseId', '==', houseId).onSnapshot(s=>{
     notes = s.docs.map(d=>({ id: d.id, ...d.data() })).sort((a,b)=>(b.at||'').localeCompare(a.at||''));
     notesState = 'ready';
@@ -490,6 +583,7 @@ function render(){
 
   renderOwnerLogin();
   renderNotes();
+  renderChangeOrders();
   renderSchedule();
   renderOrders();
   renderFiles();
@@ -650,6 +744,217 @@ $('mentionMenu').addEventListener('mousedown', e=>{
   if(b){ e.preventDefault(); pickMention(b.dataset.uid); }
 });
 $('noteText').addEventListener('blur', ()=>setTimeout(closeMentionMenu, 150));
+
+/* ============================================================
+   CHANGE ORDERS
+   Extra work on a home: one or more items, each with a subcontractor and a price.
+   Draft → sent to the buyer → approved (signed) or declined. The buyer approves and
+   signs on their own page; only then are the subs told. Nothing that has been sent is
+   ever edited or deleted, so there's a permanent record to look back at.
+   ============================================================ */
+let changeOrders = [];
+let coState = 'loading';   // 'loading' | 'ready' | 'blocked'
+let coOpenId = null;       // the change order open in the popup ('' = a brand-new one)
+let coDraftItems = [];     // the item rows being edited
+let scrolledToCo = false;
+const CO_LABEL = { draft:'Draft', sent:'Waiting on buyer', approved:'Approved', declined:'Declined' };
+function money(n){ return (Number(n) || 0).toLocaleString('en-US', { style:'currency', currency:'USD' }); }
+function dateTime(iso){
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) + ' at ' + d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+}
+function vendorOptions(selected){
+  const list = Object.keys(vendors).map(id=>({ id, name: vendors[id] })).filter(v=>v.name).sort((a,b)=>a.name.localeCompare(b.name, undefined, { sensitivity:'base' }));
+  return '<option value="">No subcontractor</option>' + list.map(v=>`<option value="${esc(v.id)}"${v.id === selected ? ' selected' : ''}>${esc(v.name)}</option>`).join('')
+    + (selected && !vendors[selected] ? `<option value="${esc(selected)}" selected>Removed vendor</option>` : '');
+}
+
+function renderChangeOrders(){
+  $('coCount').textContent = changeOrders.length ? `(${changeOrders.length})` : '';
+  $('coNewBtn').disabled = coState !== 'ready';
+  $('coList').innerHTML = coState === 'blocked'
+    ? '<span class="muted">Change orders can\'t be saved yet — the database security rules need the change-orders collection added.</span>'
+    : coState === 'loading' ? '<span class="muted">Loading…</span>'
+    : changeOrders.length ? changeOrders.map(c=>{
+        const when = c.status === 'approved' ? `Signed by ${c.decision && c.decision.by || 'the buyer'} · ${dateTime(c.decision && c.decision.at)}`
+          : c.status === 'declined' ? `Declined · ${dateTime(c.decision && c.decision.at)}`
+          : c.status === 'sent' ? `Sent to the buyer ${dateTime(c.sentAt)}`
+          : `Not sent yet · written ${dateTime(c.createdAt)}`;
+        return `<button type="button" class="co-row" data-co="${esc(c.id)}">
+          <span class="co-num">#${c.number || ''}</span>
+          <span class="co-main"><div class="co-name">${esc(c.title || 'Change order')}</div><div class="co-meta">${esc(when)} · ${(c.items||[]).length} item${(c.items||[]).length===1?'':'s'}</div></span>
+          <span class="pill ${esc(c.status)}">${CO_LABEL[c.status] || esc(c.status)}</span>
+          <span class="co-amt">${money(c.total)}</span>
+        </button>`;
+      }).join('')
+    : '<span class="muted">No change orders on this home.</span>';
+
+  if(!scrolledToCo && location.hash === '#changeorders' && coState === 'ready'){
+    scrolledToCo = true;
+    $('coCard').scrollIntoView({ block:'start' });
+  }
+}
+
+/* ---- the popup: write a new one, or look back at one ---- */
+function coCurrent(){ return coOpenId ? changeOrders.find(c=>c.id === coOpenId) || null : null; }
+function openCo(id){
+  coOpenId = id || '';
+  const c = coCurrent();
+  coDraftItems = c ? (c.items || []).map(i=>({ ...i })) : [{ desc:'', subId:'', price:'' }];
+  $('co_title').value = c ? c.title || '' : '';
+  $('co_note').value = c ? c.note || '' : '';
+  $('coError').classList.remove('show');
+  fillCoModal();
+  $('coOverlay').classList.add('show');
+}
+function closeCo(){ $('coOverlay').classList.remove('show'); coOpenId = null; }
+
+function fillCoModal(){
+  if(coOpenId === null) return;
+  const c = coCurrent();
+  if(coOpenId && !c){ closeCo(); return; }       // it was deleted elsewhere
+  const editable = !c || c.status === 'draft';
+  $('coModalSub').textContent = [job.community, job.lot ? 'Lot ' + job.lot : '', job.client].filter(Boolean).join(' · ');
+  $('coModalTitle').textContent = c ? `Change order #${c.number}` : 'New change order';
+  $('co_title').disabled = !editable;
+  $('co_note').disabled = !editable;
+  $('coAddItem').style.display = editable ? '' : 'none';
+  // once it's sent it's a record — show what was sent, not half-typed edits
+  if(!editable){ coDraftItems = (c.items || []).map(i=>({ ...i })); $('co_title').value = c.title || ''; $('co_note').value = c.note || ''; }
+
+  $('coItems').innerHTML = coDraftItems.map((it, i)=>`<div class="co-item">
+      <input class="desc" type="text" data-i="${i}" data-f="desc" value="${esc(it.desc || '')}" placeholder="What's being added or changed" maxlength="200" ${editable ? '' : 'disabled'}>
+      <select data-i="${i}" data-f="subId" ${editable ? '' : 'disabled'}>${vendorOptions(it.subId || '')}</select>
+      <input class="price" type="number" step="0.01" data-i="${i}" data-f="price" value="${it.price === '' || it.price == null ? '' : esc(it.price)}" placeholder="Price" ${editable ? '' : 'disabled'}>
+      ${editable && coDraftItems.length > 1 ? `<button type="button" class="x-btn" data-rm="${i}" title="Remove this item">&times;</button>` : '<span></span>'}
+    </div>`).join('');
+  updateCoTotal();
+
+  // where it stands
+  const bar = $('coStatusBar');
+  bar.className = 'co-status' + (c && (c.status === 'approved' || c.status === 'declined') ? ' ' + c.status : '');
+  bar.style.display = c && c.status !== 'draft' ? 'block' : 'none';
+  if(c && c.status === 'sent') bar.innerHTML = `<strong>Waiting on the homeowner.</strong> Sent ${esc(dateTime(c.sentAt))}. They approve and sign it on their own page — send them the link from “Homeowner page” above if they don't have it. No subcontractor has been told yet.`;
+  if(c && c.status === 'declined') bar.innerHTML = `<strong>Declined</strong> by ${esc(c.decision && c.decision.by || 'the homeowner')} on ${esc(dateTime(c.decision && c.decision.at))}. No subcontractor was told.`;
+  if(c && c.status === 'approved'){
+    const emailed = c.subsEmailed || [], skipped = c.subsSkipped || [];
+    const subLine = c.subNotice === 'sent' ? (emailed.length ? `Subcontractors emailed: ${esc(emailed.join(', '))}.` : 'No subcontractor needed emailing.') + (skipped.length ? ` Couldn't reach: ${esc(skipped.join(', '))}.` : '')
+      : c.subNotice === 'paused' ? 'Subcontractors have <strong>not</strong> been told, because emails to subs are switched off in Admin Settings.'
+      : 'Letting the subcontractors know…';
+    bar.innerHTML = `<strong>Approved and signed.</strong> ${subLine}`;
+  }
+
+  // the signed record
+  const d = c && c.decision;
+  $('coDecision').innerHTML = c && c.status === 'approved' && d ? `<div class="signed">
+      <label>Signed approval</label>
+      <div class="who"><strong>${esc(d.by)}</strong> approved this change order for <strong>${money(d.totalAgreed != null ? d.totalAgreed : c.total)}</strong> on ${esc(dateTime(d.at))}.</div>
+      ${d.signature ? `<img src="${esc(d.signature)}" alt="Signature of ${esc(d.by)}">` : ''}
+      <div class="fine">Signed on the homeowner's own page. Device: ${esc(d.device || 'not recorded')}</div>
+    </div>` : '';
+
+  // buttons for where it's at
+  const foot = $('coFoot');
+  if(!c) foot.innerHTML = `<button class="btn btn-ghost" data-close-co>Cancel</button><button class="btn btn-ghost" data-co-act="save">Save as draft</button><button class="btn btn-primary" data-co-act="send">Send to homeowner</button>`;
+  else if(c.status === 'draft') foot.innerHTML = `<button class="btn btn-danger" data-co-act="delete" style="margin-right:auto;">Delete draft</button><button class="btn btn-ghost" data-co-act="save">Save draft</button><button class="btn btn-primary" data-co-act="send">Send to homeowner</button>`;
+  else if(c.status === 'sent') foot.innerHTML = `<button class="btn btn-ghost" data-co-act="recall" style="margin-right:auto;">Take it back to edit</button><button class="btn btn-primary" data-close-co>Close</button>`;
+  else if(c.status === 'approved' && c.subNotice === 'paused') foot.innerHTML = `<button class="btn btn-ghost" data-co-act="notify" style="margin-right:auto;">Email the subs now</button><button class="btn btn-primary" data-close-co>Close</button>`;
+  else foot.innerHTML = `<button class="btn btn-primary" data-close-co>Close</button>`;
+}
+function updateCoTotal(){
+  $('coTotal').textContent = money(coDraftItems.reduce((s,i)=>s + (Number(i.price) || 0), 0));
+}
+
+$('coNewBtn').addEventListener('click', ()=>openCo(''));
+$('coList').addEventListener('click', e=>{
+  const row = e.target.closest('[data-co]');
+  if(row) openCo(row.dataset.co);
+});
+$('coAddItem').addEventListener('click', ()=>{ coDraftItems.push({ desc:'', subId:'', price:'' }); fillCoModal(); });
+$('coItems').addEventListener('input', e=>{
+  const el = e.target.closest('[data-f]');
+  if(!el) return;
+  coDraftItems[Number(el.dataset.i)][el.dataset.f] = el.value;
+  updateCoTotal();
+});
+$('coItems').addEventListener('change', e=>{
+  const el = e.target.closest('[data-f]');
+  if(el) coDraftItems[Number(el.dataset.i)][el.dataset.f] = el.value;
+});
+$('coItems').addEventListener('click', e=>{
+  const rm = e.target.closest('[data-rm]');
+  if(!rm) return;
+  coDraftItems.splice(Number(rm.dataset.rm), 1);
+  fillCoModal();
+});
+$('coOverlay').addEventListener('click', async e=>{
+  if(e.target === $('coOverlay') || e.target.closest('[data-close-co]')){ closeCo(); return; }
+  const btn = e.target.closest('[data-co-act]');
+  if(!btn) return;
+  const act = btn.dataset.coAct;
+  const c = coCurrent();
+  const ref = c ? db.collection('change-orders').doc(c.id) : db.collection('change-orders').doc();
+  const now = new Date().toISOString();
+  const fail = msg=>{ $('coError').textContent = msg; $('coError').classList.add('show'); };
+  $('coError').classList.remove('show');
+
+  try{
+    if(act === 'delete'){
+      if(!confirm('Delete this draft? It was never sent to the homeowner.')) return;
+      closeCo();
+      await ref.delete();
+      return;
+    }
+    if(act === 'recall'){
+      if(!confirm('Take this change order back?\n\nThe homeowner will no longer see it. You can edit it and send it again.')) return;
+      await ref.update({ status: 'draft', sentAt: '', updatedAt: now });
+      return;
+    }
+    if(act === 'notify'){
+      btn.disabled = true;
+      await ref.update({ notifyRequestedAt: now });
+      return;
+    }
+
+    // save or send
+    const title = $('co_title').value.trim();
+    const items = coDraftItems.map(i=>({ desc: String(i.desc || '').trim(), subId: i.subId || '', subName: vendors[i.subId] || '', price: Math.round((Number(i.price) || 0) * 100) / 100 }))
+      .filter(i=>i.desc || i.price);
+    if(!title) return fail('Give the change order a title — what is being changed.');
+    if(!items.length) return fail('Add at least one item.');
+    if(items.some(i=>!i.desc)) return fail('Every item needs a description.');
+    if(act === 'send'){
+      if(items.some(i=>!i.price)) { if(!confirm('One or more items have no price. Send it to the homeowner anyway?')) return; }
+      if(!confirm(`Send this change order to the homeowner for ${money(items.reduce((s,i)=>s+i.price,0))}?\n\nThey'll see it on their page and can approve and sign it. Subcontractors are only told once it's approved.`)) return;
+    }
+    const user = firebase.auth().currentUser;
+    const data = {
+      houseId,
+      houseLabel: [job.community, job.lot ? 'Lot ' + job.lot : '', job.client].filter(Boolean).join(' · '),
+      address: job.address || '',
+      title, note: $('co_note').value.trim(), items,
+      total: Math.round(items.reduce((s,i)=>s + i.price, 0) * 100) / 100,
+      status: act === 'send' ? 'sent' : 'draft',
+      sentAt: act === 'send' ? now : '',
+      updatedAt: now,
+    };
+    if(!c){
+      data.number = changeOrders.reduce((m,x)=>Math.max(m, x.number || 0), 0) + 1;
+      data.createdAt = now;
+      data.createdBy = { uid: user.uid, name: staffName(), email: user.email || '' };
+    }
+    btn.disabled = true;
+    const wasNew = !c;
+    coOpenId = ref.id;   // so the popup follows the saved record as soon as it comes back
+    try{ await ref.set(data, { merge: true }); }
+    catch(err){ if(wasNew) coOpenId = ''; throw err; }
+    if(act === 'save') closeCo(); else fillCoModal();
+  } catch(err){
+    console.error(err);
+    btn.disabled = false;
+    fail('Could not save — check your connection and try again.');
+  }
+});
 
 /* ---- this home's buyer page ----
    No login for the buyer: each home has its own private link. The link codes are kept

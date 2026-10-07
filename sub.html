@@ -223,6 +223,11 @@
       <h2>Your jobs here</h2>
       <div class="card" id="houseJobs"></div>
 
+      <div id="houseCoWrap" style="display:none;">
+        <h2>Approved change orders</h2>
+        <div class="card" id="houseCo"></div>
+      </div>
+
       <h2>Plans &amp; prints</h2>
       <div class="card" id="housePlans"></div>
 
@@ -323,7 +328,8 @@ async function demoApi(action, extra){
   const copy = x=>JSON.parse(JSON.stringify(x));
   if(action === 'load') return { sub: demoState.sub, today: demoIso(0), tasks: copy(demoState.tasks) };
   if(action === 'setNotify'){ demoState.sub.notify = extra.notify; return { notify: extra.notify }; }
-  if(action === 'house') return { house: DEMO_HOUSES[extra.houseId], folders: extra.houseId === 'd1' ? ['Kitchen', 'Trim'] : [], tasks: copy(demoState.tasks.filter(t=>t.houseId===extra.houseId)), files: copy(demoState.files[extra.houseId] || []) };
+  if(action === 'house') return { house: DEMO_HOUSES[extra.houseId], folders: extra.houseId === 'd1' ? ['Kitchen', 'Trim'] : [],
+    changeOrders: extra.houseId === 'd1' ? [{ id:'co1', number:1, title:'Upgrade to soft-close cabinet hardware', items:['Soft-close hinges and drawer slides, whole kitchen'], approvedAt: demoIso(-5) }] : [], tasks: copy(demoState.tasks.filter(t=>t.houseId===extra.houseId)), files: copy(demoState.files[extra.houseId] || []) };
   if(action === 'addPhoto'){
     const forTask = demoState.tasks.find(x=>x.houseId===extra.houseId && x.taskId===extra.taskId);
     const f = { id:'n'+Date.now()+Math.random(), kind:'photo', name:'', url: extra.dataUrl, caption:'', folder: extra.folder || '', taskId: forTask ? forTask.taskId : '', taskTitle: forTask ? forTask.title : '', by: demoState.sub.name, at: new Date().toISOString() };
@@ -584,6 +590,7 @@ async function openHouse(houseId){
     house.tasks = data.tasks || [];
     house.files = data.files || [];
     house.folders = data.folders || [];
+    house.changeOrders = data.changeOrders || [];
     $('houseLoading').style.display = 'none';
     $('houseBody').style.display = 'block';
     renderHouse();
@@ -610,6 +617,15 @@ function renderHouse(){
     </div>`;
   }).join('')
     : '<span style="color:var(--ink-soft);">No jobs listed.</span>';
+
+  // extra work the home buyer has signed off on, that's been given to this sub
+  const cos = house.changeOrders || [];
+  $('houseCoWrap').style.display = cos.length ? 'block' : 'none';
+  $('houseCo').innerHTML = cos.map(c=>`<div class="mini-job" style="display:block;">
+      <div style="font-weight:700; color:var(--navy);">${esc(c.title || 'Change order')}</div>
+      ${c.items.map(d=>`<div style="font-size:15px; margin-top:4px;">• ${esc(d)}</div>`).join('')}
+      <div class="d" style="margin-top:4px;">Approved by the home buyer${c.approvedAt ? ' · ' + esc(shortDate(c.approvedAt)) : ''}</div>
+    </div>`).join('');
 
   const plans = house.files.filter(f=>f.kind === 'plan');
   $('housePlans').innerHTML = plans.length ? plans.map(f=>

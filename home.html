@@ -52,6 +52,28 @@
   .pct small{font-size:15px; font-weight:400; color:var(--ink-soft); margin-left:6px;}
   .bar{height:12px; background:#e7e2d5; border-radius:6px; overflow:hidden; margin:12px 0 18px;}
   .bar div{height:100%; background:var(--good); border-radius:6px;}
+  /* change orders */
+  h2 .count{background:var(--amber); color:#fff; border-radius:20px; padding:1px 8px; font-size:12px; margin-left:4px; letter-spacing:0;}
+  .co{border-left:5px solid var(--steel-line);}
+  .co.sent{border-left-color:var(--amber);}
+  .co.approved{border-left-color:var(--good);}
+  .co-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
+  .co-title{font-size:17px; font-weight:700; color:var(--navy); line-height:1.3;}
+  .co-chip{flex:none; font-size:11.5px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; border-radius:20px; padding:3px 10px;}
+  .co-chip.sent{background:#fbeee0; color:#96661a;}
+  .co-chip.approved{background:#eaf1ec; color:var(--good);}
+  .co-chip.declined{background:#fbeae4; color:var(--danger);}
+  .co-line{display:flex; justify-content:space-between; gap:14px; padding:9px 0; border-top:1px solid #f1ede3; font-size:15.5px;}
+  .co-line .p{flex:none; font-weight:600; white-space:nowrap;}
+  .co-sum{display:flex; justify-content:space-between; padding:11px 0 2px; border-top:2px solid #e2ddd0; font-size:17px; font-weight:800; color:var(--navy);}
+  .co-note{font-size:14.5px; background:#faf8f2; border:1px solid #ece8dd; border-radius:6px; padding:9px 11px; margin-top:12px; line-height:1.45; white-space:pre-wrap;}
+  .co-done{font-size:14px; color:var(--ink-soft); margin-top:12px; line-height:1.5;}
+  .btn-go{background:var(--good); color:#fff;}
+  .sig-box{position:relative; border:2px dashed var(--steel-line); border-radius:8px; background:#fff; touch-action:none;}
+  .sig-box canvas{display:block; width:100%; height:auto; touch-action:none; cursor:crosshair;}
+  .sig-line{position:absolute; left:16px; right:16px; bottom:26%; border-bottom:1px solid #d4d2c8; pointer-events:none;}
+  .agree{display:flex; align-items:flex-start; gap:10px; font-size:15px; font-weight:400; line-height:1.45; color:var(--ink); margin:4px 0 18px; cursor:pointer;}
+  .agree input{width:22px; height:22px; flex:none; margin-top:1px;}
   button.phase{width:100%; background:none; border:none; text-align:left; font-family:inherit; color:inherit; cursor:pointer;}
   .phase .pname{flex:1; min-width:0;}
   .phase .pics{display:block; font-size:12px; font-weight:400; color:var(--ink-soft); margin-top:1px;}
@@ -141,6 +163,12 @@
       <div class="dates" id="dates"></div>
     </div>
 
+    <!-- Change orders the office has sent: review, approve and sign -->
+    <div id="coSection" style="display:none;">
+      <h2>Change orders <span class="count" id="coWaiting" style="display:none;"></span></h2>
+      <div id="coList"></div>
+    </div>
+
     <h2>Progress</h2>
     <div class="card" id="progress"></div>
 
@@ -160,6 +188,32 @@
   </div>
 
   <footer>Alden Homes — Handcrafted Homes &amp; Communities</footer>
+</div>
+
+<!-- review and sign one change order -->
+<div class="screen" id="signScreen">
+  <div class="screen-top">
+    <button type="button" id="signBack">&lsaquo; Back</button>
+    <div class="ttl" id="signTitle"></div>
+  </div>
+  <div class="wrap" style="padding-top:16px;">
+    <div class="card" id="signSummary"></div>
+    <div class="card">
+      <div class="error" id="signError"></div>
+      <div class="field">
+        <label for="signName">Your full name</label>
+        <input type="text" id="signName" autocomplete="name" placeholder="First and last name" style="font-size:17px; letter-spacing:0;">
+      </div>
+      <div class="field">
+        <label>Sign here with your finger or mouse</label>
+        <div class="sig-box"><canvas id="sigPad" width="600" height="200"></canvas><span class="sig-line"></span></div>
+        <button type="button" class="link-btn" id="sigClear">Clear and sign again</button>
+      </div>
+      <label class="agree"><input type="checkbox" id="signAgree"> <span id="signAgreeText"></span></label>
+      <button class="btn btn-go" id="signApprove">Approve and sign</button>
+      <div style="text-align:center; margin-top:14px;"><button type="button" class="link-btn" id="signDecline">I don't want this change — decline it</button></div>
+    </div>
+  </div>
 </div>
 
 <!-- photos for one finished step -->
@@ -232,6 +286,12 @@ function demoData(){
       ],
       now: ['Trim install'], next: ['Painting', 'Light delivery', 'Electrical finish out'],
     },
+    changeOrders: [
+      { id:'c2', number:2, title:'Add recessed lights in the kitchen', status:'sent', sentAt:iso(-1), note:'Six 4-inch LED cans on a dimmer, laid out as we discussed at the walk-through.',
+        items:[ { desc:'Six recessed LED lights, installed', price:780 }, { desc:'Dimmer switch', price:95 } ], total:875, decidedBy:'', decidedAt:'' },
+      { id:'c1', number:1, title:'Upgrade to soft-close cabinet hardware', status:'approved', sentAt:iso(-30), note:'',
+        items:[ { desc:'Soft-close hinges and drawer slides, whole kitchen', price:640 } ], total:640, decidedBy:'Sample Family', decidedAt:iso(-28) },
+    ],
     folders: ['Framing', 'Kitchen'],
     photos: [
       { id:'p1', url:demoPhoto(30,'Trim going in'), folder:'', caption:'', taskId:'t13', at:iso(-1) },
@@ -276,6 +336,8 @@ function render(){
 
   $('dates').innerHTML = [['Walk-through', data.dates.walk], ['Move-in', data.dates.move], ['Settlement', data.dates.settle]]
     .map(([l, iso])=>`<div><div class="l">${l}</div><div class="v${iso ? '' : ' none'}">${iso ? esc(shortDate(iso)) : 'to be set'}</div></div>`).join('');
+
+  renderChangeOrders();
 
   /* progress */
   const p = data.progress;
@@ -325,6 +387,124 @@ function render(){
     ? data.plans.map(f=>`<a class="file" href="${esc(f.url)}" target="_blank" rel="noopener"><span class="ic">${/\.pdf$/i.test(f.name) ? 'PDF' : 'FILE'}</span><span><div class="n">${esc(f.name)}</div><div class="s">Tap to open</div></span></a>`).join('')
     : '<div class="quiet">No plans have been posted yet.</div>';
 }
+
+/* ============================================================
+   CHANGE ORDERS — review, approve and sign
+   ============================================================ */
+function money(n){ return (Number(n) || 0).toLocaleString('en-US', { style:'currency', currency:'USD' }); }
+function coItemsHtml(c){
+  return c.items.map(i=>`<div class="co-line"><span>${esc(i.desc)}</span><span class="p">${money(i.price)}</span></div>`).join('')
+    + `<div class="co-sum"><span>Total</span><span>${money(c.total)}</span></div>`
+    + (c.note ? `<div class="co-note">${esc(c.note)}</div>` : '');
+}
+function renderChangeOrders(){
+  const list = data.changeOrders || [];
+  const waiting = list.filter(c=>c.status === 'sent').length;
+  $('coSection').style.display = list.length ? 'block' : 'none';
+  $('coWaiting').textContent = waiting;
+  $('coWaiting').style.display = waiting ? '' : 'none';
+  const label = { sent:'Needs your approval', approved:'Approved', declined:'Declined' };
+  $('coList').innerHTML = list.map(c=>`<div class="card co ${esc(c.status)}">
+      <div class="co-top"><div class="co-title">${esc(c.title || 'Change order')}</div><span class="co-chip ${esc(c.status)}">${label[c.status] || ''}</span></div>
+      <div style="margin-top:10px;">${coItemsHtml(c)}</div>
+      ${c.status === 'sent' ? `<button class="btn btn-go" data-sign="${esc(c.id)}" style="margin-top:16px;">Review and sign</button>` : ''}
+      ${c.status === 'approved' ? `<div class="co-done">Approved and signed by ${esc(c.decidedBy || 'you')} on ${esc(niceDate(c.decidedAt))}.</div>` : ''}
+      ${c.status === 'declined' ? `<div class="co-done">Declined on ${esc(niceDate(c.decidedAt))}.</div>` : ''}
+    </div>`).join('');
+}
+
+let signing = null;   // the change order open on the signing screen
+$('coList').addEventListener('click', e=>{
+  const btn = e.target.closest('[data-sign]');
+  if(!btn) return;
+  signing = (data.changeOrders || []).find(c=>c.id === btn.dataset.sign) || null;
+  if(!signing) return;
+  $('signTitle').textContent = signing.title || 'Change order';
+  $('signSummary').innerHTML = `<div class="co-title" style="margin-bottom:8px;">${esc(signing.title || 'Change order')}</div>${coItemsHtml(signing)}`;
+  $('signAgreeText').textContent = `I approve this change to my home and agree to the price of ${money(signing.total)}.`;
+  $('signName').value = '';
+  $('signAgree').checked = false;
+  $('signError').classList.remove('show');
+  clearSignature();
+  $('signScreen').classList.add('show');
+  $('signScreen').scrollTop = 0;
+});
+$('signBack').addEventListener('click', ()=>$('signScreen').classList.remove('show'));
+
+/* the signature pad: draw with a finger, stylus or mouse */
+const pad = $('sigPad');
+const ink = pad.getContext('2d');
+let drawing = false, hasInk = false;
+function clearSignature(){
+  ink.fillStyle = '#ffffff';
+  ink.fillRect(0, 0, pad.width, pad.height);
+  hasInk = false;
+}
+function padPoint(e){
+  const r = pad.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (pad.width / r.width), y: (e.clientY - r.top) * (pad.height / r.height) };
+}
+pad.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  pad.setPointerCapture(e.pointerId);
+  drawing = true;
+  const p = padPoint(e);
+  ink.strokeStyle = '#1f2a44'; ink.lineWidth = 3; ink.lineCap = 'round'; ink.lineJoin = 'round';
+  ink.beginPath(); ink.moveTo(p.x, p.y);
+});
+pad.addEventListener('pointermove', e=>{
+  if(!drawing) return;
+  e.preventDefault();
+  const p = padPoint(e);
+  ink.lineTo(p.x, p.y); ink.stroke();
+  hasInk = true;
+});
+['pointerup','pointercancel','pointerleave'].forEach(ev=>pad.addEventListener(ev, ()=>{ drawing = false; }));
+$('sigClear').addEventListener('click', clearSignature);
+clearSignature();
+
+function signFail(msg){
+  $('signError').textContent = msg;
+  $('signError').classList.add('show');
+  $('signError').scrollIntoView({ block:'center', behavior:'smooth' });
+}
+async function decide(decision){
+  if(!signing) return;
+  $('signError').classList.remove('show');
+  const name = $('signName').value.trim().replace(/\s+/g, ' ');
+  if(decision === 'approved'){
+    if(name.length < 2) return signFail('Please type your full name.');
+    if(!hasInk) return signFail('Please sign in the box.');
+    if(!$('signAgree').checked) return signFail('Please tick the box to confirm you approve this change and its price.');
+  } else if(!confirm('Decline this change order?\n\nThe work in it will not be done.')) return;
+
+  const btn = decision === 'approved' ? $('signApprove') : $('signDecline');
+  btn.disabled = true;
+  try{
+    if(DEMO){
+      await new Promise(r=>setTimeout(r, 400));
+      Object.assign(signing, { status: decision, decidedBy: name || 'Sample Family', decidedAt: new Date().toISOString() });
+    } else {
+      const res = await fetch(API, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({
+        token, action:'decideChangeOrder', changeOrderId: signing.id, decision, name,
+        signature: decision === 'approved' ? pad.toDataURL('image/png') : '',
+      }) });
+      if(res.status === 409){ $('signScreen').classList.remove('show'); await load(); return; } // already answered — just show where it stands
+      if(!res.ok) throw new Error('server ' + res.status);
+    }
+    $('signScreen').classList.remove('show');
+    signing = null;
+    if(DEMO) render(); else await load();
+    $('coSection').scrollIntoView({ block:'start' });
+  } catch(err){
+    console.error(err);
+    signFail('That didn\'t go through. Check your connection and try again, or call the office.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+$('signApprove').addEventListener('click', ()=>decide('approved'));
+$('signDecline').addEventListener('click', ()=>decide('declined'));
 
 function openPhoto(id){
   const f = data.photos.find(x=>x.id === id);

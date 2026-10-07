@@ -200,8 +200,20 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
       });
       files.sort((a, b)=>(b.at || '').localeCompare(a.at || '')); // newest first
       folders.sort((a, b)=>a.localeCompare(b, 'en', { sensitivity: 'base' }));
+      // Extra work on this house that the buyer has approved and that's assigned to this sub.
+      // Only approved ones, only their own items, and never the price the buyer is paying.
+      const coSnap = await db.collection('change-orders').where('houseId', '==', body.houseId).get();
+      const changeOrders = [];
+      coSnap.forEach(d=>{
+        const c = d.data();
+        if(c.status !== 'approved') return;
+        const mine = (c.items || []).filter(i=>i.subId === sub.id).map(i=>i.desc || '');
+        if(mine.length) changeOrders.push({ id: d.id, number: c.number || 0, title: c.title || '', items: mine, approvedAt: (c.decision && c.decision.at) || '' });
+      });
+      changeOrders.sort((a, b)=>(b.number || 0) - (a.number || 0));
       res.json({
         folders,
+        changeOrders,
         house: { community: sched.community || '', lot: sched.lot || '', client: sched.client || '', address: sched.address || '', model: sched.model || '' },
         tasks: (sched.tasks || []).filter(t=>t.id && t.start && (t.subIds || []).includes(sub.id)).map(t=>taskForSub(body.houseId, sched, t, sub.id)),
         files,
@@ -298,11 +310,63 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
     if(!jobDoc || !jobDoc.exists){ res.status(403).json({ error: 'bad-link' }); return; }
     const job = { id: jobDoc.id, ...jobDoc.data() };
 
+    // The buyer approving (and signing) or declining a change order the office sent them.
+    if(body.action === 'decideChangeOrder'){
+      const decision = body.decision;
+      if(!['approved', 'declined'].includes(decision) || typeof body.changeOrderId !== 'string' || !body.changeOrderId){ res.status(400).json({ error: 'request' }); return; }
+      const name = typeof body.name === 'string' ? body.name.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
+      const signature = typeof body.signature === 'string' ? body.signature : '';
+      if(decision === 'approved'){
+        if(name.length < 2){ res.status(400).json({ error: 'name' }); return; }
+        // a drawn signature, sent as a small PNG
+        if(!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature) || signature.length < 400 || signature.length > 300000){ res.status(400).json({ error: 'signature' }); return; }
+      }
+      const ref = db.collection('change-orders').doc(body.changeOrderId);
+      const result = await db.runTransaction(async tx=>{
+        const doc = await tx.get(ref);
+        // it has to be this home's change order, and still waiting for an answer
+        if(!doc.exists || doc.data().houseId !== job.id) return 'not-yours';
+        if(doc.data().status !== 'sent') return 'already-decided';
+        const now = new Date().toISOString();
+        tx.update(ref, {
+          status: decision,
+          decision: {
+            by: decision === 'approved' ? name : (name || job.client || ''),
+            at: now,
+            signature: decision === 'approved' ? signature : '',
+            // kept with the record of the signing
+            device: String(req.get('User-Agent') || '').slice(0, 300),
+            totalAgreed: decision === 'approved' ? (doc.data().total || 0) : null,
+          },
+          updatedAt: now,
+        });
+        return 'ok';
+      });
+      if(result !== 'ok'){ res.status(result === 'not-yours' ? 404 : 409).json({ error: result }); return; }
+      res.json({ ok: true });
+      return;
+    }
+
     const today = todayIso();
-    const [schedDoc, filesSnap] = await Promise.all([
+    const [schedDoc, filesSnap, coSnap] = await Promise.all([
       db.collection('build-schedules').doc(job.id).get(),
       db.collection('house-files').where('houseId', '==', job.id).get(),
+      db.collection('change-orders').where('houseId', '==', job.id).get(),
     ]);
+    // Change orders the office has sent — never drafts. The buyer sees what's being changed
+    // and the price, not which subcontractor does the work.
+    const changeOrders = [];
+    coSnap.forEach(d=>{
+      const c = d.data();
+      if(!['sent', 'approved', 'declined'].includes(c.status)) return;
+      changeOrders.push({
+        id: d.id, number: c.number || 0, title: c.title || '', note: c.note || '', status: c.status,
+        items: (c.items || []).map(i=>({ desc: i.desc || '', price: Number(i.price) || 0 })),
+        total: Number(c.total) || 0, sentAt: c.sentAt || '',
+        decidedBy: (c.decision && c.decision.by) || '', decidedAt: (c.decision && c.decision.at) || '',
+      });
+    });
+    changeOrders.sort((a, b)=>(b.number || 0) - (a.number || 0));
 
     // Progress: how far along, which phase, what's happening now and what's next — no sub names.
     // how many photos were posted against each task, so finished steps can show their pictures
@@ -349,7 +413,7 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
       today,
       home: { name: job.client || '', community: job.community || '', address: job.address || '', model: job.model || '' },
       dates: { walk: job.walk || '', move: job.move || '', settle: job.settle || '' },
-      progress, photos, plans, folders,
+      progress, photos, plans, folders, changeOrders,
     });
   } catch(err){
     logger.error('homePortal failed', err);
@@ -586,6 +650,91 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
       logger.error('Could not email a note mention', { uid, error: String(err) });
     }
   }
+});
+
+/* ============================================================
+   onChangeOrderDecided — the buyer approved or declined a change order.
+   • The staff member who wrote it is emailed either way.
+   • On approval, each subcontractor with an item on it is emailed — this is the first
+     they hear of it. If emails to subs are switched off (Admin Settings), they are not
+     emailed; the office can send it later with "Notify subs" on the change order.
+   ============================================================ */
+if(EMAIL_ON) exports.onChangeOrderDecided = onDocumentWritten({ document: 'change-orders/{coId}', secrets: [GMAIL_APP_PASSWORD] }, async event=>{
+  const before = event.data.before.exists ? event.data.before.data() : null;
+  const after = event.data.after.exists ? event.data.after.data() : null;
+  if(!after) return;
+  const justDecided = ['approved', 'declined'].includes(after.status) && (!before || before.status !== after.status);
+  const askedToNotify = after.status === 'approved' && !!after.notifyRequestedAt && (!before || before.notifyRequestedAt !== after.notifyRequestedAt);
+  if(!justDecided && !askedToNotify) return;
+
+  const nodemailer = require('nodemailer');
+  const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: MAIL_USER.value(), pass: GMAIL_APP_PASSWORD.value().replace(/\s+/g, '') } });
+  const font = 'font-family:Arial,Helvetica,sans-serif;';
+  const house = after.houseLabel || 'a home';
+  const label = `Change order #${after.number || ''}${after.title ? ' — ' + after.title : ''}`;
+  const shell = (heading, inner)=>`<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f4ef"><tr><td align="center" style="padding:24px 12px;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;" bgcolor="#ffffff">
+      <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">${esc(heading)}</span></td></tr>
+      ${inner}
+    </table></td></tr></table>`;
+  const button = (href, text)=>`<tr><td style="padding:16px 24px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:16px 12px;${font}font-size:17px;font-weight:bold;"><a href="${esc(href)}" style="color:#ffffff;text-decoration:none;">${esc(text)} &rarr;</a></td></tr></table></td></tr>
+      <tr><td style="padding:10px 24px 24px;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(href)}</td></tr>`;
+
+  // 1. tell the staff member who wrote it
+  if(justDecided && after.createdBy && after.createdBy.email){
+    const who = (after.decision && after.decision.by) || 'The home buyer';
+    const verb = after.status === 'approved' ? 'approved and signed' : 'declined';
+    const link = `https://aldenhomes.github.io/AldenHomesHUB/house.html?id=${encodeURIComponent(after.houseId || '')}#changeorders`;
+    try{
+      await transport.sendMail({
+        from: `"Alden Homes Hub" <${MAIL_USER.value()}>`, to: after.createdBy.email,
+        subject: `${after.status === 'approved' ? 'Approved' : 'Declined'}: ${label} on ${house}`,
+        text: `${who} ${verb} ${label} on ${house}.\n\nOpen this home: ${link}`,
+        html: shell(after.status === 'approved' ? 'Change order approved' : 'Change order declined',
+          `<tr><td style="padding:22px 24px 4px;${font}font-size:15px;line-height:1.5;color:#33363a;"><strong>${esc(who)}</strong> ${verb} <strong>${esc(label)}</strong> on ${esc(house)}.</td></tr>${button(link, 'Open this home')}`),
+      });
+    } catch(err){ logger.error('Could not email the change order result to staff', { error: String(err) }); }
+  }
+
+  // 2. on approval, tell the subs who have work on it
+  if(after.status !== 'approved' || after.subNotifiedAt) return;
+  const settings = await notifySettings();
+  if(settings.paused && !askedToNotify){
+    await event.data.after.ref.update({ subNotice: 'paused' });
+    logger.info('Change order approved; subs not emailed because emails are switched off', { house });
+    return;
+  }
+  const bySub = {};
+  (after.items || []).forEach(i=>{ if(i.subId) (bySub[i.subId] = bySub[i.subId] || []).push(i.desc || ''); });
+  const emailed = [], skipped = [];
+  for(const subId of Object.keys(bySub)){
+    const doc = await db.collection('subs').doc(subId).get();
+    if(!doc.exists) continue;
+    const sub = doc.data();
+    const recipients = String(sub.email || '').split(/[;,]/).map(s=>s.trim()).filter(Boolean);
+    if(!recipients.length){ skipped.push(sub.name || subId); continue; }
+    let token = sub.linkToken;
+    if(!token){ token = newToken(); await doc.ref.update({ linkToken: token }); }
+    const link = `${PORTAL_URL}?k=${encodeURIComponent(token)}`;
+    const items = bySub[subId];
+    try{
+      await transport.sendMail({
+        from: `"${MAIL_NAME.value()}" <${MAIL_USER.value()}>`, replyTo: settings.replyTo || MAIL_REPLY_TO.value() || undefined, to: recipients,
+        subject: `Approved change order — ${house}`,
+        text: `Hi ${sub.name || ''},\n\nThe home buyer has approved a change order at ${house}${after.address ? ' (' + after.address + ')' : ''} that includes work for you:\n\n${items.map(d=>'- ' + d).join('\n')}\n\nSee it with the rest of your Alden Homes jobs: ${link}\n\nThank you,\nAlden Homes`,
+        html: shell('Approved change order',
+          `<tr><td style="padding:22px 24px 4px;${font}font-size:15px;line-height:1.5;color:#33363a;">Hi ${esc(sub.name || '')},<br><br>The home buyer has approved a change order at <strong>${esc(house)}</strong>${after.address ? ' (' + esc(after.address) + ')' : ''} that includes work for you:</td></tr>
+           <tr><td style="padding:8px 24px 4px;"><table width="100%" cellpadding="0" cellspacing="0" border="0">${items.map(d=>`<tr><td style="padding:11px 0;border-top:1px solid #e2ddd0;${font}font-size:15px;font-weight:bold;color:#4B4F54;">${esc(d)}</td></tr>`).join('')}</table></td></tr>
+           ${button(link, 'Open my jobs')}`),
+      });
+      emailed.push(sub.name || subId);
+    } catch(err){
+      skipped.push(sub.name || subId);
+      logger.error('Could not email a sub about a change order', { sub: sub.name, error: String(err) });
+    }
+  }
+  await event.data.after.ref.update({ subNotifiedAt: new Date().toISOString(), subNotice: 'sent', subsEmailed: emailed, subsSkipped: skipped });
+  logger.info('Change order approved; subs notified', { house, emailed: emailed.length, skipped: skipped.length });
 });
 
 /* ============================================================
