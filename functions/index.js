@@ -180,19 +180,26 @@ exports.subPortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async
     if(body.action === 'load'){
       const today = todayIso();
       const snap = await db.collection('build-schedules').get();
-      const tasks = [];
+      const tasks = [], others = [];
       snap.forEach(doc=>{
         const sched = doc.data();
         if(!sched.sentAt) return; // the office hasn't sent this house out yet — it's still a draft
+        const before = tasks.length;
         (sched.tasks || []).forEach(t=>{
           if(!t.id || !t.start || !(t.subIds || []).includes(sub.id)) return;
           // keep the list short: open work, plus anything finished in the last week
           if(t.done ? (t.doneAt || '').slice(0, 10) < addDaysIso(today, -7) : t.end < addDaysIso(today, -30)) return;
           tasks.push(taskForSub(doc.id, sched, t, sub.id));
         });
+        // The rest of the schedule on houses where they have work, for their calendar — so they can
+        // see what comes before and after them. Just the job and its dates: never who is doing it.
+        if(tasks.length > before) (sched.tasks || []).forEach(t=>{
+          if(!t.id || !t.start || !t.end || (t.subIds || []).includes(sub.id) || t.end < addDaysIso(today, -45)) return;
+          others.push({ houseId: doc.id, title: t.title || '', phase: t.phase || '', start: t.start, end: t.end, done: !!t.done });
+        });
       });
       tasks.sort((a, b)=>a.start.localeCompare(b.start));
-      res.json({ sub: { name: sub.name || '', notify: sub.notify === 'text' ? 'text' : 'email', hasPhone: !!sub.phone, hasEmail: !!sub.email }, today, tasks });
+      res.json({ sub: { name: sub.name || '', notify: sub.notify === 'text' ? 'text' : 'email', hasPhone: !!sub.phone, hasEmail: !!sub.email }, today, tasks, others });
       return;
     }
 

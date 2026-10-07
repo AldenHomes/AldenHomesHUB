@@ -85,18 +85,33 @@
   .cal-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
   .cal-nav button{border:2px solid var(--steel-line); background:#fff; border-radius:8px; width:44px; height:44px; font-size:20px; color:var(--navy); cursor:pointer;}
   .cal-nav .m{font-size:18px; font-weight:700; color:var(--navy);}
-  .mini{background:var(--paper-2); border-radius:10px; box-shadow:var(--shadow); padding:10px 8px 8px; margin-bottom:16px;}
-  .mini-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px; text-align:center;}
-  .mini-grid .dow{font-size:11px; font-weight:700; color:var(--ink-soft); padding:4px 0 6px;}
-  .day{position:relative; padding:9px 0 13px; font-size:14.5px; border-radius:8px; color:var(--ink);}
-  .day.out{color:#c5c0b2;}
-  .day.today{font-weight:800; box-shadow:inset 0 0 0 2px var(--navy);}
-  .day.has{font-weight:700;}
-  .day.has.confirmed{background:#eaf1ec; color:var(--good);}
-  .day.has.pending{background:#fbeee0; color:#96661a;}
-  .day.has.declined{background:#fbeae4; color:var(--danger);}
-  .legend{display:flex; gap:14px; justify-content:center; font-size:12px; color:var(--ink-soft); margin-top:8px;}
-  .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
+  /* the calendar: each job is a bar across its days, like the office's own schedule.
+     Phones show Monday–Friday so the bars are wide enough to read. */
+  .wrap.wide{max-width:1040px;}
+  .cal-filters{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px;}
+  .cal-filters .seg{margin-top:0;}
+  .cal-filters .seg button{padding:9px 14px; font-size:14.5px;}
+  .cal-filters select{flex:1 1 160px; min-width:0; padding:10px 10px; border:2px solid var(--steel-line); border-radius:8px; background:#fff; font-size:14.5px; font-weight:700; color:var(--navy); font-family:inherit;}
+  .cal{background:var(--paper-2); border-radius:10px; box-shadow:var(--shadow); overflow:hidden; margin-bottom:10px;}
+  .cal-dow, .cal-week{display:grid; grid-template-columns:repeat(var(--cols),minmax(0,1fr));}
+  .cal-dow{background:var(--navy); color:#eee; font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; text-align:center;}
+  .cal-dow div{padding:9px 2px;}
+  .cal-week{border-bottom:1px solid #e2ddd0;}
+  .cal-week:last-child{border-bottom:none;}
+  .cal-day{grid-row:1 / -1; min-height:62px; padding:4px 2px; border-left:1px solid #f1ede3; font-size:12px; color:var(--ink-soft); text-align:center;}
+  .cal-day.weekend{background:#f8f6f0;}
+  .cal-day.out .n{opacity:.4;}
+  .cal-day .n{display:inline-block; min-width:22px; line-height:22px; border-radius:50%; font-weight:700;}
+  .cal-day.today .n{background:var(--navy); color:#fff;}
+  .cal-bar{z-index:1; margin:1px 2px; height:23px; line-height:23px; padding:0 6px; border:none; border-radius:4px; color:#fff; font-size:11.5px; font-weight:700; font-family:inherit; text-align:left; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cal-bar.other{opacity:.5; font-weight:600;}
+  .cal-bar.mine{box-shadow:inset 0 0 0 2px var(--navy-2);}
+  .cal-bar.mine.declined{background:#fff !important; color:var(--danger); box-shadow:inset 0 0 0 2px var(--danger); text-decoration:line-through;}
+  .cal-bar.is-done{text-decoration:line-through;}
+  .cal-bar.from-prev{border-top-left-radius:0; border-bottom-left-radius:0; margin-left:0;}
+  .cal-bar.to-next{border-top-right-radius:0; border-bottom-right-radius:0; margin-right:0;}
+  .legend{display:flex; gap:6px 14px; flex-wrap:wrap; justify-content:center; font-size:12px; color:var(--ink-soft); margin-bottom:18px;}
+  .legend i{display:inline-block; width:18px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; background:#8a8f94;}
   .row{display:flex; gap:12px; align-items:center; width:100%; text-align:left; background:var(--paper-2); border:none; border-radius:10px; box-shadow:var(--shadow); padding:12px 14px; margin-bottom:9px; cursor:pointer; font-family:inherit;}
   .row .when{flex:none; width:62px; text-align:center; font-weight:700; color:var(--navy); font-size:14px; line-height:1.25;}
   .row .when small{display:block; font-weight:400; color:var(--ink-soft); font-size:12px;}
@@ -202,10 +217,19 @@
         <div class="m" id="calLabel"></div>
         <button type="button" id="calNext" aria-label="Next month">&rsaquo;</button>
       </div>
-      <div class="mini">
-        <div class="mini-grid" id="miniGrid"></div>
-        <div class="legend"><span><i style="background:#eaf1ec; border:1px solid #c5dccb;"></i>Approved</span><span><i style="background:#fbeee0; border:1px solid #eccba2;"></i>Needs answer</span></div>
+      <div class="cal-filters">
+        <div class="seg" id="calScope">
+          <button type="button" data-scope="all">All jobs</button>
+          <button type="button" data-scope="mine">Just mine</button>
+        </div>
+        <select id="calHouse" aria-label="Which house"></select>
       </div>
+      <div class="cal">
+        <div class="cal-dow" id="calDow"></div>
+        <div id="calWeeks"></div>
+      </div>
+      <div class="legend" id="calLegend"></div>
+      <h2 id="monthHead">Your jobs this month</h2>
       <div id="monthList"></div>
     </div>
 
@@ -297,6 +321,7 @@ const token = new URLSearchParams(location.search).get('k') || '';
 let me = null;      // { name, notify, hasPhone, hasEmail }
 let today = '';
 let tasks = [];
+let others = [];    // the rest of the schedule on their houses (job + dates only), for the calendar
 let view = 'todo';  // 'todo' | 'schedule'
 let calMonth = '';  // 'YYYY-MM' shown on the Schedule tab
 let house = null;   // the house screen, when open: { id, house, tasks, files }
@@ -355,7 +380,18 @@ const demoState = {
 async function demoApi(action, extra){
   await new Promise(r=>setTimeout(r, 250));
   const copy = x=>JSON.parse(JSON.stringify(x));
-  if(action === 'load') return { sub: demoState.sub, today: demoIso(0), tasks: copy(demoState.tasks) };
+  if(action === 'load'){
+    // the other trades around the sample jobs, so the calendar looks like a real house
+    const o = (houseId, title, phase, from, to)=>({ houseId, title, phase, start: demoIso(from), end: demoIso(to), done: to < 0 });
+    const others = [
+      o('d1','DRYWALL FINISH','Drywall/Insulation',-9,-3), o('d1','PAINT PRIME','Interior Finishes',-2,1), o('d1','FLOORING','Interior Finishes',2,6),
+      o('d1','COUNTERTOP TEMPLATE','Interior Finishes',10,10), o('d1','PLUMBING FINISH','Final Finishes',12,14), o('d1','ELECTRIC FINISH','Final Finishes',13,15),
+      o('d2','FLOORING','Interior Finishes',6,9), o('d2','PAINT FINAL','Final Finishes',14,17),
+      o('d3','DRYWALL HANG','Drywall/Insulation',9,14), o('d3','FLOORING','Interior Finishes',17,21),
+    ];
+    const phases = { a:'Interior Finishes', b:'Interior Finishes', c:'Interior Finishes', d:'Interior Finishes' };
+    return { sub: demoState.sub, today: demoIso(0), tasks: copy(demoState.tasks).map(t=>({ ...t, phase: phases[t.taskId] || '' })), others };
+  }
   if(action === 'setNotify'){ demoState.sub.notify = extra.notify; return { notify: extra.notify }; }
   if(action === 'house') return { house: DEMO_HOUSES[extra.houseId], folders: extra.houseId === 'd1' ? ['Kitchen', 'Trim'] : [],
     changeOrders: extra.houseId === 'd1' ? [{ id:'co1', number:1, title:'Upgrade to soft-close cabinet hardware', items:['Soft-close hinges and drawer slides, whole kitchen'], approvedAt: demoIso(-5) }] : [], tasks: copy(demoState.tasks.filter(t=>t.houseId===extra.houseId)), files: copy(demoState.files[extra.houseId] || []) };
@@ -401,7 +437,7 @@ async function load(){
   show('stateLoading');
   try{
     const data = await api('load');
-    me = data.sub; today = data.today; tasks = data.tasks || [];
+    me = data.sub; today = data.today; tasks = data.tasks || []; others = data.others || [];
     calMonth = calMonth || today.slice(0,7);
     $('hello').textContent = me.name ? `Hi, ${me.name}` : 'My Jobs';
     show('main');
@@ -482,6 +518,7 @@ function render(){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
   $('viewTodo').style.display = view === 'todo' ? 'block' : 'none';
   $('viewSchedule').style.display = view === 'schedule' ? 'block' : 'none';
+  $('main').parentNode.classList.toggle('wide', view === 'schedule'); // the calendar gets the full width on a big screen
   if(view === 'schedule') renderSchedule();
 
   document.querySelectorAll('#notifySeg button').forEach(b=>b.classList.toggle('on', b.dataset.notify === me.notify));
@@ -508,37 +545,82 @@ function statusChip(t){
   return '<span class="chip pending">Answer</span>';
 }
 
+// Same colours the office's schedule uses for each stage of the build.
+const PHASE_COLORS = {
+  'Pre-Construction':'#8a8f94', 'Foundation':'#8a5a3a', 'Framing':'#c98a2b', 'Rough-Ins':'#2f7d8c',
+  'Exterior Finishes':'#5a7247', 'Drywall/Insulation':'#6a4c93', 'Interior Finishes':'#3d5570', 'Final Finishes':'#3f7a4e'
+};
+let calScope = 'all';   // 'all' = everything on the house, 'mine' = only this sub's jobs
+let calHouse = null;    // which house the calendar shows ('' = every house); picked the first time it opens
+let calBars = [];       // the jobs drawn on the calendar, so a tapped bar can be looked up
+// phones show Monday–Friday; wider screens show the whole week
+function calColumns(){ return window.innerWidth >= 700 ? [0,1,2,3,4,5,6] : [1,2,3,4,5]; }
+
 function renderSchedule(){
   const [y, m] = calMonth.split('-').map(Number);
   $('calLabel').textContent = new Date(y, m-1, 1).toLocaleDateString(undefined, { month:'long', year:'numeric' });
-
-  // what each day of the month holds: 'pending' wins over 'confirmed' so nothing waiting gets hidden
   const first = isoOf(y, m, 1);
   const daysInMonth = new Date(y, m, 0).getDate();
   const last = isoOf(y, m, daysInMonth);
-  const dayState = {};
-  tasks.filter(t=>t.answer !== 'declined').forEach(t=>{
-    for(let d = 1; d <= daysInMonth; d++){
-      const iso = isoOf(y, m, d);
-      if(iso < t.start || iso > t.end) continue;
-      const wd = new Date(y, m-1, d).getDay();
-      if(wd === 0 || wd === 6) continue; // jobs run on working days
-      if(t.answer === 'pending' && !t.done) dayState[iso] = 'pending';
-      else if(dayState[iso] !== 'pending') dayState[iso] = 'confirmed';
-    }
-  });
 
-  const lead = new Date(y, m-1, 1).getDay();
-  let cells = ['S','M','T','W','T','F','S'].map(d=>`<div class="dow">${d}</div>`).join('');
-  for(let i = 0; i < lead; i++) cells += '<div class="day out"></div>';
-  for(let d = 1; d <= daysInMonth; d++){
-    const iso = isoOf(y, m, d);
-    const state = dayState[iso];
-    cells += `<div class="day${state ? ' has '+state : ''}${iso === today ? ' today' : ''}">${d}</div>`;
+  // the houses this sub has work on
+  const houses = [];
+  tasks.forEach(t=>{ if(!houses.some(h=>h.id === t.houseId)) houses.push({ id: t.houseId, label: houseLabel(t.house || {}) || 'House' }); });
+  if(calHouse === null || (calHouse && !houses.some(h=>h.id === calHouse))){
+    // start on the house with their next job, so the calendar isn't several houses piled together
+    const next = tasks.find(t=>!t.done && t.end >= today) || tasks[0];
+    calHouse = houses.length > 1 && next ? next.houseId : '';
   }
-  $('miniGrid').innerHTML = cells;
+  $('calHouse').style.display = houses.length > 1 ? '' : 'none';
+  $('calHouse').innerHTML = `<option value="">All my houses</option>` + houses.map(h=>`<option value="${esc(h.id)}"${h.id === calHouse ? ' selected' : ''}>${esc(h.label)}</option>`).join('');
+  document.querySelectorAll('#calScope button').forEach(b=>b.classList.toggle('on', b.dataset.scope === calScope));
 
-  const inMonth = tasks.filter(t=>t.start <= last && t.end >= first);
+  // what goes on the calendar: their own jobs, plus (unless filtered) the other work on the house
+  const inHouse = x=>!calHouse || x.houseId === calHouse;
+  calBars = tasks.filter(inHouse).map(t=>({ ...t, mine: true }))
+    .concat(calScope === 'all' ? others.filter(inHouse).map(o=>({ ...o, mine: false })) : [])
+    .sort((a, b)=>a.start.localeCompare(b.start) || (b.mine - a.mine));
+  const labelHouse = !calHouse && houses.length > 1; // several houses at once: say which house each bar is
+
+  const cols = calColumns();
+  $('calDow').style.setProperty('--cols', cols.length);
+  $('calDow').innerHTML = cols.map(wd=>`<div>${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][wd]}</div>`).join('');
+  let html = '';
+  for(let d = 1 - new Date(y, m-1, 1).getDay(); d <= daysInMonth; d += 7){
+    const days = cols.map(wd=>{ const dt = new Date(y, m-1, d + wd); return isoOf(dt.getFullYear(), dt.getMonth()+1, dt.getDate()); });
+    if(days.every(iso=>iso < first || iso > last)) continue; // a week with no days of this month showing
+    // the part of each job that falls in this week, stacked into rows so bars never overlap
+    const segs = [];
+    calBars.forEach((t, idx)=>{
+      const hit = days.map((iso, i)=>(iso >= t.start && iso <= t.end && cols[i] !== 0 && cols[i] !== 6) ? i : -1).filter(i=>i !== -1);
+      if(!hit.length) return;
+      const from = hit[0], to = hit[hit.length-1];
+      segs.push({ t, idx, from, to, fromPrev: t.start < days[from], toNext: t.end > days[to] });
+    });
+    const lanes = [];
+    segs.forEach(s=>{
+      let lane = lanes.findIndex(end=>end < s.from);
+      if(lane === -1){ lane = lanes.length; lanes.push(-1); }
+      lanes[lane] = s.to;
+      s.lane = lane;
+    });
+    const dayCells = days.map((iso, i)=>
+      `<div class="cal-day${cols[i] === 0 || cols[i] === 6 ? ' weekend' : ''}${iso < first || iso > last ? ' out' : ''}${iso === today ? ' today' : ''}" style="grid-column:${i+1};"><span class="n">${Number(iso.slice(8))}</span></div>`).join('');
+    const bars = segs.map(s=>{
+      const t = s.t;
+      const mark = !t.mine ? '' : t.done ? '✓ ' : t.answer === 'confirmed' ? '✓ ' : t.answer === 'declined' ? '✕ ' : '? ';
+      const where = labelHouse ? (houses.find(h=>h.id === t.houseId) || {}).label : '';
+      const text = mark + (where ? where.split(' · ').slice(0, 2).join(' ') + ' · ' : '') + (t.title || 'Job');
+      return `<button type="button" class="cal-bar ${t.mine ? 'mine ' + esc(t.answer) : 'other'}${t.done ? ' is-done' : ''}${s.fromPrev ? ' from-prev' : ''}${s.toNext ? ' to-next' : ''}" data-bar="${s.idx}"
+        style="grid-column:${s.from+1} / ${s.to+2}; grid-row:${s.lane+2}; background:${PHASE_COLORS[t.phase] || '#8a8f94'};">${esc(text)}</button>`;
+    }).join('');
+    html += `<div class="cal-week" style="--cols:${cols.length}; grid-template-rows:28px repeat(${lanes.length}, 25px) minmax(8px,1fr);">${dayCells}${bars}</div>`;
+  }
+  $('calWeeks').innerHTML = html;
+  $('calLegend').innerHTML = `<span><i style="box-shadow:inset 0 0 0 2px var(--navy-2);"></i>Your jobs (✓ approved · ? needs your answer)</span>`
+    + (calScope === 'all' ? `<span><i style="opacity:.5;"></i>Other work on the house</span>` : '');
+
+  const inMonth = tasks.filter(t=>inHouse(t) && t.start <= last && t.end >= first);
   $('monthList').innerHTML = inMonth.length ? inMonth.map(t=>{
     const [, sm, sd] = t.start.split('-').map(Number);
     const monthName = new Date(y, sm-1, 1).toLocaleDateString(undefined, { month:'short' });
@@ -557,6 +639,26 @@ function shiftMonth(n){
 }
 $('calPrev').addEventListener('click', ()=>shiftMonth(-1));
 $('calNext').addEventListener('click', ()=>shiftMonth(1));
+$('calScope').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-scope]');
+  if(b){ calScope = b.dataset.scope; renderSchedule(); }
+});
+$('calHouse').addEventListener('change', e=>{ calHouse = e.target.value; renderSchedule(); });
+// tapping a bar: their own job opens that house; anyone else's just says what it is and when
+$('calWeeks').addEventListener('click', e=>{
+  const bar = e.target.closest('[data-bar]');
+  const t = bar && calBars[Number(bar.dataset.bar)];
+  if(!t) return;
+  if(t.mine){ openHouse(t.houseId); return; }
+  const h = tasks.find(x=>x.houseId === t.houseId);
+  toast(`${t.title} · ${whenText(t)}${h ? ' · ' + houseLabel(h.house || {}) : ''}`);
+});
+let calCols = calColumns().length;
+window.addEventListener('resize', ()=>{
+  if(calCols === calColumns().length) return;
+  calCols = calColumns().length;
+  if(view === 'schedule' && me) renderSchedule();
+});
 
 /* ============================================================
    Buttons on a job (confirm / can't / done) and opening a house
