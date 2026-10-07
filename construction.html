@@ -232,6 +232,16 @@
   .field textarea:focus, .tk-notes:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
   .search{flex:1 1 240px;}
   .search input{width:100%; padding:10px 12px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; background:var(--paper-2); color:var(--ink); font-family:inherit;}
+  .c-link{min-width:150px;}
+  .link-chip{display:inline-flex; align-items:center; gap:5px; max-width:240px; text-align:left; border:1px dashed transparent; background:transparent; color:#b0ab9d; border-radius:20px; padding:4px 10px; font-size:12px; cursor:pointer; font-family:inherit; line-height:1.3;}
+  .link-chip:hover{border-color:var(--steel-line); color:var(--navy); background:#fff;}
+  .link-chip.on{background:#e6ecf5; color:#3b5a8a; font-weight:700; border:1px solid #c9d6ea;}
+  .link-chip svg{flex:none;}
+  .radio{display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--steel-line); border-radius:var(--radius); margin-bottom:8px; cursor:pointer; text-transform:none; letter-spacing:0; font-weight:400; color:var(--ink);}
+  .radio:has(input:checked){border-color:var(--navy); background:#faf8f2;}
+  .radio input{margin-top:3px; flex:none;}
+  .radio strong{display:block; font-size:14px; color:var(--navy);}
+  .radio small{display:block; font-size:12.5px; color:var(--ink-soft); margin-top:2px; line-height:1.4;}
   .check-label{display:inline-flex; align-items:center; gap:7px; margin:0; font-size:13px; font-weight:600; text-transform:none; letter-spacing:0; color:var(--ink-soft); cursor:pointer; white-space:nowrap;}
   .pill{display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; white-space:nowrap;}
   .pill.todo{background:#fbeee0; color:var(--amber);}
@@ -404,7 +414,7 @@
               <thead>
                 <tr>
                   <th></th><th>#</th><th>Task</th><th>Phase</th><th>Days</th><th>Subcontractor</th>
-                  <th>Start</th><th>End</th><th>Timeline</th><th></th>
+                  <th>Starts</th><th>Start</th><th>End</th><th>Timeline</th><th></th>
                 </tr>
               </thead>
               <tbody id="scheduleBody"></tbody>
@@ -437,7 +447,7 @@
       <div class="table-wrap">
         <table class="task-table">
           <thead>
-            <tr><th></th><th>#</th><th>Task</th><th>Phase</th><th>Days</th><th>Who Does It</th><th></th></tr>
+            <tr><th></th><th>#</th><th>Task</th><th>Phase</th><th>Days</th><th>Who Does It</th><th>Starts</th><th></th></tr>
           </thead>
           <tbody id="templateBody"></tbody>
         </table>
@@ -447,6 +457,8 @@
         <select class="cell-input" id="tplAddSelect" style="width:auto; min-width:240px; border-color:var(--steel-line); background:#fff; padding:10px 12px;"></select>
       </div>
       <div class="hint">
+        Tasks run one after another, top to bottom. To overlap two jobs, click a task's <strong>Starts</strong> setting and link it to another task:
+        it can start the same day, or follow that task with a gap or an overlap. Linked tasks move together and don't push the ones below later.<br><br>
         A template is the order of tasks for a type of house. Each task's days and vendor come from the <strong>Tasks</strong> tab, so changing your painter there
         changes it in every template at once. Only change days or the vendor <em>here</em> when this type of house is different from the usual — it gets a small
         tag you can click to go back to the usual. Editing a template affects houses started after the edit; schedules already built keep what they have.
@@ -540,6 +552,44 @@
     </div>
     <div class="modal-body" id="tkBody"></div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close="taskOverlay">Close</button></div>
+  </div>
+</div>
+
+<!-- Link a task to another task (used in templates and on a house) -->
+<div class="overlay" id="linkOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="muted small">When does it start?</div>
+        <h2 id="lkTitle"></h2>
+      </div>
+      <button class="modal-close" data-close="linkOverlay">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="radio"><input type="radio" name="lkType" value="none">
+        <span><strong>After the task above</strong><small>It takes its turn in the list, like most tasks.</small></span></label>
+      <label class="radio"><input type="radio" name="lkType" value="start">
+        <span><strong>At the same time as another task</strong><small>The two overlap: they start together and move together.</small></span></label>
+      <label class="radio"><input type="radio" name="lkType" value="finish">
+        <span><strong>When another task finishes</strong><small>It follows that specific task wherever it moves, and can overlap its last days.</small></span></label>
+
+      <div id="lkDetails" style="margin-top:16px;">
+        <div class="field">
+          <label for="lkTo">Linked to</label>
+          <select id="lkTo"></select>
+        </div>
+        <div class="field">
+          <label for="lkLag">Shift by (working days)</label>
+          <input type="number" id="lkLag" step="1" value="0" style="width:110px;">
+          <div class="muted small" id="lkLagHelp" style="margin-top:6px; line-height:1.5;"></div>
+        </div>
+      </div>
+      <div class="muted small" style="line-height:1.5;">Linked tasks run alongside the others — they don't push the tasks below them later.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close="linkOverlay">Cancel</button>
+      <button class="btn btn-primary" id="lkSave">Save</button>
+    </div>
   </div>
 </div>
 
@@ -753,7 +803,26 @@ function resolveTemplateRow(row){
     duration: row.duration != null ? Math.max(1, parseInt(row.duration, 10) || 1) : libDuration,
     subIds: Array.isArray(row.subIds) ? row.subIds : libSubIds,
     libDuration, libSubIds,
+    link: cleanLink(row.link),   // tied to another task in this template (by its task-list id)
   };
+}
+// How a task is named in a link: by its task-list id in a template, by its own id on a house.
+const templateKey = t=>t.taskId;
+const houseKey = t=>t.id;
+// A link, tidied for saving: which task it's tied to, whether it goes off that task's
+// start or finish, and how many working days to shift by. null = not linked.
+function cleanLink(link){
+  if(!link || !link.to) return null;
+  return { to: String(link.to), type: link.type === 'start' ? 'start' : 'finish', lag: parseInt(link.lag, 10) || 0 };
+}
+// In plain words, for the chip shown on a linked task.
+function describeLink(t){
+  if(!t.anchor || !t.link) return '';
+  const name = t.anchor.title || 'another task';
+  const n = parseInt(t.link.lag, 10) || 0;
+  const days = Math.abs(n) + ' day' + (Math.abs(n) === 1 ? '' : 's');
+  if(t.link.type === 'start') return n === 0 ? `Same day as ${name}` : (n > 0 ? `${days} after ${name} starts` : `${days} before ${name} starts`);
+  return n === 0 ? `Right after ${name}` : (n > 0 ? `${days} after ${name} finishes` : `Overlaps the last ${days} of ${name}`);
 }
 function setSyncStatus(state){
   $('syncDot').classList.toggle('offline', state==='offline');
@@ -783,19 +852,60 @@ function workdayIndex(startIso, iso){
   return i;
 }
 
-// Lay the tasks out one after another. Each task starts the working day after the
-// one above it ends; a task's "lag" nudges that later (+) or earlier (-, an overlap).
-// Returns new task objects with startIdx/endIdx/start/end filled in.
-function layoutTasks(startIso, tasks){
-  const positioned = [];
+/* Lay the tasks out on the calendar. There are two kinds of task:
+
+   • Main-line tasks (no link). They run one after another, top to bottom: each starts
+     the working day after the main-line task above it ends. A task's "lag" nudges that
+     later (+, a gap) or earlier (−, an overlap).
+
+   • Linked tasks. A link ties a task to another task so the two move together:
+       type 'start'  — starts when the other task starts (same day), plus `lag` days
+       type 'finish' — starts when the other task finishes, plus `lag` days (− = overlap)
+     Linked tasks run alongside the main line; they don't push the tasks below them.
+
+   `keyOf` says how a task is named in a link: its own id on a house, or the task-list
+   id in a template. Returns new task objects with startIdx/endIdx/start/end filled in,
+   plus baseIdx (where it would start with no lag) and anchor (the task it's linked to). */
+function layoutTasks(startIso, tasks, keyOf){
+  keyOf = keyOf || (t=>t.id);
+  const positioned = tasks.map(t=>({ ...t, duration: Math.max(1, parseInt(t.duration, 10) || 1), anchor: null, placed: false }));
+  const byKey = {};
+  positioned.forEach(t=>{ const k = keyOf(t); if(k && !(k in byKey)) byKey[k] = t; });
+  positioned.forEach(t=>{
+    const a = t.link && t.link.to ? byKey[t.link.to] : null;
+    t.anchor = a && a !== t ? a : null;
+  });
+  const place = (t, baseIdx, lag)=>{
+    t.baseIdx = baseIdx;
+    t.startIdx = Math.max(0, baseIdx + (parseInt(lag, 10) || 0));
+    t.endIdx = t.startIdx + t.duration - 1;
+    t.placed = true;
+  };
+  // 1. the main line, in order
   let cursor = 0;
-  for(const t of tasks){
-    const duration = Math.max(1, parseInt(t.duration, 10) || 1);
-    const startIdx = Math.max(0, cursor + (parseInt(t.lag, 10) || 0));
-    const endIdx = startIdx + duration - 1;
-    cursor = endIdx + 1;
-    positioned.push({ ...t, duration, startIdx, endIdx });
+  positioned.forEach(t=>{
+    if(t.anchor) return;
+    place(t, cursor, t.lag);
+    cursor = t.endIdx + 1;
+  });
+  // 2. linked tasks, once the task they're tied to has been placed (a link can chain off another link)
+  let moved = true;
+  while(moved){
+    moved = false;
+    positioned.forEach(t=>{
+      if(t.placed || !t.anchor.placed) return;
+      place(t, t.link.type === 'start' ? t.anchor.startIdx : t.anchor.endIdx + 1, t.link.lag);
+      moved = true;
+    });
   }
+  // 3. anything left is linked in a circle (A to B and B to A) — put it after the task above so it isn't lost
+  positioned.forEach((t, i)=>{
+    if(t.placed) return;
+    let above = null;
+    for(let k = i - 1; k >= 0 && !above; k--) if(positioned[k].placed) above = positioned[k];
+    t.anchor = null;
+    place(t, above ? above.endIdx + 1 : 0, 0);
+  });
   const span = positioned.reduce((m,t)=>Math.max(m, t.endIdx+1), 0);
   // one pass over the calendar to turn working-day numbers into dates
   const dates = [];
@@ -966,6 +1076,8 @@ function storedTask(t, withDates){
     out.taskId = t.taskId || '';   // which task on the Tasks tab this came from ('' = added just for this house)
     out.notes = t.notes || '';
     out.lag = parseInt(t.lag, 10) || 0;
+    // tied to another task on this house (by that task's id). Dropped if that task is gone.
+    out.link = t.anchor ? cleanLink(t.link) : null;
     out.start = t.start || '';
     out.end = t.end || '';
     out.status = t.status || 'draft';
@@ -1018,9 +1130,11 @@ function saveSchedule(sched, tasks, startDate){
 // ones on the Tasks tab, so a change there keeps flowing through to this template.
 function saveTemplate(tpl, rows){
   const { id, ...rest } = tpl;
+  // work the links out afresh, so one pointing at a task that's no longer in the template is dropped
+  const laid = layoutTasks('', rows, templateKey).tasks;
   return save(templatesCol.doc(id).set({
     ...rest,
-    tasks: rows.map(t=>{
+    tasks: laid.map(t=>{
       const lib = libTask(t.taskId);
       const duration = Math.max(1, parseInt(t.duration, 10) || 1);
       const subIds = Array.isArray(t.subIds) ? t.subIds : [];
@@ -1028,6 +1142,7 @@ function saveTemplate(tpl, rows){
         taskId: t.taskId,
         duration: lib && duration === Math.max(1, parseInt(lib.duration, 10) || 1) ? null : duration,
         subIds: lib && sameIds(subIds, lib.subIds || []) ? null : subIds,
+        link: t.anchor ? cleanLink(t.link) : null,
       };
     }),
     updatedAt: new Date().toISOString(),
@@ -1147,7 +1262,8 @@ function taskRowHtml(t, idx, mode, span){
 
   let dateCells = '';
   if(mode === 'schedule'){
-    const lag = parseInt(t.lag, 10) || 0;
+    // a hand-moved gap or overlap only applies to main-line tasks; a linked task's shift is part of its link
+    const lag = t.anchor ? 0 : (parseInt(t.lag, 10) || 0);
     const lagNote = lag === 0 ? '' : `<div><span class="lag-note" title="This task was moved by hand">${lag>0 ? `+${lag}d gap` : `${-lag}d overlap`}<button type="button" data-act="clear-lag" data-idx="${idx}" title="Put it back right after the task above">&times;</button></span></div>`;
     const left = span ? (t.startIdx/span)*100 : 0;
     const width = span ? (t.duration/span)*100 : 0;
@@ -1178,6 +1294,9 @@ function taskRowHtml(t, idx, mode, span){
   const subTag = isTpl && !t.missing && !sameIds(subIds, t.libSubIds)
     ? `<span class="lag-note" title="This template uses a different vendor than the usual one set on the Tasks tab">different from usual<button type="button" data-act="reset-subs" data-idx="${idx}" title="Go back to the usual">&times;</button></span>` : '';
 
+  // When it starts: its turn in the list, or linked to another task so the two move together.
+  const linkCell = mode === 'library' ? '' : `<td class="c-link"><button type="button" class="link-chip${t.anchor ? ' on' : ''}" data-act="link" data-idx="${idx}" title="Change when this task starts, or link it to another task">${t.anchor ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 007.07 0l3-3a5 5 0 00-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 00-7.07 0l-3 3a5 5 0 007.07 7.07l1.5-1.5"/></svg> ${esc(describeLink(t))}` : 'After the task above'}</button></td>`;
+
   let endCells = '';
   if(mode === 'library'){
     const used = templates.filter(tpl=>(tpl.tasks||[]).some(r=>r.taskId===t.id)).length;
@@ -1193,6 +1312,7 @@ function taskRowHtml(t, idx, mode, span){
     <td class="c-phase">${phaseCell}</td>
     <td><input type="number" min="1" step="1" class="cell-input days" data-idx="${idx}" data-field="duration" value="${esc(t.duration)}">${durTag}</td>
     <td class="c-subs"><div class="subs-cell">${chips}${addSub}${subTag}</div></td>
+    ${linkCell}
     ${dateCells}
     ${endCells}
     <td style="white-space:nowrap;">${noteBtn}<button type="button" class="icon-btn del" data-act="delete" data-idx="${idx}" title="Remove this task"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button></td>
@@ -1403,9 +1523,12 @@ function renderTemplates(){
   $('tplAddSelect').innerHTML = '<option value="">+ Add a task to this template…</option>'
     + taskLib.map(t=>`<option value="${esc(t.id)}">${esc(t.title || 'Untitled task')}</option>`).join('');
   if(!tpl){ $('templateBody').innerHTML = ''; $('templateSummary').textContent = ''; return; }
-  const rows = (tpl.tasks || []).map(resolveTemplateRow);
-  const days = rows.reduce((s,t)=>s + (t.missing ? 0 : t.duration), 0);
-  $('templateSummary').textContent = `${rows.length} tasks · ${days} working days (about ${Math.round(days/5)} weeks)`;
+  // lay the template out the same way a house would be, so links and overlaps count toward its length
+  const laid = layoutTasks('', (tpl.tasks || []).map(resolveTemplateRow), templateKey);
+  const rows = laid.tasks;
+  const days = laid.span;
+  const linked = rows.filter(t=>t.anchor).length;
+  $('templateSummary').textContent = `${rows.length} tasks · ${days} working days (about ${Math.round(days/5)} weeks)${linked ? ` · ${linked} linked` : ''}`;
   $('templateBody').innerHTML = rows.map((t,i)=>taskRowHtml(t, i, 'template', 0)).join('');
 }
 
@@ -1500,6 +1623,7 @@ function scheduleCtx(){
   if(!sched) return null;
   return {
     mode: 'schedule',
+    keyOf: houseKey,
     tasks: layoutTasks(sched.startDate, sched.tasks || []).tasks,
     startDate: sched.startDate,
     commit(tasks){ return saveSchedule(sched, tasks, sched.startDate); },
@@ -1510,7 +1634,8 @@ function templateCtx(){
   if(!tpl) return null;
   return {
     mode: 'template',
-    tasks: (tpl.tasks || []).map(resolveTemplateRow),
+    keyOf: templateKey,
+    tasks: layoutTasks('', (tpl.tasks || []).map(resolveTemplateRow), templateKey).tasks,
     commit(tasks){ return saveTemplate(tpl, tasks); },
   };
 }
@@ -1533,14 +1658,65 @@ function moveTask(tasks, from, to){
   return true;
 }
 
-// Put a task on a chosen date. The move is stored as a gap (or overlap) relative to
-// the task above it, so everything below keeps following along. A blank date clears it.
+// Put a task on a chosen date. The move is stored as a shift from where the task would
+// naturally start (baseIdx): for a main-line task that's a gap or overlap against the task
+// above, so everything below keeps following; for a linked task it adjusts the link, so the
+// task keeps moving with the one it's tied to. A blank date clears the shift.
 function setTaskStart(ctx, idx, iso){
   const t = ctx.tasks[idx];
-  if(!iso){ t.lag = 0; return; }
-  const natural = idx > 0 ? ctx.tasks[idx-1].endIdx + 1 : 0; // where it would start on its own
-  t.lag = workdayIndex(ctx.startDate, iso) - natural;
+  const shift = iso ? workdayIndex(ctx.startDate, iso) - t.baseIdx : 0;
+  if(t.anchor) t.link = { ...t.link, lag: shift };
+  else t.lag = shift;
 }
+
+/* ---- linking a task to another task (templates and houses share this popup) ---- */
+let linkEdit = null;   // { getCtx, idx } while the popup is open
+function linkHelp(){
+  const type = (document.querySelector('input[name="lkType"]:checked') || {}).value || 'none';
+  $('lkDetails').style.display = type === 'none' ? 'none' : 'block';
+  $('lkLagHelp').innerHTML = type === 'start'
+    ? '<strong>0</strong> = starts the same day. <strong>2</strong> = starts two days after it starts. <strong>-1</strong> = starts a day before it.'
+    : '<strong>0</strong> = starts the next working day after it finishes. <strong>-2</strong> = overlaps its last two days. <strong>3</strong> = leaves a three-day gap.';
+}
+function openLinkModal(getCtx, idx){
+  const ctx = getCtx();
+  const t = ctx && ctx.tasks[idx];
+  if(!t) return;
+  linkEdit = { getCtx, idx };
+  const myKey = ctx.keyOf(t);
+  $('lkTitle').textContent = t.title || 'This task';
+  // every other task it could be tied to, in schedule order
+  const seen = new Set([myKey]);
+  const options = [];
+  ctx.tasks.forEach((x, i)=>{
+    const k = ctx.keyOf(x);
+    if(!k || seen.has(k) || x.missing) return;
+    seen.add(k);
+    options.push(`<option value="${esc(k)}">${i+1}. ${esc(x.title || 'Untitled task')}</option>`);
+  });
+  $('lkTo').innerHTML = options.join('');
+  const type = t.anchor ? (t.link.type === 'start' ? 'start' : 'finish') : 'none';
+  document.querySelectorAll('input[name="lkType"]').forEach(r=>{ r.checked = r.value === type; });
+  if(t.anchor) $('lkTo').value = t.link.to;
+  else if(idx > 0 && ctx.keyOf(ctx.tasks[idx-1])) $('lkTo').value = ctx.keyOf(ctx.tasks[idx-1]); // most often it's the task just above
+  $('lkLag').value = t.anchor ? (parseInt(t.link.lag, 10) || 0) : 0;
+  linkHelp();
+  $('linkOverlay').classList.add('show');
+}
+document.querySelectorAll('input[name="lkType"]').forEach(r=>r.addEventListener('change', linkHelp));
+$('lkSave').addEventListener('click', ()=>{
+  if(!linkEdit) return;
+  const ctx = linkEdit.getCtx();
+  const t = ctx && ctx.tasks[linkEdit.idx];
+  if(!t){ $('linkOverlay').classList.remove('show'); return; }
+  const type = (document.querySelector('input[name="lkType"]:checked') || {}).value || 'none';
+  if(type !== 'none' && !$('lkTo').value){ alert('There is no other task to link to yet.'); return; }
+  t.link = type === 'none' ? null : { to: $('lkTo').value, type, lag: parseInt($('lkLag').value, 10) || 0 };
+  if(type !== 'none') t.lag = 0; // a hand-set gap no longer applies once it's linked
+  $('linkOverlay').classList.remove('show');
+  linkEdit = null;
+  ctx.commit(ctx.tasks, { task: t, act: 'edit' });
+});
 
 function wireTaskTable(tbodyId, getCtx){
   const tbody = $(tbodyId);
@@ -1581,6 +1757,7 @@ function wireTaskTable(tbodyId, getCtx){
     const act = btn.dataset.act;
 
     if(act === 'open'){ openTaskPopup(t.id); return; }
+    if(act === 'link'){ openLinkModal(getCtx, idx); return; }
     if(act === 'rm-sub'){ t.subIds = (t.subIds||[]).filter(id=>id !== btn.dataset.sub); }
     else if(act === 'clear-lag'){ t.lag = 0; }
     else if(act === 'reset-dur'){ t.duration = t.libDuration; }
@@ -1898,10 +2075,18 @@ $('startSaveBtn').addEventListener('click', async ()=>{
     createdAt: new Date().toISOString(),
   };
   // copy the template's tasks — from here on this house's schedule is its own
-  const tasks = (tpl.tasks||[]).map(resolveTemplateRow).filter(t=>!t.missing).map(t=>({
+  const rows = (tpl.tasks||[]).map(resolveTemplateRow).filter(t=>!t.missing);
+  const tasks = rows.map(t=>({
     id: newId(), taskId: t.taskId, title: t.title, phase: t.phase, duration: t.duration, subIds: [...t.subIds],
     notes: '', lag: 0, status: 'draft',
   }));
+  // carry the template's links across: there they point at task-list ids, here at this house's own tasks
+  const houseIdFor = {};
+  tasks.forEach(t=>{ if(!(t.taskId in houseIdFor)) houseIdFor[t.taskId] = t.id; });
+  tasks.forEach((t, i)=>{
+    const link = rows[i].link;
+    t.link = link && houseIdFor[link.to] && houseIdFor[link.to] !== t.id ? { to: houseIdFor[link.to], type: link.type, lag: link.lag } : null;
+  });
   closeOverlay('startOverlay');
   if(await saveSchedule(sched, tasks, snapToWorkday(start))){
     openScheduleId = job.id;
