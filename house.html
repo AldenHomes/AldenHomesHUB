@@ -168,6 +168,26 @@
   .remind-row button{border:1px solid var(--steel-line); background:var(--paper-2); color:var(--navy); border-radius:20px; padding:5px 11px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;}
   .remind-row button:hover{background:#e9e5da;}
   .remind-set{display:inline-flex; align-items:center; gap:6px; margin-top:8px; background:#fdf0dc; color:#96661a; font-weight:700; font-size:12.5px; border-radius:20px; padding:3px 11px;}
+  /* timeline */
+  .tl-toggle{display:flex; align-items:center; gap:11px; width:100%; background:none; border:none; padding:0; cursor:pointer; font-family:inherit; text-align:left; color:inherit;}
+  .tl-title{font-size:16px; font-weight:700; color:var(--navy);}
+  .tl-hint{margin-left:auto; font-size:12.5px; color:var(--ink-soft);}
+  .tl-arrow{font-size:11px; color:var(--ink-soft); transition:transform .15s;}
+  #timelineCard.open .tl-arrow{transform:rotate(90deg);}
+  #timelineCard{min-height:0;}
+  .tl-day{font-size:11.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft); margin:16px 0 2px;}
+  .tl-day:first-child{margin-top:4px;}
+  .tl-row{display:flex; gap:12px; align-items:flex-start; padding:9px 0; border-top:1px solid #f1ede3;}
+  .tl-day + .tl-row{border-top:none;}
+  .tl-dot{flex:none; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#eef0e8; color:var(--rust-2); margin-top:1px;}
+  .tl-dot.notes{background:#e6ecf5; color:#3b5a8a;}
+  .tl-dot.schedule{background:#fdf0dc; color:#96661a;}
+  .tl-dot.co{background:#eaf1ec; color:var(--good);}
+  .tl-dot.bad{background:#fbeae4; color:var(--danger);}
+  .tl-main{flex:1; min-width:0;}
+  .tl-t{font-size:14px; line-height:1.45; word-break:break-word;}
+  .tl-m{font-size:12px; color:var(--ink-soft); margin-top:1px;}
+  .tl-more{display:block; margin:12px auto 2px; border:1px solid var(--steel-line); background:var(--paper-2); color:var(--navy); border-radius:var(--radius); padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;}
   /* comments under a note */
   .replies{margin-top:8px;}
   .reply{margin:0 0 8px 2px; padding:7px 0 1px 12px; border-left:3px solid #e2ddd0;}
@@ -403,6 +423,20 @@
             <div class="muted" style="font-size:12.5px; min-height:16px;"><span id="uploadTarget"></span> <span id="uploadNote"></span></div>
             <div class="share-bar" id="shareBar"></div>
             <div class="photo-grid" id="photoGrid"></div>
+          </div>
+        </div>
+
+        <!-- Timeline: everything that has happened on this home, newest first. Closed until someone wants it. -->
+        <div class="card wide" id="timelineCard">
+          <button type="button" class="tl-toggle" id="timelineToggle" aria-expanded="false">
+            <span class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg></span>
+            <span class="tl-title">Timeline <span class="muted" id="timelineCount" style="font-size:12px; font-weight:400;"></span></span>
+            <span class="tl-hint" id="timelineHint">Show the history of this home</span>
+            <span class="tl-arrow">&#9654;</span>
+          </button>
+          <div class="card-body" id="timelineBody" style="display:none;">
+            <div class="folder-row" id="timelineFilters"></div>
+            <div id="timelineList"></div>
           </div>
         </div>
       </div>
@@ -641,6 +675,129 @@ function homeFor(r){
   if(byAddr.length > 1){ const both = byAddr.filter(j=>byLot.includes(j)); return both.length === 1 ? both[0] : null; }
   return byLot.length === 1 ? byLot[0] : null;
 }
+/* ============================================================
+   TIMELINE — one running history of the home, newest first.
+   Nothing is stored for it (apart from schedule moves and vendor swaps, which
+   Construction Schedules keeps on the schedule as `history`): it is put together from
+   what the rest of the page already has — notes and comments, the punch list, change
+   orders, service requests, photos and plans, and the build schedule.
+   ============================================================ */
+let timelineOpen = false;   // closed until someone clicks it
+let timelineFilter = 'all';
+let timelineLimit = 40;
+const TL_KINDS = [['all', 'Everything'], ['notes', 'Notes'], ['schedule', 'Schedule'], ['co', 'Change orders'], ['service', 'Service'], ['files', 'Photos and plans']];
+const TL_ICONS = {
+  notes: '<path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>',
+  schedule: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  co: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>',
+  service: '<path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.5 2.5-2.1-.4-.4-2.1z"/>',
+  files: '<path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/>',
+};
+function timelineEvents(){
+  const ev = [];
+  const add = (at, kind, text, meta, bad)=>{ if(at) ev.push({ at, kind, text, meta: meta || '', bad: !!bad }); };
+  const span = (a, b)=>a === b ? fmtDate(a) : fmtDate(a) + ' – ' + fmtDate(b);
+  const clip = (t, len)=>{ t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > len ? t.slice(0, len - 1) + '…' : t; };
+
+  // notes, comments and the punch list
+  notes.forEach(x=>{
+    const who = (x.by && x.by.name) || 'Someone';
+    if(x.kind === 'subDeclined') add(x.at, 'schedule', `${who} declined a job`, clip(x.text, 220), true);
+    else if(x.kind === 'subNote') add(x.at, 'notes', `${who} (subcontractor) sent a note${(x.photos || []).length ? ` with ${x.photos.length} photo${x.photos.length === 1 ? '' : 's'}` : ''}`, clip(x.text, 220));
+    else if(x.kind === 'subWaiting') add(x.at, 'schedule', 'A job had no answer from a sub for three weeks', clip(x.text, 220), true);
+    else if(x.todo) add(x.at, 'notes', `${who} added a punch list item: ${clip(x.text, 160)}`, [(x.mentionNames || []).length ? 'for ' + x.mentionNames.join(', ') : '', x.priority === 'high' ? 'high priority' : '', x.due ? 'needed by ' + fmtDate(x.due) : ''].filter(Boolean).join(' · '));
+    else add(x.at, 'notes', `${who} added a note: ${clip(x.text, 200)}`);
+    if(x.todo && x.done) add(x.doneAt, 'notes', `${(x.doneBy && x.doneBy.name) || 'Someone'} checked off: ${clip(x.text, 160)}`, 'punch list');
+    (x.replies || []).forEach(r=>add(r.at, 'notes', `${(r.by && r.by.name) || 'Someone'} commented: ${clip(r.text, 200)}`, 'on “' + clip(x.text, 60) + '”'));
+  });
+
+  // change orders: sent, then approved or declined
+  changeOrders.forEach(c=>{
+    const label = `change order #${c.number || ''}${c.title ? ': ' + clip(c.title, 80) : ''}`;
+    if(c.sentAt) add(c.sentAt, 'co', `${(c.createdBy && c.createdBy.name) || 'The office'} sent ${label} to the buyer`, money(c.total));
+    if(c.decision && c.decision.at && c.status === 'approved') add(c.decision.at, 'co', `${c.decision.by || 'The buyer'} approved and signed ${label}`, money(c.decision.totalAgreed != null ? c.decision.totalAgreed : c.total) + (c.subNotice === 'sent' ? ' · subs notified' : ''));
+    if(c.decision && c.decision.at && c.status === 'declined') add(c.decision.at, 'co', `${c.decision.by || 'The buyer'} declined ${label}`, '', true);
+  });
+
+  // service requests about this home
+  serviceRequests.filter(r=>{ const h = homeFor(r); return h && h.id === houseId; }).forEach(r=>{
+    add(r.submittedAt, 'service', `Service request from ${r.name || 'the homeowner'}: ${clip(r.description, 180)}`, r.vendorName ? 'assigned to ' + r.vendorName : '');
+    if(r.status === 'sent') add(r.completedAt, 'service', `Service request completed: ${clip(r.description, 120)}`);
+  });
+
+  // photos and plans: one line per person per day, not one per photo
+  const groups = {};
+  files.filter(f=>f.kind === 'photo' || f.kind === 'plan').forEach(f=>{
+    const who = (f.by && f.by.name) || 'Alden Homes';
+    const key = (f.uploadedAt || '').slice(0, 10) + '|' + who + '|' + f.kind + '|' + (f.taskTitle || '');
+    const g = groups[key] = groups[key] || { at: f.uploadedAt, who, kind: f.kind, task: f.taskTitle || '', sub: f.by && f.by.type === 'sub', names: [], count: 0 };
+    g.count++; g.names.push(f.name || '');
+    if((f.uploadedAt || '') > (g.at || '')) g.at = f.uploadedAt;
+  });
+  Object.values(groups).forEach(g=>add(g.at, 'files', g.kind === 'plan'
+    ? `${g.who} uploaded ${g.count === 1 ? 'a plan: ' + clip(g.names[0], 80) : g.count + ' plans'}`
+    : `${g.who}${g.sub ? ' (subcontractor)' : ''} added ${g.count === 1 ? 'a photo' : g.count + ' photos'}${g.task ? ' to ' + g.task : ''}`));
+  const shared = {};
+  files.filter(f=>f.kind === 'photo' && f.shared && f.sharedAt).forEach(f=>{ const d = f.sharedAt.slice(0, 10); shared[d] = shared[d] || { at: f.sharedAt, count: 0 }; shared[d].count++; if(f.sharedAt > shared[d].at) shared[d].at = f.sharedAt; });
+  Object.values(shared).forEach(g=>add(g.at, 'files', `${g.count === 1 ? 'A photo was' : g.count + ' photos were'} shown to the customer`));
+
+  // the build schedule: sent, moved, vendors swapped, subs answering, jobs finished
+  if(sched){
+    add(sched.sentAt, 'schedule', 'The schedule was sent to subs', sched.lastSend && (sched.lastSend.emailed || []).length ? sched.lastSend.emailed.length + ' emailed' : '');
+    (sched.history || []).forEach(h=>{
+      if(h.kind === 'moved') add(h.at, 'schedule', `${h.by || 'Someone'} moved ${h.title} from ${span(h.from.start, h.from.end)} to ${span(h.to.start, h.to.end)}`, h.others ? `${h.others} job${h.others === 1 ? '' : 's'} after it moved too` : '');
+      else if(h.kind === 'vendor') add(h.at, 'schedule', `${h.by || 'Someone'} changed the vendor on ${h.title}`, `${(h.from || []).join(', ') || 'nobody'} → ${(h.to || []).join(', ') || 'nobody'}`);
+    });
+    (sched.tasks || []).forEach(t=>{
+      Object.keys(t.confirmAt || {}).forEach(subId=>{
+        const answer = (t.confirm || {})[subId];
+        if(answer !== 'confirmed' && answer !== 'declined') return;
+        const reason = (t.confirmNote || {})[subId];
+        add(t.confirmAt[subId], 'schedule', `${vendors[subId] || 'A sub'} ${answer === 'confirmed' ? 'approved' : 'declined'} ${t.title || 'a job'}, ${span(t.start, t.end)}`, reason ? '“' + clip(reason, 160) + '”' : '', answer === 'declined');
+      });
+      if(t.done) add(t.doneAt, 'schedule', `${t.title || 'A job'} was marked done`, t.doneBy ? 'by ' + (vendors[t.doneBy] || 'the sub') : '');
+    });
+  }
+  return ev.sort((a, b)=>(b.at || '').localeCompare(a.at || ''));
+}
+function renderTimeline(){
+  const all = timelineEvents();
+  const list = all.filter(e=>timelineFilter === 'all' || e.kind === timelineFilter);
+  $('timelineCount').textContent = all.length ? `(${all.length})` : '';
+  $('timelineCard').classList.toggle('open', timelineOpen);
+  $('timelineToggle').setAttribute('aria-expanded', String(timelineOpen));
+  $('timelineHint').textContent = timelineOpen ? 'Hide' : 'Show the history of this home';
+  $('timelineBody').style.display = timelineOpen ? 'block' : 'none';
+  if(!timelineOpen){ $('timelineList').innerHTML = ''; return; }
+  $('timelineFilters').innerHTML = TL_KINDS.map(([key, label])=>{
+    const count = key === 'all' ? all.length : all.filter(e=>e.kind === key).length;
+    return count || key === 'all' ? `<button type="button" class="fchip${timelineFilter === key ? ' on' : ''}" data-tl="${key}">${label} <span class="n">${count}</span></button>` : '';
+  }).join('');
+  if(!list.length){ $('timelineList').innerHTML = '<span class="muted">Nothing has happened on this home yet. Notes, schedule changes, change orders, service requests and photos will show up here as they happen.</span>'; return; }
+  const dayName = iso=>{
+    const d = new Date(iso), today = new Date(), y = new Date(Date.now() - 86400000);
+    const same = (a, b)=>a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    return same(d, today) ? 'Today' : same(d, y) ? 'Yesterday' : d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+  };
+  let lastDay = '', html = '';
+  list.slice(0, timelineLimit).forEach(e=>{
+    const d = new Date(e.at);
+    const day = isNaN(d) ? '' : dayName(e.at);
+    if(day !== lastDay){ html += `<div class="tl-day">${esc(day)}</div>`; lastDay = day; }
+    const time = isNaN(d) || (e.at || '').length <= 10 ? '' : d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+    html += `<div class="tl-row"><span class="tl-dot ${e.bad ? 'bad' : e.kind}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${TL_ICONS[e.kind] || ''}</svg></span>
+      <div class="tl-main"><div class="tl-t">${esc(e.text)}</div><div class="tl-m">${esc([time, e.meta].filter(Boolean).join(' · '))}</div></div></div>`;
+  });
+  if(list.length > timelineLimit) html += `<button type="button" class="tl-more" id="timelineMore">Show ${Math.min(40, list.length - timelineLimit)} earlier</button>`;
+  $('timelineList').innerHTML = html;
+}
+document.getElementById('timelineCard').addEventListener('click', e=>{
+  if(e.target.closest('#timelineToggle')){ timelineOpen = !timelineOpen; renderTimeline(); return; }
+  const chip = e.target.closest('[data-tl]');
+  if(chip){ timelineFilter = chip.dataset.tl; timelineLimit = 40; renderTimeline(); return; }
+  if(e.target.closest('#timelineMore')){ timelineLimit += 40; renderTimeline(); }
+});
+
 function renderService(){
   const mine = serviceRequests.filter(r=>{ const h = homeFor(r); return h && h.id === houseId; })
     .sort((a,b)=>(b.submittedAt||'').localeCompare(a.submittedAt||''));
@@ -688,6 +845,7 @@ function render(){
   renderOwnerLogin();
   renderNotes();
   renderService();
+  renderTimeline();
   renderChangeOrders();
   renderSchedule();
   renderOrders();
@@ -1573,6 +1731,7 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+<script src="hubsearch.js"></script>
 <script src="assistant.js"></script>
 </body>
 </html>

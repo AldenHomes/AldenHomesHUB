@@ -1064,6 +1064,7 @@ function attachListeners(){
   subsCol.onSnapshot(s=>{
     subs = s.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.name||'').localeCompare(b.name||'', undefined, {sensitivity:'base'}));
     renderAll(); setSyncStatus('idle');
+    if(pendingVendorId && subs.some(v=>v.id === pendingVendorId)){ const v = pendingVendorId; pendingVendorId = null; switchTab('subs'); openSubModal(v); }
   }, listenerError('subs'));
 }
 
@@ -1140,14 +1141,39 @@ function saveSchedule(sched, tasks, startDate){
     }
     return out;
   });
+  // a short record of what this save changed, for the home's timeline
+  const history = scheduleChanges(sched, before, stored);
   return save(schedCol.doc(id).set({
     ...rest,
+    ...(history ? { history } : {}),
     startDate,
     tasks: stored,
     projectedEnd: laid.projectedEnd,
     updatedAt: new Date().toISOString(),
   }));
 }
+// What a save changed on a house that subs have already been sent: dates that moved and vendors
+// that were swapped. Moving one job usually drags every job after it, so that is recorded as ONE
+// entry — the first job that moved, plus how many followed. Kept on the schedule as `history`
+// (most recent 150), which the home's timeline reads. Drafts aren't recorded: nobody has seen them.
+function scheduleChanges(sched, before, stored){
+  if(!sched.sentAt) return null;
+  const moved = stored.filter(t=>{ const p = before[t.id]; return p && p.start && (p.start !== t.start || p.end !== t.end); });
+  const swapped = stored.filter(t=>{ const p = before[t.id]; return p && !sameIds(p.subIds || [], t.subIds || []); });
+  if(!moved.length && !swapped.length) return null;
+  const user = firebase.auth().currentUser;
+  const by = user ? (user.displayName || String(user.email || '').split('@')[0]) : '';
+  const at = new Date().toISOString();
+  const entries = [];
+  if(moved.length){
+    const t = moved[0], p = before[t.id];
+    entries.push({ at, by, kind: 'moved', title: t.title || 'A job', from: { start: p.start, end: p.end }, to: { start: t.start, end: t.end }, others: moved.length - 1 });
+  }
+  swapped.forEach(t=>entries.push({ at, by, kind: 'vendor', title: t.title || 'A job',
+    from: (before[t.id].subIds || []).map(id=>subName(id)).filter(Boolean), to: (t.subIds || []).map(id=>subName(id)).filter(Boolean) }));
+  return [...(sched.history || []), ...entries].slice(-150);
+}
+
 // Save a template. Days and vendors are only stored when they differ from the usual
 // ones on the Tasks tab, so a change there keeps flowing through to this template.
 function saveTemplate(tpl, rows){
@@ -2049,6 +2075,7 @@ $('showFinished').addEventListener('change', renderHouses);
 // Arriving from a home's page (construction.html?house=…) jumps straight to that home.
 // A notification about a sub adds &task=…, which also opens that job's popup.
 let pendingHouseId = new URLSearchParams(location.search).get('house');
+let pendingVendorId = new URLSearchParams(location.search).get('vendor');
 let jobsLoaded = false, schedulesLoaded = false;
 function handlePendingHouse(){
   if(!pendingHouseId || !jobsLoaded || !schedulesLoaded) return;
@@ -2330,6 +2357,7 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+<script src="hubsearch.js"></script>
 <script src="assistant.js"></script>
 </body>
 </html>
