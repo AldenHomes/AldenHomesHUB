@@ -20,7 +20,7 @@
    ============================================================ */
 const { onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onDocumentWritten, onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentWritten, onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { defineSecret, defineString } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
@@ -1073,6 +1073,53 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
       logger.info('Emailed a note mention', { to: user.email, house });
     } catch(err){
       logger.error('Could not email a note mention', { uid, error: String(err) });
+    }
+  }
+});
+
+/* ============================================================
+   onNoteReplied — someone commented on a note.
+   The hub decides who should hear about it (everyone already in the conversation, plus
+   anyone tagged in the comment) and saves that list on the comment as `notify`.
+   This emails those people.
+   ============================================================ */
+if(EMAIL_ON) exports.onNoteReplied = onDocumentUpdated({ document: 'notes/{noteId}', secrets: [GMAIL_APP_PASSWORD] }, async event=>{
+  const before = event.data.before.data() || {}, note = event.data.after.data() || {};
+  const had = new Set((before.replies || []).map(r=>r.id));
+  const fresh = (note.replies || []).filter(r=>r && r.id && !had.has(r.id));
+  // only a newly added comment counts — not a check-off, a "read" flag or a deleted comment
+  if(fresh.length !== 1 || (note.replies || []).length <= (before.replies || []).length) return;
+  const reply = fresh[0];
+  const author = (reply.by && reply.by.uid) || '';
+  const uids = [...new Set(Array.isArray(reply.notify) ? reply.notify : [])].filter(uid=>uid && uid !== author);
+  if(!uids.length) return;
+
+  const nodemailer = require('nodemailer');
+  const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: MAIL_USER.value(), pass: GMAIL_APP_PASSWORD.value().replace(/\s+/g, '') } });
+  const who = (reply.by && reply.by.name) || 'Someone';
+  const house = note.houseId ? (note.houseLabel || 'a home') : 'the punch list';
+  const site = 'https://aldenhomes.github.io/AldenHomesHUB/';
+  const link = note.houseId ? `${site}house.html?id=${encodeURIComponent(note.houseId)}#notes` : `${site}punch.html`;
+  const original = String(note.text || '');
+  const font = 'font-family:Arial,Helvetica,sans-serif;';
+  const html = `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f4ef"><tr><td align="center" style="padding:24px 12px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;" bgcolor="#ffffff">
+    <tr><td bgcolor="#4B4F54" style="padding:20px 24px;${font}font-size:20px;font-weight:bold;color:#ffffff;">Alden Homes Hub<br><span style="font-size:13px;font-weight:normal;color:#d9dccb;">New comment</span></td></tr>
+    <tr><td style="padding:22px 24px 6px;${font}font-size:15px;line-height:1.5;color:#33363a;"><strong>${esc(who)}</strong> commented on a note on <strong>${esc(house)}</strong>:</td></tr>
+    <tr><td style="padding:8px 24px 4px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#faf8f2" style="padding:14px 16px;border-left:4px solid #A3AA83;${font}font-size:15px;line-height:1.55;color:#33363a;">${esc(reply.text || '').replace(/\n/g, '<br>')}</td></tr></table></td></tr>
+    <tr><td style="padding:10px 24px 0;${font}font-size:13px;line-height:1.5;color:#6b6f72;">The note: ${esc(original.slice(0, 300))}${original.length > 300 ? '…' : ''}</td></tr>
+    <tr><td style="padding:16px 24px 0;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#3f7a4e" style="padding:16px 12px;${font}font-size:17px;font-weight:bold;"><a href="${esc(link)}" style="color:#ffffff;text-decoration:none;">Open the note &rarr;</a></td></tr></table></td></tr>
+    <tr><td style="padding:10px 24px 24px;${font}font-size:12px;line-height:1.5;color:#8a8f94;word-break:break-all;">Button not working? Copy this link: ${esc(link)}</td></tr>
+  </table></td></tr></table>`;
+  const text = `${who} commented on a note on ${house}:\n\n${reply.text || ''}\n\nThe note: ${original.slice(0, 300)}\n\nOpen the note: ${link}`;
+  for(const uid of uids){
+    try{
+      const user = await admin.auth().getUser(uid);
+      if(!user.email || user.disabled) continue;
+      await transport.sendMail({ from: `"Alden Homes Hub" <${MAIL_USER.value()}>`, to: user.email, subject: `New comment on ${house}`, text, html });
+      logger.info('Emailed a note comment', { to: user.email, house });
+    } catch(err){
+      logger.error('Could not email a note comment', { uid, error: String(err) });
     }
   }
 });

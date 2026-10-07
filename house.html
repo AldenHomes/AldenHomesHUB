@@ -158,6 +158,17 @@
   .todo-check.on{background:var(--good); border-color:var(--good);}
   .note.todo.done .note-text{text-decoration:line-through; color:var(--ink-soft);}
   .todo-tag{background:#fdf0dc; color:#96661a; font-weight:700; border-radius:20px; padding:0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.3px;}
+  /* comments under a note */
+  .replies{margin-top:8px;}
+  .reply{margin:0 0 8px 2px; padding:7px 0 1px 12px; border-left:3px solid #e2ddd0;}
+  .reply .note-head strong{font-size:13px;}
+  .reply .note-text{font-size:13.5px; margin-top:2px;}
+  .reply-link{background:none; border:none; padding:2px 0; font-size:12.5px; font-weight:700; color:var(--rust-2); cursor:pointer; font-family:inherit;}
+  .reply-link:hover{text-decoration:underline;}
+  .reply-box{position:relative; display:flex; gap:8px; margin-top:4px;}
+  .reply-box input{flex:1; min-width:0; padding:9px 11px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; color:var(--ink); background:#fff; font-family:inherit;}
+  .reply-box input:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+  .reply-box .btn{padding:8px 14px;}
   .note.for-me{background:#fdf6ea; margin:0 -20px; padding-left:20px; padding-right:20px;}
   .owner-login{margin-top:16px; padding-top:14px; border-top:1px solid #ece8dd; font-size:13px; color:var(--ink-soft); line-height:1.7;}
   .owner-login strong{color:var(--ink);}
@@ -702,7 +713,60 @@ function noteHtml(text){
   return html;
 }
 
+/* ---- comments on a note ----
+   Kept on the note itself as `replies: [{ id, text, by:{uid,name}, at, notify:[uid] }]`.
+   A comment notifies everyone already in the conversation — the person who wrote the note,
+   anyone tagged in it, anyone who has commented — and anyone tagged with @ in the comment
+   (`watchers` on the note is everyone who
+   should see it under their bell; their `readBy` flag is cleared so it shows as new).
+   The server emails the same people. */
+let replyOpenId = null;   // the note whose comment box is open
+let replyDraft = '';      // what's been typed in it — kept so a refresh of the list doesn't lose it
+let replyFocus = false;
+function repliesHtml(n){
+  const me = myUid();
+  const list = (n.replies || []).map(r=>`<div class="reply">
+      <div class="note-head"><strong>${esc((r.by && r.by.name) || 'Someone')}</strong><span>${esc(noteTime(r.at))}</span>
+        ${r.by && r.by.uid === me ? `<button type="button" class="x-btn" data-delete-reply="${esc(n.id)}" data-reply-id="${esc(r.id)}" title="Delete this comment">&times;</button>` : ''}</div>
+      <div class="note-text">${noteHtml(r.text || '')}</div>
+    </div>`).join('');
+  return `<div class="replies">${list}${replyOpenId === n.id
+    ? `<div class="reply-box"><input type="text" data-reply-input="${esc(n.id)}" placeholder="Write a comment…  Type @ to notify someone." maxlength="1000" autocomplete="off"><button type="button" class="btn btn-primary" data-reply-send="${esc(n.id)}">Post</button></div>`
+    : `<button type="button" class="reply-link" data-reply-open="${esc(n.id)}">${list ? 'Add a comment' : 'Comment'}</button>`}</div>`;
+}
+async function postReply(noteId){
+  const note = notes.find(x=>x.id === noteId);
+  const user = firebase.auth().currentUser;
+  const text = replyDraft.trim();
+  if(!note || !user || !text) return;
+  // who hears about it: everyone already in the conversation (the note's author, anyone tagged
+  // in it or in an earlier comment, earlier commenters) plus anyone tagged in this comment
+  const thread = [note.by && note.by.uid, ...(note.mentions || []), ...(note.watchers || []), ...(note.replies || []).map(r=>r.by && r.by.uid)];
+  const notify = [...new Set([...thread, ...mentionsIn(text).map(p=>p.uid)])].filter(uid=>uid && uid !== user.uid);
+  const now = new Date().toISOString();
+  const FV = firebase.firestore.FieldValue;
+  const patch = {
+    replies: FV.arrayUnion({ id: now + '-' + Math.random().toString(36).slice(2, 8), text, by: { uid: user.uid, name: staffName() }, at: now, notify }),
+    lastAt: now,
+  };
+  if(notify.length){
+    patch.watchers = FV.arrayUnion(...notify);
+    notify.forEach(uid=>{ patch['readBy.' + uid] = false; });
+  }
+  const sent = replyDraft;
+  replyDraft = ''; replyOpenId = null; replyFocus = false;
+  try{ await db.collection('notes').doc(noteId).update(patch); }
+  catch(err){
+    console.error(err);
+    replyOpenId = noteId; replyDraft = sent; replyFocus = true;
+    renderNotes();
+    alert('Could not save the comment — check your connection and try again.');
+  }
+}
+
 function renderNotes(){
+  // the @ menu may be sitting inside a comment box that's about to be redrawn — park it first
+  if($('notesList').contains($('mentionMenu'))){ closeMentionMenu(); $('noteText').parentNode.insertBefore($('mentionMenu'), $('noteText').nextSibling); }
   $('noteCount').textContent = notes.length ? `(${notes.length})` : '';
   const me = myUid();
   $('noteHint').innerHTML = (staff.length ? 'Type @ to notify someone — they get it on their hub and by email. ' : '') + 'Type @todo to add it to the <a href="punch.html" style="color:inherit;">punch list</a>.';
@@ -715,9 +779,17 @@ function renderNotes(){
         <div class="note-head"><strong>${esc((n.by && n.by.name) || 'Someone')}</strong>${n.by && n.by.type === 'sub' ? '<span>subcontractor ·</span>' : ''}<span>${esc(noteTime(n.at))}</span>${n.todo ? `<span class="todo-tag">Punch list</span>${n.done && n.doneBy && n.doneBy.name ? `<span>done by ${esc(n.doneBy.name)}</span>` : ''}` : ''}
           ${n.by && n.by.uid === me ? `<button type="button" class="x-btn" data-delete-note="${esc(n.id)}" title="Delete this note">&times;</button>` : ''}</div>
         <div class="note-text">${noteHtml(n.text || '')}</div>
+        ${repliesHtml(n)}
         ${n.todo ? '</div>' : ''}
       </div>`).join('')
     : '<div class="note muted">No notes on this home yet.</div>';
+
+  // put back whatever was being typed in an open comment box
+  const replyBox = $('notesList').querySelector('[data-reply-input]');
+  if(replyBox){
+    replyBox.value = replyDraft;
+    if(replyFocus){ replyBox.focus(); replyBox.setSelectionRange(replyDraft.length, replyDraft.length); }
+  }
 
   // arriving from the bell (house.html?id=…#notes) lands on the notes
   if(!scrolledToNotes && location.hash === '#notes' && notesState === 'ready'){
@@ -729,7 +801,7 @@ function renderNotes(){
 // Opening the home counts as reading the notes that mention you, so the bell clears.
 function markNotesRead(){
   const me = myUid();
-  const unread = notes.filter(n=>(n.mentions||[]).includes(me) && !(n.readBy && n.readBy[me]));
+  const unread = notes.filter(n=>((n.mentions||[]).includes(me) || (n.watchers||[]).includes(me)) && !(n.readBy && n.readBy[me]));
   if(!me || !unread.length) return;
   const batch = db.batch();
   unread.forEach(n=>batch.update(db.collection('notes').doc(n.id), new firebase.firestore.FieldPath('readBy', me), true));
@@ -763,7 +835,33 @@ $('noteAddBtn').addEventListener('click', async ()=>{
   } catch(err){ console.error(err); alert('Could not save the note — check your connection and try again.'); }
   $('noteAddBtn').disabled = false;
 });
+$('notesList').addEventListener('input', e=>{
+  if(!e.target.matches('[data-reply-input]')) return;
+  replyDraft = e.target.value;
+  updateMentionMenu(e.target);
+});
+$('notesList').addEventListener('keydown', e=>{
+  if(!e.target.matches('[data-reply-input]')) return;
+  if(mentionKey(e)) return;
+  if(e.key === 'Enter'){ e.preventDefault(); postReply(e.target.dataset.replyInput); }
+  else if(e.key === 'Escape'){ replyOpenId = null; replyDraft = ''; replyFocus = false; renderNotes(); }
+});
+$('notesList').addEventListener('focusin', e=>{ if(e.target.matches('[data-reply-input]')) replyFocus = true; });
+$('notesList').addEventListener('focusout', e=>{ if(e.target.matches('[data-reply-input]')){ replyFocus = false; setTimeout(closeMentionMenu, 150); } });
 $('notesList').addEventListener('click', async e=>{
+  const opener = e.target.closest('[data-reply-open]');
+  if(opener){ replyOpenId = opener.dataset.replyOpen; replyDraft = ''; replyFocus = true; renderNotes(); return; }
+  const sender = e.target.closest('[data-reply-send]');
+  if(sender){ postReply(sender.dataset.replySend); return; }
+  const delReply = e.target.closest('[data-delete-reply]');
+  if(delReply){
+    const note = notes.find(x=>x.id === delReply.dataset.deleteReply);
+    const reply = note && (note.replies || []).find(r=>r.id === delReply.dataset.replyId);
+    if(!reply || !confirm('Delete this comment? This cannot be undone.')) return;
+    try{ await db.collection('notes').doc(note.id).update({ replies: firebase.firestore.FieldValue.arrayRemove(reply) }); }
+    catch(err){ console.error(err); alert('Could not delete the comment — check your connection and try again.'); }
+    return;
+  }
   const check = e.target.closest('[data-todo]');
   if(check){
     const n = notes.find(x=>x.id === check.dataset.todo);
@@ -784,15 +882,19 @@ $('notesList').addEventListener('click', async e=>{
 
 /* ---- the @ menu: type @ and a few letters, pick a person ---- */
 let mentionStart = -1;   // where the "@" being typed sits in the text
+let mentionBox = null;   // the box being typed in: the note box, or a comment box
 function closeMentionMenu(){ $('mentionMenu').classList.remove('show'); mentionStart = -1; }
-function updateMentionMenu(){
-  const box = $('noteText');
+function updateMentionMenu(target){
+  const box = mentionBox = (target && target.nodeType === 1) ? target : $('noteText');
+  const inComment = box !== $('noteText');
+  // the menu lives next to the box it belongs to, so it opens right under it
+  if($('mentionMenu').parentNode !== box.parentNode) box.parentNode.appendChild($('mentionMenu'));
   const before = box.value.slice(0, box.selectionStart);
   // an "@" at the start of a word, plus whatever has been typed after it (names can have spaces)
   const m = /(^|\s)@([^@\n]{0,40})$/.exec(before);
   if(!m){ closeMentionMenu(); return; }
   const typed = m[2].toLowerCase();
-  const offerTodo = 'todo'.startsWith(typed.replace('-', '')) && !/(^|\s)@to-?do\b/i.test(box.value.replace(m[0], ''));
+  const offerTodo = !inComment && 'todo'.startsWith(typed.replace('-', '')) && !/(^|\s)@to-?do\b/i.test(box.value.replace(m[0], ''));
   // The list opens the moment "@" is typed and narrows with each letter. Names that
   // start with what's typed come first, then anything containing it (name or email).
   const starts = staff.filter(s=>s.name.toLowerCase().startsWith(typed));
@@ -807,7 +909,7 @@ function updateMentionMenu(){
 }
 function pickMention(uid){
   const s = uid === '__todo' ? { name: 'todo' } : staff.find(x=>x.uid === uid);
-  const box = $('noteText');
+  const box = mentionBox || $('noteText');
   if(!s || mentionStart < 0) return;
   const insert = '@' + s.name + ' ';
   box.value = box.value.slice(0, mentionStart) + insert + box.value.slice(box.selectionStart);
@@ -815,10 +917,13 @@ function pickMention(uid){
   closeMentionMenu();
   box.focus();
   box.setSelectionRange(caret, caret);
+  if(box.matches('[data-reply-input]')) replyDraft = box.value;
 }
-$('noteText').addEventListener('input', updateMentionMenu);
-$('noteText').addEventListener('keydown', e=>{
-  if(!$('mentionMenu').classList.contains('show')) return;
+$('noteText').addEventListener('input', e=>updateMentionMenu(e.target));
+$('noteText').addEventListener('keydown', e=>{ mentionKey(e); });
+// Keys while the @ menu is open (pick, move, close). Returns true if the key was used up.
+function mentionKey(e){
+  if(!$('mentionMenu').classList.contains('show')) return false;
   if(e.key === 'Enter' || e.key === 'Tab'){
     e.preventDefault();
     pickMention($('mentionMenu').querySelector('button.on').dataset.uid);
@@ -830,8 +935,9 @@ $('noteText').addEventListener('keydown', e=>{
     const i = items.findIndex(b=>b.classList.contains('on'));
     items[i].classList.remove('on');
     items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].classList.add('on');
-  }
-});
+  } else return false;
+  return true;
+}
 $('mentionMenu').addEventListener('mousedown', e=>{
   const b = e.target.closest('button[data-uid]');
   if(b){ e.preventDefault(); pickMention(b.dataset.uid); }
