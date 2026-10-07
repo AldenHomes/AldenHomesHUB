@@ -125,6 +125,15 @@
   @media (max-width:640px){ .titlebar-stats{display:none;} }
   /* ---- phone-size fixes ---- */
 html, body{max-width:100%; overflow-x:clip;}
+  @media (max-width:640px){
+    /* header buttons wrap instead of running off the side; the signed-in email drops to its own line */
+    .titlebar-account{flex-wrap:wrap; width:100%; gap:8px 10px;}
+    .titlebar-account #currentUserEmail{order:20; flex:1 1 100%; overflow-wrap:anywhere;}
+    /* the green "Synced" light sits up beside the page title, out of the button row */
+    .titlebar{position:relative;}
+    .titlebar .sync-badge{position:absolute; top:16px; right:14px;}
+    .titlebar .brand{padding-right:74px;}
+  }
   .item-text, .group-head{overflow-wrap:anywhere;}
   @media (max-width:640px){
     .add-row select{flex:1 1 100%;}

@@ -228,6 +228,15 @@
   /* ---- phone-size fixes ---- */
 html, body{max-width:100%; overflow-x:clip;}
   @media (max-width:640px){
+    /* header buttons wrap instead of running off the side; the signed-in email drops to its own line */
+    .titlebar-account{flex-wrap:wrap; width:100%; gap:8px 10px;}
+    .titlebar-account #currentUserEmail{order:20; flex:1 1 100%; overflow-wrap:anywhere;}
+    /* the green "Synced" light sits up beside the page title, out of the button row */
+    .titlebar{position:relative;}
+    .titlebar .sync-badge{position:absolute; top:16px; right:14px;}
+    .titlebar .brand{padding-right:74px;}
+  }
+  @media (max-width:640px){
     /* the bell's list used to open off the left edge; now it spans the screen under the header */
     .bell-wrap{position:static;}
     .bell-panel{position:absolute; left:12px; right:12px; top:auto; width:auto; margin-top:8px;}
@@ -243,6 +252,14 @@ html, body{max-width:100%; overflow-x:clip;}
     .mw-go{margin-left:35px;}
     .mw-day{flex:1 1 40%;}
     .welcome{align-items:center;}
+    /* hub header: Search and the bell on the left, Settings and Sign out stacked on the right, email underneath */
+    .titlebar-account{display:grid; grid-template-columns:auto auto auto 1fr auto; align-items:center; gap:6px 10px;}
+    .titlebar-account > #hubSearchBtn{grid-column:1; grid-row:1 / span 2;}
+    .titlebar-account > .bell-wrap{grid-column:2; grid-row:1 / span 2;}
+    .titlebar-account > #installBtn{grid-column:3; grid-row:1 / span 2;}
+    .titlebar-account > a.signout-btn{grid-column:5; grid-row:1; text-align:center;}
+    .titlebar-account > #signOutBtn{grid-column:5; grid-row:2;}
+    .titlebar-account > #currentUserEmail{grid-column:1 / -1; grid-row:3;}
   }
 </style>
 </head>
