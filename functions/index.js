@@ -39,7 +39,7 @@ function fileForSub(id, f){
   // Photos are tagged with who added them. Staff show simply as "Alden Homes" to subs —
   // the office sees the individual's name, but it isn't handed out to vendors.
   const by = f.by && f.by.type === 'sub' ? (f.by.name || 'Subcontractor') : 'Alden Homes';
-  return { id, kind: f.kind || 'photo', name: f.name || '', url: f.url || '', caption: f.caption || '', folder: f.folder || '', by, at: f.uploadedAt || '' };
+  return { id, kind: f.kind || 'photo', name: f.name || '', url: f.url || '', caption: f.caption || '', folder: f.folder || '', taskId: f.taskId || '', taskTitle: f.taskTitle || '', by, at: f.uploadedAt || '' };
 }
 // A sub may only open a house the office has sent out AND where they have at least one task.
 async function houseForSub(houseId, subId){
@@ -305,6 +305,10 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
     ]);
 
     // Progress: how far along, which phase, what's happening now and what's next — no sub names.
+    // how many photos were posted against each task, so finished steps can show their pictures
+    const photosPerTask = {};
+    filesSnap.forEach(d=>{ const f = d.data(); if(f.kind === 'photo' && f.taskId) photosPerTask[f.taskId] = (photosPerTask[f.taskId] || 0) + 1; });
+
     let progress = null;
     if(schedDoc.exists){
       const tasks = (schedDoc.data().tasks || []).filter(t=>t.start);
@@ -314,15 +318,17 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
       tasks.forEach(t=>{
         const name = t.phase || 'General';
         let p = phases.find(x=>x.name === name);
-        if(!p){ p = { name, total: 0, done: 0, active: false }; phases.push(p); }
+        if(!p){ p = { name, total: 0, done: 0, active: false, tasks: [] }; phases.push(p); }
         p.total++;
         if(isDone(t)) p.done++;
         if(isNow(t)) p.active = true;
+        // each step of the phase: its name, where it stands, and how many photos it has — no dates, no sub names
+        p.tasks.push({ id: t.id || '', title: plainTitle(t.title), state: isDone(t) ? 'done' : (isNow(t) ? 'now' : 'upcoming'), photos: photosPerTask[t.id] || 0 });
       });
       const done = tasks.filter(isDone).length;
       progress = {
         percent: tasks.length ? Math.round(done / tasks.length * 100) : 0,
-        phases: phases.map(p=>({ name: p.name, state: p.done === p.total ? 'done' : (p.active || p.done > 0 ? 'now' : 'upcoming') })),
+        phases: phases.map(p=>({ name: p.name, state: p.done === p.total ? 'done' : (p.active || p.done > 0 ? 'now' : 'upcoming'), tasks: p.tasks })),
         now: tasks.filter(isNow).map(t=>plainTitle(t.title)),
         next: tasks.filter(t=>!isDone(t) && t.start > today).slice(0, 3).map(t=>plainTitle(t.title)),
       };
@@ -333,7 +339,7 @@ exports.homePortal = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, asyn
       const f = d.data();
       if(f.kind === 'folder'){ if(f.name) folders.push(f.name); }
       else if(f.kind === 'plan') plans.push({ id: d.id, name: f.name || 'Plan', url: f.url || '', at: f.uploadedAt || '' });
-      else photos.push({ id: d.id, url: f.url || '', folder: f.folder || '', caption: f.caption || '', at: f.uploadedAt || '' });
+      else photos.push({ id: d.id, url: f.url || '', folder: f.folder || '', caption: f.caption || '', taskId: f.taskId || '', at: f.uploadedAt || '' });
     });
     photos.sort((a, b)=>(b.at || '').localeCompare(a.at || '')); // newest first
     plans.sort((a, b)=>(a.name || '').localeCompare(b.name || ''));

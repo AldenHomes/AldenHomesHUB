@@ -125,6 +125,8 @@
   .viewer .cap{color:#eee; font-size:14px; margin-top:12px; text-align:center;}
   .viewer button{position:absolute; top:10px; right:12px; background:none; border:none; color:#fff; font-size:34px; line-height:1; cursor:pointer;}
 
+  .toast{position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:60; width:max-content; max-width:calc(100% - 28px); background:var(--navy-2); color:#fff; font-size:15px; font-weight:600; padding:12px 18px; border-radius:24px; box-shadow:0 6px 20px rgba(0,0,0,.3); display:none; text-align:center;}
+  .toast.show{display:block;}
   .prefs{margin-top:34px; padding-top:18px; border-top:1px solid #e2ddd0; font-size:14.5px; color:var(--ink-soft); text-align:center; line-height:1.6;}
   .seg{display:inline-flex; margin-top:8px; border:2px solid var(--steel-line); border-radius:8px; overflow:hidden; background:#fff;}
   .seg button{border:none; background:#fff; padding:10px 20px; font-size:15px; font-weight:700; color:var(--ink-soft); cursor:pointer; font-family:inherit;}
@@ -239,6 +241,10 @@
   </div>
 </div>
 
+<!-- shared by every job's "Add photos" button -->
+<input type="file" id="taskPhotoInput" accept="image/*" multiple style="display:none;">
+<div class="toast" id="toast"></div>
+
 <div class="viewer" id="viewer">
   <button type="button" id="viewerClose" aria-label="Close">&times;</button>
   <img id="viewerImg" alt="">
@@ -304,7 +310,7 @@ const demoState = {
     d1: [
       { id:'f1', kind:'plan', name:'Coleman — Floor Plans Rev B.pdf', url:'#', by:'Alden Homes', at:demoIso(-40) },
       { id:'f2', kind:'plan', name:'Kitchen layout — Lot 70.pdf', url:'#', by:'Alden Homes', at:demoIso(-12) },
-      { id:'f4', kind:'photo', name:'', url:demoPhoto(30,'Trim delivery'), caption:'Trim staged in garage', folder:'Trim', by:'Alden Homes', at:demoIso(-2) },
+      { id:'f4', kind:'photo', name:'', url:demoPhoto(30,'Trim delivery'), caption:'Trim staged in garage', folder:'Trim', taskId:'c', taskTitle:'TRIM INSTALL', by:'Sample Trim & Kitchens', at:demoIso(-2) },
       { id:'f3', kind:'photo', name:'', url:demoPhoto(95,'Kitchen — before'), caption:'Kitchen wall before cabinets', folder:'Kitchen', by:'Alden Homes', at:demoIso(-3) },
       { id:'f6', kind:'photo', name:'', url:demoPhoto(200,'Rough-in'), caption:'Plumbing rough-in', folder:'', by:'Sample Plumbing Co.', at:demoIso(-20) },
     ],
@@ -319,7 +325,8 @@ async function demoApi(action, extra){
   if(action === 'setNotify'){ demoState.sub.notify = extra.notify; return { notify: extra.notify }; }
   if(action === 'house') return { house: DEMO_HOUSES[extra.houseId], folders: extra.houseId === 'd1' ? ['Kitchen', 'Trim'] : [], tasks: copy(demoState.tasks.filter(t=>t.houseId===extra.houseId)), files: copy(demoState.files[extra.houseId] || []) };
   if(action === 'addPhoto'){
-    const f = { id:'n'+Date.now(), kind:'photo', name:'', url: extra.dataUrl, caption:'', folder: extra.folder || '', by: demoState.sub.name, at: new Date().toISOString() };
+    const forTask = demoState.tasks.find(x=>x.houseId===extra.houseId && x.taskId===extra.taskId);
+    const f = { id:'n'+Date.now()+Math.random(), kind:'photo', name:'', url: extra.dataUrl, caption:'', folder: extra.folder || '', taskId: forTask ? forTask.taskId : '', taskTitle: forTask ? forTask.title : '', by: demoState.sub.name, at: new Date().toISOString() };
     demoState.files[extra.houseId].unshift(f);
     return { file: f };
   }
@@ -395,9 +402,12 @@ function jobCard(t, kind){
     chip = t.done ? '<span class="chip finished">Done</span>'
          : happening ? '<span class="chip now">Happening now</span>'
          : '<span class="chip confirmed">Confirmed</span>';
+    // photos go against this specific job, so the office and the home buyer see them with the right step
+    const photoBtn = `<button class="btn btn-plain" data-add-photos ${key}>Add photos</button>`;
     buttons = t.done
-      ? `<button class="link-btn" data-act="undone" ${key}>Not finished after all? Undo</button>`
-      : `<div class="btn-row"><button class="btn ${t.start <= today ? 'btn-yes' : 'btn-plain'}" data-act="done" ${key}>Mark done</button></div>
+      ? `<div class="btn-row">${photoBtn}</div>
+         <button class="link-btn" data-act="undone" ${key}>Not finished after all? Undo</button>`
+      : `<div class="btn-row"><button class="btn ${t.start <= today ? 'btn-yes' : 'btn-plain'}" data-act="done" ${key}>Mark done</button>${photoBtn}</div>
          <button class="link-btn" data-act="declined" ${key}>Can't make it any more</button>`;
   } else {
     chip = '<span class="chip declined">Can\'t make it</span>';
@@ -512,6 +522,14 @@ document.body.addEventListener('click', async e=>{
   const opener = e.target.closest('[data-open-house]');
   if(opener){ openHouse(opener.dataset.openHouse); return; }
 
+  // "Add photos" on a specific job: remember which job, then open the camera / photo picker
+  const adder = e.target.closest('[data-add-photos]');
+  if(adder){
+    photoTarget = { houseId: adder.dataset.house, taskId: adder.dataset.task };
+    $('taskPhotoInput').click();
+    return;
+  }
+
   const btn = e.target.closest('[data-act]');
   if(!btn) return;
   const act = btn.dataset.act;
@@ -584,8 +602,13 @@ function renderHouse(){
     ? `<a href="${esc(mapLink(h.address))}" target="_blank" rel="noopener">${esc(h.address)}</a><div style="font-size:13.5px; color:var(--ink-soft); margin-top:3px;">Tap the address for directions${h.model ? ' · ' + esc(h.model) : ''}</div>`
     : '<span style="color:var(--ink-soft);">No address on file.</span>';
 
-  $('houseJobs').innerHTML = house.tasks.length ? house.tasks.map(t=>
-    `<div class="mini-job"><span><div style="font-weight:700; color:var(--navy);">${esc(t.title)}</div><div class="d">${esc(whenText(t))}</div></span>${statusChip(t)}</div>`).join('')
+  $('houseJobs').innerHTML = house.tasks.length ? house.tasks.map(t=>{
+    const n = house.files.filter(f=>f.kind === 'photo' && f.taskId === t.taskId).length;
+    return `<div class="mini-job">
+      <span><div style="font-weight:700; color:var(--navy);">${esc(t.title)}</div><div class="d">${esc(whenText(t))}${n ? ` · ${n} photo${n===1?'':'s'}` : ''}</div></span>
+      <span style="text-align:right; flex:none;">${statusChip(t)}${t.answer === 'confirmed' ? `<br><button type="button" class="link-btn" style="margin-top:2px;" data-add-photos data-house="${esc(t.houseId)}" data-task="${esc(t.taskId)}">Add photos</button>` : ''}</span>
+    </div>`;
+  }).join('')
     : '<span style="color:var(--ink-soft);">No jobs listed.</span>';
 
   const plans = house.files.filter(f=>f.kind === 'plan');
@@ -628,7 +651,7 @@ $('housePhotos').addEventListener('click', e=>{
   const f = house.files.find(x=>x.id === a.dataset.photo);
   if(!f) return;
   $('viewerImg').src = f.url;
-  $('viewerCap').textContent = [f.caption, f.by ? 'From ' + f.by : ''].filter(Boolean).join(' · ');
+  $('viewerCap').textContent = [f.taskTitle, f.caption, f.by ? 'From ' + f.by : ''].filter(Boolean).join(' · ');
   $('viewer').classList.add('show');
 });
 $('viewerClose').addEventListener('click', ()=>$('viewer').classList.remove('show'));
@@ -653,30 +676,47 @@ function shrinkPhoto(file){
     img.src = url;
   });
 }
-$('photoInput').addEventListener('change', async e=>{
-  const files = Array.from(e.target.files || []);
-  e.target.value = '';
-  if(!files.length || !house) return;
-  const houseId = house.id;
-  // if they have a job going on here right now, file the photos under it
-  const current = house.tasks.find(t=>t.start <= today && t.end >= today && !t.done) || house.tasks.find(t=>!t.done) || null;
-  $('houseError').classList.remove('show');
-  $('addPhotoBtn').style.opacity = '.5';
-  $('addPhotoBtn').style.pointerEvents = 'none';
+let photoTarget = null;   // which job the "Add photos" button that was tapped belongs to
+let toastTimer = null;
+function toast(msg, sticky){
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  if(!sticky) toastTimer = setTimeout(()=>el.classList.remove('show'), 3500);
+}
+
+// Upload a batch of photos. taskId ties them to one of the sub's jobs ('' = just the house).
+let uploading = false;
+async function uploadPhotos(fileList, target){
+  const files = Array.from(fileList || []);
+  if(!files.length || !target || uploading) return;
+  uploading = true;
+  const task = tasks.find(t=>t.houseId === target.houseId && t.taskId === target.taskId) || null;
   let failed = 0;
   for(let i = 0; i < files.length; i++){
-    $('uploadNote').textContent = `Uploading photo ${i+1} of ${files.length}…`;
+    toast(`Uploading photo ${i+1} of ${files.length}…`, true);
     try{
       const dataUrl = await shrinkPhoto(files[i]);
-      const data = await api('addPhoto', { houseId, taskId: current ? current.taskId : '', folder: house && house.folder !== ALL ? house.folder : '', dataUrl });
-      if(house && house.id === houseId){ house.files.unshift(data.file); renderHouse(); }
+      const data = await api('addPhoto', { houseId: target.houseId, taskId: target.taskId || '', folder: target.folder || '', dataUrl });
+      if(house && house.id === target.houseId){ house.files.unshift(data.file); renderHouse(); }
     } catch(err){ console.error(err); failed++; }
   }
-  $('addPhotoBtn').style.opacity = '';
-  $('addPhotoBtn').style.pointerEvents = '';
+  uploading = false;
   const ok = files.length - failed;
-  $('uploadNote').textContent = ok ? `${ok} photo${ok===1?'':'s'} added. Thank you!` : '';
-  if(failed) showError(`${failed} photo${failed===1?'':'s'} didn't upload. Check your connection and try again.`, 'houseError');
+  if(failed) toast(`${failed} photo${failed===1?'':'s'} didn't upload. Check your connection and try again.`);
+  else toast(`${ok} photo${ok===1?'':'s'} added${task ? ' to ' + task.title : ''}. Thank you!`);
+}
+
+// the house screen's own button: photos of the house in general, into the open folder if there is one
+$('photoInput').addEventListener('change', e=>{
+  const files = e.target.files;
+  if(house) uploadPhotos(files, { houseId: house.id, taskId: '', folder: house.folder !== ALL ? house.folder : '' }).then(()=>{ e.target.value = ''; });
+});
+// "Add photos" on a job
+$('taskPhotoInput').addEventListener('change', e=>{
+  const files = e.target.files;
+  uploadPhotos(files, photoTarget).then(()=>{ e.target.value = ''; });
 });
 
 load();

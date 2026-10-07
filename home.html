@@ -52,6 +52,25 @@
   .pct small{font-size:15px; font-weight:400; color:var(--ink-soft); margin-left:6px;}
   .bar{height:12px; background:#e7e2d5; border-radius:6px; overflow:hidden; margin:12px 0 18px;}
   .bar div{height:100%; background:var(--good); border-radius:6px;}
+  button.phase{width:100%; background:none; border:none; text-align:left; font-family:inherit; color:inherit; cursor:pointer;}
+  .phase .pname{flex:1; min-width:0;}
+  .phase .pics{display:block; font-size:12px; font-weight:400; color:var(--ink-soft); margin-top:1px;}
+  .phase .tagline{margin-left:0 !important;}
+  .phase .chev{flex:none; color:#b9b4a5; font-size:20px; line-height:1; transition:transform .15s;}
+  .phase.open .chev{transform:rotate(90deg);}
+  .steps{margin:2px 0 10px 13px; padding-left:22px; border-left:2px solid #ece8dd;}
+  .step{display:flex; align-items:center; gap:10px; width:100%; padding:8px 0; font-size:15px; color:var(--ink-soft); background:none; border:none; text-align:left; font-family:inherit;}
+  .step .mark{flex:none; width:16px; text-align:center; font-size:12px; color:#c5c0b2;}
+  .step.done{color:var(--ink);} .step.done .mark{color:var(--good); font-weight:800; font-size:14px;}
+  .step.now{color:var(--navy); font-weight:700;} .step.now .mark{color:var(--amber);}
+  .step .st{flex:1; min-width:0;}
+  .step.has-photos{cursor:pointer;}
+  .step .see{flex:none; font-size:13px; font-weight:700; color:var(--rust-2); background:#f3f5ee; border:1px solid #dfe3d3; border-radius:20px; padding:3px 10px;}
+  .screen{position:fixed; inset:0; background:var(--paper); z-index:20; overflow-y:auto; display:none;}
+  .screen.show{display:block;}
+  .screen-top{position:sticky; top:0; background:var(--paper-2); border-bottom:4px solid var(--rust); padding:12px 14px; display:flex; align-items:center; gap:10px; z-index:2;}
+  .screen-top button{border:2px solid var(--steel-line); background:#fff; border-radius:8px; padding:9px 14px; font-size:15px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit;}
+  .screen-top .ttl{font-size:17px; font-weight:700; color:var(--navy); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .phase{display:flex; align-items:center; gap:12px; padding:9px 0; font-size:16px;}
   .phase .dot{flex:none; width:26px; height:26px; border-radius:50%; border:2px solid var(--steel-line); display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; font-weight:800;}
   .phase.done .dot{background:var(--good); border-color:var(--good);}
@@ -143,6 +162,15 @@
   <footer>Alden Homes — Handcrafted Homes &amp; Communities</footer>
 </div>
 
+<!-- photos for one finished step -->
+<div class="screen" id="stepScreen">
+  <div class="screen-top">
+    <button type="button" id="stepBack">&lsaquo; Back</button>
+    <div class="ttl" id="stepTitle"></div>
+  </div>
+  <div class="wrap" style="padding-top:16px;"><div class="card" id="stepPhotos"></div></div>
+</div>
+
 <div class="viewer" id="viewer">
   <button type="button" id="viewerClose" aria-label="Close">&times;</button>
   <img id="viewerImg" alt="">
@@ -163,6 +191,8 @@ const ALL = '__all';
 
 let data = null;        // what the server sent back for this home
 let folder = ALL;       // which photo folder is showing
+const openPhases = new Set();   // which stages of the build are expanded
+let phasesPrimed = false;       // the stage in progress starts out open
 
 const $ = id => document.getElementById(id);
 function esc(s){
@@ -191,19 +221,24 @@ function demoData(){
     progress: {
       percent: 62,
       phases: [
-        { name:'Pre-Construction', state:'done' }, { name:'Foundation', state:'done' }, { name:'Framing', state:'done' },
-        { name:'Rough-Ins', state:'done' }, { name:'Exterior Finishes', state:'done' }, { name:'Drywall/Insulation', state:'done' },
-        { name:'Interior Finishes', state:'now' }, { name:'Final Finishes', state:'upcoming' },
+        { name:'Pre-Construction', state:'done', tasks:[ { id:'t1', title:'Plan review', state:'done', photos:0 } ] },
+        { name:'Foundation', state:'done', tasks:[ { id:'t2', title:'Basement excavation', state:'done', photos:0 }, { id:'t3', title:'Pour basement floor', state:'done', photos:0 } ] },
+        { name:'Framing', state:'done', tasks:[ { id:'t4', title:'Sub floor framing', state:'done', photos:1 }, { id:'t5', title:'Frame', state:'done', photos:1 }, { id:'t6', title:'Trusses', state:'done', photos:0 } ] },
+        { name:'Rough-Ins', state:'done', tasks:[ { id:'t7', title:'Plumbing rough-in', state:'done', photos:0 }, { id:'t8', title:'Electrical rough-in', state:'done', photos:0 } ] },
+        { name:'Exterior Finishes', state:'done', tasks:[ { id:'t9', title:'Siding install', state:'done', photos:0 } ] },
+        { name:'Drywall/Insulation', state:'done', tasks:[ { id:'t10', title:'Wall insulation', state:'done', photos:0 }, { id:'t11', title:'Drywall', state:'done', photos:1 } ] },
+        { name:'Interior Finishes', state:'now', tasks:[ { id:'t12', title:'Trim delivery', state:'done', photos:0 }, { id:'t13', title:'Trim install', state:'now', photos:1 }, { id:'t14', title:'Painting', state:'upcoming', photos:0 }, { id:'t15', title:'Kitchen install', state:'upcoming', photos:0 } ] },
+        { name:'Final Finishes', state:'upcoming', tasks:[ { id:'t16', title:'Carpet', state:'upcoming', photos:0 }, { id:'t17', title:'Cleaning', state:'upcoming', photos:0 } ] },
       ],
       now: ['Trim install'], next: ['Painting', 'Light delivery', 'Electrical finish out'],
     },
     folders: ['Framing', 'Kitchen'],
     photos: [
-      { id:'p1', url:demoPhoto(30,'Trim going in'), folder:'', caption:'', at:iso(-1) },
-      { id:'p2', url:demoPhoto(95,'Kitchen walls'), folder:'Kitchen', caption:'', at:iso(-6) },
-      { id:'p3', url:demoPhoto(200,'Drywall hung'), folder:'', caption:'', at:iso(-20) },
-      { id:'p4', url:demoPhoto(28,'Second floor framed'), folder:'Framing', caption:'', at:iso(-60) },
-      { id:'p5', url:demoPhoto(40,'First floor walls'), folder:'Framing', caption:'', at:iso(-66) },
+      { id:'p1', url:demoPhoto(30,'Trim going in'), folder:'', caption:'', taskId:'t13', at:iso(-1) },
+      { id:'p2', url:demoPhoto(95,'Kitchen walls'), folder:'Kitchen', caption:'', taskId:'', at:iso(-6) },
+      { id:'p3', url:demoPhoto(200,'Drywall hung'), folder:'', caption:'', taskId:'t11', at:iso(-20) },
+      { id:'p4', url:demoPhoto(28,'Second floor framed'), folder:'Framing', caption:'', taskId:'t5', at:iso(-60) },
+      { id:'p5', url:demoPhoto(40,'First floor walls'), folder:'Framing', caption:'', taskId:'t4', at:iso(-66) },
     ],
     plans: [ { id:'f1', name:'Coleman — Floor Plans.pdf', url:'#' }, { id:'f2', name:'Site Plan — Lot 70.pdf', url:'#' } ],
   };
@@ -247,14 +282,31 @@ function render(){
   if(!p){
     $('progress').innerHTML = '<div class="quiet">Your build schedule isn\'t set up here yet. Once it is, you\'ll see each stage of your home come together on this page.</div>';
   } else {
+    if(!phasesPrimed){ phasesPrimed = true; p.phases.filter(ph=>ph.state === 'now').forEach(ph=>openPhases.add(ph.name)); }
     const label = { done:'Done', now:'In progress', upcoming:'' };
     $('progress').innerHTML = `
       <div class="pct">${p.percent}%<small>complete</small></div>
       <div class="bar"><div style="width:${p.percent}%"></div></div>
-      ${p.phases.map(ph=>`<div class="phase ${ph.state}"><span class="dot">${ph.state === 'done' ? '✓' : ''}</span>${esc(ph.name)}<span class="tagline">${label[ph.state]}</span></div>`).join('')}
+      ${p.phases.map((ph, i)=>{
+        const steps = ph.tasks || [];
+        const open = openPhases.has(ph.name);
+        const pics = steps.reduce((n, t)=>n + (t.photos || 0), 0);
+        return `<button type="button" class="phase ${ph.state}${open ? ' open' : ''}" data-phase="${esc(ph.name)}" aria-expanded="${open}">
+            <span class="dot">${ph.state === 'done' ? '✓' : ''}</span>
+            <span class="pname">${esc(ph.name)}${pics ? `<span class="pics">${pics} photo${pics===1?'':'s'}</span>` : ''}</span>
+            <span class="tagline">${label[ph.state]}</span>
+            <span class="chev">›</span>
+          </button>
+          ${open ? `<div class="steps">${steps.map(t=>{
+            const mark = t.state === 'done' ? '✓' : (t.state === 'now' ? '●' : '○');
+            return t.photos
+              ? `<button type="button" class="step ${t.state} has-photos" data-task="${esc(t.id)}"><span class="mark">${mark}</span><span class="st">${esc(t.title)}</span><span class="see">${t.photos} photo${t.photos===1?'':'s'} ›</span></button>`
+              : `<div class="step ${t.state}"><span class="mark">${mark}</span><span class="st">${esc(t.title)}</span></div>`;
+          }).join('')}</div>` : ''}`;
+      }).join('')}
       ${p.now.length ? `<div class="mini-h">Happening now</div>${p.now.map(t=>`<div class="item">${esc(t)}</div>`).join('')}` : ''}
       ${p.next.length ? `<div class="mini-h">Coming up next</div>${p.next.map(t=>`<div class="item">${esc(t)}</div>`).join('')}` : ''}
-      <div class="quiet" style="font-size:13px; margin-top:14px;">Building schedules shift with weather and deliveries, so treat this as a guide rather than fixed dates.</div>`;
+      <div class="quiet" style="font-size:13px; margin-top:14px;">Tap a stage to see its steps, and any step with photos to see them. Building schedules shift with weather and deliveries, so treat this as a guide rather than fixed dates.</div>`;
   }
 
   /* photos — newest first, with any folders as tabs */
@@ -274,17 +326,49 @@ function render(){
     : '<div class="quiet">No plans have been posted yet.</div>';
 }
 
+function openPhoto(id){
+  const f = data.photos.find(x=>x.id === id);
+  if(!f) return;
+  $('viewerImg').src = f.url;
+  $('viewerCap').textContent = [f.caption, f.at ? niceDate(f.at) : ''].filter(Boolean).join(' · ');
+  $('viewer').classList.add('show');
+}
 $('photos').addEventListener('click', e=>{
   const c = e.target.closest('[data-folder]');
   if(c){ folder = c.dataset.folder; render(); return; }
   const a = e.target.closest('a[data-photo]');
   if(!a) return;
   e.preventDefault();
-  const f = data.photos.find(x=>x.id === a.dataset.photo);
-  if(!f) return;
-  $('viewerImg').src = f.url;
-  $('viewerCap').textContent = [f.caption, f.at ? niceDate(f.at) : ''].filter(Boolean).join(' · ');
-  $('viewer').classList.add('show');
+  openPhoto(a.dataset.photo);
+});
+
+/* progress: open a stage to see its steps; open a step to see the photos taken of that work */
+$('progress').addEventListener('click', e=>{
+  const step = e.target.closest('[data-task]');
+  if(step){ openStep(step.dataset.task); return; }
+  const ph = e.target.closest('[data-phase]');
+  if(!ph) return;
+  const name = ph.dataset.phase;
+  openPhases.has(name) ? openPhases.delete(name) : openPhases.add(name);
+  render();
+});
+function openStep(taskId){
+  let title = '';
+  data.progress.phases.forEach(ph=>(ph.tasks || []).forEach(t=>{ if(t.id === taskId) title = t.title; }));
+  const pics = data.photos.filter(f=>f.taskId === taskId);
+  $('stepTitle').textContent = title || 'Photos';
+  $('stepPhotos').innerHTML = pics.length
+    ? `<div class="photos">${pics.map(f=>`<a href="${esc(f.url)}" data-photo="${esc(f.id)}"><img src="${esc(f.url)}" alt="Photo of this step" loading="lazy">${f.at ? `<span class="tag">${esc(shortDate(f.at))}</span>` : ''}</a>`).join('')}</div>`
+    : '<div class="quiet">No photos for this step yet.</div>';
+  $('stepScreen').classList.add('show');
+  $('stepScreen').scrollTop = 0;
+}
+$('stepBack').addEventListener('click', ()=>$('stepScreen').classList.remove('show'));
+$('stepPhotos').addEventListener('click', e=>{
+  const a = e.target.closest('a[data-photo]');
+  if(!a) return;
+  e.preventDefault();
+  openPhoto(a.dataset.photo);
 });
 $('viewerClose').addEventListener('click', ()=>$('viewer').classList.remove('show'));
 $('viewer').addEventListener('click', e=>{ if(e.target === $('viewer')) $('viewer').classList.remove('show'); });
