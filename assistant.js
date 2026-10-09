@@ -208,33 +208,69 @@
      (Firefox can't) — there the mic is hidden, and typing, or the keyboard's own
      microphone on a phone, still works. ---- */
   const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let rec = null, listening = false, heard = '';
-  function stopListening(){ if(rec && listening){ try{ rec.stop(); } catch(e){} } }
+  /* The mic stays on until it's pressed again (the owner found it cutting people off mid-sentence).
+     Browsers end a listening session by themselves after a pause, so each time one ends while the
+     mic is still "on" another is started and the words carry over: `base` is everything heard in
+     earlier sessions (or already typed in the box), `part` is the current session so far. */
+  const ANDROID = /Android/i.test(navigator.userAgent);   // its long sessions repeat words, so it gets short ones back to back
+  let rec = null, listening = false, base = '', part = '', sendOnStop = false, startedAt = 0, quickEnds = 0;
+  function micLooks(on){
+    el('aiMic').classList.toggle('listening', on);
+    el('aiMic').title = on ? 'Press again when you\'re done talking' : 'Talk';
+    el('aiText').placeholder = on ? 'Listening… press the microphone again when you\'re done' : 'Say it or type it…';
+  }
+  // switch the mic off; sendIt = send what was heard once the last words have come in
+  function micOff(sendIt){
+    if(!listening) return;
+    listening = false;
+    sendOnStop = !!sendIt;
+    micLooks(false);
+    try{ rec.stop(); } catch(e){}
+  }
+  function stopListening(){ micOff(false); }
+  function startSession(){
+    rec = new Speech();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    rec.continuous = !ANDROID;
+    part = '';
+    startedAt = Date.now();
+    rec.onresult = e=>{
+      if(!listening && !sendOnStop) return;   // switched off without sending (typed and pressed Send, or closed)
+      part = Array.from(e.results).map(r=>r[0].transcript).join(' ').replace(/\s+/g, ' ').trim();
+      el('aiText').value = (base + ' ' + part).trim();
+    };
+    rec.onerror = e=>{
+      if(e.error === 'no-speech' || e.error === 'aborted') return;   // just a pause — onend carries on
+      listening = false;
+      micLooks(false);
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed') add('The microphone is blocked for this page. Allow it in the browser\'s address bar, or just type instead.', 'ai-msg bot');
+    };
+    rec.onend = ()=>{
+      base = (base + ' ' + part).trim();
+      part = '';
+      if(listening){
+        // the browser stopped by itself; keep going unless it's refusing to start (then leave the words in the box)
+        quickEnds = Date.now() - startedAt < 1000 ? quickEnds + 1 : 0;
+        if(quickEnds < 4){ try{ startSession(); return; } catch(err){ console.error(err); } }
+        listening = false;
+        micLooks(false);
+        return;
+      }
+      if(sendOnStop){ sendOnStop = false; if(base) send(); }   // the Confirm step is the safety net
+    };
+    rec.start();
+  }
   if(!Speech){
     el('aiMic').style.display = 'none';
   } else {
     el('aiMic').addEventListener('click', ()=>{
-      if(listening){ stopListening(); return; }
-      rec = new Speech();
-      rec.lang = 'en-US';
-      rec.interimResults = true;
-      rec.continuous = false;
-      heard = '';
-      rec.onstart = ()=>{ listening = true; el('aiMic').classList.add('listening'); el('aiText').placeholder = 'Listening…'; };
-      rec.onresult = e=>{
-        heard = Array.from(e.results).map(r=>r[0].transcript).join(' ').trim();
-        el('aiText').value = heard;
-      };
-      rec.onerror = e=>{
-        if(e.error === 'not-allowed' || e.error === 'service-not-allowed') add('The microphone is blocked for this page. Allow it in the browser\'s address bar, or just type instead.', 'ai-msg bot');
-      };
-      rec.onend = ()=>{
-        listening = false;
-        el('aiMic').classList.remove('listening');
-        el('aiText').placeholder = 'Say it or type it…';
-        if(heard) send(); // send as soon as they stop talking — the Confirm step is the safety net
-      };
-      try{ rec.start(); } catch(e){ console.error(e); }
+      if(listening){ micOff(true); return; }
+      base = el('aiText').value.trim();   // carry on from anything already in the box
+      quickEnds = 0; sendOnStop = false;
+      listening = true;
+      micLooks(true);
+      try{ startSession(); } catch(e){ console.error(e); listening = false; micLooks(false); }
     });
   }
 })();
