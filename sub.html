@@ -914,11 +914,16 @@ function renderHouse(){
     </div>`).join('');
 
   const plans = house.files.filter(f=>f.kind === 'plan');
-  $('housePlans').innerHTML = plans.length ? plans.map(f=>
+  const planRow = f=>
     `<a class="file" href="${esc(f.url)}" target="_blank" rel="noopener">
       <span class="ic">${/\.pdf$/i.test(f.name) ? 'PDF' : 'FILE'}</span>
       <span><div class="n">${esc(f.name || 'Plan')}</div><div class="s">Tap to open</div></span>
-    </a>`).join('')
+    </a>`;
+  // files the office sorted into folders (Plans, Appliances…) sit under that folder's name
+  const planFolders = [...new Set(plans.map(f=>f.folder || '').filter(Boolean))].sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:'base' }));
+  $('housePlans').innerHTML = plans.length
+    ? plans.filter(f=>!f.folder).map(planRow).join('')
+      + planFolders.map(name=>`<div style="font-size:13px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft); margin:16px 0 6px;">${esc(name)}</div>${plans.filter(f=>f.folder === name).map(planRow).join('')}`).join('')
     : '<span style="color:var(--ink-soft); font-size:15px;">No plans have been posted for this house yet.</span>';
 
   // Photos: newest first, each tagged with who added it. Folders the office set up show as tabs.

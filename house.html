@@ -222,6 +222,11 @@
   .file-row:first-child{border-top:none; padding-top:0;}
   .file-row a{flex:1; min-width:0; color:var(--navy); font-weight:600; text-decoration:none; word-break:break-word;}
   .file-row a:hover{text-decoration:underline;}
+  .file-row select{flex:0 0 auto; max-width:120px; font-size:11.5px; padding:3px 4px; border:1px solid var(--steel-line); border-radius:4px; background:var(--paper-2); color:var(--ink-soft); font-family:inherit; cursor:pointer;}
+  .plan-folder{display:flex; align-items:center; gap:7px; margin-top:12px; padding:6px 10px; background:#f1ede3; border-radius:4px; font-size:12.5px; font-weight:700; color:var(--navy);}
+  .plan-folder:first-child{margin-top:0;}
+  .plan-folder .n{font-weight:400; color:var(--ink-soft); font-family:"Courier New",monospace; font-size:11px;}
+  .plan-folder + .file-row{border-top:none;}
   .x-btn{flex:none; border:none; background:transparent; color:var(--ink-soft); cursor:pointer; font-size:17px; line-height:1; padding:3px 7px; border-radius:3px;}
   .x-btn:hover{background:#fbeae4; color:#a8451a;}
   .photo-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:10px; margin-top:8px;}
@@ -448,7 +453,7 @@ html, body{max-width:100%; overflow-x:clip;}
             Upload plans
             <input type="file" id="planInput" accept="application/pdf,image/*" multiple style="display:none;">
           </label>
-          <div class="drag-hint">or drag PDFs and pictures onto this box</div>
+          <div class="drag-hint">or drag files, or a whole folder, onto this box</div>
           <a class="btn btn-ghost" id="filesBtn" href="#" target="_blank" rel="noopener" style="display:none;">Open OneDrive folder</a>
         </div>
 
@@ -474,7 +479,7 @@ html, body{max-width:100%; overflow-x:clip;}
           </div>
           <div class="card-body">
             <div class="folder-row" id="folderRow" style="display:none;"></div>
-            <div class="muted" style="font-size:12.5px; min-height:16px;"><span id="uploadTarget"></span> <span id="uploadNote"></span> <span class="drag-hint">You can also drag photos onto this box.</span></div>
+            <div class="muted" style="font-size:12.5px; min-height:16px;"><span id="uploadTarget"></span> <span id="uploadNote"></span> <span class="drag-hint">You can also drag photos, or a folder of photos, onto this box.</span></div>
             <div class="share-bar" id="shareBar"></div>
             <div class="photo-grid" id="photoGrid"></div>
           </div>
@@ -1626,10 +1631,7 @@ function renderFiles(){
   const plans = files.filter(f=>f.kind === 'plan');
   $('plansList').innerHTML = filesState === 'blocked' ? blocked
     : filesState === 'loading' ? '<span class="muted">Loading…</span>'
-    : plans.length ? plans.map(f=>`<div class="file-row">
-        <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name || 'Plan')}</a>
-        <button type="button" class="x-btn" data-delete="${esc(f.id)}" title="Remove">&times;</button>
-      </div>`).join('')
+    : plans.length ? plansHtml(plans)
     : '<span class="muted">No plans uploaded yet.</span>';
 
   // Photos: newest first (the list is already sorted by upload time), optionally narrowed to a folder.
@@ -1675,6 +1677,45 @@ function renderFiles(){
       }).join('')
     : (filesState === 'loading' ? '' : `<span class="muted">${allPhotos.length ? 'No photos in this folder yet.' : 'No photos yet. Photos added by subs on site show up here too.'}</span>`);
 }
+
+/* ---- folders in Prints & Files ----
+   Simpler than photo folders: a file just carries the name of its folder, and a folder is there
+   for as long as a file is in it. Dragging a folder in sets the name; the menu on each row moves a file. */
+function planFolderNames(){
+  const seen = {};
+  files.filter(f=>f.kind === 'plan' && f.folder).forEach(f=>{ if(!seen[f.folder.toLowerCase()]) seen[f.folder.toLowerCase()] = f.folder; });
+  return Object.values(seen).sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:'base' }));
+}
+function plansHtml(plans){
+  const folders = planFolderNames();
+  const byName = (a,b)=>(a.name || '').localeCompare(b.name || '', undefined, { numeric:true, sensitivity:'base' });
+  const row = f=>`<div class="file-row">
+        <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name || 'Plan')}</a>
+        <select data-plan-move="${esc(f.id)}" title="Put this file in a folder">
+          <option value="">${f.folder ? 'Move…' : 'Folder…'}</option>
+          ${folders.filter(x=>x.toLowerCase() !== (f.folder || '').toLowerCase()).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}
+          <option value="__new">New folder…</option>
+          ${f.folder ? '<option value="__none">Take out of folder</option>' : ''}
+        </select>
+        <button type="button" class="x-btn" data-delete="${esc(f.id)}" title="Remove">&times;</button>
+      </div>`;
+  const inFolder = name=>plans.filter(f=>(f.folder || '').toLowerCase() === name.toLowerCase()).sort(byName);
+  const loose = plans.filter(f=>!f.folder);
+  return (folders.length ? loose.slice().sort(byName) : loose).map(row).join('')
+    + folders.map(name=>`<div class="plan-folder"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>${esc(name)} <span class="n">${inFolder(name).length}</span></div>${inFolder(name).map(row).join('')}`).join('');
+}
+$('plansList').addEventListener('change', async e=>{
+  const sel = e.target.closest('select[data-plan-move]');
+  if(!sel || !sel.value) return;
+  let folder = sel.value === '__none' ? '' : sel.value;
+  if(sel.value === '__new'){
+    folder = (prompt('Name for the new folder (for example Plans, Appliances, or Selections):') || '').trim().slice(0, 60);
+    if(!folder){ sel.value = ''; return; }
+    folder = planFolderNames().find(x=>x.toLowerCase() === folder.toLowerCase()) || folder;   // same folder, however it's typed
+  }
+  try{ await db.collection('house-files').doc(sel.dataset.planMove).update({ folder }); }
+  catch(err){ console.error(err); alert('Could not move the file — check your connection and try again.'); sel.value = ''; }
+});
 
 /* ---- photo folders ----
    A folder is its own small record alongside the photos (kind: 'folder'), so an empty
@@ -1777,11 +1818,27 @@ function shrinkPhoto(file){
     img.src = url;
   });
 }
-async function uploadFiles(list, kind){
+async function uploadFiles(list, kind, folderOf){
   const picked = Array.from(list || []);
   if(!picked.length || !job) return;
   const user = firebase.auth().currentUser;
   let failed = 0;
+  // folderOf (optional): Map of file -> the folder it was dragged in with. Names are matched to
+  // folders already here however they're capitalised; a photo folder that's missing is made first.
+  const known = kind === 'photo' ? folderNames() : planFolderNames();
+  const folderFor = file=>{
+    const name = ((folderOf && folderOf.get(file)) || '').trim().slice(0, 60);
+    if(!name) return '';
+    let match = known.find(x=>x.toLowerCase() === name.toLowerCase());
+    if(!match){ known.push(name); match = name; if(kind === 'photo') newPhotoFolders.push(name); }
+    return match;
+  };
+  const newPhotoFolders = [];
+  const folders = new Map(picked.map(f=>[f, folderFor(f)]));
+  for(const name of newPhotoFolders){
+    try{ await db.collection('house-files').add({ houseId, kind:'folder', name, uploadedAt: new Date().toISOString(), by: { type:'staff', id: user ? user.uid : '', name: staffName() } }); }
+    catch(err){ console.error(err); }
+  }
   for(let i = 0; i < picked.length; i++){
     const file = picked[i];
     $('uploadNote').textContent = `Uploading ${kind === 'plan' ? 'file' : 'photo'} ${i+1} of ${picked.length}…`;
@@ -1797,8 +1854,8 @@ async function uploadFiles(list, kind){
         houseId, kind, name: file.name, path, url: await stored.getDownloadURL(),
         contentType: isPhoto ? 'image/jpeg' : (file.type || ''), size: blob.size,
         caption: '', taskId: '', taskTitle: '', phase: '',
-        // a photo goes into whichever folder is open when it's added
-        folder: isPhoto && currentFolder !== ALL ? currentFolder : '',
+        // from a dragged-in folder: that folder. Otherwise a photo goes into whichever folder is open.
+        folder: folders.get(file) || (isPhoto && currentFolder !== ALL ? currentFolder : ''),
         by: { type: 'staff', id: user ? user.uid : '', name: staffName() },
         uploadedAt: new Date().toISOString(),
       });
@@ -1819,6 +1876,21 @@ const dragHasFiles = e=>!!e.dataTransfer && Array.from(e.dataTransfer.types || [
 const dropCardOf = e=>{ const c = e.target && e.target.closest ? e.target.closest('#notesCard, #plansCard, #photosCard') : null; return c ? c.id : ''; };
 const isPicture = f=>/^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(f.name);
 const isPdf = f=>f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+// Everything inside a dragged-in folder, each file tagged with the folder it sits in.
+function entryFiles(entry, parent){
+  if(entry.isFile) return new Promise(res=>entry.file(f=>res([{ file: f, folder: parent }]), ()=>res([])));
+  if(!entry.isDirectory) return Promise.resolve([]);
+  const reader = entry.createReader();
+  const all = [];
+  // readEntries hands back a batch at a time; keep asking until it comes back empty
+  const more = ()=>new Promise(res=>reader.readEntries(async batch=>{
+    if(!batch.length){ res(all); return; }
+    for(const child of batch) all.push(...await entryFiles(child, entry.name));
+    res(more());
+  }, ()=>res(all)));
+  return more();
+}
+const isJunkFile = f=>/^(\.|~\$)/.test(f.name) || /^(thumbs\.db|desktop\.ini)$/i.test(f.name);
 let dropClear = null;
 function dropMarks(over){
   Object.keys(DROP_CARDS).forEach(id=>{ $(id).classList.toggle('drop-ok', over !== null); $(id).classList.toggle('drop-here', over === id); });
@@ -1838,7 +1910,16 @@ window.addEventListener('drop', async e=>{
   dropMarks(null);
   if(!job) return;
   const where = DROP_CARDS[dropCardOf(e)] || '';
-  const all = Array.from(e.dataTransfer.files || []);
+  // (the dropped items have to be picked up straight away — they're gone after the first wait)
+  const entries = Array.from(e.dataTransfer.items || []).map(i=>i.webkitGetAsEntry ? i.webkitGetAsEntry() : null).filter(Boolean);
+  let all = Array.from(e.dataTransfer.files || []);
+  const folderOf = new Map();
+  if(entries.some(en=>en.isDirectory)){
+    const found = (await Promise.all(entries.map(en=>entryFiles(en, '')))).flat().filter(x=>!isJunkFile(x.file));
+    found.forEach(x=>folderOf.set(x.file, x.folder));
+    all = found.map(x=>x.file);
+    if(!all.length){ $('uploadNote').textContent = 'That folder has no files in it.'; return; }
+  }
   const pictures = all.filter(isPicture), pdfs = all.filter(isPdf);
   const left = count=>count ? ` ${count} file${count === 1 ? ' was' : 's were'} left out — only ${where === 'photo' ? 'pictures can go in Photos' : 'PDFs and pictures can be added'}.` : '';
   if(where === 'note'){
@@ -1853,15 +1934,15 @@ window.addEventListener('drop', async e=>{
   let skipped = 0;
   if(where === 'photo'){
     skipped = all.length - pictures.length;
-    await uploadFiles(pictures, 'photo');
+    await uploadFiles(pictures, 'photo', folderOf);
   } else if(where === 'plan'){
     const ok = all.filter(f=>isPicture(f) || isPdf(f));
     skipped = all.length - ok.length;
-    await uploadFiles(ok, 'plan');
+    await uploadFiles(ok, 'plan', folderOf);
   } else {
     skipped = all.length - pictures.length - pdfs.length;
-    if(pdfs.length){ $('plansCard').scrollIntoView({ behavior:'smooth', block:'center' }); await uploadFiles(pdfs, 'plan'); }
-    if(pictures.length){ $('photosCard').scrollIntoView({ behavior:'smooth', block:'center' }); await uploadFiles(pictures, 'photo'); }
+    if(pdfs.length){ $('plansCard').scrollIntoView({ behavior:'smooth', block:'center' }); await uploadFiles(pdfs, 'plan', folderOf); }
+    if(pictures.length){ $('photosCard').scrollIntoView({ behavior:'smooth', block:'center' }); await uploadFiles(pictures, 'photo', folderOf); }
   }
   if(skipped) $('uploadNote').textContent += left(skipped);
 });
