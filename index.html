@@ -136,6 +136,9 @@
   .mw-row{display:flex; align-items:flex-start; gap:11px; padding:10px 0; border-top:1px solid #f1ede3; text-decoration:none; color:inherit;}
   .mw-row:first-child{border-top:none;}
   /* punch items: two to a row, one on a phone */
+  .mw-pics{display:flex; gap:5px; flex-wrap:wrap; margin-top:5px;}
+  .mw-pics img{width:54px; height:54px; object-fit:cover; border-radius:5px; background:#e9e6dc; display:block;}
+  .mw-site .mw-pics img{width:40px; height:40px;}
   .mw-two{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); column-gap:22px; border-top:1px solid #f1ede3;}
   .mw-two:first-child{border-top:none;}
   .mw-two .mw-row{border-top:1px solid #f1ede3;}
@@ -866,7 +869,7 @@ function renderSites(){
   };
   const todoLine = t=>{
     const tag = t.due && t.due < today ? 'Overdue' : t.due === today ? 'Due today' : t.priority === 'high' ? 'High priority' : '';
-    return `<div class="todo${tag ? ' hot' : ''}"><button type="button" class="mw-check" data-mw-check="${escHtml(t.id)}" aria-label="Mark as done" title="Done"></button><span>${tag ? `<span class="tag">${tag}:</span> ` : ''}${escHtml(t.text || '')}</span></div>`;
+    return `<div class="todo${tag ? ' hot' : ''}"><button type="button" class="mw-check" data-mw-check="${escHtml(t.id)}" aria-label="Mark as done" title="Done"></button><span>${tag ? `<span class="tag">${tag}:</span> ` : ''}${escHtml(t.text || '')}${punchPics(t)}</span></div>`;
   };
   box.innerHTML = head + '<div class="mw-sites-row">' + homes.map(h=>{
     const href = !h.id ? 'punch.html' : h.jobs.length ? 'construction.html?house=' + encodeURIComponent(h.id) : 'house.html?id=' + encodeURIComponent(h.id);
@@ -979,6 +982,11 @@ function myWorkGather(){
   declined.sort((a,b)=>a.start.localeCompare(b.start));
   return { today, punch, late, dueToday, reminders, fresh, declined };
 }
+// the photos on a punch item, as small pictures that open full size
+function punchPics(t){
+  const pics = (t.photos || []).slice(0, 4);
+  return pics.length ? `<div class="mw-pics">${pics.map(url=>`<a href="${escHtml(url)}" target="_blank" rel="noopener"><img src="${escHtml(url)}" alt="Photo" loading="lazy"></a>`).join('')}</div>` : '';
+}
 function renderMyWork(){
   const box = document.getElementById('myWork');
   if(!myWork.ready){ box.style.display = 'none'; return; }
@@ -1026,7 +1034,7 @@ function renderMyWork(){
     return `<span class="mw-chip ${days < 0 ? 'red' : days <= 1 ? 'amber' : ''}">${days < 0 ? 'Overdue ' + (-days) + (days === -1 ? ' day' : ' days') : days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'Due ' + escHtml(day(t.due))}</span> `;
   };
   const punchRow = t=>`<div class="mw-row"><button type="button" class="mw-check" data-mw-check="${escHtml(t.id)}" aria-label="Mark as done" title="Done"></button>
-      <div class="mw-main"><div class="mw-t">${escHtml(t.text || '')}</div><div class="mw-m">${t.priority === 'high' ? '<span class="mw-chip red">High priority</span> ' : ''}${dueTag(t)}${escHtml(where(t))}</div></div></div>`;
+      <div class="mw-main"><div class="mw-t">${escHtml(t.text || '')}</div><div class="mw-m">${t.priority === 'high' ? '<span class="mw-chip red">High priority</span> ' : ''}${dueTag(t)}${escHtml(where(t))}</div>${punchPics(t)}</div></div>`;
   const noteHref = x=>['subDeclined', 'subNote', 'subWaiting'].includes(x.kind)
     ? `construction.html?house=${encodeURIComponent(x.houseId || '')}&task=${encodeURIComponent(x.taskId || '')}`
     : (x.houseId ? `house.html?id=${encodeURIComponent(x.houseId)}#notes` : 'punch.html');

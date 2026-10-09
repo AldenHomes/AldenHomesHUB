@@ -283,13 +283,13 @@
       if(_shot){
         // the walk-through picture goes up first, so the item is saved with it attached
         try{ const up = await uploadShot(_shot, toRun.homeId); toRun.photos = [up.url]; toRun.photoPaths = [up.path]; }
-        catch(err){ console.error('walk-through picture did not upload', err); noPicture = true; }
+        catch(err){ console.error('walk-through picture did not upload', err); noPicture = String((err && (err.code || err.message)) || 'unknown reason').slice(0, 80); }
       }
       const data = await call({ action:'run', actions:[toRun] });
       const r = (data.results || [])[0] || {};
       if(r.ok){
         // say what became of the picture, so a missing one isn't a mystery
-        const pic = noPicture ? ' · the picture didn\'t upload, so it was saved without one'
+        const pic = noPicture ? ' · the picture didn\'t upload (' + noPicture + '), so it was saved without one'
           : _shot ? (r.photosSaved ? ' · picture attached' : ' · saved, but the picture was not kept')
           : _walk ? ' · no picture was taken for this one' : '';
         finish('done', '✓ Done' + pic);
@@ -418,6 +418,7 @@
     if(!walk || !walk.on || !el('aiVideo').videoWidth) return;
     const f = { t: Date.now() - walk.startedAt, shot: null };
     walk.frames.push(f);
+    walk.camSize = el('aiVideo').videoWidth + 'x' + el('aiVideo').videoHeight;
     walk.saving.push(walkShot().then(b=>{ f.shot = b; }).catch(()=>{}));
     el('aiWalkPics').textContent = 'Camera on';
   }
@@ -531,6 +532,8 @@
     const transcript = tape.clips.map((c, i)=>'[' + (i + 1) + '] ' + c.text).join('\n');
     add(escHtml(`Walk-through · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`), 'ai-msg user');
     if(!tape.frames.length) add('The camera didn\'t give me any pictures during that walk-through, so the items will come without them.', 'ai-msg bot');
+    // a line of plain facts, so a problem can be pinned down from a screenshot of this panel
+    add(escHtml('Check: ' + tape.frames.length + ' of ' + w.frames.length + ' stills kept · ' + tape.clips.length + ' pieces heard · camera ' + (w.camSize || 'never started')), 'ai-msg hint');
     const waiting = add('Making the list…', 'ai-msg bot');
     busy = true; el('aiSend').disabled = true;
     try{
