@@ -48,6 +48,23 @@
   .ai-round:disabled{opacity:.45; cursor:default;}
   .ai-round.listening{background:var(--danger, #b3452f); color:#fff; animation:aiPulse 1.2s ease-in-out infinite;}
   @keyframes aiPulse{0%,100%{box-shadow:0 0 0 0 rgba(179,69,47,.45);} 50%{box-shadow:0 0 0 10px rgba(179,69,47,0);}}
+  .ai-card img{display:block; width:100%; max-height:190px; object-fit:cover; border-radius:7px; margin-top:8px; background:#e9e6dc;}
+  .ai-all{align-self:stretch; padding:12px 8px; border-radius:8px; border:none; background:var(--good, #3f7a4e); color:#fff; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit;}
+  .ai-all:disabled{opacity:.5; cursor:default;}
+  /* walk-through: the camera, what's being heard, and one button to finish */
+  .ai-walk{display:none; flex-direction:column; min-height:0; flex:1;}
+  .ai-panel.walking .ai-walk{display:flex;}
+  .ai-panel.walking .ai-log, .ai-panel.walking .ai-foot{display:none;}
+  .ai-walk video{width:100%; max-height:46vh; min-height:150px; background:#1e2022; object-fit:cover; display:block;}
+  .ai-walk-rec{display:flex; align-items:center; gap:7px; padding:8px 14px 0; font-size:12.5px; font-weight:700; color:var(--danger, #b3452f);}
+  .ai-walk-rec .dot{width:9px; height:9px; border-radius:50%; background:var(--danger, #b3452f); animation:aiPulse 1.2s ease-in-out infinite;}
+  .ai-walk-rec .pics{margin-left:auto; color:var(--ink-soft, #6b6f72); font-weight:400;}
+  .ai-walk-text{flex:1; min-height:54px; max-height:110px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; padding:8px 14px; font-size:14.5px; line-height:1.45; color:var(--ink, #33363a);}
+  .ai-walk-text.quiet{color:var(--ink-soft, #6b6f72);}
+  .ai-walk-btns{display:flex; gap:8px; padding:10px 12px 12px; border-top:1px solid #ece8dd;}
+  .ai-walk-btns button{padding:13px 10px; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit;}
+  .ai-walk-btns .stop{flex:1; background:var(--danger, #b3452f); color:#fff; border:none;}
+  .ai-walk-btns .cancel{background:#fff; color:var(--ink-soft, #6b6f72); border:2px solid var(--steel-line, #d4d2c8);}
   .ai-panel, .ai-panel *{box-sizing:border-box;}
   .ai-panel{font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; color:var(--ink, #33363a);}
 `;
@@ -57,9 +74,18 @@
 <div class="ai-panel" id="aiPanel" role="dialog" aria-label="Hub assistant">
   <div class="ai-head"><strong>Hub assistant</strong><button type="button" id="aiClose" aria-label="Close">&times;</button></div>
   <div class="ai-log" id="aiLog"></div>
+  <div class="ai-walk" id="aiWalk">
+    <video id="aiVideo" playsinline muted autoplay></video>
+    <div class="ai-walk-rec"><span class="dot"></span><span id="aiWalkTime">0:00</span><span class="pics" id="aiWalkPics"></span></div>
+    <div class="ai-walk-text quiet" id="aiWalkText">Walk through and say what needs doing as you point the camera at it.</div>
+    <div class="ai-walk-btns"><button type="button" class="cancel" id="aiWalkCancel">Cancel</button><button type="button" class="stop" id="aiWalkStop">Done &mdash; make the list</button></div>
+  </div>
   <div class="ai-foot">
     <button type="button" class="ai-round" id="aiMic" title="Tap and speak" aria-label="Tap and speak">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
+    </button>
+    <button type="button" class="ai-round" id="aiCam" title="Record a walk-through" aria-label="Record a walk-through" style="display:none;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M15 10l6-3v10l-6-3z"/></svg>
     </button>
     <input type="text" id="aiText" placeholder="Say it or type it…" maxlength="1000" autocomplete="off">
     <button type="button" class="ai-round send" id="aiSend" title="Send" aria-label="Send">
@@ -114,6 +140,7 @@
     el('aiText').focus();
   }
   function close(){
+    cancelWalk();
     stopListening();
     el('aiPanel').classList.remove('show');
     el('aiFab').classList.add('show');
@@ -138,6 +165,35 @@
     return 'That didn\'t go through. Check your connection and try again.';
   }
 
+  // Put proposed changes on screen as cards. `shots` (walk-through only) = { clip number: picture } —
+  // the picture rides along on the card and is only uploaded if that card is confirmed.
+  function showActions(actions, shots){
+    const ids = [];
+    actions.forEach(a=>{
+      const id = 'c' + (++cardSeq);
+      const shot = shots && a.clip ? shots[a.clip] : null;
+      pending[id] = shot ? { ...a, _shot: shot } : a;
+      ids.push(id);
+      const sum = a.summary || {};
+      const card = add(`<div class="t">${escHtml(sum.title || 'Change')}</div>
+        <div class="x">${escHtml(sum.text || '')}</div>
+        ${sum.people ? `<div class="p">${escHtml(sum.people)}</div>` : ''}
+        <div class="row"><button type="button" class="ai-no" data-ai-cancel="${id}">Cancel</button><button type="button" class="ai-yes" data-ai-confirm="${id}">Confirm</button></div>`, 'ai-card');
+      card.dataset.card = id;
+      if(shot){
+        const img = document.createElement('img');
+        img.alt = 'Picture from the walk-through';
+        img.src = URL.createObjectURL(shot);
+        card.insertBefore(img, card.querySelector('.row'));
+      }
+    });
+    if(ids.length > 1){
+      const all = add(`Add all ${ids.length}`, 'ai-all');
+      all.setAttribute('role', 'button');
+      all.dataset.aiAll = ids.join(',');
+    }
+  }
+
   async function send(){
     const text = el('aiText').value.trim();
     if(!text || busy) return;
@@ -151,15 +207,7 @@
       waiting.textContent = data.reply || '';
       history.push({ role:'user', text }, { role:'assistant', text: data.reply || '' });
       history = history.slice(-6);
-      (data.actions || []).forEach(a=>{
-        const id = 'c' + (++cardSeq);
-        pending[id] = a;
-        const sum = a.summary || {};
-        add(`<div class="t">${escHtml(sum.title || 'Change')}</div>
-          <div class="x">${escHtml(sum.text || '')}</div>
-          ${sum.people ? `<div class="p">${escHtml(sum.people)}</div>` : ''}
-          <div class="row"><button type="button" class="ai-no" data-ai-cancel="${id}">Cancel</button><button type="button" class="ai-yes" data-ai-confirm="${id}">Confirm</button></div>`, 'ai-card').dataset.card = id;
-      });
+      showActions(data.actions || []);
     } catch(err){
       console.error(err);
       waiting.textContent = problemText(err);
@@ -171,37 +219,54 @@
   el('aiText').addEventListener('keydown', e=>{ if(e.key === 'Enter') send(); });
 
   // Confirm / Cancel on a proposed change
-  log.addEventListener('click', async e=>{
-    const yes = e.target.closest('[data-ai-confirm]'), no = e.target.closest('[data-ai-cancel]');
-    const id = yes ? yes.dataset.aiConfirm : no ? no.dataset.aiCancel : '';
+  async function settleCard(id, confirmed){
     const action = pending[id];
     if(!action) return;
     const card = log.querySelector(`[data-card="${id}"]`);
+    const yes = card.querySelector('[data-ai-confirm]');
     const finish = (cls, text)=>{
       delete pending[id];
       card.querySelector('.row').remove();
       if(cls) card.classList.add(cls);
       const st = document.createElement('div'); st.className = 'state'; st.textContent = text; card.appendChild(st);
     };
-    if(no){ finish('cancelled', 'Cancelled — nothing was saved.'); history.push({ role:'user', text:'(I cancelled that.)' }); return; }
+    if(!confirmed){ finish('cancelled', 'Cancelled — nothing was saved.'); history.push({ role:'user', text:'(I cancelled that.)' }); return; }
     card.querySelectorAll('button').forEach(b=>{ b.disabled = true; });
     yes.textContent = 'Saving…';
-    try{
-      const { summary, ...toRun } = action;
-      const data = await call({ action:'run', actions:[toRun] });
-      const r = (data.results || [])[0] || {};
-      if(r.ok){ finish('done', '\u2713 Done'); history.push({ role:'user', text:'(I confirmed that and it was saved.)' }); }
-      else {
-        card.querySelectorAll('button').forEach(b=>{ b.disabled = false; });
-        yes.textContent = 'Confirm';
-        add(escHtml(r.problem || 'That couldn\'t be saved.'), 'ai-msg bot');
-      }
-    } catch(err){
-      console.error(err);
+    const again = text=>{
       card.querySelectorAll('button').forEach(b=>{ b.disabled = false; });
       yes.textContent = 'Confirm';
-      add(problemText(err), 'ai-msg bot');
+      add(text, 'ai-msg bot');
+    };
+    try{
+      const { summary, _shot, ...toRun } = action;
+      let noPicture = false;
+      if(_shot){
+        // the walk-through picture goes up first, so the item is saved with it attached
+        try{ const up = await uploadShot(_shot, toRun.homeId); toRun.photos = [up.url]; toRun.photoPaths = [up.path]; }
+        catch(err){ console.error('walk-through picture did not upload', err); noPicture = true; }
+      }
+      const data = await call({ action:'run', actions:[toRun] });
+      const r = (data.results || [])[0] || {};
+      if(r.ok){ finish('done', '✓ Done' + (noPicture ? ' (the picture didn\'t upload)' : '')); history.push({ role:'user', text:'(I confirmed that and it was saved.)' }); }
+      else again(escHtml(r.problem || 'That couldn\'t be saved.'));
+    } catch(err){
+      console.error(err);
+      again(problemText(err));
     }
+  }
+  log.addEventListener('click', async e=>{
+    const all = e.target.closest('[data-ai-all]');
+    if(all){
+      if(all.disabled || all.dataset.busy) return;
+      all.dataset.busy = '1'; all.style.opacity = '.5';
+      for(const id of all.dataset.aiAll.split(',')) await settleCard(id, true);   // one at a time; ones already settled are skipped
+      all.remove();
+      return;
+    }
+    const yes = e.target.closest('[data-ai-confirm]'), no = e.target.closest('[data-ai-cancel]');
+    if(yes) settleCard(yes.dataset.aiConfirm, true);
+    else if(no) settleCard(no.dataset.aiCancel, false);
   });
 
   /* ---- the microphone: the browser turns speech into text. Not every browser can
@@ -272,5 +337,176 @@
       micLooks(true);
       try{ startSession(); } catch(e){ console.error(e); listening = false; micLooks(false); }
     });
+  }
+
+  /* ---- walk-through: point the phone's camera and talk ----
+     Nothing is recorded or saved as a video. While they talk the browser turns the speech into text
+     (same as the microphone) and the hub keeps a still picture from the camera each time they start
+     on something new. At the end the text goes to the assistant in numbered clips; it breaks it
+     into punch list items and says which clip each came from, so each card shows that picture.
+     Pictures stay on this device and are only uploaded for the cards that get confirmed. */
+  const WALK_CLIP_MS = 6000;      // talking this long without a break starts a new clip (and picture)
+  const WALK_GAP_MS = 2500;       // ...and so does starting up again after a silence this long
+  const WALK_MAX_MS = 10 * 60000; // a walk-through stops by itself after ten minutes
+  const WALK_MAX_CLIPS = 120;
+  let walk = null;
+  const walkTotal = ()=>(walk.done + ' ' + walk.cur).replace(/\s+/g, ' ').trim();
+  function walkShot(){
+    const v = el('aiVideo');
+    if(!v.videoWidth) return Promise.resolve(null);
+    const scale = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);   // drawn now, so it's this moment even if saving takes a beat
+    return new Promise(res=>c.toBlob(b=>res(b), 'image/jpeg', 0.8));
+  }
+  function walkHeard(){
+    const now = Date.now(), total = walkTotal();
+    const last = walk.clips[walk.clips.length - 1];
+    if(!last || ((now - walk.lastHeard > WALK_GAP_MS || now - walk.lastClip > WALK_CLIP_MS) && walk.clips.length < WALK_MAX_CLIPS && total.length > walk.prevLen)){
+      const clip = { at: last ? Math.max(walk.prevLen, last.at + 1) : 0, shot: null };
+      clip.ready = walkShot().then(b=>{ clip.shot = b; });
+      walk.clips.push(clip);
+      walk.lastClip = now;
+    }
+    walk.lastHeard = now;
+    walk.prevLen = total.length;
+    const box = el('aiWalkText');
+    box.classList.remove('quiet');
+    box.textContent = total.length > 220 ? '…' + total.slice(-220) : total;
+    el('aiWalkPics').textContent = walk.clips.length + (walk.clips.length === 1 ? ' picture' : ' pictures');
+  }
+  function walkListen(){
+    const rec = walk.rec = new Speech();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    rec.continuous = !ANDROID;
+    const started = Date.now();
+    rec.onresult = e=>{
+      if(!walk) return;
+      walk.cur = Array.from(e.results).map(r=>r[0].transcript).join(' ');
+      walkHeard();
+    };
+    rec.onerror = e=>{ if(walk && (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture')) walk.deaf = true; };
+    rec.onend = ()=>{
+      if(!walk) return;
+      walk.done = walkTotal(); walk.cur = '';
+      if(walk.on && !walk.deaf){
+        // the browser ends a stretch of listening after a pause — start the next one
+        walk.quick = Date.now() - started < 1000 ? walk.quick + 1 : 0;
+        if(walk.quick < 6){ try{ walkListen(); return; } catch(err){ console.error(err); } }
+        walk.deaf = true;
+      }
+      if(walk.on && walk.deaf){
+        const box = el('aiWalkText');
+        box.classList.add('quiet');
+        box.textContent = (walk.done ? walk.done.slice(-140) + '\n\n' : '') + 'The microphone stopped. Press Done to use what was heard so far.';
+      }
+      if(walk.finish) walk.finish();
+    };
+    rec.start();
+  }
+  async function startWalk(){
+    if(walk || busy) return;
+    stopListening();
+    let stream;
+    try{ stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false }); }
+    catch(err){ console.error(err); add('The camera is blocked or this device doesn\'t have one. Allow the camera for this page in the browser, or use the microphone instead.', 'ai-msg bot'); return; }
+    walk = { stream, clips: [], done: '', cur: '', prevLen: 0, lastHeard: 0, lastClip: 0, on: true, quick: 0, startedAt: Date.now() };
+    el('aiVideo').srcObject = stream;
+    el('aiWalkText').className = 'ai-walk-text quiet';
+    el('aiWalkText').textContent = 'Walk through and say what needs doing as you point the camera at it.';
+    el('aiWalkPics').textContent = '';
+    el('aiWalkTime').textContent = '0:00';
+    el('aiWalkStop').disabled = false;
+    el('aiPanel').classList.add('walking');
+    walk.timer = setInterval(()=>{
+      if(!walk) return;
+      const secs = Math.floor((Date.now() - walk.startedAt) / 1000);
+      el('aiWalkTime').textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+      if(walk.on && Date.now() - walk.startedAt > WALK_MAX_MS) finishWalk();
+    }, 500);
+    try{ if(navigator.wakeLock) walk.wake = await navigator.wakeLock.request('screen'); } catch(e){}   // keep the phone from dimming mid-walk
+    try{ walkListen(); } catch(err){ console.error(err); walk.deaf = true; }
+  }
+  // stop listening and the camera; hands back what was gathered
+  async function endWalk(){
+    const w = walk;
+    if(!w) return null;
+    w.on = false;
+    // the last few words arrive just after stop() — give them a moment
+    await new Promise(res=>{ w.finish = res; try{ w.rec.stop(); } catch(e){ res(); } setTimeout(res, 1500); });
+    await Promise.all(w.clips.map(c=>c.ready));
+    clearInterval(w.timer);
+    try{ if(w.wake) w.wake.release(); } catch(e){}
+    w.stream.getTracks().forEach(t=>t.stop());
+    el('aiVideo').srcObject = null;
+    el('aiPanel').classList.remove('walking');
+    const total = (w.done + ' ' + w.cur).replace(/\s+/g, ' ').trim();
+    walk = null;
+    return { w, total };
+  }
+  function cancelWalk(){ if(walk) endWalk(); }
+  async function finishWalk(){
+    if(!walk || !walk.on) return;
+    el('aiWalkStop').disabled = true;
+    el('aiWalkStop').textContent = 'Finishing…';
+    const secs = Math.floor((Date.now() - walk.startedAt) / 1000);
+    const got = await endWalk();
+    el('aiWalkStop').innerHTML = 'Done &mdash; make the list';
+    if(!got) return;
+    const { w, total } = got;
+    if(!total){ add('I didn\'t hear anything during that walk-through, so there\'s nothing to make a list from. Check the microphone is allowed for this page and try again.', 'ai-msg bot'); return; }
+    // cut the text at each clip's start (pulled back to the start of a word); clips with no words are dropped
+    const cuts = w.clips.map(c=>{ const sp = total.lastIndexOf(' ', Math.min(c.at, total.length)); return sp < 0 ? 0 : sp; });
+    const shots = {}, lines = [];
+    w.clips.forEach((c, i)=>{
+      const text = total.slice(cuts[i], i + 1 < cuts.length ? cuts[i + 1] : total.length).trim();
+      if(!text) return;
+      lines.push('[' + (lines.length + 1) + '] ' + text);
+      if(c.shot) shots[lines.length] = c.shot;
+    });
+    if(!lines.length) lines.push('[1] ' + total);
+    const transcript = lines.join('\n');
+    add(escHtml(`Walk-through · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} · ${Object.keys(shots).length} pictures`), 'ai-msg user');
+    const waiting = add('Making the list…', 'ai-msg bot');
+    busy = true; el('aiSend').disabled = true;
+    try{
+      const data = await call({ action:'ask', walk:true, text: transcript, history, context: pageContext() });
+      waiting.textContent = data.reply || '';
+      history.push({ role:'user', text: 'Walk-through transcript:\n' + transcript.slice(0, 1300) }, { role:'assistant', text: data.reply || '' });
+      history = history.slice(-6);
+      showActions(data.actions || [], shots);
+    } catch(err){
+      console.error(err);
+      waiting.textContent = problemText(err);
+      // don't lose a whole walk-through to a dropped connection
+      add('Here is what was heard, so it isn\'t lost:\n\n' + escHtml(total), 'ai-msg bot');
+    }
+    busy = false; el('aiSend').disabled = false;
+    log.scrollTop = log.scrollHeight;
+  }
+  // Save one walk-through picture where punch list photos live. Pages that don't already use
+  // file storage load that part of Firebase the first time it's needed.
+  async function uploadShot(blob, homeId){
+    if(typeof firebase.storage !== 'function'){
+      const app = document.querySelector('script[src*="firebase-app-compat"]');
+      await new Promise((res, rej)=>{
+        const sc = document.createElement('script');
+        sc.src = (app ? app.src : 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js').replace('firebase-app-compat', 'firebase-storage-compat');
+        sc.onload = res; sc.onerror = rej;
+        document.head.appendChild(sc);
+      });
+    }
+    const path = `houses/${homeId || 'punch-list'}/photos/punch-walk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const stored = firebase.storage().ref().child(path);
+    await stored.put(blob, { contentType: 'image/jpeg' });
+    return { url: await stored.getDownloadURL(), path };
+  }
+  if(Speech && navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    el('aiCam').style.display = '';
+    el('aiCam').addEventListener('click', startWalk);
+    el('aiWalkStop').addEventListener('click', finishWalk);
+    el('aiWalkCancel').addEventListener('click', ()=>{ cancelWalk(); });
   }
 })();

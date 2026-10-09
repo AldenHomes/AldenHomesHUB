@@ -808,7 +808,8 @@ const ASSISTANT_TOOLS = [
       assign_user_ids: { type: 'array', items: str, description: 'uids of the team members it is for. Empty if nobody was named.' },
       due_date: { ...str, description: 'The date it needs to be done by, as YYYY-MM-DD, worked out from today\'s date if they said something like "by Friday". An empty string if no date was mentioned.' },
       high_priority: { type: 'boolean', description: 'True only if they said it is high priority, urgent, or similar.' },
-    }, required: ['text', 'home_id', 'assign_user_ids', 'due_date', 'high_priority'], additionalProperties: false } },
+      photo_clip: { type: 'integer', description: 'Only for a walk-through: the number of the clip in which they were talking about this item, so the picture from that moment is attached. 0 for anything that is not from a walk-through.' },
+    }, required: ['text', 'home_id', 'assign_user_ids', 'due_date', 'high_priority', 'photo_clip'], additionalProperties: false } },
   { name: 'complete_punch_item', strict: true,
     description: 'Propose checking an item off the punch list. Find the item id with list_punch_items or get_home first. Shown to the user to confirm.',
     input_schema: { type: 'object', properties: { item_id: { ...str, description: 'The id of the punch list item.' } }, required: ['item_id'], additionalProperties: false } },
@@ -828,6 +829,8 @@ Wording: for a note or a punch list item, write what the person said as a clean 
 Questions: answer from the lists below, or look the home up with get_home when the answer needs its schedule, notes, punch list or service history. If the information isn't there, say so plainly.
 
 How to answer: the reader is office staff reading on a phone, not a technical person. Keep it to a sentence or two in plain words, no formatting symbols, with dates written like "Tue, Oct 20". Refer to homes the way the staff do ("AP Lot 40, Smith"), never by id.
+
+Walk-throughs: sometimes the message is the transcript of someone walking through a home with their phone camera, talking about what they see. It arrives split into numbered clips ("[1] ...", "[2] ..."), and the hub kept a picture from the start of each clip. Turn it into punch list items: one add_punch_item call for each separate thing that needs doing, worded as a short clear instruction that would make sense to someone who was not there (say which room or spot if they did). Set photo_clip to the clip where they started talking about that item. Leave out chatter and anything that is only a remark, and never add an item they did not ask for. If they named who should do something, assign it; otherwise leave it unassigned. Make all the calls in one go, then say in one sentence how many items are waiting to be confirmed. If the transcript does not make clear which home it is and none is open on their screen, ask which home before proposing anything.
 
 If they ask for something you have no way to do — moving schedule dates, emailing a sub, changing a service request — say you can't do that from here yet, and mention where in the hub it's done if you know (Construction Schedules, Service Center, Punch List, Admin Settings).`;
 
@@ -926,7 +929,9 @@ async function assistantCheck(name, input, ctx){
     const due = typeof input.due_date === 'string' ? input.due_date.trim() : '';
     if(due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) return { error: 'due_date must be YYYY-MM-DD, or an empty string for no date.' };
     const high = input.high_priority === true;
-    return { action: { type: 'add_punch_item', homeId: job ? job.id : '', text, assign: who.map(s=>s.uid), due, high },
+    // from a walk-through: which clip's picture goes with it (the hub holds the pictures until Confirm)
+    const clip = Number.isInteger(input.photo_clip) && input.photo_clip > 0 && input.photo_clip <= 300 ? input.photo_clip : 0;
+    return { action: { type: 'add_punch_item', homeId: job ? job.id : '', text, assign: who.map(s=>s.uid), due, high, ...(clip ? { clip } : {}) },
       summary: { title: `Add to the punch list${job ? ' for ' + jobLabel(job) : ''}`, text,
         people: [who.length ? 'For ' + who.map(s=>s.name).join(', ') : '', due ? 'Needed by ' + niceDate(due) : '', high ? 'High priority' : ''].filter(Boolean).join(' · ') } };
   }
@@ -961,9 +966,14 @@ async function assistantRun(action, ctx){
     const ok = await assistantCheck('add_punch_item', { home_id: action.homeId, text: action.text, assign_user_ids: action.assign, due_date: action.due || '', high_priority: action.high === true }, ctx);
     if(ok.error) return ok.error;
     const a = ok.action, job = a.homeId ? ctx.jobs.find(j=>j.id === a.homeId) : null;
+    // a walk-through picture the hub uploaded just before calling: only our own storage, only where punch photos live
+    const photoOk = (url, path)=>typeof url === 'string' && url.length < 1000 && /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/[^/]+\/o\/houses%2F/.test(url)
+      && typeof path === 'string' && /^houses\/[^/]+\/photos\/punch-[\w.-]+\.jpg$/.test(path);
+    const pics = (Array.isArray(action.photos) ? action.photos : []).slice(0, 6)
+      .map((url, i)=>({ url, path: (Array.isArray(action.photoPaths) ? action.photoPaths : [])[i] })).filter(p=>photoOk(p.url, p.path));
     await db.collection('notes').add({
       todo: true, done: false, text: a.text, houseId: job ? job.id : '', houseLabel: job ? jobLabel(job) : 'General',
-      due: a.due, priority: a.high ? 'high' : '', photos: [], photoPaths: [],
+      due: a.due, priority: a.high ? 'high' : '', photos: pics.map(p=>p.url), photoPaths: pics.map(p=>p.path),
       mentions: a.assign, mentionNames: named(a.assign), by, at: now, readBy: {},
     });
     return '';
@@ -999,8 +1009,11 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
     }
 
     if(body.action !== 'ask'){ res.status(400).json({ error: 'action' }); return; }
-    const text = cleanText(body.text, 1000);
-    if(!text){ res.status(400).json({ error: 'text' }); return; }
+    // a walk-through is a whole transcript, so it is allowed to be much longer than a spoken command
+    const walk = body.walk === true;
+    const said = cleanText(body.text, walk ? 12000 : 1000);
+    if(!said){ res.status(400).json({ error: 'text' }); return; }
+    const text = walk ? 'This is the transcript of a walk-through I just recorded, in numbered clips. Please turn it into punch list items.\n\n' + said : said;
     // a little of the conversation so far, so "no, I meant lot 41" makes sense
     const history = (Array.isArray(body.history) ? body.history : []).slice(-6)
       .filter(h=>h && ['user', 'assistant'].includes(h.role) && typeof h.text === 'string' && h.text.trim())
