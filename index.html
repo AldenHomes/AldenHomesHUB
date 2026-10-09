@@ -108,6 +108,18 @@
   .mw-day{flex:1 1 110px; background:#f3f5ee; border-radius:var(--radius); padding:7px 10px; font-size:12.5px; color:var(--ink-soft); line-height:1.45;}
   .mw-day strong{display:block; color:var(--navy); font-size:13px;}
   .mw-day .wet{color:#2f7d8c; font-weight:700;}
+  /* "On site today": one small card per home with work scheduled today */
+  .mw-sites{padding:0 16px 12px;}
+  .mw-sites-h{font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); margin-bottom:6px;}
+  .mw-sites-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .mw-site{flex:1 1 210px; max-width:340px; min-width:0; display:block; text-decoration:none; background:#faf8f2; border:1px solid #ece8dd; border-left:4px solid #8a8f94; border-radius:var(--radius); padding:7px 10px 8px; color:var(--ink);}
+  .mw-site:hover{border-color:var(--navy); background:#fff;}
+  .mw-site strong{display:block; font-size:13px; color:var(--navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mw-site .job{display:flex; align-items:baseline; gap:6px; font-size:12.5px; line-height:1.4; margin-top:2px;}
+  .mw-site .dot{flex:none; width:7px; height:7px; border-radius:50%; position:relative; top:-1px;}
+  .mw-site .who{color:var(--ink-soft);}
+  .mw-site .more{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  @media (max-width:560px){ .mw-site{flex-basis:100%; max-width:none;} }
   .mw-title{font-size:15px; font-weight:700; color:var(--navy);}
   .mw-sum{flex:1; display:flex; gap:6px; flex-wrap:wrap; align-items:center; font-size:13.5px; color:var(--ink-soft);}
   .mw-chip{border-radius:20px; padding:2px 10px; font-size:12px; font-weight:700; background:#ece8dd; color:var(--ink-soft); white-space:nowrap;}
@@ -361,6 +373,7 @@ html, body{max-width:100%; overflow-x:clip;}
       </div>
       <div class="mw-settings" id="myWorkSettings" style="display:none;"></div>
       <div class="mw-weather" id="myWorkWeather" style="display:none;"></div>
+      <div class="mw-sites" id="myWorkSites" style="display:none;"></div>
       <div class="mywork-body" id="myWorkBody" style="display:none;"></div>
     </div>
 
@@ -555,6 +568,7 @@ function attachScheduleStatsListener(db){
       return d===null || d>=0; // active until it settles
     });
     renderActiveHomes();
+    renderMyWork(); // the strip names homes too
     document.getElementById('tileStatTotal').textContent = jobs.length;
     document.getElementById('tileStatYTD').textContent = jobs.filter(j=>{
       const isModel = String(j.client||'').trim().replace(/\s+/g,' ').toLowerCase() === 'model home';
@@ -718,7 +732,7 @@ const myWork = { uid: '', mentions: [], watchers: [], schedules: [], subs: {}, w
    Kept per login in settings/hub-prefs as { uid: { tilesHidden:[tile id], strip:{...} } },
    so it follows them to their phone. A copy is kept on the device too, so the hub looks
    right straight away and still works if that record can't be read or saved. */
-const HUB_DEFAULTS = { tilesHidden: [], strip: { punch: true, notes: true, reminders: true, declined: null, weather: false, place: { name: 'Lititz, PA', lat: 40.1573, lon: -76.3069 } } };
+const HUB_DEFAULTS = { tilesHidden: [], strip: { punch: true, notes: true, reminders: true, declined: null, weather: false, sites: false, place: { name: 'Lititz, PA', lat: 40.1573, lon: -76.3069 } } };
 let hubPrefs = JSON.parse(JSON.stringify(HUB_DEFAULTS));
 function applyHubPrefs(raw){
   const p = raw && typeof raw === 'object' ? raw : {};
@@ -807,6 +821,33 @@ function renderWeather(){
   }).join('');
 }
 
+/* ---- "On site today" (optional): each home with work on its build schedule today ----
+   Read from the build schedules the strip already has; nothing is stored. Drafts count too —
+   this is the office's own view. A job ticked done drops off. */
+const SITE_COLORS = { 'Pre-Construction':'#8a8f94', 'Foundation':'#8a5a3a', 'Framing':'#c98a2b', 'Rough-Ins':'#2f7d8c',
+  'Exterior Finishes':'#5a7247', 'Drywall/Insulation':'#6a4c93', 'Interior Finishes':'#3d5570', 'Final Finishes':'#3f7a4e' };
+function renderSites(){
+  const box = document.getElementById('myWorkSites');
+  if(!hubPrefs.strip.sites){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const d = new Date(); const today = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const homes = myWork.schedules.map(sc=>{
+    const job = allHomes.find(h=>h.id === sc.id);
+    const jobs = (sc.tasks || []).filter(t=>t.start && t.start <= today && t.end >= today && !t.done).sort((a,b)=>a.start.localeCompare(b.start));
+    return { id: sc.id, job, jobs, label: job ? [job.community, job.lot ? 'Lot ' + job.lot : '', job.client].filter(Boolean).join(' · ') : '' };
+  }).filter(h=>h.job && h.jobs.length)
+    .sort((a,b)=>a.label.localeCompare(b.label, undefined, { numeric:true, sensitivity:'base' }));
+  const head = `<div class="mw-sites-h">On site today · ${d.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' })}</div>`;
+  box.style.display = 'block';
+  if(!homes.length){ box.innerHTML = head + '<div style="font-size:13px; color:var(--ink-soft);">Nothing is on the build schedules for today.</div>'; return; }
+  const jobLine = t=>{
+    const who = (t.subIds || []).map(id=>myWork.subs[id]).filter(Boolean).join(', ');
+    return `<div class="job"><span class="dot" style="background:${SITE_COLORS[t.phase] || '#8a8f94'};"></span><span>${escHtml(t.title || 'A job')}${who ? ` <span class="who">— ${escHtml(who)}</span>` : ''}</span></div>`;
+  };
+  box.innerHTML = head + '<div class="mw-sites-row">' + homes.map(h=>
+    `<a class="mw-site" href="construction.html?house=${encodeURIComponent(h.id)}" style="border-left-color:${SITE_COLORS[h.jobs[0].phase] || '#8a8f94'};" title="Open this home's schedule">
+      <strong>${escHtml(h.label)}</strong>${h.jobs.slice(0, 3).map(jobLine).join('')}${h.jobs.length > 3 ? `<div class="more">+${h.jobs.length - 3} more</div>` : ''}</a>`).join('') + '</div>';
+}
+
 /* ---- the gear on the strip: what shows there ---- */
 let gearOpen = false;
 function renderGear(){
@@ -822,6 +863,7 @@ function renderGear(){
     + row('notes', st.notes, 'Notes and comments for me')
     + row('reminders', st.reminders, 'Reminders I set')
     + row('declined', declinedOn, 'Jobs a vendor declined that need someone else')
+    + row('sites', st.sites, 'What\'s scheduled at each home today')
     + row('weather', st.weather, 'Weather')
     + (st.weather ? `<div class="place">For <input type="text" id="weatherPlace" value="${escHtml(st.place.name)}" placeholder="Town or ZIP code" autocomplete="off"> <button type="button" id="weatherPlaceBtn">Change</button> <span id="weatherPlaceNote"></span></div>` : '')
     + '<div style="margin-top:10px;"><button type="button" class="done" id="gearDone">Done</button></div>';
@@ -912,7 +954,7 @@ function renderMyWork(){
   if(!st.notes) g.fresh = [];
   if(!st.reminders) g.reminders = [];
   if(st.declined === false) g.declined = [];
-  renderGear(); renderWeather();
+  renderGear(); renderWeather(); renderSites();
   const where = x=>{ const j = allHomes.find(h=>h.id === x.houseId); return x.houseId ? (j ? [j.community, j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') : (x.houseLabel || 'A home')) : 'General'; };
   const day = iso=>{ const [y, m, dd] = iso.split('-').map(Number); return new Date(y, m-1, dd).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }); };
   const urgentCount = g.late.length + g.dueToday.length + g.declined.length + g.reminders.length;
