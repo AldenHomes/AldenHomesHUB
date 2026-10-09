@@ -830,7 +830,7 @@ Questions: answer from the lists below, or look the home up with get_home when t
 
 How to answer: the reader is office staff reading on a phone, not a technical person. Keep it to a sentence or two in plain words, no formatting symbols, with dates written like "Tue, Oct 20". Refer to homes the way the staff do ("AP Lot 40, Smith"), never by id.
 
-Walk-throughs: sometimes the message is the transcript of someone walking through a home with their phone camera, talking about what they see. It arrives split into numbered clips ("[1] ...", "[2] ..."), and the hub kept a picture from the start of each clip. Turn it into punch list items: one add_punch_item call for each separate thing that needs doing, worded as a short clear instruction that would make sense to someone who was not there (say which room or spot if they did). Set photo_clip to the clip where they started talking about that item. Leave out chatter and anything that is only a remark, and never add an item they did not ask for. If they named who should do something, assign it; otherwise leave it unassigned. Make all the calls in one go, then say in one sentence how many items are waiting to be confirmed. If the transcript does not make clear which home it is and none is open on their screen, ask which home before proposing anything.
+Walk-throughs: sometimes the message is the transcript of someone walking through a home with their phone camera, talking about what they see. It arrives cut into short numbered clips of a few seconds each ("[1] ...", "[2] ..."), and the hub kept pictures from the camera all the way through with the time of each, so a clip number tells it which moment to take the picture from. Turn it into punch list items: one add_punch_item call for each separate thing that needs doing, worded as a short clear instruction that would make sense to someone who was not there (say which room or spot if they did). Set photo_clip to the clip in which they name or describe the thing itself, because that is when the camera is on it. That is often a clip or two after they start leading up to it ("okay, next, over here...") and before they move on, so pick the clip with the telling words ("this outlet cover", "the paint by the door"), not the lead-in. Leave out chatter and anything that is only a remark, and never add an item they did not ask for. If they named who should do something, assign it; otherwise leave it unassigned. Make all the calls in one go, then say in one sentence how many items are waiting to be confirmed. If the transcript does not make clear which home it is and none is open on their screen, ask which home before proposing anything.
 
 If they ask for something you have no way to do — moving schedule dates, emailing a sub, changing a service request — say you can't do that from here yet, and mention where in the hub it's done if you know (Construction Schedules, Service Center, Punch List, Admin Settings).`;
 
@@ -976,6 +976,9 @@ async function assistantRun(action, ctx){
       due: a.due, priority: a.high ? 'high' : '', photos: pics.map(p=>p.url), photoPaths: pics.map(p=>p.path),
       mentions: a.assign, mentionNames: named(a.assign), by, at: now, readBy: {},
     });
+    // told back to the hub, so the card can say whether its picture was kept
+    action.photosSent = Array.isArray(action.photos) ? action.photos.length : 0;
+    action.photosSaved = pics.length;
     return '';
   }
   if(action.type === 'complete_punch_item'){
@@ -1001,9 +1004,10 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
       const results = [];
       for(const a of actions){
         const problem = await assistantRun(a || {}, ctx);
-        results.push({ ok: !problem, problem });
+        results.push({ ok: !problem, problem, ...(a && a.photosSent ? { photosSaved: a.photosSaved || 0 } : {}) });
       }
-      logger.info('Assistant actions run', { by: ctx.me.name, actions: actions.map(a=>a && a.type), failed: results.filter(r=>!r.ok).length });
+      logger.info('Assistant actions run', { by: ctx.me.name, actions: actions.map(a=>a && a.type), failed: results.filter(r=>!r.ok).length,
+        photosSent: actions.map(a=>(a && a.photosSent) || 0), photosSaved: actions.map(a=>(a && a.photosSaved) || 0) });
       res.json({ results });
       return;
     }
@@ -1083,7 +1087,7 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
       }
       messages.push({ role: 'user', content: results });
     }
-    logger.info('Assistant request', { by: ctx.me.name, tokensIn, tokensOut, proposed: proposed.map(p=>p.type) });
+    logger.info('Assistant request', { by: ctx.me.name, tokensIn, tokensOut, proposed: proposed.map(p=>p.type), ...(walk ? { walk: true, clips: proposed.map(p=>p.clip || 0) } : {}) });
     res.json({ reply: reply || (proposed.length ? 'Here is what I\'ll do once you confirm.' : 'Sorry, I didn\'t catch that. Could you say it another way?'), actions: proposed });
   } catch(err){
     logger.error('hubAssistant failed', { error: String(err), status: err && err.status });

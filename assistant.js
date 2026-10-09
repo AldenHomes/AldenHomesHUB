@@ -65,6 +65,9 @@
   .ai-walk-btns button{padding:13px 10px; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit;}
   .ai-walk-btns .stop{flex:1; background:var(--danger, #b3452f); color:#fff; border:none;}
   .ai-walk-btns .cancel{background:#fff; color:var(--ink-soft, #6b6f72); border:2px solid var(--steel-line, #d4d2c8);}
+  .ai-pic-nav{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px; font-size:12px; color:var(--ink-soft, #6b6f72);}
+  .ai-pic-nav button{border:1px solid var(--steel-line, #d4d2c8); background:#fff; border-radius:6px; padding:6px 10px; font-size:12.5px; font-weight:700; color:var(--navy, #4B4F54); cursor:pointer; font-family:inherit;}
+  .ai-pic-nav button:disabled{opacity:.4; cursor:default;}
   .ai-panel, .ai-panel *{box-sizing:border-box;}
   .ai-panel{font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; color:var(--ink, #33363a);}
 `;
@@ -165,14 +168,35 @@
     return 'That didn\'t go through. Check your connection and try again.';
   }
 
-  // Put proposed changes on screen as cards. `shots` (walk-through only) = { clip number: picture } —
-  // the picture rides along on the card and is only uploaded if that card is confirmed.
-  function showActions(actions, shots){
+  // Put proposed changes on screen as cards. `tape` (walk-through only) = { frames:[{ t, shot }], clips:[{ t, text }] }:
+  // every still kept during the walk with the time it was taken, and the transcript in short pieces
+  // with the time each was said. An item's picture is the still from the moment its piece was spoken;
+  // Earlier / Later on the card step through the neighbouring stills. Only the one showing when
+  // Confirm is pressed gets uploaded.
+  function showActions(actions, tape){
     const ids = [];
+    const words = t=>String(t || '').toLowerCase().match(/[a-z]{4,}/g) || [];
+    const guessClip = text=>{
+      let best = 0, score = 0;
+      const want = new Set(words(text));
+      tape.clips.forEach((c, i)=>{ const hit = new Set(words(c.text).filter(w=>want.has(w))).size; if(hit > score){ score = hit; best = i + 1; } });
+      return best;
+    };
+    const frameAt = ms=>{
+      let best = -1, off = Infinity;
+      tape.frames.forEach((f, i)=>{ const d = Math.abs(f.t - ms); if(d < off){ off = d; best = i; } });
+      return best;
+    };
     actions.forEach(a=>{
       const id = 'c' + (++cardSeq);
-      const shot = shots && a.clip ? shots[a.clip] : null;
-      pending[id] = shot ? { ...a, _shot: shot } : a;
+      let fi = -1;
+      const fromWalk = !!tape && a.type === 'add_punch_item';
+      if(fromWalk && tape.frames.length){
+        // the assistant says which piece an item came from; if it didn't, go by the wording
+        const clip = tape.clips[(a.clip || 0) - 1] || tape.clips[guessClip((a.summary || {}).text) - 1];
+        if(clip) fi = frameAt(clip.t - WALK_LAG_MS);
+      }
+      pending[id] = fi >= 0 ? { ...a, _tape: tape, _fi: fi } : (fromWalk ? { ...a, _walk: true } : a);
       ids.push(id);
       const sum = a.summary || {};
       const card = add(`<div class="t">${escHtml(sum.title || 'Change')}</div>
@@ -180,11 +204,12 @@
         ${sum.people ? `<div class="p">${escHtml(sum.people)}</div>` : ''}
         <div class="row"><button type="button" class="ai-no" data-ai-cancel="${id}">Cancel</button><button type="button" class="ai-yes" data-ai-confirm="${id}">Confirm</button></div>`, 'ai-card');
       card.dataset.card = id;
-      if(shot){
-        const img = document.createElement('img');
-        img.alt = 'Picture from the walk-through';
-        img.src = URL.createObjectURL(shot);
-        card.insertBefore(img, card.querySelector('.row'));
+      if(fi >= 0){
+        const pic = document.createElement('div');
+        pic.className = 'ai-pic';
+        pic.innerHTML = `<img alt="Picture from the walk-through"><div class="ai-pic-nav"><button type="button" data-ai-pic="-1">&lsaquo; Earlier</button><span>Not the right moment?</span><button type="button" data-ai-pic="1">Later &rsaquo;</button></div>`;
+        card.insertBefore(pic, card.querySelector('.row'));
+        showPic(id);
       }
     });
     if(ids.length > 1){
@@ -192,6 +217,16 @@
       all.setAttribute('role', 'button');
       all.dataset.aiAll = ids.join(',');
     }
+  }
+  // draw (or redraw, after Earlier / Later) the still a walk-through card is holding
+  function showPic(id){
+    const a = pending[id], card = log.querySelector(`[data-card="${id}"]`);
+    if(!a || !a._tape || !card) return;
+    const img = card.querySelector('.ai-pic img');
+    if(img.src) URL.revokeObjectURL(img.src);
+    img.src = URL.createObjectURL(a._tape.frames[a._fi].shot);
+    card.querySelector('[data-ai-pic="-1"]').disabled = a._fi <= 0;
+    card.querySelector('[data-ai-pic="1"]').disabled = a._fi >= a._tape.frames.length - 1;
   }
 
   async function send(){
@@ -227,6 +262,9 @@
     const finish = (cls, text)=>{
       delete pending[id];
       card.querySelector('.row').remove();
+      const nav = card.querySelector('.ai-pic-nav');
+      if(nav) nav.remove();
+      if(cls === 'cancelled' && card.querySelector('.ai-pic')) card.querySelector('.ai-pic').remove();
       if(cls) card.classList.add(cls);
       const st = document.createElement('div'); st.className = 'state'; st.textContent = text; card.appendChild(st);
     };
@@ -239,7 +277,8 @@
       add(text, 'ai-msg bot');
     };
     try{
-      const { summary, _shot, ...toRun } = action;
+      const { summary, _tape, _fi, _walk, ...toRun } = action;
+      const _shot = _tape ? _tape.frames[_fi].shot : null;
       let noPicture = false;
       if(_shot){
         // the walk-through picture goes up first, so the item is saved with it attached
@@ -248,7 +287,14 @@
       }
       const data = await call({ action:'run', actions:[toRun] });
       const r = (data.results || [])[0] || {};
-      if(r.ok){ finish('done', '✓ Done' + (noPicture ? ' (the picture didn\'t upload)' : '')); history.push({ role:'user', text:'(I confirmed that and it was saved.)' }); }
+      if(r.ok){
+        // say what became of the picture, so a missing one isn't a mystery
+        const pic = noPicture ? ' · the picture didn\'t upload, so it was saved without one'
+          : _shot ? (r.photosSaved ? ' · picture attached' : ' · saved, but the picture was not kept')
+          : _walk ? ' · no picture was taken for this one' : '';
+        finish('done', '✓ Done' + pic);
+        history.push({ role:'user', text:'(I confirmed that and it was saved.)' });
+      }
       else again(escHtml(r.problem || 'That couldn\'t be saved.'));
     } catch(err){
       console.error(err);
@@ -256,6 +302,12 @@
     }
   }
   log.addEventListener('click', async e=>{
+    const nav = e.target.closest('[data-ai-pic]');
+    if(nav){
+      const id = nav.closest('.ai-card').dataset.card, a = pending[id];
+      if(a && a._tape){ a._fi = Math.max(0, Math.min(a._tape.frames.length - 1, a._fi + Number(nav.dataset.aiPic))); showPic(id); }
+      return;
+    }
     const all = e.target.closest('[data-ai-all]');
     if(all){
       if(all.disabled || all.dataset.busy) return;
@@ -340,41 +392,48 @@
   }
 
   /* ---- walk-through: point the phone's camera and talk ----
-     Nothing is recorded or saved as a video. While they talk the browser turns the speech into text
-     (same as the microphone) and the hub keeps a still picture from the camera each time they start
-     on something new. At the end the text goes to the assistant in numbered clips; it breaks it
-     into punch list items and says which clip each came from, so each card shows that picture.
-     Pictures stay on this device and are only uploaded for the cards that get confirmed. */
-  const WALK_CLIP_MS = 6000;      // talking this long without a break starts a new clip (and picture)
-  const WALK_GAP_MS = 2500;       // ...and so does starting up again after a silence this long
+     Nothing is saved as a video. While they walk, the hub keeps a still from the camera every
+     second and a half, each with the time it was taken, and the browser turns the speech into text
+     (same as the microphone), which is cut into short pieces with the time each was said. At the end
+     the numbered pieces go to the assistant; it breaks them into punch list items and says which
+     piece each came from, and the card shows the still from that moment. The stills stay on this
+     device; only the one on a card that gets confirmed is uploaded. */
+  const WALK_PIECE_MS = 2500;     // the transcript is cut into pieces about this long
+  const WALK_GAP_MS = 1500;       // ...and at any silence longer than this
+  const WALK_FRAME_MS = 1500;     // how often a still is kept
+  const WALK_LAG_MS = 600;        // words appear a little after they're spoken, so look this far back for the picture
   const WALK_MAX_MS = 10 * 60000; // a walk-through stops by itself after ten minutes
-  const WALK_MAX_CLIPS = 120;
+  const WALK_MAX_CLIPS = 300;
   let walk = null;
   const walkTotal = ()=>(walk.done + ' ' + walk.cur).replace(/\s+/g, ' ').trim();
   function walkShot(){
     const v = el('aiVideo');
-    if(!v.videoWidth) return Promise.resolve(null);
     const scale = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight));
     const c = document.createElement('canvas');
     c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
     c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);   // drawn now, so it's this moment even if saving takes a beat
-    return new Promise(res=>c.toBlob(b=>res(b), 'image/jpeg', 0.8));
+    return new Promise(res=>c.toBlob(b=>res(b), 'image/jpeg', 0.72));
+  }
+  function walkFrame(){
+    if(!walk || !walk.on || !el('aiVideo').videoWidth) return;
+    const f = { t: Date.now() - walk.startedAt, shot: null };
+    walk.frames.push(f);
+    walk.saving.push(walkShot().then(b=>{ f.shot = b; }).catch(()=>{}));
+    el('aiWalkPics').textContent = 'Camera on';
   }
   function walkHeard(){
     const now = Date.now(), total = walkTotal();
     const last = walk.clips[walk.clips.length - 1];
-    if(!last || ((now - walk.lastHeard > WALK_GAP_MS || now - walk.lastClip > WALK_CLIP_MS) && walk.clips.length < WALK_MAX_CLIPS && total.length > walk.prevLen)){
-      const clip = { at: last ? Math.max(walk.prevLen, last.at + 1) : 0, shot: null };
-      clip.ready = walkShot().then(b=>{ clip.shot = b; });
-      walk.clips.push(clip);
+    if(!last || ((now - walk.lastHeard > WALK_GAP_MS || now - walk.lastClip > WALK_PIECE_MS) && walk.clips.length < WALK_MAX_CLIPS && total.length > walk.prevLen)){
+      walk.clips.push({ at: last ? Math.max(walk.prevLen, last.at + 1) : 0, t: now - walk.startedAt });
       walk.lastClip = now;
+      walkFrame();   // and a still right at the moment a new piece starts
     }
     walk.lastHeard = now;
     walk.prevLen = total.length;
     const box = el('aiWalkText');
     box.classList.remove('quiet');
     box.textContent = total.length > 220 ? '…' + total.slice(-220) : total;
-    el('aiWalkPics').textContent = walk.clips.length + (walk.clips.length === 1 ? ' picture' : ' pictures');
   }
   function walkListen(){
     const rec = walk.rec = new Speech();
@@ -412,20 +471,23 @@
     let stream;
     try{ stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false }); }
     catch(err){ console.error(err); add('The camera is blocked or this device doesn\'t have one. Allow the camera for this page in the browser, or use the microphone instead.', 'ai-msg bot'); return; }
-    walk = { stream, clips: [], done: '', cur: '', prevLen: 0, lastHeard: 0, lastClip: 0, on: true, quick: 0, startedAt: Date.now() };
+    walk = { stream, clips: [], frames: [], saving: [], done: '', cur: '', prevLen: 0, lastHeard: 0, lastClip: 0, on: true, quick: 0, startedAt: Date.now() };
+    el('aiPanel').classList.add('walking');   // shown first: some phones won't start a hidden video
     el('aiVideo').srcObject = stream;
+    try{ await el('aiVideo').play(); } catch(e){ console.warn('camera preview did not start by itself', e); }
     el('aiWalkText').className = 'ai-walk-text quiet';
     el('aiWalkText').textContent = 'Walk through and say what needs doing as you point the camera at it.';
-    el('aiWalkPics').textContent = '';
+    el('aiWalkPics').textContent = 'Starting the camera…';
     el('aiWalkTime').textContent = '0:00';
     el('aiWalkStop').disabled = false;
-    el('aiPanel').classList.add('walking');
     walk.timer = setInterval(()=>{
       if(!walk) return;
       const secs = Math.floor((Date.now() - walk.startedAt) / 1000);
       el('aiWalkTime').textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
       if(walk.on && Date.now() - walk.startedAt > WALK_MAX_MS) finishWalk();
     }, 500);
+    walk.shooter = setInterval(walkFrame, WALK_FRAME_MS);
+    walkFrame();
     try{ if(navigator.wakeLock) walk.wake = await navigator.wakeLock.request('screen'); } catch(e){}   // keep the phone from dimming mid-walk
     try{ walkListen(); } catch(err){ console.error(err); walk.deaf = true; }
   }
@@ -434,9 +496,10 @@
     const w = walk;
     if(!w) return null;
     w.on = false;
+    clearInterval(w.shooter);
     // the last few words arrive just after stop() — give them a moment
     await new Promise(res=>{ w.finish = res; try{ w.rec.stop(); } catch(e){ res(); } setTimeout(res, 1500); });
-    await Promise.all(w.clips.map(c=>c.ready));
+    await Promise.all(w.saving);
     clearInterval(w.timer);
     try{ if(w.wake) w.wake.release(); } catch(e){}
     w.stream.getTracks().forEach(t=>t.stop());
@@ -457,18 +520,17 @@
     if(!got) return;
     const { w, total } = got;
     if(!total){ add('I didn\'t hear anything during that walk-through, so there\'s nothing to make a list from. Check the microphone is allowed for this page and try again.', 'ai-msg bot'); return; }
-    // cut the text at each clip's start (pulled back to the start of a word); clips with no words are dropped
+    // cut the text where each piece started (pulled back to the start of a word); pieces with no words are dropped
     const cuts = w.clips.map(c=>{ const sp = total.lastIndexOf(' ', Math.min(c.at, total.length)); return sp < 0 ? 0 : sp; });
-    const shots = {}, lines = [];
+    const tape = { frames: w.frames.filter(f=>f.shot), clips: [] };
     w.clips.forEach((c, i)=>{
       const text = total.slice(cuts[i], i + 1 < cuts.length ? cuts[i + 1] : total.length).trim();
-      if(!text) return;
-      lines.push('[' + (lines.length + 1) + '] ' + text);
-      if(c.shot) shots[lines.length] = c.shot;
+      if(text) tape.clips.push({ t: c.t, text });
     });
-    if(!lines.length) lines.push('[1] ' + total);
-    const transcript = lines.join('\n');
-    add(escHtml(`Walk-through · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} · ${Object.keys(shots).length} pictures`), 'ai-msg user');
+    if(!tape.clips.length) tape.clips.push({ t: 0, text: total });
+    const transcript = tape.clips.map((c, i)=>'[' + (i + 1) + '] ' + c.text).join('\n');
+    add(escHtml(`Walk-through · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`), 'ai-msg user');
+    if(!tape.frames.length) add('The camera didn\'t give me any pictures during that walk-through, so the items will come without them.', 'ai-msg bot');
     const waiting = add('Making the list…', 'ai-msg bot');
     busy = true; el('aiSend').disabled = true;
     try{
@@ -476,7 +538,7 @@
       waiting.textContent = data.reply || '';
       history.push({ role:'user', text: 'Walk-through transcript:\n' + transcript.slice(0, 1300) }, { role:'assistant', text: data.reply || '' });
       history = history.slice(-6);
-      showActions(data.actions || [], shots);
+      showActions(data.actions || [], tape);
     } catch(err){
       console.error(err);
       waiting.textContent = problemText(err);
