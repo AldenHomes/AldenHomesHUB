@@ -1592,8 +1592,16 @@ function renderTaskModal(sched, laid, h){
           ${others.map(x=>`<option value="${esc(x.id)}">${esc(x.name || 'Unnamed')}</option>`).join('')}
         </select>
       </div>` : '';
+    // on a house that's been sent: whether this vendor has been emailed about the job yet
+    const asked = t.asked && t.asked[id];
+    const askedDay = asked && asked.at ? new Date(asked.at).toLocaleDateString(undefined, { month:'numeric', day:'numeric', year:'2-digit' }) : '';
+    const emailed = !sched.sentAt || status !== 'pending' || !s ? ''
+      : !String(s.email || '').trim() ? '<div class="small" style="color:#a8451a;">No email address on file — not emailed</div>'
+      : !asked ? '<div class="muted small">Not emailed yet</div>'
+      : asked.start !== t.start || asked.end !== t.end ? `<div class="muted small">Emailed ${esc(askedDay)} with the old dates — the new dates go out at 7:00 tomorrow</div>`
+      : `<div class="small" style="color:#3f7d4e;">&#10003; Emailed ${esc(askedDay)}</div>`;
     return `<div class="confirm-row">
-      <div><div class="who">${esc(s ? s.name : 'Removed sub')}</div>${contact ? `<div class="muted small">${esc(contact)}</div>` : ''}</div>
+      <div><div class="who">${esc(s ? s.name : 'Removed sub')}</div>${contact ? `<div class="muted small">${esc(contact)}</div>` : ''}${emailed}</div>
       <div class="confirm-btns">${Object.keys(CONFIRM_LABELS).map(k=>
         `<button type="button" data-confirm="${k}" data-sub="${esc(id)}" class="${k===status ? 'on-'+k : ''}">${CONFIRM_LABELS[k]}</button>`).join('')}</div>
       ${swap}
@@ -1610,7 +1618,7 @@ function renderTaskModal(sched, laid, h){
     <label>Sub approvals</label>
     ${(t.subIds||[]).length
       ? `<div class="confirm-summary"><span class="c-yes">✓ ${c.confirmed} approved</span><span class="c-no">✕ ${c.declined} declined</span><span class="c-wait">… ${c.pending} pending</span></div>${subRows}
-         <div class="hint">Subs approve or decline from their own link. You can also set it by hand when they answer by phone or text. If the dates change afterwards it goes back to Pending. A vendor you swap in starts as Pending and is asked in the next morning's email (or press “Send again”).</div>`
+         <div class="hint">Subs approve or decline from their own link. You can also set it by hand when they answer by phone or text. If the dates change afterwards it goes back to Pending. A vendor you swap in starts as Pending and is emailed about the job right away, as long as emails to subs are switched on.</div>`
       : `<div class="muted" style="font-size:13.5px;">Nobody is assigned to this task. Assign a vendor in the List view.</div>`}
     <label class="check-label" style="margin-top:20px; font-size:14px; color:var(--ink);">
       <input type="checkbox" id="tkDone" ${t.done ? 'checked' : ''}> This task is finished
@@ -2059,6 +2067,9 @@ $('tkBody').addEventListener('change', e=>{
     t.subIds = (t.subIds||[]).map(id=>id===oldId ? pickedId : id);
     t.confirm = { ...(t.confirm||{}), [pickedId]: 'pending' };
     delete t.confirm[oldId];
+    // on a house the subs already have, the new vendor is emailed straight away (the server watches askNow)
+    const open = openSchedule();
+    if(open && open.sentAt) open.askNow = { at: new Date().toISOString(), subIds: [pickedId] };
   }
   else return;
   e.target.blur(); // let the popup refresh with the new dates

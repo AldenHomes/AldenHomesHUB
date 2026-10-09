@@ -1279,8 +1279,14 @@ if(EMAIL_ON) exports.onScheduleSend = onDocumentWritten({ document: 'build-sched
   const before = event.data.before.exists ? event.data.before.data() : null;
   const after = event.data.after.exists ? event.data.after.data() : null;
   // Only act when the "send" button was just pressed — not on every edit to the schedule.
-  if(!after || !after.sendRequestedAt) return;
-  if(before && before.sendRequestedAt === after.sendRequestedAt) return;
+  if(!after) return;
+  const sendPressed = !!after.sendRequestedAt && !(before && before.sendRequestedAt === after.sendRequestedAt);
+  if(!sendPressed){
+    // ...or when a vendor was just swapped in for one who declined (construction.html sets askNow)
+    const askNow = after.askNow && after.askNow.at && !(before && before.askNow && before.askNow.at === after.askNow.at) ? after.askNow : null;
+    if(askNow && after.sentAt) await askSwappedIn(event.params.houseId, after, askNow);
+    return;
+  }
 
   const houseId = event.params.houseId;
   const settings = await notifySettings();
@@ -1312,6 +1318,30 @@ if(EMAIL_ON) exports.onScheduleSend = onDocumentWritten({ document: 'build-sched
   } });
   logger.info('Schedule sent to subs', { house: houseName(after), emailed: outcome.emailed.length, skipped: outcome.skipped.length, failed: outcome.failed.length });
 });
+
+// A vendor picked to replace one who declined, on a house the subs already have: email just that
+// vendor their unanswered jobs on this house now, rather than leaving it for the 7:00 follow-up.
+// With emails switched off nothing is sent or marked, so the follow-up picks it up once they're on.
+async function askSwappedIn(houseId, sched, askNow){
+  const settings = await notifySettings();
+  if(settings.paused) return;
+  const ids = (Array.isArray(askNow.subIds) ? askNow.subIds : []).filter(x=>typeof x === 'string' && x).slice(0, 10);
+  const today = todayIso();
+  const bySub = {};
+  (sched.tasks || []).forEach(t=>{
+    if(!t.id || !t.start || t.done || t.end < today) return;
+    (t.subIds || []).forEach(subId=>{
+      if(!ids.includes(subId)) return;
+      if(((t.confirm && t.confirm[subId]) || 'pending') !== 'pending') return;
+      const asked = t.asked && t.asked[subId];
+      if(asked && asked.start === t.start && asked.end === t.end) return; // already asked about these dates
+      (bySub[subId] = bySub[subId] || []).push({ houseId, sched, t, was: movedFrom(t, subId) });
+    });
+  });
+  const outcome = await emailSubs(bySub, 'new', settings);
+  await recordAsked(outcome.asked);
+  logger.info('Swapped-in vendor asked', { house: houseName(sched), emailed: outcome.emailed, skipped: outcome.skipped, failed: outcome.failed });
+}
 
 /* ============================================================
    dailyFollowUp — changes, new assignments and reminders
