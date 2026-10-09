@@ -112,9 +112,14 @@
   .mw-sites{padding:0 16px 12px;}
   .mw-sites-h{font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); margin-bottom:6px;}
   .mw-sites-row{display:flex; gap:8px; flex-wrap:wrap;}
-  .mw-site{flex:1 1 210px; max-width:340px; min-width:0; display:block; text-decoration:none; background:#faf8f2; border:1px solid #ece8dd; border-left:4px solid #8a8f94; border-radius:var(--radius); padding:7px 10px 8px; color:var(--ink);}
-  .mw-site:hover{border-color:var(--navy); background:#fff;}
-  .mw-site strong{display:block; font-size:13px; color:var(--navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mw-site{flex:1 1 210px; max-width:340px; min-width:0; display:block; background:#faf8f2; border:1px solid #ece8dd; border-left:4px solid #8a8f94; border-radius:var(--radius); padding:7px 10px 8px; color:var(--ink);}
+  .mw-site > a{display:block; text-decoration:none; font-weight:700; font-size:13px; color:var(--navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mw-site > a:hover{text-decoration:underline;}
+  .mw-site .todo{display:flex; align-items:flex-start; gap:7px; font-size:12.5px; line-height:1.4; margin-top:4px;}
+  .mw-site .job + .todo, .mw-site .more + .todo{margin-top:6px; padding-top:6px; border-top:1px dashed #e2ddcf;}
+  .mw-site .todo .mw-check{width:16px; height:16px; border-width:1.5px; border-radius:4px; margin-top:1px;}
+  .mw-site .todo.hot .mw-check{border-color:var(--danger);}
+  .mw-site .todo .tag{color:var(--danger); font-weight:700;}
   .mw-site .job{display:flex; align-items:baseline; gap:6px; font-size:12.5px; line-height:1.4; margin-top:2px;}
   .mw-site .dot{flex:none; width:7px; height:7px; border-radius:50%; position:relative; top:-1px;}
   .mw-site .who{color:var(--ink-soft);}
@@ -830,23 +835,47 @@ function renderSites(){
   const box = document.getElementById('myWorkSites');
   if(!hubPrefs.strip.sites){ box.style.display = 'none'; box.innerHTML = ''; return; }
   const d = new Date(); const today = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  const homes = myWork.schedules.map(sc=>{
-    const job = allHomes.find(h=>h.id === sc.id);
+  // my own open punch list items ride along on their home's card, if I have punch items switched on
+  const punch = hubPrefs.strip.punch ? myWorkGather().punch : [];
+  const cards = {};
+  const card = id=>cards[id] || (cards[id] = { id, jobs: [], todos: [] });
+  myWork.schedules.forEach(sc=>{
     const jobs = (sc.tasks || []).filter(t=>t.start && t.start <= today && t.end >= today && !t.done).sort((a,b)=>a.start.localeCompare(b.start));
-    return { id: sc.id, job, jobs, label: job ? [job.community, job.lot ? 'Lot ' + job.lot : '', job.client].filter(Boolean).join(' · ') : '' };
-  }).filter(h=>h.job && h.jobs.length)
-    .sort((a,b)=>a.label.localeCompare(b.label, undefined, { numeric:true, sensitivity:'base' }));
-  const head = `<div class="mw-sites-h">On site today · ${d.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' })}</div>`;
+    if(jobs.length) card(sc.id).jobs = jobs;
+  });
+  punch.forEach(t=>card(t.houseId || '').todos.push(t));
+  const homes = Object.values(cards).map(c=>{
+    const job = allHomes.find(h=>h.id === c.id);
+    const label = job ? [job.community, job.lot ? 'Lot ' + job.lot : '', job.client].filter(Boolean).join(' · ') : (c.id ? ((c.todos[0] || {}).houseLabel || '') : 'General');
+    return { ...c, label };
+  }).filter(h=>h.label)
+    // homes in order, the "General" card (punch items not tied to a home) last
+    .sort((a,b)=>(a.id ? 0 : 1) - (b.id ? 0 : 1) || a.label.localeCompare(b.label, undefined, { numeric:true, sensitivity:'base' }));
+  const head = `<div class="mw-sites-h">${punch.length ? 'Today at a glance' : 'On site today'} · ${d.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' })}</div>`;
   box.style.display = 'block';
   if(!homes.length){ box.innerHTML = head + '<div style="font-size:13px; color:var(--ink-soft);">Nothing is on the build schedules for today.</div>'; return; }
   const jobLine = t=>{
     const who = (t.subIds || []).map(id=>myWork.subs[id]).filter(Boolean).join(', ');
     return `<div class="job"><span class="dot" style="background:${SITE_COLORS[t.phase] || '#8a8f94'};"></span><span>${escHtml(t.title || 'A job')}${who ? ` <span class="who">— ${escHtml(who)}</span>` : ''}</span></div>`;
   };
-  box.innerHTML = head + '<div class="mw-sites-row">' + homes.map(h=>
-    `<a class="mw-site" href="construction.html?house=${encodeURIComponent(h.id)}" style="border-left-color:${SITE_COLORS[h.jobs[0].phase] || '#8a8f94'};" title="Open this home's schedule">
-      <strong>${escHtml(h.label)}</strong>${h.jobs.slice(0, 3).map(jobLine).join('')}${h.jobs.length > 3 ? `<div class="more">+${h.jobs.length - 3} more</div>` : ''}</a>`).join('') + '</div>';
+  const todoLine = t=>{
+    const tag = t.due && t.due < today ? 'Overdue' : t.due === today ? 'Due today' : t.priority === 'high' ? 'High priority' : '';
+    return `<div class="todo${tag ? ' hot' : ''}"><button type="button" class="mw-check" data-mw-check="${escHtml(t.id)}" aria-label="Mark as done" title="Done"></button><span>${tag ? `<span class="tag">${tag}:</span> ` : ''}${escHtml(t.text || '')}</span></div>`;
+  };
+  box.innerHTML = head + '<div class="mw-sites-row">' + homes.map(h=>{
+    const href = !h.id ? 'punch.html' : h.jobs.length ? 'construction.html?house=' + encodeURIComponent(h.id) : 'house.html?id=' + encodeURIComponent(h.id);
+    const left = (h.jobs.length > 3 ? h.jobs.length - 3 : 0), leftTodo = (h.todos.length > 3 ? h.todos.length - 3 : 0);
+    return `<div class="mw-site" style="border-left-color:${h.jobs.length ? (SITE_COLORS[h.jobs[0].phase] || '#8a8f94') : '#c9c4b5'};">
+      <a href="${href}" title="${!h.id ? 'Open the punch list' : h.jobs.length ? 'Open this home\'s schedule' : 'Open this home'}">${escHtml(h.label)}</a>${h.jobs.slice(0, 3).map(jobLine).join('')}${left ? `<div class="more">+${left} more</div>` : ''}${h.todos.slice(0, 3).map(todoLine).join('')}${leftTodo ? `<a class="more" href="punch.html" style="display:block; font-weight:400;">+${leftTodo} more on the punch list</a>` : ''}</div>`;
+  }).join('') + '</div>';
 }
+document.getElementById('myWorkSites').addEventListener('click', e=>{
+  const check = e.target.closest('[data-mw-check]');
+  if(!check || !myWork.db) return;
+  check.disabled = true;
+  myWork.db.collection('notes').doc(check.dataset.mwCheck).update({ done: true, doneAt: new Date().toISOString(), doneBy: { uid: myWork.uid, name: myWork.name } })
+    .catch(err=>{ console.error(err); check.disabled = false; alert('Could not save — check your connection and try again.'); });
+});
 
 /* ---- the gear on the strip: what shows there ---- */
 let gearOpen = false;
@@ -863,7 +892,7 @@ function renderGear(){
     + row('notes', st.notes, 'Notes and comments for me')
     + row('reminders', st.reminders, 'Reminders I set')
     + row('declined', declinedOn, 'Jobs a vendor declined that need someone else')
-    + row('sites', st.sites, 'What\'s scheduled at each home today')
+    + row('sites', st.sites, 'What\'s scheduled at each home today (with my punch list items)')
     + row('weather', st.weather, 'Weather')
     + (st.weather ? `<div class="place">For <input type="text" id="weatherPlace" value="${escHtml(st.place.name)}" placeholder="Town or ZIP code" autocomplete="off"> <button type="button" id="weatherPlaceBtn">Change</button> <span id="weatherPlaceNote"></span></div>` : '')
     + '<div style="margin-top:10px;"><button type="button" class="done" id="gearDone">Done</button></div>';
