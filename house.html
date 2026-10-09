@@ -223,7 +223,13 @@
   .file-row a{flex:1; min-width:0; color:var(--navy); font-weight:600; text-decoration:none; word-break:break-word;}
   .file-row a:hover{text-decoration:underline;}
   .file-row select{flex:0 0 auto; max-width:120px; font-size:11.5px; padding:3px 4px; border:1px solid var(--steel-line); border-radius:4px; background:var(--paper-2); color:var(--ink-soft); font-family:inherit; cursor:pointer;}
-  .plan-folder{display:flex; align-items:center; gap:7px; margin-top:12px; padding:6px 10px; background:#f1ede3; border-radius:4px; font-size:12.5px; font-weight:700; color:var(--navy);}
+  .plan-folder{display:flex; align-items:center; gap:7px; width:100%; margin-top:8px; padding:8px 10px; background:#f1ede3; border:none; border-radius:4px; font-size:12.5px; font-weight:700; color:var(--navy); font-family:inherit; text-align:left; cursor:pointer;}
+  .plan-folder:hover{background:#e9e4d6;}
+  .plan-folder .arrow{margin-left:auto; transition:transform .12s;}
+  .plan-folder.open .arrow{transform:rotate(180deg);}
+  .card-head .edit-btn{margin-left:auto; border:1px solid var(--steel-line); background:var(--paper-2); color:var(--ink-soft); border-radius:4px; padding:5px 12px; font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer;}
+  .card-head .edit-btn:hover{border-color:var(--navy); color:var(--navy);}
+  .card-head .edit-btn.on{background:var(--navy); border-color:var(--navy); color:#fff;}
   .plan-folder:first-child{margin-top:0;}
   .plan-folder .n{font-weight:400; color:var(--ink-soft); font-family:"Courier New",monospace; font-size:11px;}
   .plan-folder + .file-row{border-top:none;}
@@ -444,8 +450,10 @@ html, body{max-width:100%; overflow-x:clip;}
           <div class="card-head">
             <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
             <h3>Prints &amp; Files</h3>
+            <button type="button" class="edit-btn" id="planEditBtn" style="display:none;">Edit</button>
           </div>
           <div class="card-body">
+            <div class="muted" id="planEditNote" style="display:none; font-size:12.5px; margin-bottom:8px;">Use the menu beside a file to put it in a folder, or the &times; to remove it. Press Done when you're finished.</div>
             <div id="plansList"></div>
             <div class="muted" id="filesBody" style="font-size:12.5px; margin-top:10px;"></div>
           </div>
@@ -1633,6 +1641,11 @@ function renderFiles(){
     : filesState === 'loading' ? '<span class="muted">Loading…</span>'
     : plans.length ? plansHtml(plans)
     : '<span class="muted">No plans uploaded yet.</span>';
+  if(!plans.length) planEdit = false;
+  $('planEditBtn').style.display = filesState === 'ready' && plans.length ? '' : 'none';
+  $('planEditBtn').textContent = planEdit ? 'Done' : 'Edit';
+  $('planEditBtn').classList.toggle('on', planEdit);
+  $('planEditNote').style.display = planEdit ? '' : 'none';
 
   // Photos: newest first (the list is already sorted by upload time), optionally narrowed to a folder.
   const allPhotos = files.filter(f=>f.kind === 'photo');
@@ -1686,24 +1699,37 @@ function planFolderNames(){
   files.filter(f=>f.kind === 'plan' && f.folder).forEach(f=>{ if(!seen[f.folder.toLowerCase()]) seen[f.folder.toLowerCase()] = f.folder; });
   return Object.values(seen).sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:'base' }));
 }
+let planEdit = false;            // Edit pressed: the folder menus and remove buttons are showing
+const planOpen = new Set();      // folders opened with their arrow (lower-case names); the rest stay closed
 function plansHtml(plans){
   const folders = planFolderNames();
   const byName = (a,b)=>(a.name || '').localeCompare(b.name || '', undefined, { numeric:true, sensitivity:'base' });
   const row = f=>`<div class="file-row">
         <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name || 'Plan')}</a>
-        <select data-plan-move="${esc(f.id)}" title="Put this file in a folder">
+        ${planEdit ? `<select data-plan-move="${esc(f.id)}" title="Put this file in a folder">
           <option value="">${f.folder ? 'Move…' : 'Folder…'}</option>
           ${folders.filter(x=>x.toLowerCase() !== (f.folder || '').toLowerCase()).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}
           <option value="__new">New folder…</option>
           ${f.folder ? '<option value="__none">Take out of folder</option>' : ''}
         </select>
-        <button type="button" class="x-btn" data-delete="${esc(f.id)}" title="Remove">&times;</button>
+        <button type="button" class="x-btn" data-delete="${esc(f.id)}" title="Remove">&times;</button>` : ''}
       </div>`;
   const inFolder = name=>plans.filter(f=>(f.folder || '').toLowerCase() === name.toLowerCase()).sort(byName);
   const loose = plans.filter(f=>!f.folder);
   return (folders.length ? loose.slice().sort(byName) : loose).map(row).join('')
-    + folders.map(name=>`<div class="plan-folder"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>${esc(name)} <span class="n">${inFolder(name).length}</span></div>${inFolder(name).map(row).join('')}`).join('');
+    + folders.map(name=>{
+        const open = planEdit || planOpen.has(name.toLowerCase());   // everything is open while editing
+        return `<button type="button" class="plan-folder${open ? ' open' : ''}" data-plan-folder="${esc(name)}" title="${open ? 'Close' : 'Open'} this folder"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>${esc(name)} <span class="n">${inFolder(name).length}</span><svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>${open ? inFolder(name).map(row).join('') : ''}`;
+      }).join('');
 }
+$('planEditBtn').addEventListener('click', ()=>{ planEdit = !planEdit; renderFiles(); });
+$('plansList').addEventListener('click', e=>{
+  const head = e.target.closest('[data-plan-folder]');
+  if(!head || planEdit) return;
+  const key = head.dataset.planFolder.toLowerCase();
+  if(planOpen.has(key)) planOpen.delete(key); else planOpen.add(key);
+  renderFiles();
+});
 $('plansList').addEventListener('change', async e=>{
   const sel = e.target.closest('select[data-plan-move]');
   if(!sel || !sel.value) return;
@@ -1831,6 +1857,7 @@ async function uploadFiles(list, kind, folderOf){
     if(!name) return '';
     let match = known.find(x=>x.toLowerCase() === name.toLowerCase());
     if(!match){ known.push(name); match = name; if(kind === 'photo') newPhotoFolders.push(name); }
+    if(kind === 'plan') planOpen.add(match.toLowerCase());
     return match;
   };
   const newPhotoFolders = [];
