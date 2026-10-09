@@ -885,10 +885,14 @@ function render(){
   ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
   const settleIn = daysFromToday(job.settle);
+  // No foundation date typed on the Job Production Schedule: use the build schedule's
+  // (its first Foundation job, or the schedule's start) rather than saying "not set".
+  const schedTasks = ((sched && sched.tasks) || []).filter(t=>t.start);
+  const schedFndn = job.fndn ? '' : ((schedTasks.filter(t=>t.phase === 'Foundation').map(t=>t.start).sort()[0]) || (sched && sched.startDate) || '');
   $('hDates').innerHTML = [
-    ['Foundation', job.fndn], ['Walk-through', job.walk], ['Move-in', job.move], ['Settlement', job.settle],
+    ['Foundation', job.fndn || schedFndn], ['Walk-through', job.walk], ['Move-in', job.move], ['Settlement', job.settle],
   ].map(([label, iso])=>`<div class="date"><div class="l">${label}</div>
-      <div class="v${iso ? (label==='Settlement' && settleIn!==null && settleIn>=0 && settleIn<=14 ? ' soon' : '') : ' none'}">${fmtDate(iso) || 'not set'}</div></div>`).join('');
+      <div class="v${iso ? (label==='Settlement' && settleIn!==null && settleIn>=0 && settleIn<=14 ? ' soon' : '') : ' none'}">${fmtDate(iso) || 'not set'}</div>${label==='Foundation' && schedFndn ? '<div class="muted" style="font-size:11px; margin-top:2px;">from the build schedule</div>' : ''}</div>`).join('');
 
   renderOwnerLogin();
   renderNotes();
