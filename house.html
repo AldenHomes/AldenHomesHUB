@@ -67,6 +67,11 @@
   .cards{display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:18px;}
   .card{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:20px 20px 18px; display:flex; flex-direction:column; gap:12px; min-height:210px;}
   .card.soon{box-shadow:none; border:1px dashed var(--steel-line); background:transparent;}
+  /* while files are being dragged over the page: the cards that take them are outlined, the one under the pointer is filled */
+  .card.drop-ok{outline:2px dashed var(--steel-line); outline-offset:-2px;}
+  .card.drop-here{outline:3px dashed #3f7d4e; background:#eef5ee;}
+  .drag-hint{font-size:12px; color:var(--ink-soft);}
+  @media (hover:none){ .drag-hint{display:none;} }
   .card-head{display:flex; align-items:center; gap:11px;}
   .card-icon{width:38px; height:38px; border-radius:var(--radius); background:#eef0e8; color:var(--rust-2); display:flex; align-items:center; justify-content:center; flex:none;}
   .card.soon .card-icon{background:#eeece4; color:var(--ink-soft);}
@@ -430,7 +435,7 @@ html, body{max-width:100%; overflow-x:clip;}
         </div>
 
         <!-- Prints & files -->
-        <div class="card">
+        <div class="card" id="plansCard">
           <div class="card-head">
             <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
             <h3>Prints &amp; Files</h3>
@@ -443,6 +448,7 @@ html, body{max-width:100%; overflow-x:clip;}
             Upload plans
             <input type="file" id="planInput" accept="application/pdf,image/*" multiple style="display:none;">
           </label>
+          <div class="drag-hint">or drag PDFs and pictures onto this box</div>
           <a class="btn btn-ghost" id="filesBtn" href="#" target="_blank" rel="noopener" style="display:none;">Open OneDrive folder</a>
         </div>
 
@@ -457,7 +463,7 @@ html, body{max-width:100%; overflow-x:clip;}
         </div>
 
         <!-- Photos: from the office and from subs on site -->
-        <div class="card wide">
+        <div class="card wide" id="photosCard">
           <div class="card-head">
             <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
             <h3>Photos <span class="muted" id="photoCount" style="font-size:12px; font-weight:400;"></span></h3>
@@ -468,7 +474,7 @@ html, body{max-width:100%; overflow-x:clip;}
           </div>
           <div class="card-body">
             <div class="folder-row" id="folderRow" style="display:none;"></div>
-            <div class="muted" style="font-size:12.5px; min-height:16px;"><span id="uploadTarget"></span> <span id="uploadNote"></span></div>
+            <div class="muted" style="font-size:12.5px; min-height:16px;"><span id="uploadTarget"></span> <span id="uploadNote"></span> <span class="drag-hint">You can also drag photos onto this box.</span></div>
             <div class="share-bar" id="shareBar"></div>
             <div class="photo-grid" id="photoGrid"></div>
           </div>
@@ -1804,6 +1810,61 @@ async function uploadFiles(list, kind){
 }
 $('planInput').addEventListener('change', e=>{ const l = e.target.files; uploadFiles(l, 'plan').then(()=>{ e.target.value = ''; }); });
 $('photoInput').addEventListener('change', e=>{ const l = e.target.files; uploadFiles(l, 'photo').then(()=>{ e.target.value = ''; }); });
+
+/* ---- drag files in ----
+   Drop on Prints & Files -> plans. Drop on Photos -> photos (into the open folder). Drop on Notes -> photos
+   waiting on the note being written. Drop anywhere else -> PDFs go to Prints & Files, pictures to Photos. */
+const DROP_CARDS = { notesCard: 'note', plansCard: 'plan', photosCard: 'photo' };
+const dragHasFiles = e=>!!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+const dropCardOf = e=>{ const c = e.target && e.target.closest ? e.target.closest('#notesCard, #plansCard, #photosCard') : null; return c ? c.id : ''; };
+const isPicture = f=>/^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(f.name);
+const isPdf = f=>f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+let dropClear = null;
+function dropMarks(over){
+  Object.keys(DROP_CARDS).forEach(id=>{ $(id).classList.toggle('drop-ok', over !== null); $(id).classList.toggle('drop-here', over === id); });
+}
+window.addEventListener('dragover', e=>{
+  if(!dragHasFiles(e)) return;
+  e.preventDefault();               // without this the browser opens the file instead
+  e.dataTransfer.dropEffect = 'copy';
+  dropMarks(dropCardOf(e));
+  clearTimeout(dropClear);
+  dropClear = setTimeout(()=>dropMarks(null), 200);   // dragover keeps firing while files are over the page
+});
+window.addEventListener('drop', async e=>{
+  if(!dragHasFiles(e)) return;
+  e.preventDefault();
+  clearTimeout(dropClear);
+  dropMarks(null);
+  if(!job) return;
+  const where = DROP_CARDS[dropCardOf(e)] || '';
+  const all = Array.from(e.dataTransfer.files || []);
+  const pictures = all.filter(isPicture), pdfs = all.filter(isPdf);
+  const left = count=>count ? ` ${count} file${count === 1 ? ' was' : 's were'} left out — only ${where === 'photo' ? 'pictures can go in Photos' : 'PDFs and pictures can be added'}.` : '';
+  if(where === 'note'){
+    // joins any photos already waiting on the note; six is the most a note carries
+    const dt = new DataTransfer();
+    Array.from($('notePhotos').files || []).concat(pictures).slice(0, 6).forEach(f=>dt.items.add(f));
+    $('notePhotos').files = dt.files;
+    $('notePhotos').dispatchEvent(new Event('change'));
+    if(all.length > pictures.length) $('notePhotoNote').textContent += (pictures.length ? ' · ' : '') + 'Only photos can go on a note.';
+    return;
+  }
+  let skipped = 0;
+  if(where === 'photo'){
+    skipped = all.length - pictures.length;
+    await uploadFiles(pictures, 'photo');
+  } else if(where === 'plan'){
+    const ok = all.filter(f=>isPicture(f) || isPdf(f));
+    skipped = all.length - ok.length;
+    await uploadFiles(ok, 'plan');
+  } else {
+    skipped = all.length - pictures.length - pdfs.length;
+    if(pdfs.length){ $('plansCard').scrollIntoView({ behavior:'smooth', block:'center' }); await uploadFiles(pdfs, 'plan'); }
+    if(pictures.length){ $('photosCard').scrollIntoView({ behavior:'smooth', block:'center' }); await uploadFiles(pictures, 'photo'); }
+  }
+  if(skipped) $('uploadNote').textContent += left(skipped);
+});
 
 document.querySelector('.cards').addEventListener('click', async e=>{
   const btn = e.target.closest('[data-delete]');

@@ -11,7 +11,7 @@
    - Everything else (Firestore, Storage, sign-in, QR images) is
      left completely alone.
    ============================================================ */
-const CACHE = 'alden-hub-v8';
+const CACHE = 'alden-hub-v9';
 
 const SHELL = [
   'index.html',
@@ -61,7 +61,9 @@ self.addEventListener('activate', event=>{
 async function networkFirst(request){
   const cache = await caches.open(CACHE);
   try{
-    const response = await fetch(request);
+    // 'no-cache' = check with the server every time; without it the browser can keep
+    // showing its own saved copy of a page for up to 10 minutes after an update.
+    const response = await fetch(request, { cache: 'no-cache' });
     if(response.ok) cache.put(request, response.clone());
     return response;
   } catch(err){
