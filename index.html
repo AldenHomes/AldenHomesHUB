@@ -135,6 +135,12 @@
   .mywork-body{padding:0 16px 10px; border-top:1px solid #ece8dd;}
   .mw-row{display:flex; align-items:flex-start; gap:11px; padding:10px 0; border-top:1px solid #f1ede3; text-decoration:none; color:inherit;}
   .mw-row:first-child{border-top:none;}
+  /* punch items: two to a row, one on a phone */
+  .mw-two{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); column-gap:22px; border-top:1px solid #f1ede3;}
+  .mw-two:first-child{border-top:none;}
+  .mw-two .mw-row{border-top:1px solid #f1ede3;}
+  .mw-two .mw-row:nth-child(-n+2){border-top:none;}
+  @media (max-width:700px){ .mw-two{grid-template-columns:1fr;} .mw-two .mw-row:nth-child(2){border-top:1px solid #f1ede3;} }
   a.mw-row:hover .mw-t{text-decoration:underline;}
   .mw-main{flex:1; min-width:0;}
   .mw-t{font-size:14.5px; line-height:1.4; word-break:break-word;}
@@ -1025,24 +1031,27 @@ function renderMyWork(){
     ? `construction.html?house=${encodeURIComponent(x.houseId || '')}&task=${encodeURIComponent(x.taskId || '')}`
     : (x.houseId ? `house.html?id=${encodeURIComponent(x.houseId)}#notes` : 'punch.html');
   const urgent = [...g.late, ...g.dueToday];
+  const two = list=>list.length ? [`<div class="mw-two">${list.join('')}</div>`] : [];
+  let shownCount = 0;
+  const count = list=>{ shownCount += list.length; return list; };
   const rows = [
-    ...urgent.map(punchRow),
-    ...g.declined.map(x=>`<div class="mw-row"><span class="mw-ic red">!</span>
+    ...two(count(urgent.map(punchRow))),
+    ...count(g.declined.map(x=>`<div class="mw-row"><span class="mw-ic red">!</span>
         <div class="mw-main"><div class="mw-t">${escHtml(x.sub)} declined ${escHtml(x.title)}, ${escHtml(x.start === x.end ? day(x.start) : day(x.start) + ' – ' + day(x.end))}</div>
           <div class="mw-m">${escHtml(where(x))}${x.reason ? ' · “' + escHtml(x.reason) + '”' : ''}</div></div>
-        <a class="mw-go" href="construction.html?house=${encodeURIComponent(x.houseId)}&task=${encodeURIComponent(x.taskId)}">Choose vendor</a></div>`),
-    ...g.reminders.map(x=>`<a class="mw-row" href="${noteHref(x)}" data-mw-read="${escHtml(x.id)}"><span class="mw-ic amber">&#128276;</span>
-        <div class="mw-main"><div class="mw-t">Reminder: ${escHtml(x.text || '')}</div><div class="mw-m">${escHtml(where(x))}</div></div><span class="mw-go">Open</span></a>`),
-    ...g.punch.filter(t=>!urgent.includes(t)).slice(0, 5).map(punchRow),
-    ...g.fresh.slice(0, 5).map(x=>{
+        <a class="mw-go" href="construction.html?house=${encodeURIComponent(x.houseId)}&task=${encodeURIComponent(x.taskId)}">Choose vendor</a></div>`)),
+    ...count(g.reminders.map(x=>`<a class="mw-row" href="${noteHref(x)}" data-mw-read="${escHtml(x.id)}"><span class="mw-ic amber">&#128276;</span>
+        <div class="mw-main"><div class="mw-t">Reminder: ${escHtml(x.text || '')}</div><div class="mw-m">${escHtml(where(x))}</div></div><span class="mw-go">Open</span></a>`)),
+    ...two(count(g.punch.filter(t=>!urgent.includes(t)).slice(0, 6).map(punchRow))),
+    ...count(g.fresh.slice(0, 5).map(x=>{
       const last = (x.replies || [])[(x.replies || []).length - 1];
       const reply = last && (last.at || '') >= (x.lastAt || '') ? last : null;
       const who = ((reply || x).by || {}).name || 'Someone';
       return `<a class="mw-row" href="${noteHref(x)}" data-mw-read="${escHtml(x.id)}"><span class="mw-ic">&#9993;</span>
         <div class="mw-main"><div class="mw-t">${escHtml(who)}${reply ? ' commented' : ''}: ${escHtml((reply || x).text || '')}</div><div class="mw-m">${escHtml(where(x))} · ${escHtml(bellTime((reply || x).at))}</div></div></a>`;
-    }),
+    })),
   ];
-  const hidden = total - rows.length;
+  const hidden = total - shownCount;
   body.innerHTML = rows.join('') + `<a class="mw-more" href="mywork.html">${hidden > 0 ? `See all ${total} in My Work` : 'Open My Work'} &rarr;</a>`;
 }
 document.getElementById('myWorkHead').addEventListener('click', ()=>{
