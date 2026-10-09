@@ -889,9 +889,19 @@ function render(){
   // (its first Foundation job, or the schedule's start) rather than saying "not set".
   const schedTasks = ((sched && sched.tasks) || []).filter(t=>t.start);
   const schedFndn = job.fndn ? '' : ((schedTasks.filter(t=>t.phase === 'Foundation').map(t=>t.start).sort()[0]) || (sched && sched.startDate) || '');
-  $('hDates').innerHTML = [
+  // With a build schedule, the first box says what is being done today (or what's next)
+  // instead of the foundation date.
+  const today = todayIso();
+  const nowTasks = schedTasks.filter(t=>t.start <= today && t.end >= today);
+  const nextTask = schedTasks.filter(t=>t.start > today).sort((a,b)=>a.start < b.start ? -1 : 1)[0];
+  const stage = nowTasks.length ? { l:'Happening now', t:nowTasks[0].title, s:'since ' + fmtDate(nowTasks[0].start) + (nowTasks.length > 1 ? ' · +' + (nowTasks.length - 1) + ' more' : '') }
+    : nextTask ? { l:'Up next', t:nextTask.title, s:'starts ' + fmtDate(nextTask.start) }
+    : schedTasks.length ? { l:'Build schedule', t:'All jobs finished', s:'' } : null;
+  const stageHtml = stage ? `<div class="date"><div class="l">${stage.l}</div>
+      <div class="v" style="font-family:inherit; font-size:16px;">${esc(stage.t)}</div>${stage.s ? `<div class="muted" style="font-size:11px; margin-top:2px;">${esc(stage.s)}</div>` : ''}</div>` : '';
+  $('hDates').innerHTML = stageHtml + [
     ['Foundation', job.fndn || schedFndn], ['Walk-through', job.walk], ['Move-in', job.move], ['Settlement', job.settle],
-  ].map(([label, iso])=>`<div class="date"><div class="l">${label}</div>
+  ].slice(stage ? 1 : 0).map(([label, iso])=>`<div class="date"><div class="l">${label}</div>
       <div class="v${iso ? (label==='Settlement' && settleIn!==null && settleIn>=0 && settleIn<=14 ? ' soon' : '') : ' none'}">${fmtDate(iso) || 'not set'}</div>${label==='Foundation' && schedFndn ? '<div class="muted" style="font-size:11px; margin-top:2px;">from the build schedule</div>' : ''}</div>`).join('');
 
   renderOwnerLogin();
