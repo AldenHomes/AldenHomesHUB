@@ -391,7 +391,7 @@ html, body{max-width:100%; overflow-x:clip;}
         </div>
         <div class="house-head">
           <div style="flex:1 1 240px;">
-            <h2 id="hdTitle"></h2>
+            <h2><a id="hdTitle" href="#" title="Open this home's page" style="color:inherit; text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'"></a></h2>
             <div class="sub" id="hdSub"></div>
           </div>
           <div class="fact">
@@ -1429,7 +1429,7 @@ function renderHouseDetail(){
   const h = houseInfo(sched);
   const laid = layoutTasks(sched.startDate, sched.tasks || []);
   $('hdTitle').textContent = [h.community, h.lot ? 'Lot '+h.lot : '', h.client].filter(Boolean).join(' · ') || 'House';
-  $('hdHomeLink').href = 'house.html?id=' + encodeURIComponent(sched.id);
+  $('hdHomeLink').href = $('hdTitle').href = 'house.html?id=' + encodeURIComponent(sched.id);
   $('hdSub').textContent = [h.address, h.model, sched.templateName ? 'Template: '+sched.templateName : ''].filter(Boolean).join('  ·  ');
   if(document.activeElement !== $('hdStart')) $('hdStart').value = sched.startDate || '';
   const late = h.move && laid.projectedEnd && laid.projectedEnd > h.move;
