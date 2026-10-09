@@ -74,6 +74,13 @@
   .item-tools button{background:none; border:none; padding:0; font-size:12.5px; font-weight:700; color:var(--rust-2); cursor:pointer; font-family:inherit;}
   .item-tools button:hover{text-decoration:underline;}
   .item-tools button.warn{color:var(--danger);}
+  /* an item being edited: its wording, home and person become boxes */
+  .item-edit textarea{width:100%; min-height:64px; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; line-height:1.45; font-family:inherit; color:var(--ink); resize:vertical;}
+  .item-edit .row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .item-edit select{flex:1 1 180px; min-width:0; padding:8px 9px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; background:#fff; color:var(--ink);}
+  .item-edit .btns{display:flex; gap:8px; margin-top:10px;}
+  .item-edit .btns button{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:8px 16px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:var(--navy);}
+  .item-edit .btns button.save{background:var(--navy); border-color:var(--navy); color:#fff;}
   .hint{font-size:12.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
 
   .filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
@@ -402,13 +409,42 @@ function renderPickers(){
   keep('newHome', `<option value="">No home (general)</option>`
     + (active.length ? `<optgroup label="Active homes">${active.map(opt).join('')}</optgroup>` : '')
     + (finished.length ? `<optgroup label="Finished homes">${finished.map(opt).join('')}</optgroup>` : ''));
-  keep('newWho', `<option value="">For anyone</option>` + staff.map(s=>`<option value="${esc(s.uid)}">For ${esc(s.name)}</option>`).join(''));
+  // first on the list, so it's what you get if you don't choose: the item is yours
+  const myUid = me() ? me().uid : '';
+  const firstFill = !$('newWho').options.length;
+  keep('newWho', `<option value="me">For me</option>` + staff.filter(s=>s.uid !== myUid).map(s=>`<option value="${esc(s.uid)}">For ${esc(s.name)}</option>`).join('') + `<option value="">For anyone</option>`);
+  if(firstFill) $('newWho').value = 'me';
   keep('whoFilter', `<option value="">Everyone's items</option><option value="me">Just mine</option><option value="nobody">Not given to anyone</option>`
     + staff.map(s=>`<option value="${esc(s.uid)}">${esc(s.name)}</option>`).join(''));
 }
 
 /* ---- the list ---- */
+let editing = null;   // the item being edited: { id, text, home, who } — kept here so a refresh of the list doesn't lose typing
+function editHtml(t){
+  const sorted = jobs.slice().sort((a,b)=>homeLabel(a).localeCompare(homeLabel(b), 'en', { numeric:true }));
+  const opt = j=>`<option value="${esc(j.id)}"${editing.home === j.id ? ' selected' : ''}>${esc(homeLabel(j))}</option>`;
+  const active = sorted.filter(isActive), finished = sorted.filter(j=>!isActive(j));
+  // a home that's no longer on the list still has to be choosable, or saving would move the item
+  const lost = editing.home && !jobs.some(j=>j.id === editing.home) ? `<option value="${esc(editing.home)}" selected>${esc(t.houseLabel || 'A home')}</option>` : '';
+  const several = (t.mentions || []).length > 1;
+  return `<div class="item item-edit">
+    <div class="item-main">
+      <textarea data-edit-text maxlength="500" aria-label="What needs doing">${esc(editing.text)}</textarea>
+      <div class="row">
+        <select data-edit-home aria-label="Home"><option value="">No home (general)</option>${lost}
+          ${active.length ? `<optgroup label="Active homes">${active.map(opt).join('')}</optgroup>` : ''}
+          ${finished.length ? `<optgroup label="Finished homes">${finished.map(opt).join('')}</optgroup>` : ''}</select>
+        <select data-edit-who aria-label="Who it's for">
+          ${several ? `<option value="__keep"${editing.who === '__keep' ? ' selected' : ''}>For ${esc((t.mentionNames || []).join(', '))}</option>` : ''}
+          <option value=""${editing.who === '' ? ' selected' : ''}>For anyone</option>
+          ${staff.map(p=>`<option value="${esc(p.uid)}"${editing.who === p.uid ? ' selected' : ''}>For ${esc(p.name)}</option>`).join('')}</select>
+      </div>
+      <div class="btns"><button type="button" class="save" data-edit-save>Save</button><button type="button" data-edit-cancel>Cancel</button></div>
+    </div>
+  </div>`;
+}
 function itemHtml(t){
+  if(editing && editing.id === t.id) return editHtml(t);
   const uid = me() ? me().uid : '';
   const names = (t.mentions || []).map((id, i)=>{
     const s = staff.find(x=>x.uid === id);
@@ -420,6 +456,7 @@ function itemHtml(t){
   const high = t.priority === 'high';
   const photos = (t.photos || []).map(url=>`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Photo" loading="lazy"></a>`).join('');
   const tools = t.done ? '' : `<div class="item-tools">
+      <button type="button" data-edit="${esc(t.id)}">Edit</button>
       <button type="button" data-due="${esc(t.id)}">${t.due ? 'Change date' : 'Set a date'}</button>
       ${t.due ? `<button type="button" data-due-clear="${esc(t.id)}">Remove date</button>` : ''}
       <button type="button" data-photo="${esc(t.id)}">Add photo</button>
@@ -455,6 +492,8 @@ function groupsHtml(list){
 function render(){
   const uid = me() ? me().uid : '';
   const q = $('search').value.trim().toLowerCase();
+  if(editing && !items.some(t=>t.id === editing.id && !t.done)) editing = null;   // it was deleted or checked off meanwhile
+  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-edit-text]') ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
   const shown = items.filter(t=>{
     const mine = (t.mentions || []);
     if(whoFilter === 'me' && !mine.includes(uid)) return false;
@@ -478,6 +517,32 @@ function render(){
   $('doneToggle').classList.toggle('open', show);
   $('doneList').style.display = show ? 'block' : 'none';
   $('doneList').innerHTML = done.length ? groupsHtml(done) : '<div class="empty">Nothing checked off yet.</div>';
+  if(typing){ const box = document.querySelector('[data-edit-text]'); if(box){ box.focus(); box.setSelectionRange(typing[0], typing[1]); } }
+}
+document.addEventListener('input', e=>{ if(editing && e.target.matches('[data-edit-text]')) editing.text = e.target.value; });
+document.addEventListener('change', e=>{
+  if(!editing) return;
+  if(e.target.matches('[data-edit-home]')) editing.home = e.target.value;
+  else if(e.target.matches('[data-edit-who]')) editing.who = e.target.value;
+});
+document.addEventListener('keydown', e=>{
+  if(!editing || !e.target.matches('[data-edit-text]')) return;
+  if(e.key === 'Escape'){ editing = null; render(); }
+  else if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); saveEdit(); }
+});
+async function saveEdit(){
+  const t = editing && items.find(x=>x.id === editing.id);
+  if(!t) return;
+  const text = editing.text.trim();
+  if(!text){ alert('The item needs some wording. To get rid of it, press Cancel and use the × instead.'); return; }
+  const job = jobs.find(j=>j.id === editing.home) || null;
+  const who = staff.find(p=>p.uid === editing.who) || null;
+  const patch = { text };
+  if(editing.home !== (t.houseId || '')){ patch.houseId = job ? job.id : ''; patch.houseLabel = job ? homeLabel(job) : 'General'; }
+  if(editing.who !== '__keep'){ patch.mentions = who ? [who.uid] : []; patch.mentionNames = who ? [who.name] : []; }
+  editing = null;
+  render();
+  await patchItem(t.id, patch);
 }
 $('search').addEventListener('input', render);
 $('whoFilter').addEventListener('change', e=>{ whoFilter = e.target.value; render(); });
@@ -489,7 +554,7 @@ async function addItem(){
   const user = me();
   if(!text || !user) return;
   const job = jobs.find(j=>j.id === $('newHome').value) || null;
-  const who = staff.find(s=>s.uid === $('newWho').value) || null;
+  const who = $('newWho').value === 'me' ? { uid: user.uid, name: myName() } : (staff.find(s=>s.uid === $('newWho').value) || null);
   $('addBtn').disabled = true;
   setSyncStatus('saving');
   try{
@@ -510,7 +575,7 @@ async function addItem(){
       mentionNames: who ? [who.name] : [],
       by: { uid: user.uid, name: myName(), email: user.email || '' },
       at: new Date().toISOString(),
-      readBy: {},
+      readBy: who && who.uid === user.uid ? { [user.uid]: true } : {},   // your own item isn't news to you
     });
     $('newText').value = '';
     $('newDue').value = ''; $('newHigh').checked = false; $('newPhotos').value = ''; $('newPhotoNote').textContent = '';
@@ -546,6 +611,19 @@ $('photoEdit').addEventListener('change', async e=>{
 });
 
 document.addEventListener('click', async e=>{
+  const edit = e.target.closest('[data-edit]');
+  if(edit){
+    const t = items.find(x=>x.id === edit.dataset.edit);
+    if(!t) return;
+    const who = t.mentions || [];
+    editing = { id: t.id, text: t.text || '', home: t.houseId || '', who: who.length > 1 ? '__keep' : (who[0] || '') };
+    render();
+    const box = document.querySelector('[data-edit-text]');
+    if(box){ box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    return;
+  }
+  if(e.target.closest('[data-edit-save]')){ saveEdit(); return; }
+  if(e.target.closest('[data-edit-cancel]')){ editing = null; render(); return; }
   const due = e.target.closest('[data-due]');
   if(due){
     const t = items.find(x=>x.id === due.dataset.due);
