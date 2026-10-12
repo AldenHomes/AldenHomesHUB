@@ -207,6 +207,30 @@
   .chip.due{background:var(--red-soft);color:var(--red)}
   .chip.soon{background:var(--amber-soft);color:#8a5d14}
   .chip.later{background:var(--staff-soft);color:var(--staff)}
+  /* the Pricing meeting: the paper pricing sheet, one row per line */
+  .prow{display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line-soft)}
+  .prow:first-child{border-top:none;padding-top:2px}
+  .prow .pl{flex:1 1 220px;min-width:0}
+  .prow .pt{font-weight:700;font-size:15px;color:var(--navy)}
+  .prow .pn{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+  .prow .pc{flex:0 1 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .prow.long .pc{flex:1 1 100%}
+  .segs{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+  .seg{border:2px solid var(--line);background:#fff;border-radius:22px;padding:7px 13px;font-size:14px;font-weight:700;color:var(--ink);line-height:1.2;text-align:center}
+  .seg small{display:block;font-size:11.5px;font-weight:400;color:var(--ink-soft);font-family:"Courier New",monospace}
+  .seg:hover{border-color:var(--sage)}
+  .seg.on{border-color:var(--good);background:var(--good-soft);color:#27573a}
+  .seg.on.dflt{border-color:var(--line);background:#f3f2ec;color:var(--ink-soft)}
+  .seg:disabled{cursor:default;opacity:.8}
+  .prow input[type=number]{width:104px;text-align:right}
+  .prow input[type=text]{width:240px;max-width:100%}
+  .prow textarea{width:100%;min-height:58px;resize:vertical}
+  .prow .tot{font-family:"Courier New",monospace;font-weight:700;color:var(--navy);white-space:nowrap}
+  .prow .stepper button{width:38px;height:38px;font-size:20px}
+  .prow .stepper span{min-width:40px;font-size:16px}
+  body.present .prow .pt{font-size:18px}
+  body.present .seg{font-size:16px;padding:10px 16px}
+  .sh-tile .art .noart{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#eef0e8,#dfe3d0);color:var(--sage-2);font-family:Georgia,serif;font-size:17px;font-weight:700;text-align:center;padding:10px}
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
 </head>
@@ -235,7 +259,8 @@
    What this version shows (agreed with the owner, Oct 2026):
      • Every visit is saved as a LEAD — a buyer who never comes back, or comes back months later, is still on file
      • Customer view (choices + prices only) vs Office view (cost code, our cost, margin)
-     • Visit 1 choices can be CHANGED at visit 2 — the change and its price difference are shown
+     • The first meeting is PRICING: the Alden Collection Pricing Sheet, section by section (owner, Oct 2026). The second is SELECTIONS.
+     • Pricing answers can be CHANGED later — the change is shown
      • More than "pick one": counts (extra outlets), per-room picks (each bathroom), colour-only picks, custom items
      • One room at a time with progress, and a list of what's still to choose before signing
      • Prices are frozen on the sheet: a later price change is offered, never applied silently; locked for good at signing
@@ -272,63 +297,245 @@ const DEVS = [{code:'AP',name:'Alden Place'},{code:'CL',name:'Cliffs'},{code:'MM
 const LOTS = [{dev:'AP',lot:'151',addr:'1022 Stanford Dr'},{dev:'AP',lot:'154',addr:'1028 Stanford Dr'},{dev:'CL',lot:'1',addr:'401 Cannon Way'},
   {dev:'CL',lot:'102',addr:'Cliffs Sec 2'},{dev:'MM',lot:'14',addr:'Mountain Meadows'},{dev:'ML',lot:'117',addr:'117 Maple Ln'},{dev:'ML',lot:'120',addr:'120 Maple Ln'}];
 const MODELS = {'The Coleman':311000,'The Hartwell':324900,'The Ashford':298500,'The Bellmore':305500};   // base price of each model
-const CODE_NAMES = {14:'Footer / Foundation',32:'Doors / Windows',34:'Framing',41:'Railing',50:'Plumbing',54:'Electrical',56:'Drywall',58:'Trim',70:'Kitchens / Vanities',71:'Fireplace',72:'Floor Covering',90:'Misc.'};
+const CODE_NAMES = {2:'Site Improvements',16:'Concrete',36:'Roofing',40:'Siding',55:'Energy Star',57:'Specialty Stairs',59:'Shelves / Mirrors',60:'Painting',14:'Footer / Foundation',32:'Doors / Windows',34:'Framing',41:'Railing',50:'Plumbing',54:'Electrical',56:'Drywall',58:'Trim',70:'Kitchens / Vanities',71:'Fireplace',72:'Floor Covering',90:'Misc.'};
 const CO_FEE = 100;
 
 /* ---------- the item list ----------
-   Each option: [name, price the customer pays, what it costs Alden, picture]. The FIRST option is the standard one, included in the base price.
-   v1: asked at the first visit.   each: asked once per room.   type 'qty': a count.   type 'color': a no-cost pick that still has to be recorded.
-   dep: only asked when another answer makes it relevant. */
+   TWO MEETINGS.
+   1. PRICING (first meeting) — the "Alden Collection Pricing Sheet", line for line: every section and BT number from
+      the paper form the team uses today. Nothing here has to be answered; anything left alone is the standard / "No".
+   2. SELECTIONS (second meeting) — the finish-level picks (colours, models), shown as picture cards. These all need an answer.
+   Prices and costs are MADE UP for the demo — the paper sheet has none on it.
+   Line kinds: pick one (o: [name, customer price, our cost]; the first is the standard), a count or amount ('qty'; entry = typed, e.g. sq ft),
+   a typed answer ('text'), and a dollar allowance ('money'). bt = the BuilderTrend line number. dep = only asked when another answer calls for it. */
+const NO = ['No',0,0];
+const yn = (id,bt,t,cc,price,cost,x)=>({ id, bt, t, cc, opt:1, o:[NO,['Yes',price,cost]], ...x });
+const ch = (id,bt,t,cc,o,x)=>({ id, bt, t, cc, opt:1, o, ...x });
+const qt = (id,bt,t,cc,unit,price,cost,max,x)=>({ id, bt, t, cc, opt:1, type:'qty', unit, price, cost, max, ...x });
+const sf = (id,bt,t,cc,unit,price,cost,x)=>({ id, bt, t, cc, opt:1, type:'qty', entry:1, unit, price, cost, max:20000, ...x });
+const tx = (id,bt,t,x)=>({ id, bt, t, cc:90, opt:1, type:'text', ...x });
+const al = (id,bt,t,cc,x)=>({ id, bt, t, cc, opt:1, type:'money', ...x });
+const nts = id=>tx(id + '_n', '', 'Notes', { long:1 });
+const Y = q=>({ dep:{ q, is:'Yes' } });
+// the three full baths share one layout on the paper sheet
+const bath = (p, n)=>[
+  ch(p+'sh', n[0], 'Shower', 50, p === 'm' ? [['Standard shower',0,0],['Standard tub/shower',0,0],['Tile with fiberglass base',3900,2800],['Tile with Corian base',5200,3700],['Custom shower',11400,8300]]
+                                           : [['Standard tub/shower',0,0],['Standard shower',0,0],['Custom shower',9800,7100]]),
+  ch(p+'sz', n[0], 'Shower size', 50, [["4'",0,0],["5'",650,440]]),
+  ch(p+'dr', n[1], 'Shower door', 50, [['None / included',0,0],['Framed',480,320],['Semi-frameless',720,480],['Frameless',1490,1020]]),
+  tx(p+'drf', n[1], 'Shower door finish', { ph:'Chrome, or…', dep:{ q:p+'dr', not:'None / included' } }),
+  tx(p+'fa', n[2], 'Shower faucet', { ph:'Standard, or which one' }),
+  yn(p+'spa', n[3], 'Vertical spa', 50, 1650, 1150),
+  ch(p+'to', n[4], 'Toilet', 50, [['Standard',0,0],['Elongated',95,60],['Comfort height',180,115],['Kohler',340,230],['Other',0,0]]),
+  yn(p+'sc', n[5], 'Soft-close seat', 50, 65, 38),
+  tx(p+'lv', n[6], 'Lav faucet', { ph:'Standard, or which one' }),
+  ch(p+'sp', n[6], 'Faucet spread', 50, [['4"',0,0],['8"',160,105],['Single',0,0]]),
+  tx(p+'lvf', n[6], 'Faucet finish', { ph:'Chrome, BN, or…' }),
+  yn(p+'gb', n[7], 'Grab bar', 50, 180, 95),
+  tx(p+'hw', n[8], 'Hardware finish (TP holder, towel ring' + (p === 'm' ? ', robe hook' : '') + ')', { ph:'Standard, or…' }),
+  nts(p),
+];
+const PRICING = [
+  { id:'lot', name:'Lot & home', qs:[ tx('phase','', 'Phase'), al('lotprem','', 'Lot premium', 2, { nocost:1 }), nts('lot') ] },
+  { id:'bsmt', name:'Basement', bt:'126–148', qs:[
+    yn('b126','126','Basement',14,18500,13900),
+    ch('b128','128','Basement ceiling height',14,[["8'",0,0],["9'",3200,2300]], Y('b126')),
+    qt('b134','134','Extra basement windows',32,'window',480,310,10, Y('b126')),
+    sf('b136','136','Finished basement',56,'sq ft',42,31, Y('b126')),
+    ch('b138','138','Basement bath',50,[['None',0,0],['Rough-in only',1450,950],['Finished bath',14800,11200]], Y('b126')),
+    yn('b138p','138','Add pit to rough-in bath',50,650,420,{ dep:{ q:'b138', is:'Rough-in only' } }),
+    yn('b138f','138','Add pit, pump & alarm to finished bath',50,1850,1300,{ dep:{ q:'b138', is:'Finished bath' } }),
+    yn('b140','140','Sump pump',50,780,520, Y('b126')),
+    yn('b147','147','Basement patio',16,2900,2100, Y('b126')),
+    qt('b200','200','Extra basement doors',32,'door',420,280,6, Y('b126')),
+    nts('bsmt') ]},
+  { id:'gar', name:'Garage', bt:'150–166', qs:[
+    ch('g150','150','Garage paint',60,[['Painted',0,0],['Take the credit',-450,-380]]),
+    yn('g152','152','Man door',32,890,610),
+    ch('g152g','152','Man door glass',32,[['Clear',0,0],['Frosted',95,60]], Y('g152')),
+    ch('g152s','152','Man door stoop',16,[['No stoop',0,0],['Stoop',420,300]], Y('g152')),
+    sf('g154','154','Additional garage space',34,'sq ft',58,43,{ note:'Length × width = total sq ft added.' }),
+    yn('g153','153','50 amp car charger outlet',54,640,420),
+    yn('g156','156','Laundry sink',50,520,340),
+    tx('g156l','156','Laundry sink location',{ ...Y('g156') }),
+    ch('g160','160','Garage door',32,[['Standard',0,0],['1 row glass, top',680,470],['1 row glass, vertical',740,510],['All glass',2900,2150]]),
+    qt('g164','164','Extra dead bolt / zero entry, garage to house',32,'door',260,170,3),
+    qt('g175','175','Extra hose bibs',50,'hose bib',240,150,4),
+    nts('gar') ]},
+  { id:'ent', name:'Entrance', bt:'180–184', qs:[
+    ch('e181','181','Walkway',16,[['Standard',0,0],['Colored',650,430],['Stamped',1450,1000]]),
+    sf('e181s','181','Extra walkway',16,'sq ft',14,10),
+    ch('e180','180','Front porch',16,[['Standard concrete',0,0],['Standard composite',2400,1750],['Azek composite',3900,2900]],{ note:'Azek is line 182.' }),
+    sf('e180s','180','Extra front porch',16,'sq ft',38,28),
+    sf('e184','184','Metal roof over the front porch',36,'sq ft',16,11),
+    nts('ent') ]},
+  { id:'lau', name:'Laundry', bt:'188–198', qs:[
+    yn('l188','188','Gas dryer hookup',50,380,250),
+    ch('l188s','188','Washer & dryer',50,[['Side by side',0,0],['Stackable',0,0]]),
+    yn('l193','193','Countertop over washer/dryer',70,620,410),
+    ch('l194','194','Hanging rod or bench',58,[['None',0,0],['Hanging rod',140,85],['Bench',680,450],['Bench & pegs',890,590]]),
+    yn('l196','196','Pet space',58,1250,860),
+    nts('lau') ]},
+  { id:'doors', name:'Front & interior doors', bt:'200–236', qs:[
+    qt('d200g','200','Upgrade doors to glass',32,'door',310,205,12),
+    ch('d200gt','200','Glass type',32,[['Clear',0,0],['Frosted',45,28]],{ dep:{ q:'d200g', min:1 } }),
+    qt('d200h','200',"Upgrade doors to 8' high",32,'door',240,160,20),
+    qt('d206','206','Pocket doors',32,'door',690,470,6),
+    ch('d206s','206','Pocket door style',32,[['Single',0,0],['Double',520,360]],{ dep:{ q:'d206', min:1 } }),
+    ch('d206g','206','Pocket door glass',32,[['No glass',0,0],['Clear',260,170],['Frosted',310,205]],{ dep:{ q:'d206', min:1 } }),
+    qt('d207','207','Soft open & close',32,'door',120,75,8),
+    qt('d208','208','Barn doors',32,'door',980,680,4),
+    ch('d208s','208','Barn door style',32,[['Single',0,0],['Double',640,440]],{ dep:{ q:'d208', min:1 } }),
+    ch('d208g','208','Barn door glass',32,[['No glass',0,0],['Clear',260,170],['Frosted',310,205]],{ dep:{ q:'d208', min:1 } }),
+    tx('d224','224','Shelving'),
+    ch('d231','231','Front door',32,[['Standard 6\' 8"',0,0],["Standard 8'",980,690]]),
+    al('d231a','231','Front door allowance',32),
+    ch('d236','236','Storm door',32,[['None',0,0],['Full view',540,370],['Hide-away screen',680,470]]),
+    nts('doors') ]},
+  { id:'ceil', name:'Ceilings', bt:'244–246', qs:[
+    ch('c244','244','Ceiling height',34,[["8'",0,0],["9'",6800,4900]]),
+    ch('c246','246','Ceiling style',34,[['Standard',0,0],['Vault',4200,3000],['Cathedral',6900,5000]]),
+    tx('c246c','246','Custom vault or cathedral'),
+    nts('ceil') ]},
+  { id:'first', name:'First floor', bt:'248, 744', qs:[
+    sf('f248u','248','Additional unfinished space',34,'sq ft',62,46),
+    sf('f248f','248','Additional finished space',34,'sq ft',135,104),
+    yn('f744','744','Add a bathroom',50,16500,12400),
+    nts('first') ]},
+  { id:'mbath', name:'Master bath', bt:'260–282', qs:bath('m', ['260','264','270','272','273','274','278','280','282']) },
+  { id:'bath2', name:'Main bath', bt:'300–330', qs:bath('n', ['300','304','310','312','313','314','318','320','322']) },
+  { id:'bath3', name:'Third bath', bt:'340–370', qs:bath('t', ['340','344','350','352','353','354','358','360','362']) },
+  { id:'powder', name:'Powder bath', bt:'380–392', qs:[
+    ch('wto','379','Toilet',50,[['Standard',0,0],['Elongated',95,60],['Comfort height',180,115],['Kohler',340,230]]),
+    yn('wsc','380','Soft-close seat',50,65,38),
+    tx('wlv','384','Lav faucet',{ ph:'Standard, or which one' }),
+    ch('wsp','384','Faucet spread',50,[['4"',0,0],['8"',160,105],['Single',0,0]]),
+    tx('wlvf','384','Faucet finish',{ ph:'Chrome, BN, or…' }),
+    tx('whw','388','Hardware finish (TP holder, towel ring)',{ ph:'Standard, or…' }),
+    yn('w744','744','Add a half bath',50,7200,5300),
+    nts('powder') ]},
+  { id:'elec', name:'Electrical', bt:'420–450', qs:[
+    qt('e420f','420','Extra recessed lights, flat ceiling',54,'light',95,58,30,{ vendor:'Lancaster Electric' }),
+    ch('e420fs','420','Recessed light size',54,[['6"',0,0],['4"',0,0]],{ dep:{ q:'e420f', min:1 } }),
+    qt('e420s','420','Extra recessed lights, sloped ceiling',54,'light',125,78,20,{ vendor:'Lancaster Electric' }),
+    qt('e424','424','Ceiling fan rough-ins',54,'rough-in',140,80,10,{ vendor:'Lancaster Electric' }),
+    qt('e426','426','Floor outlets',54,'outlet',310,190,6,{ vendor:'Lancaster Electric' }),
+    ch('e446','446','Generator',54,[['None',0,0],['Rough-in only',950,640],['Generator installed',9800,7600]],{ vendor:'Lancaster Electric' }),
+    ch('e450','450','Energy Star',55,[['Yes',0,0],['Take the credit',-1150,-1150]]),
+    nts('elec') ]},
+  { id:'kit', name:'Kitchen', bt:'500–530', qs:[
+    ch('k500c','500','Cabinets',70,[['Paint',0,0],['Stain',0,0]],{ vendor:'Keystone Kitchens' }),
+    ch('k500','500','Countertops',70,[['Standard',0,0],['Granite',5400,3900],['Quartz',6800,4950]],{ vendor:'Keystone Kitchens' }),
+    al('k500a','500','Countertop allowance',70),
+    ch('k514','514','Under-cabinet electronics',54,[['None',0,0],['LED rope lighting',780,500],['Legrand power strip',1150,760]]),
+    yn('k516','516','Gas stove hookup',50,420,280),
+    ch('k518','518','Pantry shelves',59,[['Standard wire',0,0],['Wood',0,0]]),
+    sf('k518l','518','Wood pantry shelving',59,'linear ft',38,24,{ dep:{ q:'k518', is:'Wood' } }),
+    ch('k520','520','Kitchen faucet finish',50,[['Standard',0,0],['Brushed nickel',85,52],['Black',145,92],['Brushed gold',210,138]]),
+    yn('k523','523','Tile backsplash',72,1450,980),
+    al('k523a','523','Backsplash allowance',72, Y('k523')),
+    nts('kit') ]},
+  { id:'fireb', name:'Fireplace & built-ins', bt:'550–566', qs:[
+    ch('f550','550','Fireplace',71,[['None',0,0],['Gas',4850,3400],['Electric',2900,2000],['50" linear',5900,4200]],{ vendor:'Napoleon dealer' }),
+    sf('f552','552','Built-ins',58,'linear ft',420,290),
+    ch('f552h','552','Built-in height',58,[['To window sill',0,0],['To ceiling',1200,800]],{ dep:{ q:'f552', min:1 } }),
+    yn('f552d','552','Built-in desk',58,1850,1250),
+    yn('f552c','552','Desk with cubbies',58,480,320, Y('f552d')),
+    yn('f553','553','Shiplap',58,1350,900),
+    yn('f554','554','Bump out',34,2200,1600),
+    tx('f560','560','Mantel style'),
+    nts('fireb') ]},
+  { id:'patio', name:'Patio & deck', bt:'600–694', qs:[
+    sf('p600p','600','Add a patio',16,'sq ft',14,10),
+    sf('p600d','600','Add a deck',41,'sq ft',38,28,{ vendor:'Elite Outdoor Expressions' }),
+    sf('p600c','600','Add a composite deck',41,'sq ft',58,43,{ vendor:'Elite Outdoor Expressions' }),
+    sf('p600f','600','Deck foundation',14,'linear ft',95,70),
+    sf('p602p','602','Add to the standard patio',16,'sq ft',14,10),
+    sf('p602d','602','Add to the standard deck',41,'sq ft',38,28),
+    sf('p606c','606','Colored concrete',16,'sq ft',4,3),
+    sf('p606s','606','Stamped concrete',16,'sq ft',9,6),
+    sf('p608','608','Upgrade standard deck to composite',41,'sq ft',22,16),
+    ch('p610','610','Railing style',41,[['Standard',0,0],['Black pickets',1480,1050]]),
+    qt('p612','612','Deck / composite steps',41,'step',185,130,12),
+    ch('p616','616','Patio door',32,[['Standard slider',0,0],['Single hinge',680,470],['Double hinge',1450,1020],['36" door, slider credit',-350,-300]]),
+    yn('p618','618','Gas line for grill',50,480,320),
+    yn('p620','620','Hot tub outlet',54,720,480),
+    al('p622','622','Cover the existing patio or deck',34),
+    al('p642','642','Add sq ft to the covered patio/deck',34),
+    ch('p644','644','Covered ceiling type',34,[['Flat',0,0],['Vault',1900,1350],['Cathedral',2900,2100]]),
+    ch('p660','660–684','Enclose it',34,[['Open',0,0],['Screened',8900,6600],['3 season',19500,14800],['Sunroom',32000,24500]]),
+    ch('p664','664','Walls',40,[['Cedar',0,0],['Vinyl, take the credit',-600,-520]],{ dep:{ q:'p660', not:'Open' } }),
+    nts('patio') ]},
+  { id:'win', name:'Windows', bt:'700–708', qs:[
+    ch('w700t','700','Transom windows',32,[['None',0,0],["1' single",420,290],["1' twin",690,480],["2' single",520,360],["2' twin",850,590]]),
+    qt('w700d','700','Add double-hung windows',32,'window',560,390,12),
+    qt('w700p','700','Add picture windows',32,'window',720,500,8),
+    ch('w701','701','Window colour',32,[['Standard white',0,0],['Black',4800,3500]]),
+    al('w702','702','Window credit',32,{ credit:1 }),
+    qt('w704','704','Skylights',32,'skylight',1450,1020,6),
+    tx('w704s','704','Skylight size',{ dep:{ q:'w704', min:1 } }),
+    qt('w704t','704','Solar tubes',32,'tube',890,620,6),
+    nts('win') ]},
+  { id:'stairs', name:'Stairs', bt:'720–730', qs:[
+    ch('s720','720','Step style',57,[['Standard carpet',0,0],['3" nosing',1900,1300],['Industrial metal',6800,5000],['Floating',9800,7300]]),
+    ch('s720w','720','Step wood',57,[['Yellow pine',0,0],['Oak',950,650],['Maple',1200,820]]),
+    ch('s724','724','Railing',57,[['Alden standard',0,0],['Modern Cottage standard',0,0]]),
+    yn('s726','','Open steps to basement',57,1850,1300),
+    al('s726a','','Open steps allowance',57, Y('s726')),
+    yn('s722','722','Stair landing',57,1400,980),
+    ch('s762','762','Stairs & storage area',34,[['Keep',0,0],['Remove, take the credit',-3800,-3300]]),
+    nts('stairs') ]},
+  { id:'second', name:'Second floor', bt:'740–744', qs:[
+    sf('u740u','740','Additional unfinished space',34,'sq ft',48,36),
+    sf('u740f','740','Additional finished space',34,'sq ft',118,90),
+    yn('u744','744','Add a bathroom',50,15800,11900),
+    nts('second') ]},
+  { id:'attic', name:'Attic & storage', bt:'760–772', qs:[
+    ch('a760','760','Storage ceiling',34,[['6\' 11" standard',0,0],["8' ceiling & window",4800,3500]]),
+    sf('a764','764','Drywall, insulate, trim & HVAC',56,'sq ft',46,34),
+    sf('a768u','768','Additional unfinished space',34,'sq ft',44,33),
+    sf('a768f','768','Additional finished space',34,'sq ft',110,84),
+    nts('attic') ]},
+  { id:'paint', name:'Paint', bt:'780–784', qs:[
+    ch('pt780','780','Paint',60,[['White ceiling / flat colour walls',0,0],['White ceiling / eggshell walls',1650,1150]]),
+    nts('paint') ]},
+  { id:'flr', name:'Flooring', bt:'790', qs:[ al('fl790','790','Flooring allowance',72), nts('flr') ] },
+  { id:'misc', name:'Miscellaneous', qs:[ tx('misc','', 'Anything else', { long:1 }) ] },
+];
 const ROOMS = [
-  { id:'home', name:'Home & site', qs:[
-    { id:'elev', t:'Elevation', cc:34, v1:1, o:[['Elevation A',0,0,ART.house('#d8d2c4')],['Elevation B',3200,2100,ART.house('#cdd0c2')],['Elevation C',5400,3650,ART.house('#c6cabb')]] },
-    { id:'found', t:'Foundation', cc:14, v1:1, o:[['Slab',0,0,ART.yesNo(false)],['In-ground basement',18500,13900,ART.yesNo(true)],['Walkout basement',31000,23800,ART.yesNo(true)]] },
-    { id:'bsmt', t:'Finish the basement', cc:56, v1:1, dep:{q:'found',not:'Slab'}, o:[['Leave unfinished',0,0,ART.yesNo(false)],['Finish basement',42000,31500,ART.yesNo(true)]] },
-    { id:'garage', t:'Garage', cc:34, v1:1, o:[['2-car',0,0,ART.house('#d3d5c8')],['Add a 3rd bay',22000,16400,ART.house('#c9ccbe')]] },
-    { id:'deck', t:'Outdoor living', cc:41, v1:1, vendor:'Elite Outdoor Expressions', o:[['None',0,0,ART.yesNo(false)],['Deck',14500,10900,ART.house('#c8b79a')],['Covered patio',26000,19800,ART.house('#bfb091')]] },
-  ]},
-  { id:'kitchen', name:'Kitchen', by:{days:21, why:'cabinets are ordered'}, qs:[
-    { id:'counters', t:'Countertops', cc:70, v1:1, vendor:'Keystone Kitchens', o:[['Laminate',0,0,ART.swatch('#cfc7b5')],['Granite',5400,3900,ART.swatch('#8a8f86')],['Quartz',6800,4950,ART.swatch('#e8e4dc')]] },
+  { id:'s_kitchen', name:'Kitchen', by:{days:21, why:'cabinets are ordered'}, qs:[
     { id:'cabcolor', t:'Cabinet colour', cc:70, type:'color', vendor:'Keystone Kitchens', o:[['White',0,0,ART.swatch('#f2efe8')],['Greige',0,0,ART.swatch('#c9c2b4')],['Navy',0,0,ART.swatch('#3d4a5c')]] },
     { id:'kfaucet', t:'Kitchen faucet', cc:50, vendor:'Fast Supply (Moen)', o:[['Brantford',0,0,ART.faucet('#b9bec2','high')],['Align',145,92,ART.faucet('#a8aeb3','low')],['Gibson pull-down',210,138,ART.faucet('#9aa1a6','pull')]] },
     { id:'ksink', t:'Kitchen sink', cc:50, vendor:'Fast Supply (Ruvati)', o:[['Stainless undermount',0,0,ART.swatch('#c5c9cc')],['Farmhouse',890,610,ART.swatch('#eef0ee')]] },
-    { id:'ksplash', t:'Tile backsplash', cc:72, vendor:'D & S Flooring', o:[['Ash Mix',0,0,ART.tile('#d4cfc6','#c2bcb1','#efece5')],['Bone',320,205,ART.tile('#e9e3d8','#ddd5c7','#f4f1ea')],['Slate',320,205,ART.tile('#828a90','#6e767c','#b9bec2')]] },
-    { id:'kcans', t:'Extra recessed lights', cc:54, type:'qty', unit:'light', price:95, cost:58, max:16, vendor:'Lancaster Electric', note:'Six come with the kitchen. Add more if you want them.' },
+    { id:'ksplash', t:'Backsplash tile', cc:72, vendor:'D & S Flooring', dep:{q:'k523',is:'Yes'}, o:[['Ash Mix',0,0,ART.tile('#d4cfc6','#c2bcb1','#efece5')],['Bone',320,205,ART.tile('#e9e3d8','#ddd5c7','#f4f1ea')],['Slate',320,205,ART.tile('#828a90','#6e767c','#b9bec2')]] },
   ]},
-  { id:'floor', name:'Flooring', by:{days:35, why:'flooring is measured and ordered'}, qs:[
-    { id:'ftier', t:'Main-floor flooring', cc:72, v1:1, vendor:'D & S Flooring', o:[['Builder LVP',0,0,ART.floorPlank('#a9855f','#7d5f3f')],['Upgrade LVP',2600,1750,ART.floorPlank('#c9b193','#a68b68')],['Hardwood',9800,7100,ART.floorPlank('#8b5e34','#5f3f21')]] },
+  { id:'s_floor', name:'Flooring', by:{days:35, why:'flooring is measured and ordered'}, qs:[
+    { id:'ftier', t:'Main-floor flooring', cc:72, vendor:'D & S Flooring', o:[['Builder LVP',0,0,ART.floorPlank('#a9855f','#7d5f3f')],['Upgrade LVP',2600,1750,ART.floorPlank('#c9b193','#a68b68')],['Hardwood',9800,7100,ART.floorPlank('#8b5e34','#5f3f21')]] },
     { id:'fcolor', t:'Main-floor colour', cc:72, type:'color', vendor:'D & S Flooring', o:[['Duxbury Oak',0,0,ART.floorPlank('#a9855f','#7d5f3f')],['Sandbar',0,0,ART.floorPlank('#c9b193','#a68b68')],['Hatfield Maple',0,0,ART.floorPlank('#b89a6e','#8f7048')]] },
     { id:'fbed', t:'Bedroom floors', cc:72, vendor:'D & S Flooring', each:["Owner's bedroom",'Bedroom 2','Bedroom 3'], o:[['Carpet, Natural Sisal',0,0,ART.carpet('#cdc4b0','#b3a894')],['Carpet, Warm Stone',0,0,ART.carpet('#bcb09a','#a1937c')],['LVP to match',620,410,ART.floorPlank('#a9855f','#7d5f3f')]] },
     { id:'fpad', t:'Carpet padding', cc:72, vendor:'D & S Flooring', o:[['8 lb standard',0,0,ART.swatch('#d9d2c2')],['10 lb plush',520,330,ART.swatch('#cfc6b3')]] },
   ]},
-  { id:'baths', name:'Bathrooms', by:{days:28, why:'plumbing fixtures are ordered'}, qs:[
-    { id:'mshower', t:"Owner's bath shower", cc:50, v1:1, vendor:'D & S Flooring', o:[['Fiberglass tub/shower',0,0,ART.swatch('#eceae4')],['Tile shower',5200,3700,ART.tile('#d4cfc6','#c2bcb1','#efece5')],['Custom tile, curbless',11400,8300,ART.tile('#828a90','#6e767c','#b9bec2')]] },
-    { id:'bdoor', t:'Shower door', cc:50, vendor:'Glass vendor', dep:{q:'mshower',not:'Fiberglass tub/shower'}, o:[['Framed clear',0,0,ART.showerDoor(5,'#b9bec2')],['Semi-frameless',720,480,ART.showerDoor(2.5,'#b9bec2')],['Frameless',1490,1020,ART.showerDoor(0,'#b9bec2')]] },
-    { id:'bfaucet', t:'Vanity faucet', cc:50, vendor:'Fast Supply (Moen)', each:["Owner's bath",'Hall bath','Powder room'], o:[['Brantford',0,0,ART.faucet('#b9bec2','low')],['Align',145,92,ART.faucet('#9aa1a6','low')],['Voss',165,104,ART.faucet('#a8aeb3','high')]] },
-    { id:'bgrab', t:'Grab bars', cc:50, type:'qty', unit:'bar', price:180, cost:95, max:6, vendor:'Fast Supply (Moen)', note:'Blocking goes in the wall now, so these are easy to add later too.' },
+  { id:'s_baths', name:'Bathrooms', by:{days:28, why:'plumbing fixtures are ordered'}, qs:[
+    { id:'btile', t:"Master shower tile", cc:72, vendor:'D & S Flooring', dep:{q:'msh',not:'Standard shower'}, o:[['Ash Mix',0,0,ART.tile('#d4cfc6','#c2bcb1','#efece5')],['Bone',0,0,ART.tile('#e9e3d8','#ddd5c7','#f4f1ea')],['Slate',480,310,ART.tile('#828a90','#6e767c','#b9bec2')]] },
+    { id:'bfaucet', t:'Vanity faucet', cc:50, vendor:'Fast Supply (Moen)', each:["Master bath",'Main bath','Powder bath'], o:[['Brantford',0,0,ART.faucet('#b9bec2','low')],['Align',145,92,ART.faucet('#9aa1a6','low')],['Voss',165,104,ART.faucet('#a8aeb3','high')]] },
   ]},
-  { id:'trim', name:'Doors, trim & hardware', by:{days:42, why:'trim is ordered'}, qs:[
+  { id:'s_trim', name:'Doors, trim & hardware', by:{days:42, why:'trim is ordered'}, qs:[
     { id:'hfinish', t:'Door hardware finish', cc:58, vendor:'Schlage', o:[['Brushed nickel',0,0,ART.knob('#b9bec2')],['Aged bronze',0,0,ART.knob('#6b5545')],['Matte black',0,0,ART.knob('#2f3133')],['Brushed gold',340,215,ART.knob('#c2a469')]] },
     { id:'hfront', t:'Front door lock', cc:32, vendor:'Schlage', o:[['Standard handleset',0,0,ART.knob('#8d8f8c')],['Smart lock',495,340,ART.knob('#2f3133')]] },
     { id:'hdoors', t:'Interior door style', cc:58, vendor:'Trim supplier', o:[['Cambrian',0,0,ART.door(2,'#f0ebe2')],['Connelly',0,0,ART.door(3,'#ece6dc')],['Keystone',260,170,ART.door(1,'#e7e0d4')]] },
   ]},
-  { id:'elec', name:'Electrical', by:{days:14, why:'the electrician roughs in'}, qs:[
-    { id:'eoutlet', t:'Extra outlets', cc:54, type:'qty', unit:'outlet', price:85, cost:45, max:30, vendor:'Lancaster Electric', note:'Code-required outlets are already included.' },
-    { id:'efloor', t:'Floor outlets', cc:54, type:'qty', unit:'outlet', price:310, cost:190, max:6, vendor:'Lancaster Electric' },
-    { id:'efan', t:'Ceiling fan pre-wire', cc:54, vendor:'Lancaster Electric', each:['Great room',"Owner's bedroom",'Bedroom 2','Bedroom 3'], o:[['No',0,0,ART.yesNo(false)],['Yes',140,80,ART.yesNo(true)]] },
-  ]},
-  { id:'fire', name:'Fireplace', qs:[
-    { id:'fp', t:'Fireplace', cc:71, v1:1, vendor:'Napoleon dealer', o:[['No fireplace',0,0,ART.yesNo(false)],['Add a fireplace',4850,3400,ART.fireplace()]] },
-    { id:'fpmodel', t:'Fireplace model', cc:71, vendor:'Napoleon dealer', dep:{q:'fp',is:'Add a fireplace'}, o:[['Ascent 36',0,0,ART.fireplace()],['Ascent 36 Linear',780,540,ART.fireplace()],['Ascent 42',1150,800,ART.fireplace()]] },
-    { id:'fpmantel', t:'Mantel', cc:58, vendor:'Trim supplier', dep:{q:'fp',is:'Add a fireplace'}, o:[['Kenwood with slate',0,0,ART.swatch('#8a8f86')],['Walnut live-edge shelf',1240,820,ART.swatch('#6b4a2e')]] },
+  { id:'s_fire', name:'Fireplace', qs:[
+    { id:'fpmodel', t:'Fireplace model', cc:71, vendor:'Napoleon dealer', dep:{q:'f550',not:'None'}, o:[['Ascent 36',0,0,ART.fireplace()],['Ascent 36 Linear',780,540,ART.fireplace()],['Ascent 42',1150,800,ART.fireplace()]] },
+    { id:'fpmantel', t:'Mantel', cc:58, vendor:'Trim supplier', dep:{q:'f550',not:'None'}, o:[['Kenwood with slate',0,0,ART.swatch('#8a8f86')],['Walnut live-edge shelf',1240,820,ART.swatch('#6b4a2e')]] },
   ]},
 ];
-const ALL_QS = ROOMS.flatMap(r=>r.qs.map(q=>({ ...q, room:r })));
+const SECTIONS = [...PRICING, ...ROOMS];
+const ALL_QS = SECTIONS.flatMap(r=>r.qs.map(q=>({ ...q, room:r, v1: PRICING.includes(r) ? 1 : 0 })));
 const qById = id=>ALL_QS.find(q=>q.id===id);
 
 /* ---------- leads (saved in this browser so the demo survives a refresh) ---------- */
-const STORE = 'aldenSelectionsDemo.v2';
-let leads = [], view = 'customer', cur = null, tab = 'v1', roomId = 'home', newOpen = false;
+const STORE = 'aldenSelectionsDemo.v3';
+let leads = [], view = 'customer', cur = null, tab = 'v1', roomId = 'lot', newOpen = false;
 
 /* ---------- two screens, one sheet ----------
    The office opens a sheet on their iPad and presses "Open customer screen". That gives a link (…?present=LEAD) for the
@@ -337,48 +544,56 @@ let leads = [], view = 'customer', cur = null, tab = 'v1', roomId = 'home', newO
    IN THIS DEMO the two screens talk through the browser's own storage, so it only works between two windows on the SAME
    computer. The real thing would go through the hub's database and work between any two devices. */
 const PRESENT = new URLSearchParams(location.search).get('present');   // set = this window is the customer's screen
-const NAV = 'aldenSelectionsDemo.nav';
+const NAV = 'aldenSelectionsDemo.nav3';
 let officeView = 'customer', shareOpen = false, flashKey = '';
 
 function seedLeads(){
+  // a pick is the option's name; a count or sq ft is a number; an allowance is { $: amount }; a typed line is { text }
+  const ans = (key, v)=>{
+    const q = qById(key.split('@')[0]);
+    if(q.type === 'qty') return { qty:v, price:q.price, cost:q.cost };
+    if(q.type === 'money') return moneyAns(q, v.$);
+    if(q.type === 'text') return { label:v.text, price:0, cost:0 };
+    const opt = q.o.find(x=>x[0]===v) || q.o[0]; return { label:opt[0], price:opt[1], cost:opt[2] };
+  };
   const mk = (o, picks)=>{
     const L = { id:'L'+Math.random().toString(36).slice(2,8), name2:'', phone:'', email:'', answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null, ...o };
-    Object.entries(picks).forEach(([key, v])=>{
-      const q = qById(key.split('@')[0]);
-      if(q.type === 'qty') L.answers[key] = { qty:v, price:q.price, cost:q.cost };
-      else { const opt = q.o.find(x=>x[0]===v) || q.o[0]; L.answers[key] = { label:opt[0], price:opt[1], cost:opt[2] }; }
-    });
+    Object.entries(picks).forEach(([key, v])=>{ L.answers[key] = ans(key, v); });
     return L;
   };
-  // 1. came in once in the spring and hasn't been back — prices have gone up since
+  const snapOf = L=>Object.fromEntries(Object.entries(L.answers).filter(([k])=>qById(k.split('@')[0]).v1).map(([k,v])=>[k, snapVal(v, qById(k.split('@')[0]))]));
+  // 1. came in for pricing in the spring and hasn't been back — prices have gone up since
   const a = mk({ name:'Dan & Erin Hostetter', phone:'717-555-0148', email:'hostetter@example.com', dev:'AP', lot:'151', model:'The Coleman', stage:'v1', created:daysAgo(128), v1Date:daysAgo(128), updated:daysAgo(128), pricedOn:daysAgo(128) },
-    { elev:'Elevation B', found:'In-ground basement', bsmt:'Leave unfinished', garage:'2-car', deck:'Deck', counters:'Quartz', ftier:'Hardwood', mshower:'Tile shower', fp:'Add a fireplace' });
-  a.answers.counters.price = 6200; a.answers.counters.cost = 4500;      // what quartz was quoted at back then
-  a.answers.ftier.price = 9100;  a.answers.ftier.cost = 6600;
-  a.answers.deck.price = 13900;  a.answers.deck.cost = 10400;
-  a.v1Snap = Object.fromEntries(Object.entries(a.answers).map(([k,v])=>[k, v.label]));
-  a.notes = [{ text:'First visit went well. They like the Coleman but need to sell their current house first. Listing it in the fall.', at:daysAgo(128) },
+    { lotprem:{$:12000}, b126:'Yes', b128:"9'", b140:'Yes', c244:"9'", g160:'1 row glass, top', k500:'Quartz', f550:'Gas', p600d:240, e424:3, d231:"Standard 8'", lot_n:{text:'Want a walkout if the lot allows it.'} });
+  a.answers.k500.price = 6200; a.answers.k500.cost = 4500;      // what these were quoted at back then
+  a.answers.c244.price = 6300; a.answers.c244.cost = 4550;
+  a.answers.p600d.price = 35;  a.answers.p600d.cost = 26;
+  a.v1Snap = snapOf(a);
+  a.notes = [{ text:'Pricing meeting went well. They like the Coleman but need to sell their current house first. Listing it in the fall.', at:daysAgo(128) },
              { text:'Left a voicemail to check in. No answer.', at:daysAgo(61) }];
   a.follow = { date:daysAgo(0), what:'Check in. Their house was due to go on the market this month.' };
-  // 2. back for the second visit, part-way through the detail
-  const b = mk({ name:'Marcus Reyes', name2:'Tasha Reyes', phone:'717-555-0172', email:'reyes@example.com', dev:'CL', lot:'102', model:'The Hartwell', stage:'v2', created:daysAgo(24), v1Date:daysAgo(24), updated:daysAgo(2), pricedOn:daysAgo(24) },
-    { elev:'Elevation A', found:'Walkout basement', bsmt:'Finish basement', garage:'2-car', deck:'Covered patio', counters:'Granite', ftier:'Upgrade LVP', mshower:'Tile shower', fp:'No fireplace' });
-  b.v1Snap = Object.fromEntries(Object.entries(b.answers).map(([k,v])=>[k, v.label]));
-  Object.assign(b.answers, mk({}, { counters:'Quartz', cabcolor:'Navy', kfaucet:'Gibson pull-down', ksink:'Farmhouse', kcans:4, fcolor:'Sandbar', 'fbed@Owner\'s bedroom':'LVP to match', 'fbed@Bedroom 2':'Carpet, Warm Stone' }).answers);
+  // 2. back for selections, part-way through
+  const bPricing = { lotprem:{$:8500}, b126:'Yes', b136:600, b138:'Finished bath', b138f:'Yes', g152:'Yes', g153:'Yes', c246:'Vault', msh:'Tile with Corian base', mdr:'Frameless', mdrf:{text:'Matte black'}, mto:'Comfort height',
+    k500c:'Paint', k500:'Granite', k523:'Yes', k520:'Black', p622:{$:18500}, p660:'Screened', w701:'Black', e420f:6, e426:1, s720:'3" nosing', pt780:'White ceiling / eggshell walls' };
+  const b = mk({ name:'Marcus Reyes', name2:'Tasha Reyes', phone:'717-555-0172', email:'reyes@example.com', dev:'CL', lot:'102', model:'The Hartwell', stage:'v2', created:daysAgo(24), v1Date:daysAgo(24), updated:daysAgo(2), pricedOn:daysAgo(24) }, bPricing);
+  b.v1Snap = snapOf(b);
+  Object.entries({ k500:'Quartz', cabcolor:'Navy', kfaucet:'Gibson pull-down', ksink:'Farmhouse', ftier:'Upgrade LVP', fcolor:'Sandbar', "fbed@Owner's bedroom":'LVP to match', 'fbed@Bedroom 2':'Carpet, Warm Stone' }).forEach(([k,v])=>{ b.answers[k] = ans(k, v); });
   b.favs['ksplash|Slate'] = true; b.favs['hfinish|Matte black'] = true;
-  b.notes = [{ text:'Had a call. They want to move forward. Booked the second visit.', at:daysAgo(6) },
-             { text:'Marcus asked about a bigger patio. Priced the covered patio at visit 1.', at:daysAgo(24) }];
+  b.notes = [{ text:'Had a call. They want to move forward. Booked the selections meeting.', at:daysAgo(6) },
+             { text:'Marcus asked about covering the patio. Put an allowance in at pricing.', at:daysAgo(24) }];
   b.follow = { date:daysAhead(5), what:'Confirm the cabinet colour before cabinets are ordered.' };
   // 3. signed and locked, with one change order since
-  const cPicks = { elev:'Elevation C', found:'In-ground basement', bsmt:'Leave unfinished', garage:'Add a 3rd bay', deck:'None', counters:'Quartz', cabcolor:'White', kfaucet:'Align', ksink:'Stainless undermount', ksplash:'Bone', kcans:2,
-    ftier:'Upgrade LVP', fcolor:'Hatfield Maple', "fbed@Owner's bedroom":'Carpet, Natural Sisal', 'fbed@Bedroom 2':'Carpet, Natural Sisal', 'fbed@Bedroom 3':'LVP to match', fpad:'10 lb plush',
-    mshower:'Tile shower', bdoor:'Frameless', "bfaucet@Owner's bath":'Voss', 'bfaucet@Hall bath':'Brantford', 'bfaucet@Powder room':'Align', bgrab:1,
-    hfinish:'Matte black', hfront:'Smart lock', hdoors:'Keystone', eoutlet:5, efloor:1, 'efan@Great room':'Yes', "efan@Owner's bedroom":'Yes', 'efan@Bedroom 2':'No', 'efan@Bedroom 3':'No',
-    fp:'Add a fireplace', fpmodel:'Ascent 42', fpmantel:'Walnut live-edge shelf' };
-  const c = mk({ name:'Priya Nair', name2:'Sam Nair', phone:'717-555-0119', email:'nair@example.com', dev:'ML', lot:'117', model:'The Coleman', stage:'signed', created:daysAgo(70), v1Date:daysAgo(70), updated:daysAgo(9), pricedOn:daysAgo(38), signedOn:daysAgo(38) }, cPicks);
-  c.v1Snap = { elev:'Elevation C', found:'In-ground basement', bsmt:'Leave unfinished', garage:'2-car', deck:'None', counters:'Quartz', ftier:'Upgrade LVP', mshower:'Tile shower', fp:'Add a fireplace' };
-  c.custom = [{ desc:'Built-in bench with cubbies in the mudroom', price:1850, cost:1200, cc:58, room:'trim' }];
+  const c = mk({ name:'Priya Nair', name2:'Sam Nair', phone:'717-555-0119', email:'nair@example.com', dev:'ML', lot:'117', model:'The Coleman', stage:'signed', created:daysAgo(70), v1Date:daysAgo(70), updated:daysAgo(9), pricedOn:daysAgo(38), signedOn:daysAgo(38) },
+    { lotprem:{$:6000}, b126:'Yes', b134:2, b140:'Yes', g153:'Yes', g160:'All glass', g175:1, e181:'Stamped', l194:'Bench & pegs', l196:'Yes', d206:2, d206s:'Single', d206g:'Frosted', d208:1, d208s:'Double', d208g:'No glass', d231:"Standard 8'", d236:'Full view',
+      c244:"9'", msh:'Custom shower', msz:"5'", mdr:'Frameless', mdrf:{text:'Brushed gold'}, mspa:'Yes', mto:'Kohler', msc:'Yes', msp:'8"', mgb:'Yes', nto:'Elongated', wto:'Comfort height',
+      e420f:8, e420fs:'4"', e424:4, e426:1, e446:'Rough-in only', k500c:'Paint', k500:'Quartz', k514:'LED rope lighting', k516:'Yes', k518:'Wood', k518l:14, k520:'Brushed gold', k523:'Yes',
+      f550:'50" linear', f552:9, f552h:'To ceiling', f553:'Yes', f560:{text:'Walnut beam, 6 ft'}, p600c:320, p610:'Black pickets', p612:4, p618:'Yes', w700t:"2' twin", w701:'Black', w704t:2, s720:'3" nosing', s720w:'Oak', pt780:'White ceiling / eggshell walls',
+      cabcolor:'White', kfaucet:'Align', ksink:'Farmhouse', ksplash:'Bone', ftier:'Hardwood', fcolor:'Hatfield Maple', "fbed@Owner's bedroom":'Carpet, Natural Sisal', 'fbed@Bedroom 2':'Carpet, Natural Sisal', 'fbed@Bedroom 3':'LVP to match', fpad:'10 lb plush',
+      btile:'Slate', "bfaucet@Master bath":'Voss', 'bfaucet@Main bath':'Brantford', 'bfaucet@Powder bath':'Align', hfinish:'Matte black', hfront:'Smart lock', hdoors:'Keystone', fpmodel:'Ascent 42', fpmantel:'Walnut live-edge shelf' });
+  c.v1Snap = snapOf(c); c.v1Snap.g160 = 'Standard';
+  c.custom = [{ desc:'Built-in bench with cubbies in the mudroom', price:1850, cost:1200, cc:58, room:'lau' }];
   c.cos = [{ desc:'Add a floor outlet in the office', price:310, cost:190, cc:54, date:daysAgo(9) }];
+  c.notes = [{ text:'Signed. Sent them their selection sheet link.', at:daysAgo(38) }];
   return [b, a, c];
 }
 // (the customer's screen never changes which view the office is in)
@@ -400,7 +615,7 @@ window.addEventListener('storage', e=>{
       if(key){
         const q = qById(key.split('@')[0]), a = L.answers[key];
         flashKey = key;
-        toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + (key.includes('@') ? ' (' + key.split('@')[1] + ')' : '') + ' — ' + (q.type === 'qty' ? a.qty : a.label));
+        toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + (key.includes('@') ? ' (' + key.split('@')[1] + ')' : '') + ' — ' + snapVal(a, q));
       }
     }
     const y = window.scrollY; echo = true; render(); echo = false; window.scrollTo(0, y); flashKey = '';
@@ -421,25 +636,36 @@ const presentUrl = L=>location.href.split('?')[0].split('#')[0] + '?present=' + 
 const lead = ()=>leads.find(l=>l.id===cur);
 const base = L=>MODELS[L.model] || 0;
 const locked = L=>L.stage === 'signed';
+const plus = n=>n < 0 ? '− ' + money(-n) + ' credit' : '+ ' + money(n);
+// an allowance is a typed dollar amount; a "credit" line comes off the price
+const moneyAns = (q, n)=>{ const p = q.credit ? -Math.abs(n) : Math.abs(n); return { amt:Math.abs(n), price:p, cost:q.nocost ? 0 : Math.round(p * 0.78) }; };
+// what an answer says, as one short string (for "changed since pricing")
+const snapVal = (a, q)=>!a ? '' : q.type === 'qty' ? String(a.qty) : q.type === 'money' ? money(a.amt) : a.label;
+const dfltVal = q=>q.type === 'qty' ? '0' : q.type === 'money' || q.type === 'text' ? '' : q.opt ? q.o[0][0] : '';
 function asked(q, L){
   if(!q.dep) return true;
-  const a = L.answers[q.dep.q];
-  if(q.dep.is) return !!a && a.label === q.dep.is;
-  return !!a && a.label !== q.dep.not;
+  const a = L.answers[q.dep.q], pq = qById(q.dep.q);
+  if(q.dep.min) return !!a && a.qty >= q.dep.min;
+  const label = a ? a.label : (pq && pq.opt && pq.o ? pq.o[0][0] : null);   // an untouched pricing line counts as its standard answer
+  if(label == null) return false;
+  return q.dep.is ? label === q.dep.is : label !== q.dep.not;
 }
 const keysOf = q=>q.each ? q.each.map(r=>q.id+'@'+r) : [q.id];
-// counts are optional (zero is an answer); everything else needs a pick
-const missing = (q, L)=>q.type === 'qty' || !asked(q, L) ? [] : keysOf(q).filter(k=>!L.answers[k]);
-const todo = (L, onlyV1)=>ALL_QS.filter(q=>!onlyV1 || q.v1).flatMap(q=>missing(q, L).map(k=>({ q, key:k })));
-// one line per pick that was made, with what it adds
+// pricing lines never have to be answered (untouched = standard); selections picks all do, except counts
+const missing = (q, L)=>q.opt || q.type === 'qty' || !asked(q, L) ? [] : keysOf(q).filter(k=>!L.answers[k]);
+const todo = L=>ALL_QS.flatMap(q=>missing(q, L).map(k=>({ q, key:k })));
+// one line per thing that was actually chosen, with what it adds
 function lines(L){
   const out = [];
   ALL_QS.forEach(q=>{ if(!asked(q, L)) return; keysOf(q).forEach(k=>{
     const a = L.answers[k]; if(!a) return;
-    const n = q.type === 'qty' ? a.qty : 1;
-    if(q.type === 'qty' && !n) return;
-    out.push({ key:k, q, where:k.includes('@') ? k.split('@')[1] : '', label:q.type === 'qty' ? n + ' ' + q.unit + (n === 1 ? '' : 's') : a.label, price:a.price * n, cost:a.cost * n,
-      std:q.type !== 'qty' && a.label === q.o[0][0] });
+    const where = k.includes('@') ? k.split('@')[1] : '';
+    if(q.type === 'qty'){ if(!a.qty) return; out.push({ key:k, q, where, label:a.qty.toLocaleString('en-US') + ' ' + q.unit + (a.qty === 1 || /ft$/.test(q.unit) ? '' : 's'), price:a.price * a.qty, cost:a.cost * a.qty, std:false, count:a.qty }); return; }
+    if(q.type === 'money'){ if(!a.price) return; out.push({ key:k, q, where, label:money(a.amt), price:a.price, cost:a.cost, std:false }); return; }
+    if(q.type === 'text'){ if(!a.label) return; out.push({ key:k, q, where, label:a.label, price:0, cost:0, std:false, typed:true }); return; }
+    const std = a.label === q.o[0][0];
+    if(q.opt && std) return;                       // a pricing line left at (or put back to) standard isn't worth a row
+    out.push({ key:k, q, where, label:a.label, price:a.price, cost:a.cost, std });
   }); });
   return out;
 }
@@ -450,6 +676,7 @@ const total = L=>base(L) + upgrades(L) + coTotal(L);
 // today's price for an answer, to spot prices that moved since the sheet was priced
 function todayPrice(k, a){
   const q = qById(k.split('@')[0]);
+  if(!q || q.type === 'money' || q.type === 'text') return { price:a.price, cost:a.cost };
   if(q.type === 'qty') return { price:q.price, cost:q.cost };
   const o = q.o.find(x=>x[0] === a.label); return o ? { price:o[1], cost:o[2] } : { price:a.price, cost:a.cost };
 }
@@ -457,6 +684,39 @@ function drift(L){
   if(locked(L)) return [];
   return Object.entries(L.answers).map(([k,a])=>{ const t = todayPrice(k, a), n = a.qty == null ? 1 : a.qty; return { k, a, t, diff:(t.price - a.price) * n }; }).filter(x=>x.diff !== 0 || x.t.cost !== x.a.cost);
 }
+// one line of the pricing sheet
+function prow(q, L){
+  if(!asked(q, L)) return '';
+  const staff = view === 'staff', lock = locked(L), a = L.answers[q.id];
+  const snap = L.v1Snap, was = snap ? (q.id in snap ? snap[q.id] : dfltVal(q)) : null, nowVal = a ? snapVal(a, q) : dfltVal(q);
+  const changed = snap && was !== nowVal ? `<div class="pn" style="color:#8a5d14">Changed since pricing${was ? ': was ' + esc(q.type === 'qty' ? was + ' ' + q.unit : was) : ''}</div>` : '';
+  let ctl = '', chosenPrice = 0, chosenCost = 0;
+  if(q.type === 'qty'){
+    const n = a ? a.qty : 0, p = a ? a.price : q.price, c = a ? a.cost : q.cost;
+    chosenPrice = p * n; chosenCost = c * n;
+    ctl = (q.entry
+        ? `<input type="number" min="0" max="${q.max}" step="1" data-num="${q.id}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}> <span class="muted" style="font-size:13.5px">${esc(q.unit)}</span>`
+        : `<div class="stepper"><button type="button" data-qty="${q.id}" data-d="-1" ${lock || !n ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-qty="${q.id}" data-d="1" ${lock || n >= q.max ? 'disabled' : ''}>+</button></div>`)
+      + `<span class="muted" style="font-size:13px">${money(p)} / ${esc(q.unit)}</span>${n ? `<span class="tot">${plus(p * n)}</span>` : ''}`;
+  } else if(q.type === 'money'){
+    chosenPrice = a ? a.price : 0; chosenCost = a ? a.cost : 0;
+    ctl = `<span class="muted">${q.credit ? '− $' : '$'}</span><input type="number" min="0" step="50" data-money="${q.id}" value="${a ? a.amt : ''}" placeholder="0" ${lock ? 'disabled' : ''}>`;
+  } else if(q.type === 'text'){
+    ctl = q.long ? `<textarea data-text="${q.id}" maxlength="600" placeholder="${esc(q.ph || '')}" ${lock ? 'disabled' : ''}>${esc(a ? a.label : '')}</textarea>`
+                 : `<input type="text" data-text="${q.id}" maxlength="120" value="${esc(a ? a.label : '')}" placeholder="${esc(q.ph || '')}" ${lock ? 'disabled' : ''}>`;
+  } else {
+    chosenPrice = a ? a.price : 0; chosenCost = a ? a.cost : 0;
+    ctl = `<div class="segs">${q.o.map((o, i)=>{
+      const sel = a ? a.label === o[0] : i === 0, price = a && a.label === o[0] ? a.price : o[1];
+      return `<button type="button" class="seg ${sel ? 'on' : ''} ${sel && !a ? 'dflt' : ''}" data-pick="${esc(q.id)}" data-opt="${esc(o[0])}" ${lock ? 'disabled' : ''}>${esc(o[0])}${price ? `<small>${plus(price)}</small>` : ''}</button>`;
+    }).join('')}</div>`;
+  }
+  return `<div class="prow ${q.long ? 'long' : ''}" id="q-${q.id}">
+    <div class="pl"><div class="pt">${esc(q.t)}</div>${q.note ? `<div class="pn">${esc(q.note)}</div>` : ''}${changed}
+      ${staff && q.type !== 'text' ? `<div class="staffline" style="display:inline-block">${q.bt ? 'BT ' + esc(q.bt) + ' · ' : ''}code ${q.cc}${q.vendor ? ' · ' + esc(q.vendor) : ''}${chosenPrice ? ` · our cost ${money(chosenCost)} · margin ${money(chosenPrice - chosenCost)}` : ''}</div>` : ''}</div>
+    <div class="pc">${ctl}</div></div>`;
+}
+
 // follow-up: how soon, in words and colour
 function followInfo(L){
   const f = L.follow; if(!f || !f.date) return null;
@@ -484,7 +744,7 @@ function officeCard(L){
     </div></div>`;
 }
 const stageChip = L=>L.stage === 'signed' ? '<span class="chip signed">Signed &amp; locked</span>'
-  : L.stage === 'v2' ? '<span class="chip v2">Visit 2 in progress</span>' : '<span class="chip v1">Visit 1 done · not back yet</span>';
+  : L.stage === 'v2' ? '<span class="chip v2">Selections in progress</span>' : '<span class="chip v1">Pricing done · not back yet</span>';
 const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name : '', L.lot ? 'Lot ' + L.lot : 'lot not chosen'].filter(Boolean).join(' · ');
 
 /* ---------- two screens on two devices ----------
@@ -567,9 +827,10 @@ function takeRemote(sheet, sent, body){
   const changed = !sent || !same(sent, merged);
   if(theirs){
     const q = qById(theirs.split('@')[0]), a = sheet.answers[theirs];
-    if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + (theirs.includes('@') ? ' (' + theirs.split('@')[1] + ')' : '') + ' — ' + (q.type === 'qty' ? a.qty : a.label)); }
+    if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + (theirs.includes('@') ? ' (' + theirs.split('@')[1] + ')' : '') + ' — ' + snapVal(a, q)); }
   }
-  if(changed){ const y = window.scrollY; render(); window.scrollTo(0, y); }
+  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
+  if(changed && !typing){ const y = window.scrollY; render(); window.scrollTo(0, y); }
   flashKey = '';
 }
 setInterval(syncTick, 1000);
@@ -593,14 +854,16 @@ function showScreen(){
     : '<h2>Opening the selection sheet…</h2>'}</div></div>`;
   if(L.stage !== 'signed') return `<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>These selections aren't final yet.</h2><p class="lede" style="margin:8px auto 0">The selection sheet appears here once everything has been chosen and signed.</p></div></div>`;
   // a page to show off: leave out the things they said no to ("Outdoor living: None", "Fan pre-wire: No")
-  const ls = lines(L).filter(l=>!(l.std && /^(no|none|leave)\b/i.test(l.label)));
-  const artOf = l=>{ if(l.q.type === 'qty') return `<span class="count">${L.answers[l.key].qty}</span>`; const o = l.q.o.find(x=>x[0] === l.label); return (o && o[3]) || ''; };
+  // from the pricing sheet, only the things they added (no credits, notes or "No"s); from selections, every pick
+  const ls = lines(L).filter(l=>l.q.v1 ? (l.price > 0 && l.q.id !== 'lotprem') : !(l.std && /^(no|none|leave)\b/i.test(l.label)));
+  const artOf = l=>{ if(l.q.type === 'qty') return `<span class="count">${L.answers[l.key].qty.toLocaleString('en-US')}</span>`; const o = (l.q.o || []).find(x=>x[0] === l.label); return (o && o[3]) || `<div class="noart">${esc(l.q.room.name)}</div>`; };
   const tile = (l, big)=>`<div class="sh-tile">${l.price > 0 ? '<span class="up">Upgrade</span>' : ''}<div class="art">${artOf(l)}</div>
-      <div class="txt"><div class="lab">${esc(l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</div><div class="val">${esc(l.q.type === 'qty' ? l.label : l.label)}</div></div></div>`;
+      <div class="txt"><div class="lab">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.room.name : l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</div><div class="val">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.t : l.q.type === 'money' ? l.q.t : l.label)}</div></div></div>`;
   // the three biggest choices lead the page
-  const sig = ls.filter(l=>l.price > 0 && l.q.type !== 'qty').sort((a,b)=>b.price - a.price).slice(0, 3);
+  const sig = ls.filter(l=>l.price > 0 && l.q.type !== 'qty' && l.q.type !== 'money').sort((a,b)=>b.price - a.price).slice(0, 3);
   const made = [...L.custom.map(c=>c.desc), ...L.cos.map(c=>c.desc)];
-  const rooms = ROOMS.map(r=>({ r, mine: ls.filter(l=>l.q.room.id === r.id && !sig.includes(l)) })).filter(x=>x.mine.length);
+  // the two meetings both have a Kitchen: on this page they are one section
+  const rooms = [...new Set(SECTIONS.map(r=>r.name))].map(name=>({ r:{ name }, mine: ls.filter(l=>l.q.room.name === name && !sig.includes(l)) })).filter(x=>x.mine.length);
   const ups = ls.filter(l=>l.price > 0).length + made.length;
   const where = [L.model, (DEVS.find(d=>d.code === L.dev) || {}).name, L.lot ? 'Lot ' + L.lot : ''].filter(Boolean).join(' · ');
   return `<div class="sh">
@@ -612,7 +875,7 @@ function showScreen(){
       <div class="sh-stats">
         <div class="sh-stat"><b>${ls.length + made.length}</b><span>choices made</span></div>
         <div class="sh-stat"><b>${ups}</b><span>custom upgrades</span></div>
-        <div class="sh-stat"><b>${ROOMS.filter(r=>ls.some(l=>l.q.room.id === r.id)).length}</b><span>spaces designed</span></div>
+        <div class="sh-stat"><b>${SECTIONS.filter(r=>ls.some(l=>l.q.room.id === r.id)).length}</b><span>parts of the home</span></div>
       </div>
       <div class="sh-actions noprint"><button type="button" id="shPdf">Download as PDF</button><button type="button" class="alt" id="shShare">Share</button></div>
     </div></div>
@@ -708,14 +971,14 @@ function leadsScreen(){
         <div class="muted" style="font-size:12.5px;margin-top:2px">${[L.phone, L.email].filter(Boolean).map(esc).join(' · ')}</div>
         ${(f=>f ? `<div style="margin-top:6px"><span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? ` <span class="muted" style="font-size:13px">${esc(f.what)}</span>` : ''}</div>` : '')(followInfo(L))}
         ${noteList(L).length ? `<div class="muted" style="font-size:13px;margin-top:5px;font-style:italic">Last note, ${esc(ago(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].at))}: ${esc(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].text.slice(0, 110))}</div>` : ''}</div>
-      <div>${stageChip(L)}<div class="muted" style="font-size:12.5px;margin-top:4px">Last visit ${esc(ago(L.updated))}${drift(L).some(d=>d.diff) ? ' · <span style="color:#8a5d14">prices have changed</span>' : ''}</div></div>
+      <div>${stageChip(L)}<div class="muted" style="font-size:12.5px;margin-top:4px">Last in ${esc(ago(L.updated))}${drift(L).some(d=>d.diff) ? ' · <span style="color:#8a5d14">prices have changed</span>' : ''}</div></div>
       <div class="amt">${money(total(L))}<div class="muted" style="font-size:11.5px;font-family:inherit;font-weight:400">${L.stage === 'signed' ? 'contract' : 'so far'}</div></div>
       <button type="button" class="btn sm" data-open="${L.id}">Open</button>
     </div>`).join('');
   const devOpts = DEVS.map(d=>`<option value="${d.code}">${d.code} — ${d.name}</option>`).join('');
   return `
     <div style="margin-top:22px"><div class="eyebrow">Selections</div><h1>Leads &amp; selection sheets</h1>
-      <p class="lede">Everyone who sits down for a first visit is saved here, whether or not they come back. Open one to pick up exactly where it was left, even months later.</p></div>
+      <p class="lede">Everyone who sits down for a pricing meeting is saved here, whether or not they come back. Open one to pick up exactly where it was left, even months later.</p></div>
     <div class="card">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2>${leads.length} on file${dueCount ? ` <span class="chip due" style="margin-left:8px;vertical-align:middle">${dueCount} to follow up</span>` : ''}</h2><div class="grow"></div>
         <button type="button" class="btn primary" id="newLeadBtn">${newOpen ? 'Cancel' : '+ New lead'}</button></div>
@@ -729,7 +992,7 @@ function leadsScreen(){
           <div><label class="f">Lot</label><select id="nLot"><option value="">Not chosen yet</option></select></div>
           <div><label class="f">Model</label><select id="nModel">${Object.keys(MODELS).map(m=>`<option>${m}</option>`).join('')}</select></div>
         </div>
-        <div style="margin-top:12px"><button type="button" class="btn good" id="nStart">Save lead &amp; start visit 1</button></div>
+        <div style="margin-top:12px"><button type="button" class="btn good" id="nStart">Save lead &amp; start pricing</button></div>
       </div>` : ''}
       <div style="margin-top:8px">${rows || '<p class="muted" style="padding:14px 0">No leads yet.</p>'}</div>
     </div>
@@ -743,17 +1006,17 @@ function leadsScreen(){
 function leadScreen(L){
   const left = todo(L).length, staff = view === 'staff';
   const d = drift(L).filter(x=>x.diff), dSum = d.reduce((s,x)=>s+x.diff,0);
-  const tabs = [['v1','Visit 1 · big choices'],['full','Full selections'],['summary','Summary'],['sign', locked(L) ? 'Signed copy' : 'Sign']]
+  const tabs = [['v1','Pricing'],['full','Selections'],['summary','Summary'],['sign', locked(L) ? 'Signed copy' : 'Sign']]
     .map(([id, label])=>`<button type="button" class="tab ${tab===id?'on':''}" data-tab="${id}">${label}${id==='full' && left && !locked(L) ? `<span class="n">${left} to choose</span>` : ''}</button>`).join('')
     + (staff ? [['vendors','For vendors'],['codes','By cost code']].map(([id,label])=>`<button type="button" class="tab staff ${tab===id?'on':''}" data-tab="${id}">${label}</button>`).join('') : '');
-  const body = tab === 'v1' ? visit1(L) : tab === 'full' ? full(L) : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
+  const body = tab === 'v1' ? sheetView(L, 'v1') : tab === 'full' ? sheetView(L, 'full') : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
   return `
     <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
         <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</h1>
         <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${money(base(L))}</div></div>
       <div style="text-align:right">${PRESENT ? (sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live"><i></i>Live with your Alden Homes rep</span>')
-        : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">First visit ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
+        : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">Pricing meeting ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
           <div class="noprint" style="margin-top:8px;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap">${shared[L.id] ? liveBadge() : ''}<button type="button" class="btn sm" id="shareBtn">${shareOpen ? 'Hide' : shared[L.id] ? 'Customer screen' : 'Open customer screen'}</button></div>`}</div>
     </div>
     ${!PRESENT && shareOpen ? `<div class="sharebox noprint"><strong>A second screen for the customer.</strong> ${liveBadge()}
@@ -780,6 +1043,7 @@ function leadScreen(L){
 /* one question, in any of its forms */
 function question(q, L, opts){
   if(!asked(q, L)) return '';
+  if(q.opt) return prow(q, L);
   const staff = view === 'staff', lock = locked(L);
   const snap = L.v1Snap || {};
   const optCard = (key, o, i)=>{
@@ -790,7 +1054,7 @@ function question(q, L, opts){
     return `<button type="button" class="opt ${sel?'sel':''}${sel && flashKey === key ? ' flash' : ''}" data-pick="${esc(key)}" data-opt="${esc(o[0])}" ${lock?'disabled':''}>
       <div class="art">${o[3] || ''}</div>${i === 0 ? '<span class="std">Standard</span>' : ''}<span class="tick">&#10003;</span>
       <div class="txt"><div class="nm">${esc(o[0])}</div>
-        <div class="pr ${price === 0 ? 'inc' : ''}">${price === 0 ? (i === 0 ? 'Included' : 'No extra cost') : '+ ' + money(price)}</div>
+        <div class="pr ${price === 0 ? 'inc' : ''}">${price === 0 ? (i === 0 ? 'Included' : 'No extra cost') : plus(price)}</div>
         ${staff && price ? `<div class="staffline">our cost ${money(cost)} · margin ${money(price - cost)}</div>` : ''}</div>
       ${!lock && !sel ? `<span class="fav ${fav?'on':''}" data-fav="${esc(key + '|' + o[0])}" title="Mark as a favourite">${fav ? '&#9829;' : '&#9825;'}</span>` : ''}
     </button>`;
@@ -798,7 +1062,7 @@ function question(q, L, opts){
   const changed = key=>{
     if(!q.v1 || !L.v1Snap || !L.answers[key] || snap[key] == null || snap[key] === L.answers[key].label) return '';
     const was = q.o.find(o=>o[0] === snap[key]), diff = L.answers[key].price - (was ? was[1] : 0);
-    return `<div class="changed">Changed since visit 1: was <strong>${esc(snap[key])}</strong> · ${diff === 0 ? 'no change in price' : (diff > 0 ? '+ ' : '− ') + money(Math.abs(diff))}</div>`;
+    return `<div class="changed">Changed since pricing: was <strong>${esc(snap[key])}</strong> · ${diff === 0 ? 'no change in price' : (diff > 0 ? '+ ' : '− ') + money(Math.abs(diff))}</div>`;
   };
   const miss = missing(q, L);
   let inner;
@@ -814,7 +1078,7 @@ function question(q, L, opts){
   }
   return `<div class="q ${miss.length && !lock ? 'todo' : ''}" id="q-${q.id}">
     <div class="q-head"><h3>${esc(q.t)}</h3>
-      ${q.v1 && opts.fullSheet ? '<span class="chip v1">chosen at visit 1 · can still change</span>' : ''}
+      ${q.v1 && opts.fullSheet ? '<span class="chip v1">priced at the first meeting</span>' : ''}
       ${q.type === 'color' ? '<span class="chip plain">colour · no cost</span>' : ''}
       ${q.each ? '<span class="chip plain">pick for each room</span>' : ''}
       ${staff ? `<span class="chip" style="background:var(--staff-soft);color:var(--staff)">code ${q.cc} · ${esc(q.vendor || 'Alden')}</span>` : ''}</div>
@@ -822,31 +1086,33 @@ function question(q, L, opts){
     ${inner}</div>`;
 }
 
-function visit1(L){
-  const left = todo(L, true).length;
-  return `<div style="margin-top:18px"><div class="eyebrow">Visit 1 · first meeting</div><h2 style="font-size:22px;margin-top:4px">The big choices</h2>
-      <p class="lede">A handful of choices that move the price the most, so you leave today with a real ballpark. Nothing here is final. It's all saved, and it can all be changed when you come back.</p></div>
-    ${ROOMS.map(r=>r.qs.filter(q=>q.v1).map(q=>question(q, L, {})).join('')).join('')}
-    ${locked(L) ? '' : `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <p style="flex:1 1 260px">${left ? `<strong>${left} still to choose.</strong> You can save now and finish later.` : '<strong>That\'s everything for a first visit.</strong>'} This sheet stays on file as a lead either way.</p>
-      ${PRESENT ? '' : '<button type="button" class="btn" id="saveClose">Save &amp; close</button>'}
-      <button type="button" class="btn primary" id="toFull">Carry on to full selections</button></div>`}`;
-}
-
-function full(L){
-  const staff = view === 'staff';
-  const prog = r=>{ const qs = r.qs.filter(q=>asked(q, L)); const keys = qs.filter(q=>q.type !== 'qty').flatMap(keysOf); return { n:keys.length, done:keys.filter(k=>L.answers[k]).length }; };
-  const nav = ROOMS.map(r=>{ const p = prog(r), all = p.done === p.n;
-    return `<button type="button" class="${roomId===r.id?'on':''}" data-room="${r.id}"><div class="rn"><span>${esc(r.name)}</span>${all ? '<span class="done">&#10003;</span>' : ''}</div>
+// One meeting's worth of sections, one at a time, with the list down the side. kind 'v1' = Pricing, 'full' = Selections.
+function sheetView(L, kind){
+  const staff = view === 'staff', pricing = kind === 'v1', list = pricing ? PRICING : ROOMS;
+  const r = list.find(x=>x.id===roomId) || list[0], i = list.indexOf(r), next = list[i+1];
+  const ls = lines(L);
+  const prog = x=>{ const qs = x.qs.filter(q=>asked(q, L)); const keys = qs.filter(q=>q.type !== 'qty').flatMap(keysOf); return { n:keys.length, done:keys.filter(k=>L.answers[k]).length }; };
+  const nav = list.map(x=>{
+    if(pricing){ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length;
+      return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? `<span class="done" style="font-size:12px">${n}</span>` : ''}</div></button>`; }
+    const p = prog(x), all = p.done === p.n;
+    return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${all ? '<span class="done">&#10003;</span>' : ''}</div>
       <div class="rp">${all ? 'All chosen' : p.done + ' of ' + p.n + ' chosen'}</div><div class="bar"><span style="width:${p.n ? p.done/p.n*100 : 100}%"></span></div></button>`; }).join('');
-  const r = ROOMS.find(x=>x.id===roomId) || ROOMS[0], i = ROOMS.indexOf(r), next = ROOMS[i+1];
   const mine = L.custom.map((c, ci)=>({ c, ci })).filter(x=>x.c.room === r.id);
+  const body = pricing ? `<div class="q" style="padding:8px 18px 12px">${r.qs.map(q=>prow(q, L)).join('') || '<p class="muted" style="padding:10px 0">Nothing to choose here for this home.</p>'}</div>`
+    : (r.qs.map(q=>question(q, L, { fullSheet:true })).join('') || '<div class="q"><p class="muted">Nothing to choose here. This room depends on what was picked at pricing.</p></div>');
+  const done = pricing && !next && !locked(L) ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <p style="flex:1 1 260px"><strong>That's the whole pricing sheet.</strong> Anything left untouched stays at standard. It's saved as a lead either way, and all of it can still be changed later.</p>
+      ${PRESENT ? '' : '<button type="button" class="btn" id="saveClose">Save &amp; close</button>'}
+      <button type="button" class="btn primary" id="toFull">Carry on to selections</button></div>` : '';
   return `<div class="rooms">
     <div class="roomnav noprint">${nav}</div>
     <div>
-      <div class="eyebrow">Room ${i+1} of ${ROOMS.length}</div><h2 style="font-size:22px;margin-top:4px">${esc(r.name)}</h2>
-      ${r.by && !locked(L) ? `<div class="deadline">Choose by <strong>${esc(nice(daysAhead(r.by.days)))}</strong> — that's when ${esc(r.by.why)}.</div>` : ''}
-      ${r.qs.map(q=>question(q, L, { fullSheet:true })).join('')}
+      <div class="eyebrow">${pricing ? 'Pricing · first meeting' : 'Selections · second meeting'} · ${i+1} of ${list.length}</div>
+      <h2 style="font-size:22px;margin-top:4px">${esc(r.name)}${staff && r.bt ? ` <span class="muted" style="font-size:13px;font-weight:400">BT ${esc(r.bt)}</span>` : ''}</h2>
+      ${pricing && i === 0 ? `<p class="lede">The pricing sheet, section by section. Go through what matters to them and skip the rest. Anything left alone stays at standard, and the total at the bottom keeps up as you go.</p>` : ''}
+      ${!pricing && r.by && !locked(L) ? `<div class="deadline">Choose by <strong>${esc(nice(daysAhead(r.by.days)))}</strong> — that's when ${esc(r.by.why)}.</div>` : ''}
+      ${body}
       ${mine.map(({c, ci})=>`<div class="q"><div class="q-head"><h3>${esc(c.desc)}</h3><span class="chip plain">special request</span></div>
         <div style="margin-top:8px"><span class="mono" style="font-weight:700;color:var(--navy)">+ ${money(c.price)}</span>${staff ? ` <span class="staffline" style="display:inline-block">our cost ${money(c.cost)} · margin ${money(c.price - c.cost)} · code ${c.cc}</span>` : ''}
         ${staff && !locked(L) ? ` <button type="button" class="btn sm" data-delcustom="${ci}" style="margin-left:8px">Remove</button>` : ''}</div></div>`).join('')}
@@ -857,24 +1123,25 @@ function full(L){
           <div><label class="f">Our cost ($)</label><input type="number" id="cuCost" min="0" step="1"></div>
           <div><label class="f">Cost code</label><select id="cuCode">${Object.entries(CODE_NAMES).map(([c,n])=>`<option value="${c}">${c} — ${n}</option>`).join('')}</select></div>
         </div><div style="margin-top:10px"><button type="button" class="btn sm" id="cuAdd">Add to this sheet</button></div></div>`
-        : (!locked(L) ? `<p class="muted" style="font-size:13.5px;margin-top:14px">Want something that isn't shown? Ask, and we'll price it and add it to your sheet.</p>` : '')}
+        : (!locked(L) && !pricing ? `<p class="muted" style="font-size:13.5px;margin-top:14px">Want something that isn't shown? Ask, and we'll price it and add it to your sheet.</p>` : '')}
+      ${done}
       <div class="noprint" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-        ${i > 0 ? `<button type="button" class="btn" data-room="${ROOMS[i-1].id}">&larr; ${esc(ROOMS[i-1].name)}</button>` : ''}
+        ${i > 0 ? `<button type="button" class="btn" data-room="${list[i-1].id}">&larr; ${esc(list[i-1].name)}</button>` : ''}
         <div class="grow"></div>
-        ${next ? `<button type="button" class="btn primary" data-room="${next.id}">Next: ${esc(next.name)} &rarr;</button>` : `<button type="button" class="btn primary" data-tab="summary">See the summary &rarr;</button>`}
+        ${next ? `<button type="button" class="btn primary" data-room="${next.id}">Next: ${esc(next.name)} &rarr;</button>` : (pricing ? '' : `<button type="button" class="btn primary" data-tab="summary">See the summary &rarr;</button>`)}
       </div>
     </div></div>`;
 }
 
 function summary(L){
   const staff = view === 'staff', ls = lines(L), left = todo(L);
-  const rows = ROOMS.map(r=>{
+  const rows = SECTIONS.map(r=>{
     const mine = ls.filter(l=>l.q.room.id === r.id), cu = L.custom.filter(c=>c.room === r.id);
     if(!mine.length && !cu.length) return '';
     const sub = mine.reduce((s,l)=>s+l.price,0) + cu.reduce((s,c)=>s+c.price,0);
-    return `<tr class="grp"><td colspan="2">${esc(r.name)}</td><td class="num">${sub ? '+ ' + money(sub) : 'included'}</td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>`
+    return `<tr class="grp"><td colspan="2">${esc(r.name)}</td><td class="num">${sub ? plus(sub) : ''}</td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>`
       + mine.map(l=>`<tr><td>${esc(l.q.t)}${l.where ? ` <span class="muted">· ${esc(l.where)}</span>` : ''}</td><td>${esc(l.label)}</td>
-          <td class="num">${l.price ? '+ ' + money(l.price) : '<span class="muted">' + (l.std ? 'included' : 'no cost') + '</span>'}</td>
+          <td class="num">${l.price ? plus(l.price) : '<span class="muted">' + (l.std ? 'included' : l.typed ? '' : 'no cost') + '</span>'}</td>
           ${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`).join('')
       + cu.map(c=>`<tr><td>Special request</td><td>${esc(c.desc)}</td><td class="num">+ ${money(c.price)}</td>${staff ? `<td class="num st">${money(c.cost)}</td><td class="num st">${money(c.price - c.cost)}</td>` : ''}</tr>`).join('');
   }).join('');
@@ -887,7 +1154,7 @@ function summary(L){
         <tbody>
           <tr><td><strong>${esc(L.model)}</strong> — base price</td><td class="muted">everything marked Standard</td><td class="num"><strong>${money(base(L))}</strong></td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>
           ${rows}
-          <tr class="tot"><td colspan="2">Upgrades</td><td class="num">+ ${money(up)}</td>${staff ? `<td class="num st">${money(upCost)}</td><td class="num st">${money(up - upCost)} (${up ? Math.round((up - upCost) / up * 100) : 0}%)</td>` : ''}</tr>
+          <tr class="tot"><td colspan="2">Upgrades &amp; lot premium</td><td class="num">${plus(up)}</td>${staff ? `<td class="num st">${money(upCost)}</td><td class="num st">${money(up - upCost)} (${up ? Math.round((up - upCost) / up * 100) : 0}%)</td>` : ''}</tr>
           ${L.cos.map(c=>`<tr><td>Change order · ${esc(nice(c.date))}</td><td>${esc(c.desc)}</td><td class="num">+ ${money(c.price)}</td>${staff ? `<td class="num st">${money(c.cost)}</td><td class="num st">${money(c.price - c.cost)}</td>` : ''}</tr>`).join('')}
           ${L.cos.length ? `<tr><td colspan="2">Change order fees (${L.cos.length} × ${money(CO_FEE)})</td><td class="num">+ ${money(L.cos.length * CO_FEE)}</td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>` : ''}
           <tr class="tot"><td colspan="2">Total</td><td class="num">${money(total(L))}</td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>
@@ -927,7 +1194,7 @@ function sign(L){
 
 function vendors(L){
   const by = {};
-  lines(L).forEach(l=>{ const v = l.q.vendor || 'Alden (in-house)'; (by[v] = by[v] || []).push(l); });
+  lines(L).forEach(l=>{ const v = l.q.vendor || ((CODE_NAMES[l.q.cc] || 'Other') + ' (trade)'); (by[v] = by[v] || []).push(l); });
   return `<div class="banner staff"><p><strong>What each vendor needs.</strong> Once the sheet is signed, each vendor would see their part on their own link in the hub, with no retyping. Prices are left off.</p></div>
     ${Object.keys(by).sort().map(v=>`<div class="card"><h2>${esc(v)}</h2><table style="margin-top:8px"><tbody>
       ${by[v].map(l=>`<tr><td style="width:42%">${esc(l.q.t)}${l.where ? ` <span class="muted">· ${esc(l.where)}</span>` : ''}</td><td><strong>${esc(l.label)}</strong>${l.std ? ' <span class="muted">(standard)</span>' : ''}</td><td class="muted" style="width:90px">code ${l.q.cc}</td></tr>`).join('')}
@@ -982,9 +1249,9 @@ document.addEventListener('click', e=>{
     const name = $('nName').value.trim(); if(!name){ toast('Add the buyer\'s name first'); return; }
     const n = { id:'L'+Math.random().toString(36).slice(2,8), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value,
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
-    leads.push(n); cur = n.id; tab = 'v1'; roomId = 'home'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
+    leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
-  const open = t.closest('[data-open]'); if(open){ cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = 'home'; render(); window.scrollTo(0, 0); return; }
+  const open = t.closest('[data-open]'); if(open){ cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
   if(!PRESENT){
     const setFollow = date=>{ L.follow = { date, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(date)); };
@@ -1005,9 +1272,9 @@ document.addEventListener('click', e=>{
   if(t.closest('#shareCopy')){ navigator.clipboard.writeText(presentUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
   if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); cur = null; render(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
-  const tb = t.closest('[data-tab]'); if(tb){ tab = tb.dataset.tab; render(); window.scrollTo(0, 0); return; }
-  const rm = t.closest('[data-room]'); if(rm){ roomId = rm.dataset.room; tab = 'full'; render(); window.scrollTo(0, 0); return; }
-  const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
+  const tb = t.closest('[data-tab]'); if(tb){ tab = tb.dataset.tab; if(tab === 'v1' && !PRICING.some(x=>x.id === roomId)) roomId = PRICING[0].id; if(tab === 'full' && !ROOMS.some(x=>x.id === roomId)) roomId = ROOMS[0].id; render(); window.scrollTo(0, 0); return; }
+  const rm = t.closest('[data-room]'); if(rm){ roomId = rm.dataset.room; tab = (PRICING.some(x=>x.id === roomId) ? 'v1' : 'full'); render(); window.scrollTo(0, 0); return; }
+  const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = (PRICING.some(x=>x.id === roomId) ? 'v1' : 'full'); render(); window.scrollTo(0, 0); return; }
   if(t.closest('#printBtn')){ window.print(); return; }
   if(t.closest('#showMake')){
     // the sheet has to be on the hub's server for the link to work on someone else's phone
@@ -1044,9 +1311,9 @@ document.addEventListener('click', e=>{
     touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return;
   }
   if(t.closest('#toFull')){
-    // the first time they move on, remember what visit 1 looked like, so later changes can be shown
-    if(!L.v1Snap) L.v1Snap = Object.fromEntries(Object.entries(L.answers).filter(([k])=>qById(k.split('@')[0]).v1).map(([k,v])=>[k, v.label]));
-    L.stage = 'v2'; tab = 'full'; roomId = 'home'; touch(L); render(); window.scrollTo(0, 0); return;
+    // the first time they move on, remember what was priced, so later changes can be shown
+    if(!L.v1Snap) L.v1Snap = Object.fromEntries(Object.entries(L.answers).filter(([k])=>(qById(k.split('@')[0]) || {}).v1).map(([k,v])=>[k, snapVal(v, qById(k.split('@')[0]))]));
+    L.stage = 'v2'; tab = 'full'; roomId = ROOMS[0].id; touch(L); render(); window.scrollTo(0, 0); return;
   }
   if(t.closest('#cuAdd')){
     const desc = $('cuDesc').value.trim(), price = Number($('cuPrice').value);
@@ -1063,6 +1330,16 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); });
 document.addEventListener('change', e=>{
+  const el = e.target, L0 = lead();
+  if(L0 && !locked(L0) && el.dataset && (el.dataset.num || el.dataset.money || el.dataset.text)){
+    const id = el.dataset.num || el.dataset.money || el.dataset.text, q = qById(id);
+    if(!q) return;
+    if(el.dataset.num){ const v = Math.max(0, Math.min(q.max, Math.round(Number(el.value) || 0))); if(!v) delete L0.answers[id]; else { const a = L0.answers[id] || { price:q.price, cost:q.cost }; a.qty = v; L0.answers[id] = a; } }
+    else if(el.dataset.money){ const v = Math.max(0, Math.round(Number(el.value) || 0)); if(!v) delete L0.answers[id]; else L0.answers[id] = moneyAns(q, v); }
+    else { const v = el.value.trim(); if(!v) delete L0.answers[id]; else L0.answers[id] = { label:v, price:0, cost:0 }; }
+    ALL_QS.forEach(x=>{ if(!asked(x, L0)) keysOf(x).forEach(k=>{ delete L0.answers[k]; }); });
+    touch(L0); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
   if(e.target.id === 'followDate' && e.target.value && lead()){ const L = lead(); L.follow = { date:e.target.value, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(L.follow.date)); return; }
   if(e.target.id === 'nDev'){ const d = e.target.value; $('nLot').innerHTML = '<option value="">Not chosen yet</option>' + LOTS.filter(l=>l.dev === d).map(l=>`<option value="${l.lot}">Lot ${l.lot} — ${esc(l.addr)}</option>`).join(''); }
 });
