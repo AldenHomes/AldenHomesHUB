@@ -136,6 +136,22 @@
   .totalbar .sub{font-size:12.5px;color:var(--ink-soft)}
   .toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:var(--navy-2);color:#fff;padding:10px 18px;border-radius:22px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:80}
   .toast.show{opacity:1}
+  /* the customer's own screen: bigger, nothing but their choices */
+  body.present{font-size:18px}
+  body.present .opts{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  body.present .opt .art{height:130px}
+  body.present .opt .nm{font-size:17px}
+  body.present .opt .pr{font-size:16px}
+  body.present .q-head h3{font-size:21px}
+  body.present .q{padding:20px 22px}
+  body.present #viewSw, body.present .top a, body.present .pill{display:none}
+  .live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--good)}
+  .live i{width:9px;height:9px;border-radius:50%;background:var(--good);animation:livePulse 1.6s ease-in-out infinite}
+  @keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(63,122,78,.5)}50%{box-shadow:0 0 0 7px rgba(63,122,78,0)}}
+  .opt.flash{animation:optFlash 1.6s ease-out}
+  @keyframes optFlash{0%{box-shadow:0 0 0 6px rgba(201,138,43,.75)}100%{box-shadow:0 0 0 2px var(--good-soft)}}
+  .sharebox{background:var(--staff-soft);border:1px solid #c9d8e6;border-radius:var(--radius);padding:14px 16px;margin-top:14px;color:#2c4a66}
+  .sharebox input{font-family:"Courier New",monospace;font-size:13px;margin-top:8px}
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
 </head>
@@ -259,6 +275,16 @@ const qById = id=>ALL_QS.find(q=>q.id===id);
 const STORE = 'aldenSelectionsDemo.v2';
 let leads = [], view = 'customer', cur = null, tab = 'v1', roomId = 'home', newOpen = false;
 
+/* ---------- two screens, one sheet ----------
+   The office opens a sheet on their iPad and presses "Open customer screen". That gives a link (…?present=LEAD) for the
+   customer's iPad: a big, customer-only view of the same sheet. A pick made on either screen shows on the other at once,
+   and the customer's screen follows whichever room the office moves to.
+   IN THIS DEMO the two screens talk through the browser's own storage, so it only works between two windows on the SAME
+   computer. The real thing would go through the hub's database and work between any two devices. */
+const PRESENT = new URLSearchParams(location.search).get('present');   // set = this window is the customer's screen
+const NAV = 'aldenSelectionsDemo.nav';
+let officeView = 'customer', shareOpen = false, flashKey = '';
+
 function seedLeads(){
   const mk = (o, picks)=>{
     const L = { id:'L'+Math.random().toString(36).slice(2,8), name2:'', phone:'', email:'', answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', ...o };
@@ -294,11 +320,41 @@ function seedLeads(){
   c.cos = [{ desc:'Add a floor outlet in the office', price:310, cost:190, cc:54, date:daysAgo(9) }];
   return [b, a, c];
 }
-function save(){ try{ localStorage.setItem(STORE, JSON.stringify({ leads, view })); } catch(e){} }
+// (the customer's screen never changes which view the office is in)
+let echo = false;   // true while redrawing for a change that came FROM the other screen — saving then would send it straight back
+function save(){ if(echo) return; try{ localStorage.setItem(STORE, JSON.stringify({ leads, view: PRESENT ? officeView : view })); } catch(e){} }
 function load(){
-  try{ const s = JSON.parse(localStorage.getItem(STORE) || 'null'); if(s && Array.isArray(s.leads)){ leads = s.leads; view = s.view === 'staff' ? 'staff' : 'customer'; return; } } catch(e){}
+  try{ const s = JSON.parse(localStorage.getItem(STORE) || 'null'); if(s && Array.isArray(s.leads)){ leads = s.leads; officeView = s.view === 'staff' ? 'staff' : 'customer'; view = PRESENT ? 'customer' : officeView; return; } } catch(e){}
   leads = seedLeads();
 }
+// the other screen changed something: take its copy, point out what changed, and (customer's screen) follow the office's room
+window.addEventListener('storage', e=>{
+  if(e.key === STORE){
+    const was = lead() ? JSON.stringify(lead().answers) : '';
+    const before = lead() ? { ...lead().answers } : {};
+    try{ const s = JSON.parse(e.newValue || 'null'); if(!s || !Array.isArray(s.leads)) return; leads = s.leads; if(PRESENT) officeView = s.view === 'staff' ? 'staff' : 'customer'; } catch(err){ return; }
+    const L = lead();
+    if(L && JSON.stringify(L.answers) !== was){
+      const key = Object.keys(L.answers).find(k=>JSON.stringify(L.answers[k]) !== JSON.stringify(before[k]));
+      if(key){
+        const q = qById(key.split('@')[0]), a = L.answers[key];
+        flashKey = key;
+        toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + (key.includes('@') ? ' (' + key.split('@')[1] + ')' : '') + ' — ' + (q.type === 'qty' ? a.qty : a.label));
+      }
+    }
+    const y = window.scrollY; echo = true; render(); echo = false; window.scrollTo(0, y); flashKey = '';
+  }
+  if(e.key === NAV && PRESENT){
+    try{ const nv = JSON.parse(e.newValue || 'null'); if(nv && nv.id === PRESENT && (nv.tab !== tab || nv.roomId !== roomId)){ tab = nv.tab; roomId = nv.roomId; echo = true; render(); echo = false; window.scrollTo(0, 0); } } catch(err){}
+  }
+});
+let lastNav = '';
+function tellNav(){
+  if(PRESENT || !cur || ['vendors','codes'].includes(tab)) return;
+  const nv = JSON.stringify({ id:cur, tab, roomId });
+  if(nv !== lastNav){ lastNav = nv; try{ localStorage.setItem(NAV, nv); } catch(e){} }
+}
+const presentUrl = L=>location.href.split('?')[0].split('#')[0] + '?present=' + encodeURIComponent(L.id);
 
 /* ---------- reading a lead ---------- */
 const lead = ()=>leads.find(l=>l.id===cur);
@@ -347,7 +403,11 @@ const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name :
 /* ---------- screens ---------- */
 function render(){
   document.querySelectorAll('#viewSw button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
+  document.body.classList.toggle('present', !!PRESENT);
+  if(PRESENT){ cur = PRESENT; view = 'customer'; if(['vendors','codes'].includes(tab)) tab = 'summary'; }
   const L = lead();
+  if(PRESENT && !L){ $('totalbar').style.display = 'none'; $('root').innerHTML = '<div class="card" style="margin-top:40px"><h2>This selection sheet isn\'t open on this device.</h2><p class="lede">In this demo the customer screen has to be opened on the same computer as the office screen, from its "Open customer screen" button.</p></div>'; return; }
+  tellNav();
   $('totalbar').style.display = L ? '' : 'none';
   $('root').innerHTML = L ? leadScreen(L) : leadsScreen();
   if(L) $('totalIn').innerHTML = totalBar(L);
@@ -397,12 +457,19 @@ function leadScreen(L){
   const body = tab === 'v1' ? visit1(L) : tab === 'full' ? full(L) : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
   return `
     <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
-      <div style="flex:1 1 320px"><a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>
+      <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
         <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</h1>
         <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${money(base(L))}</div></div>
-      <div style="text-align:right">${stageChip(L)}<div class="muted" style="font-size:12.5px;margin-top:5px">First visit ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div></div>
+      <div style="text-align:right">${PRESENT ? '<span class="live"><i></i>Live with your Alden Homes rep</span>'
+        : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">First visit ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
+          <button type="button" class="btn sm noprint" id="shareBtn" style="margin-top:8px">${shareOpen ? 'Hide' : 'Open customer screen'}</button>`}</div>
     </div>
-    ${d.length ? `<div class="banner amber noprint"><p><strong>${d.length} price${d.length===1?' has':'s have'} changed since this sheet was priced on ${esc(nice(L.pricedOn))}.</strong>
+    ${!PRESENT && shareOpen ? `<div class="sharebox noprint"><strong>A second screen for the customer.</strong>
+        They open this link on their own iPad and see the same sheet in a big, customer-only view. Whatever either of you taps shows on both screens straight away, and their screen follows the room you're on.
+        <input type="text" readonly value="${esc(presentUrl(L))}" onclick="this.select()">
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="btn sm primary" id="shareOpenBtn">Open it in a new window</button>
+          <span style="font-size:12.5px">Demo note: here it only works in a second window on this same computer. Put the two windows side by side to try it. The real version would work between any two devices.</span></div></div>` : ''}
+    ${d.length && !PRESENT ? `<div class="banner amber noprint"><p><strong>${d.length} price${d.length===1?' has':'s have'} changed since this sheet was priced on ${esc(nice(L.pricedOn))}.</strong>
         At today's prices the same choices come to ${money(Math.abs(dSum))} ${dSum >= 0 ? 'more' : 'less'}. The sheet keeps the prices it was quoted at until someone decides.
         <span class="muted" style="display:block;font-size:13px;margin-top:4px">${d.map(x=>esc(qById(x.k.split('@')[0]).t) + ': ' + money(x.a.price) + ' → ' + money(x.t.price)).join(' · ')}</span></p>
         <button type="button" class="btn sm" id="repriceBtn">Update to today's prices</button></div>` : ''}
@@ -421,7 +488,7 @@ function question(q, L, opts){
     const fav = L.favs[key + '|' + o[0]];
     // a sheet shows the price it was quoted at for the picked option, today's price for the others
     const price = sel ? a.price : o[1], cost = sel ? a.cost : o[2];
-    return `<button type="button" class="opt ${sel?'sel':''}" data-pick="${esc(key)}" data-opt="${esc(o[0])}" ${lock?'disabled':''}>
+    return `<button type="button" class="opt ${sel?'sel':''}${sel && flashKey === key ? ' flash' : ''}" data-pick="${esc(key)}" data-opt="${esc(o[0])}" ${lock?'disabled':''}>
       <div class="art">${o[3] || ''}</div>${i === 0 ? '<span class="std">Standard</span>' : ''}<span class="tick">&#10003;</span>
       <div class="txt"><div class="nm">${esc(o[0])}</div>
         <div class="pr ${price === 0 ? 'inc' : ''}">${price === 0 ? (i === 0 ? 'Included' : 'No extra cost') : '+ ' + money(price)}</div>
@@ -463,7 +530,7 @@ function visit1(L){
     ${ROOMS.map(r=>r.qs.filter(q=>q.v1).map(q=>question(q, L, {})).join('')).join('')}
     ${locked(L) ? '' : `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <p style="flex:1 1 260px">${left ? `<strong>${left} still to choose.</strong> You can save now and finish later.` : '<strong>That\'s everything for a first visit.</strong>'} This sheet stays on file as a lead either way.</p>
-      <button type="button" class="btn" id="saveClose">Save &amp; close</button>
+      ${PRESENT ? '' : '<button type="button" class="btn" id="saveClose">Save &amp; close</button>'}
       <button type="button" class="btn primary" id="toFull">Carry on to full selections</button></div>`}`;
 }
 
@@ -589,7 +656,7 @@ function totalBar(L){
     <div class="sub">Base ${money(base(L))}<br>Upgrades + ${money(up)}${co ? ' · change orders + ' + money(co) : ''}</div>
     <div class="grow"></div>
     ${locked(L) ? '' : '<span class="sub">Saved automatically</span>'}
-    <button type="button" class="btn" id="saveClose2">${locked(L) ? 'Close' : 'Save &amp; close'}</button>`;
+    ${PRESENT ? '' : `<button type="button" class="btn" id="saveClose2">${locked(L) ? 'Close' : 'Save &amp; close'}</button>`}`;
 }
 
 /* ---------- doing things ---------- */
@@ -607,6 +674,8 @@ document.addEventListener('click', e=>{
   }
   const open = t.closest('[data-open]'); if(open){ cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = 'home'; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
+  if(t.closest('#shareBtn')){ shareOpen = !shareOpen; render(); return; }
+  if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); cur = null; render(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
   const tb = t.closest('[data-tab]'); if(tb){ tab = tb.dataset.tab; render(); window.scrollTo(0, 0); return; }
   const rm = t.closest('[data-room]'); if(rm){ roomId = rm.dataset.room; tab = 'full'; render(); window.scrollTo(0, 0); return; }
@@ -662,6 +731,8 @@ document.addEventListener('change', e=>{
 });
 
 load();
+// the customer's screen opens on whatever the office is looking at
+if(PRESENT){ try{ const nv = JSON.parse(localStorage.getItem(NAV) || 'null'); if(nv && nv.id === PRESENT){ tab = nv.tab; roomId = nv.roomId; } } catch(e){} }
 render();
 </script>
 </body>
