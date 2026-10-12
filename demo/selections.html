@@ -195,6 +195,18 @@
   .sharelink input{flex:1 1 280px;font-family:"Courier New",monospace;font-size:13px}
   body.pdfing .noprint{display:none!important}
   @page{margin:0}
+  /* office notes + follow-up on a lead (never shown to the customer) */
+  .office{background:var(--staff-soft);border:1px solid #c9d8e6;border-radius:var(--radius);padding:16px 18px;margin-top:16px}
+  .office h2{color:var(--staff);font-size:16px}
+  .office-cols{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:12px}
+  .office textarea{min-height:64px;resize:vertical}
+  .note{background:#fff;border-radius:6px;padding:9px 11px;margin-top:8px;font-size:14.5px;line-height:1.45;white-space:pre-wrap;display:flex;gap:8px}
+  .note .when{font-size:12px;color:var(--ink-soft);margin-top:3px}
+  .note .x{border:none;background:none;color:var(--ink-soft);font-size:18px;line-height:1;padding:0 2px;align-self:flex-start}
+  .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip.due{background:var(--red-soft);color:var(--red)}
+  .chip.soon{background:var(--amber-soft);color:#8a5d14}
+  .chip.later{background:var(--staff-soft);color:var(--staff)}
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
 </head>
@@ -251,7 +263,7 @@ const iso = d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+St
 const daysAgo = n=>{ const d=new Date(); d.setDate(d.getDate()-n); return iso(d); };
 const daysAhead = n=>daysAgo(-n);
 const nice = s=>{ if(!s) return ''; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); };
-const ago = s=>{ const [y,m,d]=s.split('-').map(Number); const days=Math.round((new Date().setHours(0,0,0,0)-new Date(y,m-1,d))/86400000);
+const ago = s=>{ if(!s) return 'a while ago'; const [y,m,d]=s.split('-').map(Number); const days=Math.round((new Date().setHours(0,0,0,0)-new Date(y,m-1,d))/86400000);
   return days<=0?'today':days===1?'yesterday':days<45?days+' days ago':Math.round(days/30)+' months ago'; };
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('show'),2400); }
 
@@ -330,7 +342,7 @@ let officeView = 'customer', shareOpen = false, flashKey = '';
 
 function seedLeads(){
   const mk = (o, picks)=>{
-    const L = { id:'L'+Math.random().toString(36).slice(2,8), name2:'', phone:'', email:'', answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', ...o };
+    const L = { id:'L'+Math.random().toString(36).slice(2,8), name2:'', phone:'', email:'', answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null, ...o };
     Object.entries(picks).forEach(([key, v])=>{
       const q = qById(key.split('@')[0]);
       if(q.type === 'qty') L.answers[key] = { qty:v, price:q.price, cost:q.cost };
@@ -345,12 +357,18 @@ function seedLeads(){
   a.answers.ftier.price = 9100;  a.answers.ftier.cost = 6600;
   a.answers.deck.price = 13900;  a.answers.deck.cost = 10400;
   a.v1Snap = Object.fromEntries(Object.entries(a.answers).map(([k,v])=>[k, v.label]));
+  a.notes = [{ text:'First visit went well. They like the Coleman but need to sell their current house first. Listing it in the fall.', at:daysAgo(128) },
+             { text:'Left a voicemail to check in. No answer.', at:daysAgo(61) }];
+  a.follow = { date:daysAgo(0), what:'Check in. Their house was due to go on the market this month.' };
   // 2. back for the second visit, part-way through the detail
   const b = mk({ name:'Marcus Reyes', name2:'Tasha Reyes', phone:'717-555-0172', email:'reyes@example.com', dev:'CL', lot:'102', model:'The Hartwell', stage:'v2', created:daysAgo(24), v1Date:daysAgo(24), updated:daysAgo(2), pricedOn:daysAgo(24) },
     { elev:'Elevation A', found:'Walkout basement', bsmt:'Finish basement', garage:'2-car', deck:'Covered patio', counters:'Granite', ftier:'Upgrade LVP', mshower:'Tile shower', fp:'No fireplace' });
   b.v1Snap = Object.fromEntries(Object.entries(b.answers).map(([k,v])=>[k, v.label]));
   Object.assign(b.answers, mk({}, { counters:'Quartz', cabcolor:'Navy', kfaucet:'Gibson pull-down', ksink:'Farmhouse', kcans:4, fcolor:'Sandbar', 'fbed@Owner\'s bedroom':'LVP to match', 'fbed@Bedroom 2':'Carpet, Warm Stone' }).answers);
   b.favs['ksplash|Slate'] = true; b.favs['hfinish|Matte black'] = true;
+  b.notes = [{ text:'Had a call. They want to move forward. Booked the second visit.', at:daysAgo(6) },
+             { text:'Marcus asked about a bigger patio. Priced the covered patio at visit 1.', at:daysAgo(24) }];
+  b.follow = { date:daysAhead(5), what:'Confirm the cabinet colour before cabinets are ordered.' };
   // 3. signed and locked, with one change order since
   const cPicks = { elev:'Elevation C', found:'In-ground basement', bsmt:'Leave unfinished', garage:'Add a 3rd bay', deck:'None', counters:'Quartz', cabcolor:'White', kfaucet:'Align', ksink:'Stainless undermount', ksplash:'Bone', kcans:2,
     ftier:'Upgrade LVP', fcolor:'Hatfield Maple', "fbed@Owner's bedroom":'Carpet, Natural Sisal', 'fbed@Bedroom 2':'Carpet, Natural Sisal', 'fbed@Bedroom 3':'LVP to match', fpad:'10 lb plush',
@@ -439,6 +457,32 @@ function drift(L){
   if(locked(L)) return [];
   return Object.entries(L.answers).map(([k,a])=>{ const t = todayPrice(k, a), n = a.qty == null ? 1 : a.qty; return { k, a, t, diff:(t.price - a.price) * n }; }).filter(x=>x.diff !== 0 || x.t.cost !== x.a.cost);
 }
+// follow-up: how soon, in words and colour
+function followInfo(L){
+  const f = L.follow; if(!f || !f.date) return null;
+  const [y,m,d] = f.date.split('-').map(Number), days = Math.round((new Date(y,m-1,d) - new Date().setHours(0,0,0,0)) / 86400000);
+  return { days, cls: days < 0 ? 'due' : days === 0 ? 'soon' : 'later',
+    when: days < 0 ? 'Follow-up overdue by ' + (-days) + (days === -1 ? ' day' : ' days') : days === 0 ? 'Follow up today' : days === 1 ? 'Follow up tomorrow' : 'Follow up ' + nice(f.date), what: f.what || '' };
+}
+const noteList = L=>Array.isArray(L.notes) ? L.notes : [];
+function officeCard(L){
+  const f = followInfo(L);
+  return `<div class="office noprint"><h2>Office notes &amp; follow-up <span style="font-weight:400;font-size:12.5px">· only the office sees this</span></h2>
+    <div class="office-cols">
+      <div><label class="f">Follow-up reminder</label>
+        ${f ? `<div><span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? `<div style="margin-top:6px;font-size:14.5px">${esc(f.what)}</div>` : ''}
+            <div class="quick"><button type="button" class="btn sm good" id="followDone">Done</button><button type="button" class="btn sm" id="followClear">Remove</button></div></div>`
+          : '<div class="muted" style="font-size:14px">No follow-up set.</div>'}
+        <div style="margin-top:12px"><input type="text" id="followWhat" placeholder="What to follow up about (optional)" maxlength="200" value="${f ? '' : ''}"></div>
+        <div class="quick">${[['Tomorrow',1],['In 3 days',3],['In a week',7],['In 2 weeks',14],['In a month',30]].map(([l,d])=>`<button type="button" class="btn sm" data-follow-in="${d}">${l}</button>`).join('')}
+          <input type="date" id="followDate" style="width:auto;padding:6px 8px" title="Or pick a date"></div></div>
+      <div><label class="f">Notes</label>
+        <textarea id="noteText" placeholder="e.g. Had a call. They want to move forward." maxlength="1000"></textarea>
+        <div style="margin-top:8px"><button type="button" class="btn sm primary" id="noteAdd">Add note</button></div>
+        ${noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at)).map(nt=>`<div class="note"><div style="flex:1">${esc(nt.text)}<div class="when">${esc(nice(nt.at))} · ${esc(ago(nt.at))}</div></div><button type="button" class="x" data-delnote="${esc(nt.at + '|' + nt.text.slice(0, 20))}" title="Delete this note">&times;</button></div>`).join('')}
+      </div>
+    </div></div>`;
+}
 const stageChip = L=>L.stage === 'signed' ? '<span class="chip signed">Signed &amp; locked</span>'
   : L.stage === 'v2' ? '<span class="chip v2">Visit 2 in progress</span>' : '<span class="chip v1">Visit 1 done · not back yet</span>';
 const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name : '', L.lot ? 'Lot ' + L.lot : 'lot not chosen'].filter(Boolean).join(' · ');
@@ -472,7 +516,8 @@ async function syncTick(){
   const navNow = !PRESENT && L && !['vendors','codes'].includes(tab) ? JSON.stringify({ tab, roomId }) : '';
   if(!PRESENT && L && !sync.last){
     // first share from the office: this device's copy is the one that counts
-    body = { action:'patch', id:cur, full:sent, ans:sent.answers, del:[], top:diffSheet(null, sent).top, nav:navNow ? JSON.parse(navNow) : null };
+    const pub = clone(sent); delete pub.notes; delete pub.follow;
+    body = { action:'patch', id:cur, full:pub, ans:sent.answers, del:[], top:diffSheet(null, sent).top, nav:navNow ? JSON.parse(navNow) : null };
   } else if(L && sync.last){
     const d = diffSheet(sync.last, L), navChanged = navNow && navNow !== sync.nav;
     body = d.any || navChanged ? { action:'patch', id:cur, ans:d.ans, del:d.del, top:d.top, ...(navChanged ? { nav:JSON.parse(navNow) } : {}) } : { action:'get', id:cur, since:sync.rev };
@@ -511,6 +556,7 @@ function takeRemote(sheet, sent, body){
   Object.assign(merged.answers, mine.ans);
   mine.del.forEach(k=>{ delete merged.answers[k]; });
   Object.assign(merged, mine.top);
+  if(now && !PRESENT){ merged.notes = now.notes || []; merged.follow = now.follow || null; }   // office-only, never on the server
   ['custom','cos'].forEach(f=>{ if(!Array.isArray(merged[f])) merged[f] = []; });
   ['answers','favs'].forEach(f=>{ if(!merged[f] || typeof merged[f] !== 'object') merged[f] = {}; });
   // what changed that this screen didn't do itself
@@ -653,11 +699,15 @@ function render(){
 }
 
 function leadsScreen(){
-  const rows = leads.slice().sort((a,b)=>b.updated.localeCompare(a.updated)).map(L=>`
+  const dueRank = L=>{ const f = followInfo(L); return f && f.days <= 0 ? 0 : 1; };
+  const dueCount = leads.filter(L=>dueRank(L) === 0).length;
+  const rows = leads.slice().sort((a,b)=>dueRank(a) - dueRank(b) || (b.updated || '').localeCompare(a.updated || '')).map(L=>`
     <div class="lead">
       <div class="who"><strong>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</strong>
         <div class="muted" style="font-size:13.5px;margin-top:2px">${esc(homeLabel(L))}</div>
-        <div class="muted" style="font-size:12.5px;margin-top:2px">${[L.phone, L.email].filter(Boolean).map(esc).join(' · ')}</div></div>
+        <div class="muted" style="font-size:12.5px;margin-top:2px">${[L.phone, L.email].filter(Boolean).map(esc).join(' · ')}</div>
+        ${(f=>f ? `<div style="margin-top:6px"><span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? ` <span class="muted" style="font-size:13px">${esc(f.what)}</span>` : ''}</div>` : '')(followInfo(L))}
+        ${noteList(L).length ? `<div class="muted" style="font-size:13px;margin-top:5px;font-style:italic">Last note, ${esc(ago(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].at))}: ${esc(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].text.slice(0, 110))}</div>` : ''}</div>
       <div>${stageChip(L)}<div class="muted" style="font-size:12.5px;margin-top:4px">Last visit ${esc(ago(L.updated))}${drift(L).some(d=>d.diff) ? ' · <span style="color:#8a5d14">prices have changed</span>' : ''}</div></div>
       <div class="amt">${money(total(L))}<div class="muted" style="font-size:11.5px;font-family:inherit;font-weight:400">${L.stage === 'signed' ? 'contract' : 'so far'}</div></div>
       <button type="button" class="btn sm" data-open="${L.id}">Open</button>
@@ -667,7 +717,7 @@ function leadsScreen(){
     <div style="margin-top:22px"><div class="eyebrow">Selections</div><h1>Leads &amp; selection sheets</h1>
       <p class="lede">Everyone who sits down for a first visit is saved here, whether or not they come back. Open one to pick up exactly where it was left, even months later.</p></div>
     <div class="card">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2>${leads.length} on file</h2><div class="grow"></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2>${leads.length} on file${dueCount ? ` <span class="chip due" style="margin-left:8px;vertical-align:middle">${dueCount} to follow up</span>` : ''}</h2><div class="grow"></div>
         <button type="button" class="btn primary" id="newLeadBtn">${newOpen ? 'Cancel' : '+ New lead'}</button></div>
       ${newOpen ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft)">
         <div class="grid">
@@ -722,6 +772,7 @@ function leadScreen(L){
         <span class="muted" style="display:block;font-size:13px;margin-top:4px">${d.map(x=>esc(qById(x.k.split('@')[0]).t) + ': ' + money(x.a.price) + ' → ' + money(x.t.price)).join(' · ')}</span></p>
         <button type="button" class="btn sm" id="repriceBtn">Update to today's prices</button></div>` : ''}
     ${locked(L) ? `<div class="banner good"><p><strong>Signed on ${esc(nice(L.signedOn))}.</strong> These choices and their prices are locked for good. Anything new is a change order.</p></div>` : ''}
+    ${staff && !PRESENT ? officeCard(L) : (!PRESENT && followInfo(L) && followInfo(L).days <= 0 ? `<div class="banner staff noprint"><p><strong>${esc(followInfo(L).when)}.</strong> ${esc(followInfo(L).what)} <span class="muted">Switch to Office view for notes.</span></p></div>` : '')}
     <div class="tabs noprint">${tabs}</div>
     ${body}`;
 }
@@ -930,11 +981,22 @@ document.addEventListener('click', e=>{
   if(t.closest('#nStart')){
     const name = $('nName').value.trim(); if(!name){ toast('Add the buyer\'s name first'); return; }
     const n = { id:'L'+Math.random().toString(36).slice(2,8), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value,
-      stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'' };
+      stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
     leads.push(n); cur = n.id; tab = 'v1'; roomId = 'home'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
   const open = t.closest('[data-open]'); if(open){ cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = 'home'; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
+  if(!PRESENT){
+    const setFollow = date=>{ L.follow = { date, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(date)); };
+    const fin = t.closest('[data-follow-in]'); if(fin){ setFollow(daysAhead(Number(fin.dataset.followIn))); return; }
+    if(t.closest('#followDone')){ L.notes = noteList(L); L.notes.push({ text:'Followed up' + (L.follow.what ? ': ' + L.follow.what : '.'), at:iso(new Date()) }); L.follow = null; render(); toast('Marked done and noted'); return; }
+    if(t.closest('#followClear')){ L.follow = null; render(); return; }
+    if(t.closest('#noteAdd')){
+      const text = ($('noteText').value || '').trim(); if(!text){ toast('Type the note first'); return; }
+      L.notes = noteList(L); L.notes.push({ text, at:iso(new Date()) }); render(); toast('Note saved'); return;
+    }
+    const dn = t.closest('[data-delnote]'); if(dn){ L.notes = noteList(L).filter(nt=>(nt.at + '|' + nt.text.slice(0, 20)) !== dn.dataset.delnote); render(); return; }
+  }
   if(t.closest('#shareBtn')){
     shareOpen = !shareOpen;
     if(shareOpen && !shared[L.id]){ shared[L.id] = true; try{ localStorage.setItem(SHARED, JSON.stringify(shared)); } catch(err){} syncTick(); }
@@ -1001,6 +1063,7 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); });
 document.addEventListener('change', e=>{
+  if(e.target.id === 'followDate' && e.target.value && lead()){ const L = lead(); L.follow = { date:e.target.value, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(L.follow.date)); return; }
   if(e.target.id === 'nDev'){ const d = e.target.value; $('nLot').innerHTML = '<option value="">Not chosen yet</option>' + LOTS.filter(l=>l.dev === d).map(l=>`<option value="${l.lot}">Lot ${l.lot} — ${esc(l.addr)}</option>`).join(''); }
 });
 
