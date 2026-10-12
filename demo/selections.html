@@ -269,6 +269,23 @@
   .doc .officecopy{background:var(--staff-soft);color:var(--staff);font-weight:700;font-size:12.5px;text-align:center;padding:6px;border-radius:4px;margin-bottom:14px}
   body.quote{background:#eceae3;padding-bottom:30px}
   body.quote .top, body.quote .totalbar{display:none!important}
+  /* a BuilderTrend selection: its choices as rows you tap */
+  .sel{padding:14px 0;border-top:1px solid var(--line-soft)}
+  .sel:first-child{border-top:none;padding-top:4px}
+  .sel-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .sel-h b{font-size:15.5px;color:var(--navy)}
+  .cho{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;border:2px solid var(--line);border-radius:10px;padding:8px 12px;background:#fff}
+  .cho.on{border-color:var(--good);background:var(--good-soft)}
+  .cho .ct{flex:1 1 200px;min-width:0;font-size:14.5px;font-weight:600}
+  .cho .cp{font-family:"Courier New",monospace;font-weight:700;color:var(--navy);white-space:nowrap}
+  .cho .cp.tbd{font-family:inherit;font-weight:400;color:#8a5d14}
+  .cho button.tog{border:2px solid var(--line);background:#fff;border-radius:20px;padding:6px 14px;font-weight:700;font-size:13.5px;color:var(--navy)}
+  .cho.on button.tog{border-color:var(--good);background:var(--good);color:#fff}
+  .cho input[type=number]{width:92px;text-align:right;padding:7px 8px}
+  .cho .stepper button{width:34px;height:34px;font-size:18px}
+  .cho .stepper span{min-width:34px;font-size:15px}
+  .gate{max-width:380px;margin:12vh auto 0;text-align:center}
+  .gate input{font-family:"Courier New",monospace;font-size:34px;letter-spacing:14px;text-align:center;padding:14px 8px}
   @media print{ body.printdoc #root > :not(.docwrap){display:none!important} body.printdoc .doc, body.quote .doc{box-shadow:none;max-width:none;margin:0;padding:10mm 12mm} body.quote{background:#fff} }
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
@@ -278,7 +295,7 @@
 <div class="top"><div class="wrap top-in">
   <div class="logo">ALDEN<span>·</span>HUB</div>
   <a href="index.html">Demo home</a>
-  <span class="pill">Selections demo · made-up data</span>
+  <span class="pill">Selections demo · real prices · sample customers</span>
   <div class="grow"></div>
   <div class="viewsw" id="viewSw" title="What the buyer sees on the screen, or what the office sees">
     <button type="button" data-view="customer">Customer view</button>
@@ -335,245 +352,59 @@ function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show');
 const DEVS = [{code:'AP',name:'Alden Place'},{code:'CL',name:'Cliffs'},{code:'MM',name:'Mountain Meadows'},{code:'ML',name:'Maple Lane'}];
 const LOTS = [{dev:'AP',lot:'151',addr:'1022 Stanford Dr'},{dev:'AP',lot:'154',addr:'1028 Stanford Dr'},{dev:'CL',lot:'1',addr:'401 Cannon Way'},
   {dev:'CL',lot:'102',addr:'Cliffs Sec 2'},{dev:'MM',lot:'14',addr:'Mountain Meadows'},{dev:'ML',lot:'117',addr:'117 Maple Ln'},{dev:'ML',lot:'120',addr:'120 Maple Ln'}];
-const MODELS = {'The Coleman':311000,'The Hartwell':324900,'The Ashford':298500,'The Bellmore':305500};   // base price of each model
+// (a home's base price is typed on the lead: BuilderTrend's "Contract Price" line has no figure in it)
 const CODE_NAMES = {2:'Site Improvements',16:'Concrete',36:'Roofing',40:'Siding',55:'Energy Star',57:'Specialty Stairs',59:'Shelves / Mirrors',60:'Painting',14:'Footer / Foundation',32:'Doors / Windows',34:'Framing',41:'Railing',50:'Plumbing',54:'Electrical',56:'Drywall',58:'Trim',70:'Kitchens / Vanities',71:'Fireplace',72:'Floor Covering',90:'Misc.'};
 const CO_FEE = 100;
 
 /* ---------- the item list ----------
-   TWO MEETINGS.
-   1. PRICING (first meeting) — the "Alden Collection Pricing Sheet", line for line: every section and BT number from
-      the paper form the team uses today. Nothing here has to be answered; anything left alone is the standard / "No".
-   2. SELECTIONS (second meeting) — the finish-level picks (colours, models), shown as picture cards. These all need an answer.
-   Prices and costs are MADE UP for the demo — the paper sheet has none on it.
-   Line kinds: pick one (o: [name, customer price, our cost]; the first is the standard), a count or amount ('qty'; entry = typed, e.g. sq ft),
-   a typed answer ('text'), and a dollar allowance ('money'). bt = the BuilderTrend line number. dep = only asked when another answer calls for it. */
-const NO = ['No',0,0];
-const yn = (id,bt,t,cc,price,cost,x)=>({ id, bt, t, cc, opt:1, o:[NO,['Yes',price,cost]], ...x });
-const ch = (id,bt,t,cc,o,x)=>({ id, bt, t, cc, opt:1, o, ...x });
-const qt = (id,bt,t,cc,unit,price,cost,max,x)=>({ id, bt, t, cc, opt:1, type:'qty', unit, price, cost, max, ...x });
-const sf = (id,bt,t,cc,unit,price,cost,x)=>({ id, bt, t, cc, opt:1, type:'qty', entry:1, unit, price, cost, max:20000, ...x });
-const tx = (id,bt,t,x)=>({ id, bt, t, cc:90, opt:1, type:'text', ...x });
-const al = (id,bt,t,cc,x)=>({ id, bt, t, cc, opt:1, type:'money', ...x });
-const nts = id=>tx(id + '_n', '', 'Notes', { long:1 });
-const Y = q=>({ dep:{ q, is:'Yes' } });
-// the three full baths share one layout on the paper sheet
-const bath = (p, n)=>[
-  ch(p+'sh', n[0], 'Shower', 50, p === 'm' ? [['Standard shower',0,0],['Standard tub/shower',0,0],['Tile with fiberglass base',3900,2800],['Tile with Corian base',5200,3700],['Custom shower',11400,8300]]
-                                           : [['Standard tub/shower',0,0],['Standard shower',0,0],['Custom shower',9800,7100]]),
-  ch(p+'sz', n[0], 'Shower size', 50, [["4'",0,0],["5'",650,440]]),
-  ch(p+'dr', n[1], 'Shower door', 50, [['None / included',0,0],['Framed',480,320],['Semi-frameless',720,480],['Frameless',1490,1020]]),
-  tx(p+'drf', n[1], 'Shower door finish', { ph:'Chrome, or…', dep:{ q:p+'dr', not:'None / included' } }),
-  tx(p+'fa', n[2], 'Shower faucet', { ph:'Standard, or which one' }),
-  yn(p+'spa', n[3], 'Vertical spa', 50, 1650, 1150),
-  ch(p+'to', n[4], 'Toilet', 50, [['Standard',0,0],['Elongated',95,60],['Comfort height',180,115],['Kohler',340,230],['Other',0,0]]),
-  yn(p+'sc', n[5], 'Soft-close seat', 50, 65, 38),
-  tx(p+'lv', n[6], 'Lav faucet', { ph:'Standard, or which one' }),
-  ch(p+'sp', n[6], 'Faucet spread', 50, [['4"',0,0],['8"',160,105],['Single',0,0]]),
-  tx(p+'lvf', n[6], 'Faucet finish', { ph:'Chrome, BN, or…' }),
-  yn(p+'gb', n[7], 'Grab bar', 50, 180, 95),
-  tx(p+'hw', n[8], 'Hardware finish (TP holder, towel ring' + (p === 'm' ? ', robe hook' : '') + ')', { ph:'Standard, or…' }),
-  nts(p),
-];
-const PRICING = [
-  { id:'lot', name:'Lot & home', qs:[ tx('phase','', 'Phase'), al('lotprem','', 'Lot premium', 2, { nocost:1 }), nts('lot') ] },
-  { id:'bsmt', name:'Basement', bt:'126–148', qs:[
-    yn('b126','126','Basement',14,18500,13900),
-    ch('b128','128','Basement ceiling height',14,[["8'",0,0],["9'",3200,2300],["10'",6100,4400]], Y('b126')),
-    qt('b134','134','Extra basement windows',32,'window',480,310,10, Y('b126')),
-    sf('b136','136','Finished basement',56,'sq ft',42,31, Y('b126')),
-    ch('b138','138','Basement bath',50,[['None',0,0],['Rough-in only',1450,950],['Finished bath',14800,11200]], Y('b126')),
-    yn('b138p','138','Add pit to rough-in bath',50,650,420,{ dep:{ q:'b138', is:'Rough-in only' } }),
-    yn('b138f','138','Add pit, pump & alarm to finished bath',50,1850,1300,{ dep:{ q:'b138', is:'Finished bath' } }),
-    yn('b140','140','Sump pump',50,780,520, Y('b126')),
-    yn('b147','147','Basement patio',16,2900,2100, Y('b126')),
-    qt('b200','200','Extra basement doors',32,'door',420,280,6, Y('b126')),
-    nts('bsmt') ]},
-  { id:'gar', name:'Garage', bt:'150–166', qs:[
-    ch('g150','150','Garage paint',60,[['Painted',0,0],['Take the credit',-450,-380]]),
-    yn('g152','152','Man door',32,890,610),
-    ch('g152g','152','Man door glass',32,[['Clear',0,0],['Frosted',95,60]], Y('g152')),
-    ch('g152s','152','Man door stoop',16,[['No stoop',0,0],['Stoop',420,300]], Y('g152')),
-    sf('g154','154','Additional garage space',34,'sq ft',58,43,{ note:'Length × width = total sq ft added.' }),
-    yn('g153','153','50 amp car charger outlet',54,640,420),
-    yn('g156','156','Laundry sink',50,520,340),
-    tx('g156l','156','Laundry sink location',{ ...Y('g156') }),
-    ch('g160','160','Garage door',32,[['Standard',0,0],['1 row glass, top',680,470],['1 row glass, vertical',740,510],['All glass',2900,2150]]),
-    qt('g164','164','Extra dead bolt / zero entry, garage to house',32,'door',260,170,3),
-    qt('g175','175','Extra hose bibs',50,'hose bib',240,150,4),
-    nts('gar') ]},
-  { id:'ent', name:'Entrance', bt:'180–184', qs:[
-    ch('e181','181','Walkway',16,[['Standard',0,0],['Colored',650,430],['Stamped',1450,1000]]),
-    sf('e181s','181','Extra walkway',16,'sq ft',14,10),
-    ch('e180','180','Front porch',16,[['Standard concrete',0,0],['Standard composite',2400,1750],['Azek composite',3900,2900]],{ note:'Azek is line 182.' }),
-    sf('e180s','180','Extra front porch',16,'sq ft',38,28),
-    sf('e184','184','Metal roof over the front porch',36,'sq ft',16,11),
-    nts('ent') ]},
-  { id:'lau', name:'Laundry', bt:'188–198', qs:[
-    yn('l188','188','Gas dryer hookup',50,380,250),
-    ch('l188s','188','Washer & dryer',50,[['Side by side',0,0],['Stackable',0,0]]),
-    yn('l193','193','Countertop over washer/dryer',70,620,410),
-    ch('l194','194','Hanging rod or bench',58,[['None',0,0],['Hanging rod',140,85],['Bench',680,450],['Bench & pegs',890,590]]),
-    yn('l196','196','Pet space',58,1250,860),
-    nts('lau') ]},
-  { id:'doors', name:'Front & interior doors', bt:'200–236', qs:[
-    qt('d200g','200','Upgrade doors to glass',32,'door',310,205,12),
-    ch('d200gt','200','Glass type',32,[['Clear',0,0],['Frosted',45,28]],{ dep:{ q:'d200g', min:1 } }),
-    qt('d200h','200',"Upgrade doors to 8' high",32,'door',240,160,20),
-    qt('d206','206','Pocket doors',32,'door',690,470,6),
-    ch('d206s','206','Pocket door style',32,[['Single',0,0],['Double',520,360]],{ dep:{ q:'d206', min:1 } }),
-    ch('d206g','206','Pocket door glass',32,[['No glass',0,0],['Clear',260,170],['Frosted',310,205]],{ dep:{ q:'d206', min:1 } }),
-    qt('d207','207','Soft open & close',32,'door',120,75,8),
-    qt('d208','208','Barn doors',32,'door',980,680,4),
-    ch('d208s','208','Barn door style',32,[['Single',0,0],['Double',640,440]],{ dep:{ q:'d208', min:1 } }),
-    ch('d208g','208','Barn door glass',32,[['No glass',0,0],['Clear',260,170],['Frosted',310,205]],{ dep:{ q:'d208', min:1 } }),
-    tx('d224','224','Shelving'),
-    ch('d231','231','Front door',32,[['Standard 6\' 8"',0,0],["Standard 8'",980,690]]),
-    al('d231a','231','Front door allowance',32),
-    ch('d236','236','Storm door',32,[['None',0,0],['Full view',540,370],['Hide-away screen',680,470]]),
-    nts('doors') ]},
-  { id:'ceil', name:'Ceilings', bt:'244–246', qs:[
-    ch('c244','244','Ceiling height',34,[["8'",0,0],["9'",6800,4900],["10'",12900,9300]]),
-    ch('c246','246','Ceiling style',34,[['Standard',0,0],['Vault',4200,3000],['Cathedral',6900,5000]]),
-    tx('c246c','246','Custom vault or cathedral'),
-    nts('ceil') ]},
-  { id:'first', name:'First floor', bt:'248, 744', qs:[
-    sf('f248u','248','Additional unfinished space',34,'sq ft',62,46),
-    sf('f248f','248','Additional finished space',34,'sq ft',135,104),
-    yn('f744','744','Add a bathroom',50,16500,12400),
-    nts('first') ]},
-  { id:'mbath', name:'Master bath', bt:'260–282', qs:bath('m', ['260','264','270','272','273','274','278','280','282']) },
-  { id:'bath2', name:'Main bath', bt:'300–330', qs:bath('n', ['300','304','310','312','313','314','318','320','322']) },
-  { id:'bath3', name:'Third bath', bt:'340–370', qs:bath('t', ['340','344','350','352','353','354','358','360','362']) },
-  { id:'powder', name:'Powder bath', bt:'380–392', qs:[
-    ch('wto','379','Toilet',50,[['Standard',0,0],['Elongated',95,60],['Comfort height',180,115],['Kohler',340,230]]),
-    yn('wsc','380','Soft-close seat',50,65,38),
-    tx('wlv','384','Lav faucet',{ ph:'Standard, or which one' }),
-    ch('wsp','384','Faucet spread',50,[['4"',0,0],['8"',160,105],['Single',0,0]]),
-    tx('wlvf','384','Faucet finish',{ ph:'Chrome, BN, or…' }),
-    tx('whw','388','Hardware finish (TP holder, towel ring)',{ ph:'Standard, or…' }),
-    yn('w744','744','Add a half bath',50,7200,5300),
-    nts('powder') ]},
-  { id:'elec', name:'Electrical', bt:'420–450', qs:[
-    qt('e420f','420','Extra recessed lights, flat ceiling',54,'light',95,58,30,{ vendor:'Lancaster Electric' }),
-    ch('e420fs','420','Recessed light size',54,[['6"',0,0],['4"',0,0]],{ dep:{ q:'e420f', min:1 } }),
-    qt('e420s','420','Extra recessed lights, sloped ceiling',54,'light',125,78,20,{ vendor:'Lancaster Electric' }),
-    qt('e424','424','Ceiling fan rough-ins',54,'rough-in',140,80,10,{ vendor:'Lancaster Electric' }),
-    qt('e426','426','Floor outlets',54,'outlet',310,190,6,{ vendor:'Lancaster Electric' }),
-    ch('e446','446','Generator',54,[['None',0,0],['Rough-in only',950,640],['Generator installed',9800,7600]],{ vendor:'Lancaster Electric' }),
-    ch('e450','450','Energy Star',55,[['Yes',0,0],['Take the credit',-1150,-1150]]),
-    nts('elec') ]},
-  { id:'kit', name:'Kitchen', bt:'500–530', qs:[
-    ch('k500c','500','Cabinets',70,[['Paint',0,0],['Stain',0,0]],{ vendor:'Keystone Kitchens' }),
-    ch('k500','500','Countertops',70,[['Standard',0,0],['Granite',5400,3900],['Quartz',6800,4950]],{ vendor:'Keystone Kitchens' }),
-    al('k500a','500','Countertop allowance',70),
-    ch('k514','514','Under-cabinet electronics',54,[['None',0,0],['LED rope lighting',780,500],['Legrand power strip',1150,760]]),
-    yn('k516','516','Gas stove hookup',50,420,280),
-    ch('k518','518','Pantry shelves',59,[['Standard wire',0,0],['Wood',0,0]]),
-    sf('k518l','518','Wood pantry shelving',59,'linear ft',38,24,{ dep:{ q:'k518', is:'Wood' } }),
-    ch('k520','520','Kitchen faucet finish',50,[['Standard',0,0],['Brushed nickel',85,52],['Black',145,92],['Brushed gold',210,138]]),
-    yn('k523','523','Tile backsplash',72,1450,980),
-    al('k523a','523','Backsplash allowance',72, Y('k523')),
-    nts('kit') ]},
-  { id:'fireb', name:'Fireplace & built-ins', bt:'550–566', qs:[
-    ch('f550','550','Fireplace',71,[['None',0,0],['Gas',4850,3400],['Electric',2900,2000],['50" linear',5900,4200]],{ vendor:'Napoleon dealer' }),
-    sf('f552','552','Built-ins',58,'linear ft',420,290),
-    ch('f552h','552','Built-in height',58,[['To window sill',0,0],['To ceiling',1200,800]],{ dep:{ q:'f552', min:1 } }),
-    yn('f552d','552','Built-in desk',58,1850,1250),
-    yn('f552c','552','Desk with cubbies',58,480,320, Y('f552d')),
-    yn('f553','553','Shiplap',58,1350,900),
-    yn('f554','554','Bump out',34,2200,1600),
-    tx('f560','560','Mantel style'),
-    nts('fireb') ]},
-  { id:'patio', name:'Patio & deck', bt:'600–694', qs:[
-    sf('p600p','600','Add a patio',16,'sq ft',14,10),
-    sf('p600d','600','Add a deck',41,'sq ft',38,28,{ vendor:'Elite Outdoor Expressions' }),
-    sf('p600c','600','Add a composite deck',41,'sq ft',58,43,{ vendor:'Elite Outdoor Expressions' }),
-    sf('p600f','600','Deck foundation',14,'linear ft',95,70),
-    sf('p602p','602','Add to the standard patio',16,'sq ft',14,10),
-    sf('p602d','602','Add to the standard deck',41,'sq ft',38,28),
-    sf('p606c','606','Colored concrete',16,'sq ft',4,3),
-    sf('p606s','606','Stamped concrete',16,'sq ft',9,6),
-    sf('p608','608','Upgrade standard deck to composite',41,'sq ft',22,16),
-    ch('p610','610','Railing style',41,[['Standard',0,0],['Black pickets',1480,1050]]),
-    qt('p612','612','Deck / composite steps',41,'step',185,130,12),
-    ch('p616','616','Patio door',32,[['Standard slider',0,0],['Single hinge',680,470],['Double hinge',1450,1020],['36" door, slider credit',-350,-300]]),
-    yn('p618','618','Gas line for grill',50,480,320),
-    yn('p620','620','Hot tub outlet',54,720,480),
-    al('p622','622','Cover the existing patio or deck',34),
-    al('p642','642','Add sq ft to the covered patio/deck',34),
-    ch('p644','644','Covered ceiling type',34,[['Flat',0,0],['Vault',1900,1350],['Cathedral',2900,2100]]),
-    ch('p660','660–684','Enclose it',34,[['Open',0,0],['Screened',8900,6600],['3 season',19500,14800],['Sunroom',32000,24500]]),
-    ch('p664','664','Walls',40,[['Cedar',0,0],['Vinyl, take the credit',-600,-520]],{ dep:{ q:'p660', not:'Open' } }),
-    nts('patio') ]},
-  { id:'win', name:'Windows', bt:'700–708', qs:[
-    ch('w700t','700','Transom windows',32,[['None',0,0],["1' single",420,290],["1' twin",690,480],["2' single",520,360],["2' twin",850,590]]),
-    qt('w700d','700','Add double-hung windows',32,'window',560,390,12),
-    qt('w700p','700','Add picture windows',32,'window',720,500,8),
-    ch('w701','701','Window colour',32,[['Standard white',0,0],['Black',4800,3500]]),
-    al('w702','702','Window credit',32,{ credit:1 }),
-    qt('w704','704','Skylights',32,'skylight',1450,1020,6),
-    tx('w704s','704','Skylight size',{ dep:{ q:'w704', min:1 } }),
-    qt('w704t','704','Solar tubes',32,'tube',890,620,6),
-    nts('win') ]},
-  { id:'stairs', name:'Stairs', bt:'720–730', qs:[
-    ch('s720','720','Step style',57,[['Standard carpet',0,0],['3" nosing',1900,1300],['Industrial metal',6800,5000],['Floating',9800,7300]]),
-    ch('s720w','720','Step wood',57,[['Yellow pine',0,0],['Oak',950,650],['Maple',1200,820]]),
-    ch('s724','724','Railing',57,[['Alden standard',0,0],['Modern Cottage standard',0,0]]),
-    yn('s726','','Open steps to basement',57,1850,1300),
-    al('s726a','','Open steps allowance',57, Y('s726')),
-    yn('s722','722','Stair landing',57,1400,980),
-    ch('s762','762','Stairs & storage area',34,[['Keep',0,0],['Remove, take the credit',-3800,-3300]]),
-    nts('stairs') ]},
-  { id:'second', name:'Second floor', bt:'740–744', qs:[
-    sf('u740u','740','Additional unfinished space',34,'sq ft',48,36),
-    sf('u740f','740','Additional finished space',34,'sq ft',118,90),
-    yn('u744','744','Add a bathroom',50,15800,11900),
-    nts('second') ]},
-  { id:'attic', name:'Attic & storage', bt:'760–772', qs:[
-    ch('a760','760','Storage ceiling',34,[['6\' 11" standard',0,0],["8' ceiling & window",4800,3500]]),
-    sf('a764','764','Drywall, insulate, trim & HVAC',56,'sq ft',46,34),
-    sf('a768u','768','Additional unfinished space',34,'sq ft',44,33),
-    sf('a768f','768','Additional finished space',34,'sq ft',110,84),
-    nts('attic') ]},
-  { id:'paint', name:'Paint', bt:'780–784', qs:[
-    ch('pt780','780','Paint',60,[['White ceiling / flat colour walls',0,0],['White ceiling / eggshell walls',1650,1150]]),
-    nts('paint') ]},
-  { id:'flr', name:'Flooring', bt:'790', qs:[ al('fl790','790','Flooring allowance',72), nts('flr') ] },
-  { id:'misc', name:'Miscellaneous', qs:[ tx('misc','', 'Anything else', { long:1 }) ] },
-];
-const ROOMS = [
-  { id:'s_kitchen', name:'Kitchen', by:{days:21, why:'cabinets are ordered'}, qs:[
-    { id:'cabcolor', t:'Cabinet colour', cc:70, type:'color', vendor:'Keystone Kitchens', o:[['White',0,0,ART.swatch('#f2efe8')],['Greige',0,0,ART.swatch('#c9c2b4')],['Navy',0,0,ART.swatch('#3d4a5c')]] },
-    { id:'kfaucet', t:'Kitchen faucet', cc:50, vendor:'Fast Supply (Moen)', o:[['Brantford',0,0,ART.faucet('#b9bec2','high')],['Align',145,92,ART.faucet('#a8aeb3','low')],['Gibson pull-down',210,138,ART.faucet('#9aa1a6','pull')]] },
-    { id:'ksink', t:'Kitchen sink', cc:50, vendor:'Fast Supply (Ruvati)', o:[['Stainless undermount',0,0,ART.swatch('#c5c9cc')],['Farmhouse',890,610,ART.swatch('#eef0ee')]] },
-    { id:'ksplash', t:'Backsplash tile', cc:72, vendor:'D & S Flooring', dep:{q:'k523',is:'Yes'}, o:[['Ash Mix',0,0,ART.tile('#d4cfc6','#c2bcb1','#efece5')],['Bone',320,205,ART.tile('#e9e3d8','#ddd5c7','#f4f1ea')],['Slate',320,205,ART.tile('#828a90','#6e767c','#b9bec2')]] },
-  ]},
-  { id:'s_floor', name:'Flooring', by:{days:35, why:'flooring is measured and ordered'}, qs:[
-    { id:'ftier', t:'Main-floor flooring', cc:72, vendor:'D & S Flooring', o:[['Builder LVP',0,0,ART.floorPlank('#a9855f','#7d5f3f')],['Upgrade LVP',2600,1750,ART.floorPlank('#c9b193','#a68b68')],['Hardwood',9800,7100,ART.floorPlank('#8b5e34','#5f3f21')]] },
-    { id:'fcolor', t:'Main-floor colour', cc:72, type:'color', vendor:'D & S Flooring', o:[['Duxbury Oak',0,0,ART.floorPlank('#a9855f','#7d5f3f')],['Sandbar',0,0,ART.floorPlank('#c9b193','#a68b68')],['Hatfield Maple',0,0,ART.floorPlank('#b89a6e','#8f7048')]] },
-    { id:'fbed', t:'Bedroom floors', cc:72, vendor:'D & S Flooring', each:["Owner's bedroom",'Bedroom 2','Bedroom 3'], o:[['Carpet, Natural Sisal',0,0,ART.carpet('#cdc4b0','#b3a894')],['Carpet, Warm Stone',0,0,ART.carpet('#bcb09a','#a1937c')],['LVP to match',620,410,ART.floorPlank('#a9855f','#7d5f3f')]] },
-    { id:'fpad', t:'Carpet padding', cc:72, vendor:'D & S Flooring', o:[['8 lb standard',0,0,ART.swatch('#d9d2c2')],['10 lb plush',520,330,ART.swatch('#cfc6b3')]] },
-  ]},
-  { id:'s_baths', name:'Bathrooms', by:{days:28, why:'plumbing fixtures are ordered'}, qs:[
-    { id:'btile', t:"Master shower tile", cc:72, vendor:'D & S Flooring', dep:{q:'msh',not:'Standard shower'}, o:[['Ash Mix',0,0,ART.tile('#d4cfc6','#c2bcb1','#efece5')],['Bone',0,0,ART.tile('#e9e3d8','#ddd5c7','#f4f1ea')],['Slate',480,310,ART.tile('#828a90','#6e767c','#b9bec2')]] },
-    { id:'bfaucet', t:'Vanity faucet', cc:50, vendor:'Fast Supply (Moen)', each:["Master bath",'Main bath','Powder bath'], o:[['Brantford',0,0,ART.faucet('#b9bec2','low')],['Align',145,92,ART.faucet('#9aa1a6','low')],['Voss',165,104,ART.faucet('#a8aeb3','high')]] },
-  ]},
-  { id:'s_trim', name:'Doors, trim & hardware', by:{days:42, why:'trim is ordered'}, qs:[
-    { id:'hfinish', t:'Door hardware finish', cc:58, vendor:'Schlage', o:[['Brushed nickel',0,0,ART.knob('#b9bec2')],['Aged bronze',0,0,ART.knob('#6b5545')],['Matte black',0,0,ART.knob('#2f3133')],['Brushed gold',340,215,ART.knob('#c2a469')]] },
-    { id:'hfront', t:'Front door lock', cc:32, vendor:'Schlage', o:[['Standard handleset',0,0,ART.knob('#8d8f8c')],['Smart lock',495,340,ART.knob('#2f3133')]] },
-    { id:'hdoors', t:'Interior door style', cc:58, vendor:'Trim supplier', o:[['Cambrian',0,0,ART.door(2,'#f0ebe2')],['Connelly',0,0,ART.door(3,'#ece6dc')],['Keystone',260,170,ART.door(1,'#e7e0d4')]] },
-  ]},
-  { id:'s_fire', name:'Fireplace', qs:[
-    { id:'fpmodel', t:'Fireplace model', cc:71, vendor:'Napoleon dealer', dep:{q:'f550',not:'None'}, o:[['Ascent 36',0,0,ART.fireplace()],['Ascent 36 Linear',780,540,ART.fireplace()],['Ascent 42',1150,800,ART.fireplace()]] },
-    { id:'fpmantel', t:'Mantel', cc:58, vendor:'Trim supplier', dep:{q:'f550',not:'None'}, o:[['Kenwood with slate',0,0,ART.swatch('#8a8f86')],['Walnut live-edge shelf',1240,820,ART.swatch('#6b4a2e')]] },
-  ]},
-];
-const SECTIONS = [...PRICING, ...ROOMS];
-const ALL_QS = SECTIONS.flatMap(r=>r.qs.map(q=>({ ...q, room:r, v1: PRICING.includes(r) ? 1 : 0 })));
+   The REAL list: BuilderTrend's master selections template (268 selections, 583 choices, customer prices), read 2026-10-12.
+   It is NOT in this file. The demo asks the hub's server for it after the passcode, so the prices never sit in the public
+   project. A selection has a BT number, a cost code and its choices; any number of choices can be taken, some by the count
+   or by the square foot. There is no builder cost in BuilderTrend's template, so cost and margin don't show yet.
+
+   TWO MEETINGS over the one list: PRICING is the lines that are on the paper pricing sheet (by BT number) — the quick pass.
+   SELECTIONS is everything — the deep dive that really designs the house. Because both read the same answers, whatever is
+   picked at pricing is already there at selections. */
+const SECTION_RANGES = [['lot','Contract & lot',0,121],['bsmt','Foundation & basement',122,149],['gar','Garage',150,169],['ext','Exterior',170,179],
+  ['ent','Front porch & entrance',180,187],['lau','Laundry & mudroom',188,199],['doors','Doors & trim',200,243],['ceil','Ceilings & first floor',244,255],
+  ['mbath','Master bath',256,299],['bath2','Main bath',300,339],['bath3','Third bath',340,378],['powder','Powder bath',379,399],['elec','Electrical',420,459],
+  ['mech','Heating, water & central vac',460,499],['kit','Kitchen',500,549],['fireb','Fireplace & built-ins',550,599],['patio','Patio & deck',600,659],
+  ['porch','Screened porch, sunroom & 3 season',660,699],['win','Windows',700,719],['stairs','Stairs',720,739],['second','Second floor',740,759],
+  ['attic','Attic & storage',760,779],['paint','Paint',780,789],['flr','Flooring',790,999]];
+// the BT numbers that appear on the Alden Collection Pricing Sheet
+const PRICING_BT = new Set([126,128,134,136,138,140,147,150,152,153,154,156,160,164,175,180,181,182,184,188,193,194,196,200,206,207,208,224,231,236,244,246,248,
+  256,264,270,272,273,274,278,280,282,300,304,310,312,313,314,318,320,322,340,344,350,352,353,354,358,360,362,379,380,384,388,420,424,426,446,450,500,514,516,518,520,523,
+  550,552,553,554,560,600,602,606,608,610,612,616,618,620,622,640,642,644,660,664,672,684,700,701,702,704,720,722,724,726,740,744,760,762,764,768,780,790]);
+// home styles, as they appear on the basement line (126) of each collection
+const STYLES = { ALDEN:['Forge','Percy','Tiffany','Coleman','Sherman','Bradford','Hinderton','Alden 2.1','Coleman 2.1','Grant','Alden','Stanford'],
+                 MCC:['Avonlea','Montgomery','Harbor','Bainbridge','Edward','Winsloe','Carmody','Carmody 2.1'] };
+const LINE_NAMES = { ALDEN:'Alden Collection', MCC:'MCC' };
+let SECTIONS = [], PRICING = [], ROOMS = [], ALL_QS = [], CAT_READY = false;
 const qById = id=>ALL_QS.find(q=>q.id===id);
+const qOfKey = k=>qById(String(k).split('#')[0]);
+function buildCatalog(cat){
+  const twins = {};                                   // a line with an MCC twin is the Alden one, even where it isn't labelled
+  cat.forEach(s=>{ if(s.line === 'MCC') twins[s.bt + '|' + s.t] = true; });
+  const used = {};
+  SECTIONS = SECTION_RANGES.map(([id, name])=>({ id, name, qs:[] }));
+  cat.forEach((s, i)=>{
+    const num = parseInt(s.bt, 10) || 0;
+    const sec = SECTIONS[SECTION_RANGES.findIndex(r=>num >= r[2] && num <= r[3])] || SECTIONS[0];
+    let id = 'b' + (s.bt || 'x') + (s.line ? s.line[0].toLowerCase() : '');
+    if(used[id]) id += '_' + i; used[id] = true;
+    const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
+    sec.qs.push({ id, bt:s.bt, num, t:s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+      c:s.c.map(c=>({ t:c.t, p:c.p, unit: /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+  });
+  SECTIONS = SECTIONS.filter(r=>r.qs.length);
+  ROOMS = SECTIONS;
+  PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
+  ALL_QS = SECTIONS.flatMap(r=>r.qs);
+  CAT_READY = true;
+}
 
 /* ---------- leads (saved in this browser so the demo survives a refresh) ---------- */
-const STORE = 'aldenSelectionsDemo.v3';
+const STORE = 'aldenSelectionsDemo.v4';
 let leads = [], view = 'customer', cur = null, tab = 'v1', roomId = 'lot', newOpen = false;
 
 /* ---------- two screens, one sheet ----------
@@ -583,55 +414,45 @@ let leads = [], view = 'customer', cur = null, tab = 'v1', roomId = 'lot', newOp
    IN THIS DEMO the two screens talk through the browser's own storage, so it only works between two windows on the SAME
    computer. The real thing would go through the hub's database and work between any two devices. */
 const PRESENT = new URLSearchParams(location.search).get('present');   // set = this window is the customer's screen
-const NAV = 'aldenSelectionsDemo.nav3';
+const NAV = 'aldenSelectionsDemo.nav4';
 let officeView = 'customer', shareOpen = false, flashKey = '';
 
 function seedLeads(){
-  // a pick is the option's name; a count or sq ft is a number; an allowance is { $: amount }; a typed line is { text }
-  const ans = (key, v)=>{
-    const q = qById(key.split('@')[0]);
-    if(q.type === 'qty') return { qty:v, price:q.price, cost:q.cost };
-    if(q.type === 'money') return moneyAns(q, v.$);
-    if(q.type === 'text') return { label:v.text, price:0, cost:0 };
-    const opt = q.o.find(x=>x[0]===v) || q.o[0]; return { label:opt[0], price:opt[1], cost:opt[2] };
+  // take a choice by BT number and a few words of its name; n = how many (or how many sq ft)
+  const take = (L, bt, words, n)=>{
+    const q = ALL_QS.find(x=>x.bt === String(bt) && (!x.line || !L.line || x.line === L.line) && x.c.some(c=>c.t.toLowerCase().includes(words.toLowerCase())));
+    if(!q) return;
+    const i = q.c.findIndex(c=>c.t.toLowerCase().includes(words.toLowerCase()));
+    L.answers[q.id + '#' + i] = { qty:n || 1, price:q.c[i].p || 0 };
   };
   const mk = (o, picks)=>{
     const L = { id:'L'+Math.random().toString(36).slice(2,8), name2:'', phone:'', email:'', answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null, ...o };
-    Object.entries(picks).forEach(([key, v])=>{ L.answers[key] = ans(key, v); });
+    picks.forEach(p=>take(L, p[0], p[1], p[2]));
     return L;
   };
-  const snapOf = L=>Object.fromEntries(Object.entries(L.answers).filter(([k])=>qById(k.split('@')[0]).v1).map(([k,v])=>[k, snapVal(v, qById(k.split('@')[0]))]));
-  // 1. came in for pricing in the spring and hasn't been back — prices have gone up since
-  const a = mk({ name:'Dan & Erin Hostetter', phone:'717-555-0148', email:'hostetter@example.com', dev:'AP', lot:'151', model:'The Coleman', stage:'v1', created:daysAgo(128), v1Date:daysAgo(128), updated:daysAgo(128), pricedOn:daysAgo(128) },
-    { lotprem:{$:12000}, b126:'Yes', b128:"9'", b140:'Yes', c244:"9'", g160:'1 row glass, top', k500:'Quartz', f550:'Gas', p600d:240, e424:3, d231:"Standard 8'", lot_n:{text:'Want a walkout if the lot allows it.'} });
-  a.answers.k500.price = 6200; a.answers.k500.cost = 4500;      // what these were quoted at back then
-  a.answers.c244.price = 6300; a.answers.c244.cost = 4550;
-  a.answers.p600d.price = 35;  a.answers.p600d.cost = 26;
-  a.v1Snap = snapOf(a);
+  // 1. came in for pricing in the spring and hasn't been back — two prices have gone up since
+  const a = mk({ name:'Dan & Erin Hostetter', phone:'717-555-0148', email:'hostetter@example.com', dev:'AP', lot:'151', line:'ALDEN', model:'Coleman', basePrice:389900, stage:'v1', created:daysAgo(128), v1Date:daysAgo(128), updated:daysAgo(128), pricedOn:daysAgo(128) },
+    [[126,'Coleman Basement'],[128,"9' tall"],[140,'Sump Pump'],[244,"Upg. to 9'"],[550,''],[424,'',3],[236,'Storm Door']]);
+  Object.keys(a.answers).forEach(k=>{ const q = qOfKey(k); if(q && (q.bt === '128' || q.bt === '244')) a.answers[k].price -= 300; });   // quoted lower back then
+  a.v1Snap = snapAll(a);
   a.notes = [{ text:'Pricing meeting went well. They like the Coleman but need to sell their current house first. Listing it in the fall.', at:daysAgo(128) },
              { text:'Left a voicemail to check in. No answer.', at:daysAgo(61) }];
   a.follow = { date:daysAgo(0), what:'Check in. Their house was due to go on the market this month.' };
-  // 2. back for selections, part-way through
-  const bPricing = { lotprem:{$:8500}, b126:'Yes', b136:600, b138:'Finished bath', b138f:'Yes', g152:'Yes', g153:'Yes', c246:'Vault', msh:'Tile with Corian base', mdr:'Frameless', mdrf:{text:'Matte black'}, mto:'Comfort height',
-    k500c:'Paint', k500:'Granite', k523:'Yes', k520:'Black', p622:{$:18500}, p660:'Screened', w701:'Black', e420f:6, e426:1, s720:'3" nosing', pt780:'White ceiling / eggshell walls' };
-  const b = mk({ name:'Marcus Reyes', name2:'Tasha Reyes', phone:'717-555-0172', email:'reyes@example.com', dev:'CL', lot:'102', model:'The Hartwell', stage:'v2', created:daysAgo(24), v1Date:daysAgo(24), updated:daysAgo(2), pricedOn:daysAgo(24) }, bPricing);
-  b.v1Snap = snapOf(b);
-  Object.entries({ k500:'Quartz', cabcolor:'Navy', kfaucet:'Gibson pull-down', ksink:'Farmhouse', ftier:'Upgrade LVP', fcolor:'Sandbar', "fbed@Owner's bedroom":'LVP to match', 'fbed@Bedroom 2':'Carpet, Warm Stone' }).forEach(([k,v])=>{ b.answers[k] = ans(k, v); });
-  b.favs['ksplash|Slate'] = true; b.favs['hfinish|Matte black'] = true;
-  b.notes = [{ text:'Had a call. They want to move forward. Booked the selections meeting.', at:daysAgo(6) },
-             { text:'Marcus asked about covering the patio. Put an allowance in at pricing.', at:daysAgo(24) }];
-  b.follow = { date:daysAhead(5), what:'Confirm the cabinet colour before cabinets are ordered.' };
+  // 2. back for selections, part-way through the deep dive
+  const b = mk({ name:'Marcus Reyes', name2:'Tasha Reyes', phone:'717-555-0172', email:'reyes@example.com', dev:'CL', lot:'102', line:'ALDEN', model:'Stanford', basePrice:452500, stage:'v2', created:daysAgo(24), v1Date:daysAgo(24), updated:daysAgo(2), pricedOn:daysAgo(24) },
+    [[126,'Stanford Basement'],[136,'per sq ft',600],[138,'Finish full bath'],[152,'Man door'],[153,'50 Amp'],[256,"5' tile shower w/corian"],[273,'Kohler Persuade'],[420,'',6],[426,''],[701,''],[206,'Std. style single',2]]);
+  b.v1Snap = snapAll(b);
+  [[277,'Round Mirror - black'],[275,'Bidet Seat w/remote'],[232,'Schlage Encode'],[268,'BLACK'],[214,'Glass double french'],[220,'Black or color trim']].forEach(p=>take(b, p[0], p[1], p[2]));
+  b.notes = [{ text:'Had a call. They want to move forward. Booked the selections meeting.', at:daysAgo(6) }];
+  b.follow = { date:daysAhead(5), what:'Confirm the cabinet choices before cabinets are ordered.' };
   // 3. signed and locked, with one change order since
-  const c = mk({ name:'Priya Nair', name2:'Sam Nair', phone:'717-555-0119', email:'nair@example.com', dev:'ML', lot:'117', model:'The Coleman', stage:'signed', created:daysAgo(70), v1Date:daysAgo(70), updated:daysAgo(9), pricedOn:daysAgo(38), signedOn:daysAgo(38) },
-    { lotprem:{$:6000}, b126:'Yes', b134:2, b140:'Yes', g153:'Yes', g160:'All glass', g175:1, e181:'Stamped', l194:'Bench & pegs', l196:'Yes', d206:2, d206s:'Single', d206g:'Frosted', d208:1, d208s:'Double', d208g:'No glass', d231:"Standard 8'", d236:'Full view',
-      c244:"9'", msh:'Custom shower', msz:"5'", mdr:'Frameless', mdrf:{text:'Brushed gold'}, mspa:'Yes', mto:'Kohler', msc:'Yes', msp:'8"', mgb:'Yes', nto:'Elongated', wto:'Comfort height',
-      e420f:8, e420fs:'4"', e424:4, e426:1, e446:'Rough-in only', k500c:'Paint', k500:'Quartz', k514:'LED rope lighting', k516:'Yes', k518:'Wood', k518l:14, k520:'Brushed gold', k523:'Yes',
-      f550:'50" linear', f552:9, f552h:'To ceiling', f553:'Yes', f560:{text:'Walnut beam, 6 ft'}, p600c:320, p610:'Black pickets', p612:4, p618:'Yes', w700t:"2' twin", w701:'Black', w704t:2, s720:'3" nosing', s720w:'Oak', pt780:'White ceiling / eggshell walls',
-      cabcolor:'White', kfaucet:'Align', ksink:'Farmhouse', ksplash:'Bone', ftier:'Hardwood', fcolor:'Hatfield Maple', "fbed@Owner's bedroom":'Carpet, Natural Sisal', 'fbed@Bedroom 2':'Carpet, Natural Sisal', 'fbed@Bedroom 3':'LVP to match', fpad:'10 lb plush',
-      btile:'Slate', "bfaucet@Master bath":'Voss', 'bfaucet@Main bath':'Brantford', 'bfaucet@Powder bath':'Align', hfinish:'Matte black', hfront:'Smart lock', hdoors:'Keystone', fpmodel:'Ascent 42', fpmantel:'Walnut live-edge shelf' });
-  c.v1Snap = snapOf(c); c.v1Snap.g160 = 'Standard';
-  c.custom = [{ desc:'Built-in bench with cubbies in the mudroom', price:1850, cost:1200, cc:58, room:'lau' }];
-  c.cos = [{ desc:'Add a floor outlet in the office', price:310, cost:190, cc:54, date:daysAgo(9) }];
+  const c = mk({ name:'Priya Nair', name2:'Sam Nair', phone:'717-555-0119', email:'nair@example.com', dev:'ML', lot:'117', line:'MCC', model:'Carmody', basePrice:478000, stage:'signed', created:daysAgo(70), v1Date:daysAgo(70), updated:daysAgo(9), pricedOn:daysAgo(38), signedOn:daysAgo(38) },
+    [[126,'Carmody'],[134,'egress'],[140,'battery'],[153,'50 Amp'],[160,'all glass'],[194,'bench and pegs'],[206,'Obscure single',2],[208,'Live edge'],[210,'Hidden'],[232,'Schlage Encode'],[236,'Hide-a-way'],
+     [244,"10' Ceiling"],[246,'vaulted ceiling in great room'],[256,"5' tile shower w/corian"],[258,'Soaking Tub'],[263,'corian seat'],[273,'Kohler Persuade'],[274,'soft close'],[275,'Purewash'],[277,'Round Mirror - gold'],[280,'grab bar'],[288,'fan light combo'],
+     [313,'18'],[420,'',8],[424,'',4],[426,''],[701,''],[224,'Cubbies and Desk'],[220,'Black or color trim']]);
+  c.v1Snap = snapAll(c);
+  c.custom = [{ desc:'Built-in bench with cubbies in the mudroom', price:1850, cost:0, cc:58, room:'lau' }];
+  c.cos = [{ desc:'Add a floor outlet in the office', price:310, cost:0, cc:54, date:daysAgo(9) }];
   c.notes = [{ text:'Signed. Sent them their selection sheet link.', at:daysAgo(38) }];
   return [b, a, c];
 }
@@ -652,9 +473,9 @@ window.addEventListener('storage', e=>{
     if(L && JSON.stringify(L.answers) !== was){
       const key = Object.keys(L.answers).find(k=>JSON.stringify(L.answers[k]) !== JSON.stringify(before[k]));
       if(key){
-        const q = qById(key.split('@')[0]), a = L.answers[key];
+        const q = qOfKey(key), a = L.answers[key];
         flashKey = key;
-        toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + (key.includes('@') ? ' (' + key.split('@')[1] + ')' : '') + ' — ' + snapVal(a, q));
+        if(q) toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + ' — ' + snapVal(a, q, key));
       }
     }
     const y = window.scrollY; echo = true; render(); echo = false; window.scrollTo(0, y); flashKey = '';
@@ -673,87 +494,63 @@ const presentUrl = L=>location.href.split('?')[0].split('#')[0] + '?present=' + 
 
 /* ---------- reading a lead ---------- */
 const lead = ()=>leads.find(l=>l.id===cur);
-const base = L=>MODELS[L.model] || 0;
+const base = L=>Number(L.basePrice) || 0;
 const locked = L=>L.stage === 'signed';
 const plus = n=>n < 0 ? '− ' + money(-n) + ' credit' : '+ ' + money(n);
-// an allowance is a typed dollar amount; a "credit" line comes off the price
-const moneyAns = (q, n)=>{ const p = q.credit ? -Math.abs(n) : Math.abs(n); return { amt:Math.abs(n), price:p, cost:q.nocost ? 0 : Math.round(p * 0.78) }; };
-// what an answer says, as one short string (for "changed since pricing")
-const snapVal = (a, q)=>!a ? '' : q.type === 'qty' ? String(a.qty) : q.type === 'money' ? money(a.amt) : a.label;
-const dfltVal = q=>q.type === 'qty' ? '0' : q.type === 'money' || q.type === 'text' ? '' : q.opt ? q.o[0][0] : '';
-function asked(q, L){
-  if(!q.dep) return true;
-  const a = L.answers[q.dep.q], pq = qById(q.dep.q);
-  if(q.dep.min) return !!a && a.qty >= q.dep.min;
-  const label = a ? a.label : (pq && pq.opt && pq.o ? pq.o[0][0] : null);   // an untouched pricing line counts as its standard answer
-  if(label == null) return false;
-  return q.dep.is ? label === q.dep.is : label !== q.dep.not;
-}
-const keysOf = q=>q.each ? q.each.map(r=>q.id+'@'+r) : [q.id];
-// pricing lines never have to be answered (untouched = standard); selections picks all do, except counts
-const missing = (q, L)=>q.opt || q.type === 'qty' || !asked(q, L) ? [] : keysOf(q).filter(k=>!L.answers[k]);
-const todo = L=>ALL_QS.flatMap(q=>missing(q, L).map(k=>({ q, key:k })));
-// one line per thing that was actually chosen, with what it adds
+const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2);
+// a selection that belongs to the other collection isn't asked
+const asked = (q, L)=>!q.line || !L.line || q.line === L.line || !LINE_NAMES[q.line];
+// the basement line lists every home style: show only this home's, when there is one
+const choicesOf = (q, L)=>{ const all = q.c.map((c, i)=>({ ...c, i })); if(q.bt !== '126' || !L.model) return all; const mine = all.filter(c=>c.t.toLowerCase().replace(/ basement$/, '') === L.model.toLowerCase()); return mine.length ? mine : all; };
+const missing = ()=>[];                       // nothing on either sheet has to be answered: untouched = standard
+const todo = ()=>[];
+const keysOf = q=>q.c.map((c, i)=>q.id + '#' + i);
+const noteKey = r=>'note:' + r.id;
+// what was chosen on one selection, as a short string (to show "changed since pricing")
+const snapQ = (q, L)=>q.c.map((c, i)=>{ const a = L.answers[q.id + '#' + i]; return a && a.qty ? c.t + (a.qty > 1 ? ' ×' + a.qty : '') : ''; }).filter(Boolean).join(', ');
+const snapAll = L=>Object.fromEntries(ALL_QS.filter(q=>q.v1).map(q=>[q.id, snapQ(q, L)]).filter(x=>x[1]));
+const snapVal = (a, q, k)=>{ const c = q && q.c ? q.c[Number(String(k).split('#')[1])] : null; return (c ? c.t : '') + (a && a.qty > 1 ? ' ×' + a.qty : ''); };
+// one line per choice that was taken, with what it adds
 function lines(L){
   const out = [];
-  ALL_QS.forEach(q=>{ if(!asked(q, L)) return; keysOf(q).forEach(k=>{
-    const a = L.answers[k]; if(!a) return;
-    const where = k.includes('@') ? k.split('@')[1] : '';
-    if(q.type === 'qty'){ if(!a.qty) return; out.push({ key:k, q, where, label:a.qty.toLocaleString('en-US') + ' ' + q.unit + (a.qty === 1 || /ft$/.test(q.unit) ? '' : 's'), price:a.price * a.qty, cost:a.cost * a.qty, std:false, count:a.qty }); return; }
-    if(q.type === 'money'){ if(!a.price) return; out.push({ key:k, q, where, label:money(a.amt), price:a.price, cost:a.cost, std:false }); return; }
-    if(q.type === 'text'){ if(!a.label) return; out.push({ key:k, q, where, label:a.label, price:0, cost:0, std:false, typed:true }); return; }
-    const std = a.label === q.o[0][0];
-    if(q.opt && std) return;                       // a pricing line left at (or put back to) standard isn't worth a row
-    out.push({ key:k, q, where, label:a.label, price:a.price, cost:a.cost, std });
-  }); });
+  SECTIONS.forEach(r=>{
+    r.qs.forEach(q=>{ if(!asked(q, L)) return; q.c.forEach((c, i)=>{
+      const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
+      out.push({ key:k, q, where:'', label:c.t + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd:c.p == null });
+    }); });
+    const n = L.answers[noteKey(r)];
+    if(n && n.label) out.push({ key:noteKey(r), q:{ id:noteKey(r), t:'Notes', room:r, cc:90, bt:'', v1:1, type:'text' }, where:'', label:n.label, price:0, cost:0, std:false, typed:true });
+  });
   return out;
 }
 const upgrades = L=>lines(L).reduce((s,l)=>s+l.price,0) + L.custom.reduce((s,c)=>s+c.price,0);
-const upgradeCost = L=>lines(L).reduce((s,l)=>s+l.cost,0) + L.custom.reduce((s,c)=>s+c.cost,0);
+const upgradeCost = ()=>0;
 const coTotal = L=>L.cos.reduce((s,c)=>s+c.price,0) + L.cos.length * CO_FEE;
 const total = L=>base(L) + upgrades(L) + coTotal(L);
 // today's price for an answer, to spot prices that moved since the sheet was priced
-function todayPrice(k, a){
-  const q = qById(k.split('@')[0]);
-  if(!q || q.type === 'money' || q.type === 'text') return { price:a.price, cost:a.cost };
-  if(q.type === 'qty') return { price:q.price, cost:q.cost };
-  const o = q.o.find(x=>x[0] === a.label); return o ? { price:o[1], cost:o[2] } : { price:a.price, cost:a.cost };
-}
+function todayPrice(k, a){ const q = qOfKey(k), c = q ? q.c[Number(k.split('#')[1])] : null; return { price: c && c.p != null ? c.p : a.price, cost:0 }; }
 function drift(L){
   if(locked(L)) return [];
-  return Object.entries(L.answers).map(([k,a])=>{ const t = todayPrice(k, a), n = a.qty == null ? 1 : a.qty; return { k, a, t, diff:(t.price - a.price) * n }; }).filter(x=>x.diff !== 0 || x.t.cost !== x.a.cost);
+  return Object.entries(L.answers).filter(([k,a])=>k.includes('#') && a.qty).map(([k,a])=>{ const t = todayPrice(k, a); return { k, a, t, diff:(t.price - a.price) * a.qty }; }).filter(x=>x.diff !== 0);
 }
-// one line of the pricing sheet
+// one selection: its choices, each one tap to take (or a count / square feet where that's how it's priced)
 function prow(q, L){
   if(!asked(q, L)) return '';
-  const staff = view === 'staff', lock = locked(L), a = L.answers[q.id];
-  const snap = L.v1Snap, was = snap ? (q.id in snap ? snap[q.id] : dfltVal(q)) : null, nowVal = a ? snapVal(a, q) : dfltVal(q);
-  const changed = snap && was !== nowVal ? `<div class="pn" style="color:#8a5d14">Changed since pricing${was ? ': was ' + esc(q.type === 'qty' ? was + ' ' + q.unit : was) : ''}</div>` : '';
-  let ctl = '', chosenPrice = 0, chosenCost = 0;
-  if(q.type === 'qty'){
-    const n = a ? a.qty : 0, p = a ? a.price : q.price, c = a ? a.cost : q.cost;
-    chosenPrice = p * n; chosenCost = c * n;
-    ctl = (q.entry
-        ? `<input type="number" min="0" max="${q.max}" step="1" data-num="${q.id}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}> <span class="muted" style="font-size:13.5px">${esc(q.unit)}</span>`
-        : `<div class="stepper"><button type="button" data-qty="${q.id}" data-d="-1" ${lock || !n ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-qty="${q.id}" data-d="1" ${lock || n >= q.max ? 'disabled' : ''}>+</button></div>`)
-      + `<span class="muted" style="font-size:13px">${money(p)} / ${esc(q.unit)}</span>${n ? `<span class="tot">${plus(p * n)}</span>` : ''}`;
-  } else if(q.type === 'money'){
-    chosenPrice = a ? a.price : 0; chosenCost = a ? a.cost : 0;
-    ctl = `<span class="muted">${q.credit ? '− $' : '$'}</span><input type="number" min="0" step="50" data-money="${q.id}" value="${a ? a.amt : ''}" placeholder="0" ${lock ? 'disabled' : ''}>`;
-  } else if(q.type === 'text'){
-    ctl = q.long ? `<textarea data-text="${q.id}" maxlength="600" placeholder="${esc(q.ph || '')}" ${lock ? 'disabled' : ''}>${esc(a ? a.label : '')}</textarea>`
-                 : `<input type="text" data-text="${q.id}" maxlength="120" value="${esc(a ? a.label : '')}" placeholder="${esc(q.ph || '')}" ${lock ? 'disabled' : ''}>`;
-  } else {
-    chosenPrice = a ? a.price : 0; chosenCost = a ? a.cost : 0;
-    ctl = `<div class="segs">${q.o.map((o, i)=>{
-      const sel = a ? a.label === o[0] : i === 0, price = a && a.label === o[0] ? a.price : o[1];
-      return `<button type="button" class="seg ${sel ? 'on' : ''} ${sel && !a ? 'dflt' : ''}" data-pick="${esc(q.id)}" data-opt="${esc(o[0])}" ${lock ? 'disabled' : ''}>${esc(o[0])}${price ? `<small>${plus(price)}</small>` : ''}</button>`;
-    }).join('')}</div>`;
-  }
-  return `<div class="prow ${q.long ? 'long' : ''}" id="q-${q.id}">
-    <div class="pl"><div class="pt">${esc(q.t)}</div>${q.note ? `<div class="pn">${esc(q.note)}</div>` : ''}${changed}
-      ${staff && q.type !== 'text' ? `<div class="staffline" style="display:inline-block">${q.bt ? 'BT ' + esc(q.bt) + ' · ' : ''}code ${q.cc}${q.vendor ? ' · ' + esc(q.vendor) : ''}${chosenPrice ? ` · our cost ${money(chosenCost)} · margin ${money(chosenPrice - chosenCost)}` : ''}</div>` : ''}</div>
-    <div class="pc">${ctl}</div></div>`;
+  const staff = view === 'staff', lock = locked(L);
+  const was = L.v1Snap ? (L.v1Snap[q.id] || '') : null, now = snapQ(q, L);
+  const changed = q.v1 && was !== null && was !== now ? `<span class="chip soon">changed since pricing${was ? ' · was ' + esc(was) : ' · added'}</span>` : '';
+  const rows = choicesOf(q, L).map(c=>{
+    const k = q.id + '#' + c.i, a = L.answers[k], n = a ? a.qty : 0, p = a ? a.price : c.p;
+    const price = c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
+    const ctl = c.unit
+      ? `<input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.unit}</span>${n ? `<span class="cp">= ${plus(p * n)}</span>` : ''}`
+      : (n ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
+        + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
+    return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
+  }).join('');
+  return `<div class="sel" id="q-${q.id}"><div class="sel-h"><b>${esc(q.t)}</b>${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${changed}
+      ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}</div>
+    ${rows || '<div class="q-sub">No choices are set up for this one yet.</div>'}</div>`;
 }
 
 // follow-up: how soon, in words and colour
@@ -792,7 +589,7 @@ const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name :
    new. Only the changes travel, so two people tapping at once don't undo each other. */
 const SYNC_URL = 'https://us-central1-alden-homes-hub.cloudfunctions.net/demoSync';
 const SHARED = STORE + '.shared';
-const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn','quoteOk'];
+const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn','quoteOk','line','basePrice'];
 let shared = {};                                  // ids of the sheets this device has shared
 try{ shared = JSON.parse(localStorage.getItem(SHARED) || '{}') || {}; } catch(e){}
 let sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 };   // state: off | connecting | live | lost | missing
@@ -865,10 +662,10 @@ function takeRemote(sheet, sent, body){
   sync.last = clone(sheet);
   const changed = !sent || !same(sent, merged);
   if(theirs){
-    const q = qById(theirs.split('@')[0]), a = sheet.answers[theirs];
-    if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + (theirs.includes('@') ? ' (' + theirs.split('@')[1] + ')' : '') + ' — ' + snapVal(a, q)); }
+    const q = qOfKey(theirs), a = sheet.answers[theirs];
+    if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + ' — ' + snapVal(a, q, theirs)); }
   }
-  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
+  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-bt-num],[data-note],[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
   if(changed && !typing){ const y = window.scrollY; render(); window.scrollTo(0, y); }
   flashKey = '';
 }
@@ -894,7 +691,7 @@ function showScreen(){
   if(L.stage !== 'signed') return `<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>These selections aren't final yet.</h2><p class="lede" style="margin:8px auto 0">The selection sheet appears here once everything has been chosen and signed.</p></div></div>`;
   // a page to show off: leave out the things they said no to ("Outdoor living: None", "Fan pre-wire: No")
   // from the pricing sheet, only the things they added (no credits, notes or "No"s); from selections, every pick
-  const ls = lines(L).filter(l=>l.q.v1 ? (l.price > 0 && l.q.id !== 'lotprem') : !(l.std && /^(no|none|leave)\b/i.test(l.label)));
+  const ls = lines(L).filter(l=>!l.typed && l.price >= 0 && l.q.num > 126 && !/^misc\b|credit/i.test(l.label));
   const artOf = l=>{ if(l.q.type === 'qty') return `<span class="count">${L.answers[l.key].qty.toLocaleString('en-US')}</span>`; const o = (l.q.o || []).find(x=>x[0] === l.label); return (o && o[3]) || `<div class="noart">${esc(l.q.room.name)}</div>`; };
   const tile = (l, big)=>`<div class="sh-tile">${l.price > 0 ? '<span class="up">Upgrade</span>' : ''}<div class="art">${artOf(l)}</div>
       <div class="txt"><div class="lab">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.room.name : l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</div><div class="val">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.t : l.q.type === 'money' ? l.q.t : l.label)}</div></div></div>`;
@@ -1031,7 +828,9 @@ function leadsScreen(){
           <div><label class="f">Email</label><input type="email" id="nEmail"></div>
           <div><label class="f">Development</label><select id="nDev"><option value="">Not sure yet</option>${devOpts}</select></div>
           <div><label class="f">Lot</label><select id="nLot"><option value="">Not chosen yet</option></select></div>
-          <div><label class="f">Model</label><select id="nModel">${Object.keys(MODELS).map(m=>`<option>${m}</option>`).join('')}</select></div>
+          <div><label class="f">Collection</label><select id="nLine">${Object.keys(LINE_NAMES).map(k=>`<option value="${k}">${LINE_NAMES[k]}</option>`).join('')}</select></div>
+          <div><label class="f">Home style</label><select id="nModel">${STYLES.ALDEN.map(m=>`<option>${m}</option>`).join('')}</select></div>
+          <div><label class="f">Base price ($)</label><input type="number" id="nBase" min="0" step="100" placeholder="e.g. 389900"></div>
         </div>
         <div style="margin-top:12px"><button type="button" class="btn good" id="nStart">Save lead &amp; start pricing</button></div>
       </div>` : ''}
@@ -1041,7 +840,7 @@ function leadsScreen(){
       <div style="flex:1 1 260px"><h2>Join as customer screen</h2><p class="muted" style="font-size:14px;margin-top:4px">For the TV or the customer's iPad. Type the code shown on the rep's device.</p></div>
       <input type="text" id="joinCode" placeholder="CODE" maxlength="12" autocomplete="off" autocapitalize="characters" style="width:170px;font-family:'Courier New',monospace;font-size:22px;letter-spacing:4px;text-transform:uppercase;text-align:center">
       <button type="button" class="btn primary" id="joinBtn">Join</button></div>
-    <p class="muted noprint" style="font-size:12.5px;margin-top:14px">Demo only: this list is kept in this browser. <a href="#" id="resetDemo">Reset the sample leads</a></p>`;
+    <p class="muted noprint" style="font-size:12.5px;margin-top:14px">Demo only: this list is kept in this browser. <a href="#" id="resetDemo">Reset the sample leads</a> · <a href="#" id="lockDemo">Lock the demo on this device</a></p>`;
 }
 
 function leadScreen(L){
@@ -1073,7 +872,7 @@ function leadScreen(L){
         <div style="font-size:12.5px;margin-top:12px">Demo note: the sample sheet is kept on the hub's server while it's shared, and anyone with the code or link can open it. It's made-up data.</div></div>` : ''}
     ${d.length && !PRESENT ? `<div class="banner amber noprint"><p><strong>${d.length} price${d.length===1?' has':'s have'} changed since this sheet was priced on ${esc(nice(L.pricedOn))}.</strong>
         At today's prices the same choices come to ${money(Math.abs(dSum))} ${dSum >= 0 ? 'more' : 'less'}. The sheet keeps the prices it was quoted at until someone decides.
-        <span class="muted" style="display:block;font-size:13px;margin-top:4px">${d.map(x=>esc(qById(x.k.split('@')[0]).t) + ': ' + money(x.a.price) + ' → ' + money(x.t.price)).join(' · ')}</span></p>
+        <span class="muted" style="display:block;font-size:13px;margin-top:4px">${d.map(x=>esc((qOfKey(x.k) || {}).t + ' — ' + snapVal(null, qOfKey(x.k), x.k)) + ': ' + money2(x.a.price) + ' → ' + money2(x.t.price)).join(' · ')}</span></p>
         <button type="button" class="btn sm" id="repriceBtn">Update to today's prices</button></div>` : ''}
     ${locked(L) ? `<div class="banner good"><p><strong>Signed on ${esc(nice(L.signedOn))}.</strong> These choices and their prices are locked for good. Anything new is a change order.</p></div>` : ''}
     ${staff && !PRESENT ? officeCard(L) : (!PRESENT && followInfo(L) && followInfo(L).days <= 0 ? `<div class="banner staff noprint"><p><strong>${esc(followInfo(L).when)}.</strong> ${esc(followInfo(L).what)} <span class="muted">Switch to Office view for notes.</span></p></div>` : '')}
@@ -1127,33 +926,28 @@ function question(q, L, opts){
     ${inner}</div>`;
 }
 
-// One meeting's worth of sections, one at a time, with the list down the side. kind 'v1' = Pricing, 'full' = Selections.
+// One meeting's worth of sections, one at a time, with the list down the side. kind 'v1' = Pricing (the lines on the paper
+// pricing sheet), 'full' = Selections (everything). Same answers either way.
 function sheetView(L, kind){
   const staff = view === 'staff', pricing = kind === 'v1', list = pricing ? PRICING : ROOMS;
   const r = list.find(x=>x.id===roomId) || list[0], i = list.indexOf(r), next = list[i+1];
   const ls = lines(L);
-  const prog = x=>{ const qs = x.qs.filter(q=>asked(q, L)); const keys = qs.filter(q=>q.type !== 'qty').flatMap(keysOf); return { n:keys.length, done:keys.filter(k=>L.answers[k]).length }; };
-  const nav = list.map(x=>{
-    if(pricing){ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length;
-      return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? `<span class="done" style="font-size:12px">${n}</span>` : ''}</div></button>`; }
-    const p = prog(x), all = p.done === p.n;
-    return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${all ? '<span class="done">&#10003;</span>' : ''}</div>
-      <div class="rp">${all ? 'All chosen' : p.done + ' of ' + p.n + ' chosen'}</div><div class="bar"><span style="width:${p.n ? p.done/p.n*100 : 100}%"></span></div></button>`; }).join('');
-  const mine = L.custom.map((c, ci)=>({ c, ci })).filter(x=>x.c.room === r.id);
-  const body = pricing ? `<div class="q" style="padding:8px 18px 12px">${r.qs.map(q=>prow(q, L)).join('') || '<p class="muted" style="padding:10px 0">Nothing to choose here for this home.</p>'}</div>`
-    : (r.qs.map(q=>question(q, L, { fullSheet:true })).join('') || '<div class="q"><p class="muted">Nothing to choose here. This room depends on what was picked at pricing.</p></div>');
+  const nav = list.map(x=>{ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length + L.custom.filter(c=>c.room === x.id).length;
+    return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? `<span class="done" style="font-size:12px">${n}</span>` : ''}</div></button>`; }).join('');
+  const qs = r.qs.filter(q=>asked(q, L));
+  const nk = noteKey(r), note = L.answers[nk];
   const done = pricing && !next && !locked(L) ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <p style="flex:1 1 260px"><strong>That's the whole pricing sheet.</strong> Anything left untouched stays at standard. It's saved as a lead either way, and all of it can still be changed later.</p>
+      <p style="flex:1 1 260px"><strong>That's the whole pricing sheet.</strong> Anything left untouched stays at standard. It's saved as a lead either way, and everything picked here is already on the selections sheet for the next meeting.</p>
       ${PRESENT ? '' : '<button type="button" class="btn" id="saveClose">Save &amp; close</button>'}
       <button type="button" class="btn primary" id="toFull">Carry on to selections</button></div>` : '';
   return `<div class="rooms">
     <div class="roomnav noprint">${nav}</div>
     <div>
-      <div class="eyebrow">${pricing ? 'Pricing · first meeting' : 'Selections · second meeting'} · ${i+1} of ${list.length}</div>
-      <h2 style="font-size:22px;margin-top:4px">${esc(r.name)}${staff && r.bt ? ` <span class="muted" style="font-size:13px;font-weight:400">BT ${esc(r.bt)}</span>` : ''}</h2>
-      ${pricing && i === 0 ? `<p class="lede">The pricing sheet, section by section. Go through what matters to them and skip the rest. Anything left alone stays at standard, and the total at the bottom keeps up as you go.</p>` : ''}
-      ${!pricing && r.by && !locked(L) ? `<div class="deadline">Choose by <strong>${esc(nice(daysAhead(r.by.days)))}</strong> — that's when ${esc(r.by.why)}.</div>` : ''}
-      ${body}
+      <div class="eyebrow">${pricing ? 'Pricing · first meeting' : 'Selections · the deep dive'} · ${i+1} of ${list.length}</div>
+      <h2 style="font-size:22px;margin-top:4px">${esc(r.name)}</h2>
+      ${i === 0 ? `<p class="lede">${pricing ? 'The pricing sheet, section by section. Tap what they want and skip the rest. Anything left alone stays at standard.' : 'Every selection for this home. What was picked at pricing is already filled in. Go as deep as they want to.'}</p>` : ''}
+      <div class="q" style="padding:6px 18px 12px">${qs.map(q=>prow(q, L)).join('') || '<p class="muted" style="padding:10px 0">Nothing to choose here for this home.</p>'}
+        <div class="sel"><div class="sel-h"><b>Notes for ${esc(r.name)}</b></div><textarea data-note="${esc(nk)}" maxlength="600" style="margin-top:8px;min-height:54px;resize:vertical" ${locked(L) ? 'disabled' : ''}>${esc(note ? note.label : '')}</textarea></div></div>
       ${customBlock(L, r)}
       ${done}
       <div class="noprint" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
@@ -1203,14 +997,13 @@ const QUOTE = new URLSearchParams(location.search).get('quote');
 let docAll = false;                                   // also list the lines left at standard
 const quoteUrl = L=>location.href.split('?')[0].split('#')[0] + '?quote=' + encodeURIComponent(L.id);
 function quoteDoc(L, forCustomer){
-  const staff = !forCustomer && view === 'staff';
-  const ls = lines(L), cols = staff ? 6 : 3;
+  const office = !forCustomer && view === 'staff', staff = false;
+  const ls = lines(L);
   const dname = (DEVS.find(d=>d.code === L.dev) || {}).name || '';
   const phase = (L.answers.phase || {}).label || '';
   const stdRow = q=>{                                 // a line nobody touched, for the "every line" version
-    if(q.type === 'text' || q.type === 'money' || q.id === 'lotprem') return '';
-    const what = q.type === 'qty' ? 'None added' : q.o[0][0];
-    return `<tr class="dstd"><td>${staff && q.bt ? `<span class="mono" style="font-size:12px">${esc(q.bt)}</span> ` : ''}${esc(q.t)}</td><td>${esc(what)}</td><td class="num">${q.type === 'qty' ? '' : 'standard'}</td>${staff ? '<td></td><td></td>' : ''}</tr>`;
+    const what = 'Standard';
+    return `<tr class="dstd"><td>${office && q.bt ? `<span class="mono" style="font-size:12px">${esc(q.bt)}</span> ` : ''}${esc(q.t)}</td><td>${esc(what)}</td><td class="num"></td></tr>`;
   };
   const secs = SECTIONS.map(r=>{
     const mine = ls.filter(l=>l.q.room.id === r.id), cu = L.custom.filter(c=>c.room === r.id);
@@ -1218,9 +1011,10 @@ function quoteDoc(L, forCustomer){
     r.qs.forEach(q=>{ if(!asked(q, L)) return; const got = mine.filter(l=>l.q.id === q.id);
       if(got.length) got.forEach(l=>rows.push(l.typed
         ? `<tr><td colspan="${staff ? 5 : 3}" class="dn">${/_n$/.test(l.q.id) || l.q.id === 'misc' ? 'Note: ' : esc(l.q.t) + ': '}${esc(l.label)}</td></tr>`
-        : `<tr><td>${staff && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(l.label)}</td><td class="num">${l.price ? plus(l.price) : (l.std ? 'standard' : 'no charge')}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
-      else if(docAll && PRICING.includes(r)) rows.push(stdRow(q));
+        : `<tr><td>${office && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(l.label)}</td><td class="num">${l.tbd ? '<em>price to come</em>' : l.price ? plus(l.price) : 'no charge'}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
+      else if(docAll && q.v1) rows.push(stdRow(q));
     });
+    mine.filter(l=>l.typed).forEach(l=>rows.push(`<tr><td colspan="3" class="dn">Note: ${esc(l.label)}</td></tr>`));
     cu.forEach(c=>rows.push(`<tr><td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`));
     if(!rows.join('')) return '';
     const sub = mine.reduce((s,l)=>s+l.price,0) + cu.reduce((s,c)=>s+c.price,0);
@@ -1228,7 +1022,7 @@ function quoteDoc(L, forCustomer){
   }).join('');
   const up = upgrades(L), co = coTotal(L), wait = waiting(L).length;
   return `<div class="doc" id="quoteDoc">
-    ${staff ? '<div class="officecopy">OFFICE COPY — shows cost and margin. Switch to Customer view for the copy that goes to the buyer.</div>' : ''}
+    ${office ? '<div class="officecopy">OFFICE COPY — shows the BuilderTrend line numbers. Switch to Customer view for the copy that goes to the buyer.</div>' : ''}
     <div class="doc-head"><img src="../icons/logo.png" alt="Alden Homes">
       <div><h1>Pricing Sheet</h1><div class="sub">${L.quoteOk ? 'Confirmed ' + esc(nice(L.quoteOk)) : 'Draft · not yet confirmed'} · prices as of ${esc(nice(L.pricedOn))}</div></div></div>
     <div class="doc-facts">
@@ -1304,7 +1098,7 @@ async function loadShared(id, done){
 }
 
 function summary(L){
-  const staff = view === 'staff', ls = lines(L), left = todo(L);
+  const staff = false, ls = lines(L), left = todo(L);
   const rows = SECTIONS.map(r=>{
     const mine = ls.filter(l=>l.q.room.id === r.id), cu = L.custom.filter(c=>c.room === r.id);
     if(!mine.length && !cu.length) return '';
@@ -1414,11 +1208,12 @@ document.addEventListener('click', e=>{
     if(code.length < 4){ toast('Type the code from the rep\'s screen'); return; }
     location.href = location.href.split('?')[0].split('#')[0] + '?present=L' + encodeURIComponent(code); return;
   }
+  if(t.closest('#lockDemo')){ e.preventDefault(); try{ localStorage.removeItem(CODE_KEY); } catch(err){} location.reload(); return; }
   if(t.closest('#resetDemo')){ e.preventDefault(); leads = seedLeads(); render(); toast('Sample leads put back'); return; }
   if(t.closest('#newLeadBtn')){ newOpen = !newOpen; render(); if(newOpen) $('nName').focus(); return; }
   if(t.closest('#nStart')){
     const name = $('nName').value.trim(); if(!name){ toast('Add the buyer\'s name first'); return; }
-    const n = { id:'L'+Math.random().toString(36).slice(2,8), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value,
+    const n = { id:'L'+Math.random().toString(36).slice(2,8), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value, line:$('nLine').value, basePrice:Number($('nBase').value) || 0,
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
     leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
@@ -1444,8 +1239,8 @@ document.addEventListener('click', e=>{
   if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); cur = null; render(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
   const tb = t.closest('[data-tab]'); if(tb){ tab = tb.dataset.tab; if(tab === 'v1' && !PRICING.some(x=>x.id === roomId)) roomId = PRICING[0].id; if(tab === 'full' && !ROOMS.some(x=>x.id === roomId)) roomId = ROOMS[0].id; render(); window.scrollTo(0, 0); return; }
-  const rm = t.closest('[data-room]'); if(rm){ roomId = rm.dataset.room; tab = (PRICING.some(x=>x.id === roomId) ? 'v1' : 'full'); render(); window.scrollTo(0, 0); return; }
-  const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = (PRICING.some(x=>x.id === roomId) ? 'v1' : 'full'); render(); window.scrollTo(0, 0); return; }
+  const rm = t.closest('[data-room]'); if(rm){ roomId = rm.dataset.room; if(tab !== 'v1' && tab !== 'full') tab = 'full'; render(); window.scrollTo(0, 0); return; }
+  const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#printBtn')){ window.print(); return; }
   if(t.closest('#docPrint')){ window.print(); return; }
   if(t.closest('#docPdf')){ docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + '.pdf'); return; }
@@ -1476,6 +1271,15 @@ document.addEventListener('click', e=>{
     }
     return;
   }
+  const tg = t.closest('[data-bt-tog]'), stp = t.closest('[data-bt-step]');
+  if(tg || stp){
+    const k = tg ? tg.dataset.btTog : stp.dataset.btStep, q = qOfKey(k), c = q && q.c[Number(k.split('#')[1])];
+    if(!c) return;
+    const a = L.answers[k] || { qty:0, price:c.p || 0 };     // the price is fixed the moment it's first picked
+    a.qty = tg ? (a.qty ? 0 : 1) : Math.max(0, Math.min(99, a.qty + Number(stp.dataset.d)));
+    if(a.qty) L.answers[k] = a; else delete L.answers[k];
+    touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
   const fav = t.closest('[data-fav]'); if(fav){ e.stopPropagation(); L.favs[fav.dataset.fav] = !L.favs[fav.dataset.fav]; if(!L.favs[fav.dataset.fav]) delete L.favs[fav.dataset.fav]; render(); return; }
   const pick = t.closest('[data-pick]');
   if(pick){
@@ -1493,7 +1297,7 @@ document.addEventListener('click', e=>{
   }
   if(t.closest('#toFull')){
     // the first time they move on, remember what was priced, so later changes can be shown
-    if(!L.v1Snap) L.v1Snap = Object.fromEntries(Object.entries(L.answers).filter(([k])=>(qById(k.split('@')[0]) || {}).v1).map(([k,v])=>[k, snapVal(v, qById(k.split('@')[0]))]));
+    if(!L.v1Snap) L.v1Snap = snapAll(L);
     L.stage = 'v2'; tab = 'full'; roomId = ROOMS[0].id; touch(L); render(); window.scrollTo(0, 0); return;
   }
   if(t.closest('#cuOpenBtn')){ cuOpen = true; cuMode = 'now'; render(); const d = $('cuDesc'); if(d) d.focus(); return; }
@@ -1530,6 +1334,15 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); });
 document.addEventListener('change', e=>{
+  if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); return; }
+  if(e.target.dataset && (e.target.dataset.btNum || e.target.dataset.note)){
+    const L1 = lead(); if(!L1 || locked(L1)) return;
+    if(e.target.dataset.note){ const v = e.target.value.trim(); if(v) L1.answers[e.target.dataset.note] = { label:v, qty:0, price:0 }; else delete L1.answers[e.target.dataset.note]; }
+    else { const k = e.target.dataset.btNum, q = qOfKey(k), c = q && q.c[Number(k.split('#')[1])]; if(!c) return;
+      const v = Math.max(0, Math.min(99999, Math.round(Number(e.target.value) || 0)));
+      if(!v) delete L1.answers[k]; else { const a = L1.answers[k] || { price:c.p || 0 }; a.qty = v; L1.answers[k] = a; } }
+    touch(L1); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
   if(e.target.name === 'cuMode'){ const keep = ($('cuDesc') || {}).value || ''; cuMode = e.target.value; render(); if($('cuDesc')) $('cuDesc').value = keep; return; }
   if(e.target.id === 'docAll'){ docAll = e.target.checked; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const el = e.target, L0 = lead();
@@ -1546,12 +1359,66 @@ document.addEventListener('change', e=>{
   if(e.target.id === 'nDev'){ const d = e.target.value; $('nLot').innerHTML = '<option value="">Not chosen yet</option>' + LOTS.filter(l=>l.dev === d).map(l=>`<option value="${l.lot}">Lot ${l.lot} — ${esc(l.addr)}</option>`).join(''); }
 });
 
-load();
-if(SHOW) loadShow();
-if(QUOTE) loadShared(QUOTE, st=>{ quoteState = st; });
-// the customer's screen opens on whatever the office is looking at
-if(PRESENT){ try{ const nv = JSON.parse(localStorage.getItem(NAV) || 'null'); if(nv && nv.id === PRESENT){ tab = nv.tab; roomId = nv.roomId; } } catch(e){} }
-if(!SHOW && !QUOTE) render();
+/* ---------- the way in ----------
+   The demo carries real prices, so it opens with a passcode. The code is checked by the hub's server, which hands back the
+   price list; nothing sensitive is in this file. A customer screen or a shared link gets the list by its sheet's own link. */
+const CODE_KEY = 'aldenDemoCode';
+let gateMsg = '';
+async function fetchCatalog(body){
+  const res = await fetch(SYNC_URL, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action:'catalog', ...body }) });
+  if(res.status === 403) return 'wrong';
+  if(res.status === 429) return 'locked';
+  if(!res.ok) return 'down';
+  const data = await res.json();
+  buildCatalog(data.catalog || []);
+  return 'ok';
+}
+function gateScreen(){
+  document.body.classList.add('show');
+  $('totalbar').style.display = 'none';
+  $('root').innerHTML = `<div class="wrap"><div class="card gate"><img src="../icons/logo.png" alt="Alden Homes" style="height:64px">
+    <h2 style="margin-top:14px">Selections demo</h2><p class="lede" style="margin:6px auto 0">Enter the passcode to open it.</p>
+    <input type="tel" inputmode="numeric" id="gateCode" maxlength="8" autocomplete="off" style="margin-top:16px" aria-label="Passcode">
+    <div style="margin-top:12px"><button type="button" class="btn primary" id="gateGo" style="width:100%">Open</button></div>
+    <p class="muted" id="gateMsg" style="font-size:13.5px;margin-top:10px;min-height:20px;color:var(--red)">${esc(gateMsg)}</p></div></div>`;
+  const i = $('gateCode'); if(i) i.focus();
+}
+async function tryCode(code, quiet){
+  if(!quiet){ const b = $('gateGo'); if(b){ b.disabled = true; b.textContent = 'Checking…'; } }
+  let r = 'down';
+  try{ r = await fetchCatalog({ code }); } catch(e){ r = 'down'; }
+  if(r === 'ok'){ try{ localStorage.setItem(CODE_KEY, code); } catch(e){} document.body.classList.remove('show'); return true; }
+  try{ localStorage.removeItem(CODE_KEY); } catch(e){}
+  gateMsg = quiet ? '' : r === 'wrong' ? 'That passcode isn\'t right.' : r === 'locked' ? 'Too many wrong tries. Wait an hour and try again.' : 'Couldn\'t reach the server. Check the connection and try again.';
+  gateScreen();
+  return false;
+}
+async function boot(){
+  const linkId = PRESENT || SHOW || QUOTE;
+  if(linkId){
+    // someone holding a sheet's link: the list comes with the link, no passcode
+    $('root').innerHTML = '<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>Opening…</h2></div></div>';
+    let r = 'down'; try{ r = await fetchCatalog({ id:linkId }); } catch(e){}
+    if(r !== 'ok'){ $('totalbar').style.display = 'none'; $('root').innerHTML = `<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>This link isn't active.</h2><p class="lede" style="margin:8px auto 0">Ask your Alden Homes rep to share it again.</p></div></div>`; return; }
+  } else {
+    let saved = ''; try{ saved = localStorage.getItem(CODE_KEY) || ''; } catch(e){}
+    if(!saved){ gateScreen(); return; }
+    if(!(await tryCode(saved, true))) return;
+  }
+  start();
+}
+function start(){
+  load();
+  if(SHOW){ loadShow(); return; }
+  if(QUOTE){ loadShared(QUOTE, st=>{ quoteState = st; }); return; }
+  // the customer's screen opens on whatever the office is looking at
+  if(PRESENT){ try{ const nv = JSON.parse(localStorage.getItem(NAV) || 'null'); if(nv && nv.id === PRESENT){ tab = nv.tab; roomId = nv.roomId; } } catch(e){} }
+  render();
+}
+document.addEventListener('click', async e=>{ if(e.target.closest('#gateGo')){ const code = ($('gateCode').value || '').trim(); if(!code) return; if(await tryCode(code)) start(); } });
+document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'gateCode') $('gateGo').click(); });
+boot();
+
 </script>
 </body>
 </html>

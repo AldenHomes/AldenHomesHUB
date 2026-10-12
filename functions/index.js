@@ -1105,11 +1105,36 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
    security rule). The sheet's id is the key — anyone with the link can open that sample sheet.
    REMOVE this function and delete that collection when the demo is retired or merged.
    ============================================================ */
-const DEMO_FIELDS = ['name', 'name2', 'phone', 'email', 'dev', 'lot', 'model', 'stage', 'created', 'v1Date', 'updated', 'pricedOn', 'v1Snap', 'custom', 'favs', 'cos', 'signedOn', 'quoteOk'];
+const DEMO_FIELDS = ['name', 'name2', 'phone', 'email', 'dev', 'lot', 'model', 'stage', 'created', 'v1Date', 'updated', 'pricedOn', 'v1Snap', 'custom', 'favs', 'cos', 'signedOn', 'quoteOk', 'line', 'basePrice'];
+// The demo's price list (read from BuilderTrend's master selections template) and its passcode are NOT in the public repo:
+// functions/demo-catalog.json and functions/.env.alden-homes-hub (DEMO_CODE=…) are git-excluded and only travel with a deploy.
+let DEMO_CATALOG = null;
+try{ DEMO_CATALOG = require('./demo-catalog.json'); } catch(e){ /* not deployed with the list: the demo says so */ }
+const DEMO_CODE = process.env.DEMO_CODE || '';
 exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (req, res)=>{
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
   const b = req.body || {};
   const id = typeof b.id === 'string' && /^L[a-z0-9]{4,12}$/.test(b.id) ? b.id : '';
+  // The price list: handed over for the right passcode, or to a customer screen / shared link whose sheet exists.
+  // Wrong passcodes are counted, and after 40 in an hour nobody gets in until the next hour (a 4-digit code needs that).
+  if(b.action === 'catalog'){
+    try{
+      if(!DEMO_CATALOG || !DEMO_CODE){ res.status(503).json({ error: 'not-set-up' }); return; }
+      let ok = false;
+      if(typeof b.code === 'string' && b.code){
+        const gate = db.collection('demo-config').doc('gate'), hour = new Date().toISOString().slice(0, 13);
+        const g = (await gate.get()).data() || {};
+        const fails = g.hour === hour ? (g.fails || 0) : 0;
+        if(fails >= 40){ res.status(429).json({ error: 'locked' }); return; }
+        if(b.code === DEMO_CODE) ok = true; else await gate.set({ hour, fails: fails + 1 });
+      } else if(id){
+        ok = (await db.collection('demo-selections').doc(id).get()).exists;
+      }
+      if(!ok){ res.status(403).json({ error: 'code' }); return; }
+      res.json({ catalog: DEMO_CATALOG });
+    } catch(err){ logger.error('demoSync catalog failed', { error: String(err) }); res.status(500).json({ error: 'server' }); }
+    return;
+  }
   if(!id){ res.status(400).json({ error: 'id' }); return; }
   const ref = db.collection('demo-selections').doc(id);
   try{
