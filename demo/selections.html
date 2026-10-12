@@ -294,6 +294,32 @@
   .cho .stepper span{min-width:34px;font-size:15px}
   .gate{max-width:380px;margin:12vh auto 0;text-align:center}
   .gate input{font-family:"Courier New",monospace;font-size:34px;letter-spacing:14px;text-align:center;padding:14px 8px}
+  /* "this home has": what doesn't apply is left off the sheet */
+  .hasbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:16px;font-size:13.5px;color:var(--ink-soft)}
+  .hasbar button{border:2px solid var(--line);background:#fff;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .hasbar button.on{border-color:var(--sage-2);background:var(--sage-soft);color:var(--sage-2)}
+  .hasbar button:disabled{cursor:default;opacity:.7}
+  .modesw{display:inline-flex;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff}
+  .modesw button{border:none;background:none;padding:6px 13px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+  .modesw button.on{background:var(--navy);color:#fff}
+  /* one selection at a time */
+  .g-top{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .g-top .bar{flex:1;height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden}
+  .g-top .bar span{display:block;height:100%;background:var(--sage-2);transition:width .2s}
+  .guide .q{padding:22px 24px 20px;margin-top:12px}
+  .guide .sel{border-top:none;padding:0}
+  .guide .sel-h{cursor:default}
+  .guide .sel-h b{font-size:24px;font-family:Georgia,serif;text-decoration:none!important}
+  .guide .sel-h .arrow{display:none}
+  .guide .cho{padding:14px 16px;margin-top:10px}
+  .guide .cho .ct{font-size:16.5px}
+  .guide .cho .cp{font-size:15.5px}
+  .guide .cho button.tog{padding:9px 20px;font-size:15px}
+  .g-nav{display:flex;gap:10px;align-items:center;margin-top:16px}
+  .g-nav .btn{padding:13px 22px;font-size:16px}
+  .g-std{font-size:13.5px;color:var(--ink-soft);margin-top:12px}
+  body.present .guide .sel-h b{font-size:30px}
+  body.present .guide .cho .ct{font-size:20px}
   @media print{ body.printdoc #root > :not(.docwrap){display:none!important} body.printdoc .doc, body.quote .doc{box-shadow:none;max-width:none;margin:0;padding:10mm 12mm} body.quote{background:#fff} }
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
@@ -435,11 +461,14 @@ function seedLeads(){
   };
   const mk = (o, picks)=>{
     const L = { id:'L'+Math.random().toString(36).slice(2,8), name2:'', phone:'', email:'', answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null, ...o };
+    const lp = ALL_QS.find(isLotPrem);
+    if(lp && o.lotPremium) L.answers[lp.id + '#0'] = { qty:1, price:o.lotPremium };
+    delete L.lotPremium;
     picks.forEach(p=>take(L, p[0], p[1], p[2]));
     return L;
   };
   // 1. came in for pricing in the spring and hasn't been back — two prices have gone up since
-  const a = mk({ name:'Dan & Erin Hostetter', phone:'717-555-0148', email:'hostetter@example.com', dev:'AP', lot:'151', line:'ALDEN', model:'Coleman', basePrice:389900, stage:'v1', created:daysAgo(128), v1Date:daysAgo(128), updated:daysAgo(128), pricedOn:daysAgo(128) },
+  const a = mk({ name:'Dan & Erin Hostetter', phone:'717-555-0148', email:'hostetter@example.com', dev:'AP', lot:'151', line:'ALDEN', model:'Coleman', basePrice:389900, lotPremium:12000, stage:'v1', created:daysAgo(128), v1Date:daysAgo(128), updated:daysAgo(128), pricedOn:daysAgo(128) },
     [[126,'Coleman Basement'],[128,"9' tall"],[140,'Sump Pump'],[244,"Upg. to 9'"],[550,''],[424,'',3],[236,'Storm Door']]);
   Object.keys(a.answers).forEach(k=>{ const q = qOfKey(k); if(q && (q.bt === '128' || q.bt === '244')) a.answers[k].price -= 300; });   // quoted lower back then
   a.v1Snap = snapAll(a);
@@ -447,14 +476,14 @@ function seedLeads(){
              { text:'Left a voicemail to check in. No answer.', at:daysAgo(61) }];
   a.follow = { date:daysAgo(0), what:'Check in. Their house was due to go on the market this month.' };
   // 2. back for selections, part-way through the deep dive
-  const b = mk({ name:'Marcus Reyes', name2:'Tasha Reyes', phone:'717-555-0172', email:'reyes@example.com', dev:'CL', lot:'102', line:'ALDEN', model:'Stanford', basePrice:452500, stage:'v2', created:daysAgo(24), v1Date:daysAgo(24), updated:daysAgo(2), pricedOn:daysAgo(24) },
+  const b = mk({ name:'Marcus Reyes', name2:'Tasha Reyes', phone:'717-555-0172', email:'reyes@example.com', dev:'CL', lot:'102', line:'ALDEN', model:'Stanford', basePrice:452500, lotPremium:8500, stage:'v2', created:daysAgo(24), v1Date:daysAgo(24), updated:daysAgo(2), pricedOn:daysAgo(24) },
     [[126,'Stanford Basement'],[136,'per sq ft',600],[138,'Finish full bath'],[152,'Man door'],[153,'50 Amp'],[256,"5' tile shower w/corian"],[273,'Kohler Persuade'],[420,'',6],[426,''],[701,''],[206,'Std. style single',2]]);
   b.v1Snap = snapAll(b);
   [[277,'Round Mirror - black'],[275,'Bidet Seat w/remote'],[232,'Schlage Encode'],[268,'BLACK'],[214,'Glass double french'],[220,'Black or color trim']].forEach(p=>take(b, p[0], p[1], p[2]));
   b.notes = [{ text:'Had a call. They want to move forward. Booked the selections meeting.', at:daysAgo(6) }];
   b.follow = { date:daysAhead(5), what:'Confirm the cabinet choices before cabinets are ordered.' };
   // 3. signed and locked, with one change order since
-  const c = mk({ name:'Priya Nair', name2:'Sam Nair', phone:'717-555-0119', email:'nair@example.com', dev:'ML', lot:'117', line:'MCC', model:'Carmody', basePrice:478000, stage:'signed', created:daysAgo(70), v1Date:daysAgo(70), updated:daysAgo(9), pricedOn:daysAgo(38), signedOn:daysAgo(38) },
+  const c = mk({ name:'Priya Nair', name2:'Sam Nair', phone:'717-555-0119', email:'nair@example.com', dev:'ML', lot:'117', line:'MCC', model:'Carmody', basePrice:478000, lotPremium:6000, stage:'signed', created:daysAgo(70), v1Date:daysAgo(70), updated:daysAgo(9), pricedOn:daysAgo(38), signedOn:daysAgo(38) },
     [[126,'Carmody'],[134,'egress'],[140,'battery'],[153,'50 Amp'],[160,'all glass'],[194,'bench and pegs'],[206,'Obscure single',2],[208,'Live edge'],[210,'Hidden'],[232,'Schlage Encode'],[236,'Hide-a-way'],
      [244,"10' Ceiling"],[246,'vaulted ceiling in great room'],[256,"5' tile shower w/corian"],[258,'Soaking Tub'],[263,'corian seat'],[273,'Kohler Persuade'],[274,'soft close'],[275,'Purewash'],[277,'Round Mirror - gold'],[280,'grab bar'],[288,'fan light combo'],
      [313,'18'],[420,'',8],[424,'',4],[426,''],[701,''],[224,'Cubbies and Desk'],[220,'Black or color trim']]);
@@ -489,13 +518,13 @@ window.addEventListener('storage', e=>{
     const y = window.scrollY; echo = true; render(); echo = false; window.scrollTo(0, y); flashKey = '';
   }
   if(e.key === NAV && PRESENT){
-    try{ const nv = JSON.parse(e.newValue || 'null'); if(nv && nv.id === PRESENT && (nv.tab !== tab || nv.roomId !== roomId)){ tab = nv.tab; roomId = nv.roomId; echo = true; render(); echo = false; window.scrollTo(0, 0); } } catch(err){}
+    try{ const nv = JSON.parse(e.newValue || 'null'); if(nv && nv.id === PRESENT && (nv.tab !== tab || nv.roomId !== navRoom())){ tab = nv.tab; setNavRoom(nv.roomId); echo = true; render(); echo = false; window.scrollTo(0, 0); } } catch(err){}
   }
 });
 let lastNav = '';
 function tellNav(){
   if(PRESENT || !cur || ['vendors','codes'].includes(tab)) return;
-  const nv = JSON.stringify({ id:cur, tab, roomId });
+  const nv = JSON.stringify({ id:cur, tab, roomId: navRoom() });
   if(nv !== lastNav){ lastNav = nv; try{ localStorage.setItem(NAV, nv); } catch(e){} }
 }
 const presentUrl = L=>location.href.split('?')[0].split('#')[0] + '?present=' + encodeURIComponent(L.id);
@@ -507,7 +536,13 @@ const locked = L=>L.stage === 'signed';
 const plus = n=>n < 0 ? '− ' + money(-n) + ' credit' : '+ ' + money(n);
 const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2);
 // a selection that belongs to the other collection isn't asked
-const asked = (q, L)=>!q.line || !L.line || q.line === L.line || !LINE_NAMES[q.line];
+const isLotPrem = q=>!q.num && /lot premium/i.test(q.t);
+const asked = (q, L)=>{
+  if(!q.num && !isLotPrem(q)) return false;      // BuilderTrend's unnumbered "Contract Price" and "Miscellaneous" lines hold nothing
+  if(q.line && L.line && q.line !== L.line && LINE_NAMES[q.line]) return false;
+  const f = featOf(q);
+  return !f || hasFeat(L, f);
+};
 // the basement line lists every home style: show only this home's, when there is one
 const choicesOf = (q, L)=>{ const all = q.c.map((c, i)=>({ ...c, i })); if(q.bt !== '126' || !L.model) return all; const mine = all.filter(c=>c.t.toLowerCase().replace(/ basement$/, '') === L.model.toLowerCase()); return mine.length ? mine : all; };
 const missing = ()=>[];                       // nothing on either sheet has to be answered: untouched = standard
@@ -536,7 +571,7 @@ const upgradeCost = ()=>0;
 const coTotal = L=>L.cos.reduce((s,c)=>s+c.price,0) + L.cos.length * CO_FEE;
 const total = L=>base(L) + upgrades(L) + coTotal(L);
 // today's price for an answer, to spot prices that moved since the sheet was priced
-function todayPrice(k, a){ const q = qOfKey(k), c = q ? q.c[Number(k.split('#')[1])] : null; return { price: c && c.p != null ? c.p : a.price, cost:0 }; }
+function todayPrice(k, a){ const q = qOfKey(k), c = q ? q.c[Number(k.split('#')[1])] : null; return { price: c && c.p ? c.p : a.price, cost:0 }; }   // a typed amount or a "price to come" keeps what was entered
 function drift(L){
   if(locked(L)) return [];
   return Object.entries(L.answers).filter(([k,a])=>k.includes('#') && a.qty).map(([k,a])=>{ const t = todayPrice(k, a); return { k, a, t, diff:(t.price - a.price) * a.qty }; }).filter(x=>x.diff !== 0);
@@ -544,8 +579,13 @@ function drift(L){
 let openSel = new Set(), openFor = '';
 function openDefault(list){ const key = cur + '|' + tab + '|' + roomId; if(openFor !== key){ openFor = key; openSel = new Set(list.length ? [list[0].id] : []); } }
 // one selection: its choices, each one tap to take (or a count / square feet where that's how it's priced)
-function prow(q, L){
+function prow(q, L, force){
   if(!asked(q, L)) return '';
+  if(isLotPrem(q)){                               // not a choice: an amount for this lot
+    const a = L.answers[q.id + '#0'];
+    return `<div class="sel open" id="q-${q.id}"><div class="sel-h" style="cursor:default"><b>Lot premium</b></div>
+      <div class="cho ${a ? 'on' : ''}"><span class="ct">What this lot adds to the price</span><span class="muted">$</span><input type="number" min="0" step="100" data-lotprem="${esc(q.id)}" value="${a ? a.price : ''}" placeholder="0" style="width:130px" ${locked(L) ? 'disabled' : ''}></div></div>`;
+  }
   const staff = view === 'staff', lock = locked(L);
   const was = L.v1Snap ? (L.v1Snap[q.id] || '') : null, now = snapQ(q, L);
   const changed = q.v1 && was !== null && was !== now ? `<span class="chip soon">changed since pricing${was ? ' · was ' + esc(was) : ' · added'}</span>` : '';
@@ -558,10 +598,10 @@ function prow(q, L){
         + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
     return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
   }).join('');
-  const isOpen = openSel.has(q.id), shown = choicesOf(q, L);
+  const isOpen = force || openSel.has(q.id), shown = choicesOf(q, L);
   const got = shown.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty), sum = got.reduce((t, c)=>{ const a = L.answers[q.id + '#' + c.i]; return t + a.price * a.qty; }, 0);
   const picked = got.length ? `<span class="picked">${got.length === 1 ? esc(got[0].t.length > 34 ? got[0].t.slice(0, 32) + '…' : got[0].t) : got.length + ' chosen'}${sum ? ' · ' + plus(sum) : ''}</span>` : '';
-  return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" data-sel="${esc(q.id)}" aria-expanded="${isOpen}"><b>${esc(q.t)}</b>${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
+  return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" ${force ? '' : `data-sel="${esc(q.id)}"`} aria-expanded="${isOpen}"><b>${esc(q.t)}</b>${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
       ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}${isOpen || got.length ? '' : `<span class="cnt">${shown.length} choice${shown.length === 1 ? '' : 's'}</span>`}
       <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
     ${isOpen ? (rows || '<div class="q-sub">No choices are set up for this one yet.</div>') : ''}</div>`;
@@ -623,7 +663,7 @@ async function syncTick(){
   if(sync.id !== cur) sync = { id:cur, rev:0, last:null, busy:false, nav:'', state:'connecting', fails:0 };
   const L = lead(), sent = L ? clone(L) : null;
   let body;
-  const navNow = !PRESENT && L && !['vendors','codes'].includes(tab) ? JSON.stringify({ tab, roomId }) : '';
+  const navNow = !PRESENT && L && !['vendors','codes'].includes(tab) ? JSON.stringify({ tab, roomId: navRoom() }) : '';
   if(!PRESENT && L && !sync.last){
     // first share from the office: this device's copy is the one that counts
     const pub = clone(sent); delete pub.notes; delete pub.follow;
@@ -648,7 +688,7 @@ async function syncTick(){
       if(data.sheet){ takeRemote(data.sheet, sent, body); sync.rev = data.rev; }
       if(PRESENT && data.nav){
         const nv = JSON.stringify(data.nav);
-        if(nv !== sync.nav){ sync.nav = nv; if(data.nav.tab !== tab || data.nav.roomId !== roomId){ tab = data.nav.tab || tab; roomId = data.nav.roomId || roomId; render(); window.scrollTo(0, 0); } }
+        if(nv !== sync.nav){ sync.nav = nv; if(data.nav.tab !== tab || data.nav.roomId !== navRoom()){ tab = data.nav.tab || tab; setNavRoom(data.nav.roomId); render(); window.scrollTo(0, 0); } }
       }
     }
     if(before !== sync.state) render();
@@ -679,7 +719,7 @@ function takeRemote(sheet, sent, body){
     const q = qOfKey(theirs), a = sheet.answers[theirs];
     if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + ' — ' + snapVal(a, q, theirs)); }
   }
-  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-bt-num],[data-note],[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
+  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-bt-num],[data-note],[data-lotprem],[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
   if(changed && !typing){ const y = window.scrollY; render(); window.scrollTo(0, y); }
   flashKey = '';
 }
@@ -940,36 +980,98 @@ function question(q, L, opts){
     ${inner}</div>`;
 }
 
-// One meeting's worth of sections, one at a time, with the list down the side. kind 'v1' = Pricing (the lines on the paper
-// pricing sheet), 'full' = Selections (everything). Same answers either way.
+/* ---------- what's in this home ----------
+   Whole groups of selections only matter if the home has the thing: basement extras need a basement, the third-bath lines
+   need a third bath. Most are settled by what was picked at pricing (take a basement there and its detail lines appear here);
+   two have no line of their own to go by, so they're simply switched on or off. A chip at the top of the sheet shows each one
+   and can override it. Switched off = those selections are left off the sheet entirely. */
+const FEATURES = [
+  { id:'bsmt',   name:'Basement',            heads:[126],         from:127, to:149 },
+  { id:'bath3',  name:'Third bath',          heads:[],            from:340, to:378, dflt:false },
+  { id:'powder', name:'Powder bath',         heads:[],            from:379, to:399, dflt:true },
+  { id:'fire',   name:'Fireplace',           heads:[550],         from:551, to:599 },
+  { id:'deck',   name:'Patio or deck',       heads:[600, 640],    from:601, to:659 },
+  { id:'porch',  name:'Porch or sunroom',    heads:[660,672,684], from:660, to:699 },
+  { id:'attic',  name:'Attic room',          heads:[760],         from:761, to:779 },
+  { id:'second', name:'Second-floor space',  heads:[740],         from:741, to:759 },
+];
+const featOf = q=>FEATURES.find(f=>q.num >= f.from && q.num <= f.to && !f.heads.includes(q.num));
+// how many choices on the sheet sit inside a feature (its own line counts: taking a basement is what turns the basement on)
+function featCount(L, f){
+  const lo = Math.min(f.from, ...f.heads), hi = f.to;
+  return Object.keys(L.answers).filter(k=>{ if(!k.includes('#') || !L.answers[k].qty) return false; const q = qOfKey(k); return q && ((q.num >= lo && q.num <= hi) || f.heads.includes(q.num)); }).length;
+}
+function hasFeat(L, f){
+  const o = L.answers['has:' + f.id];
+  if(o) return o.qty > 0;
+  return featCount(L, f) > 0 || !!f.dflt;
+}
+// the sections of a meeting that have anything to ask for this home
+const sectionsFor = (L, list)=>list.filter(r=>r.qs.some(q=>asked(q, L)));
+
+/* ---------- one at a time, or the whole section ---------- */
+let gIdx = 0, followGuide = null;
+const modes = { v1:'list', full:'guide' };          // pricing is a quick pass down a list; selections is talked through item by item
+try{ Object.assign(modes, JSON.parse(localStorage.getItem('aldenDemoModes') || '{}')); } catch(e){}
+const modeOf = ()=>PRESENT && followGuide !== null ? (followGuide ? 'guide' : 'list') : (modes[tab] || 'list');
+// where the office is, for the customer's screen to follow: the section, and in one-at-a-time view which selection
+const navRoom = ()=>roomId + ((tab === 'v1' || tab === 'full') && modeOf() === 'guide' ? '~' + gIdx : '');
+function setNavRoom(str){ const p = String(str || '').split('~'); if(p[0]) roomId = p[0]; if(p.length > 1){ gIdx = Number(p[1]) || 0; followGuide = true; } else followGuide = false; }
+
+// One meeting's worth of sections, with the list down the side. kind 'v1' = Pricing (the lines on the paper pricing sheet),
+// 'full' = Selections (everything). Same answers either way. Each can be worked one selection at a time or as a whole section.
 function sheetView(L, kind){
-  const staff = view === 'staff', pricing = kind === 'v1', list = pricing ? PRICING : ROOMS;
-  const r = list.find(x=>x.id===roomId) || list[0], i = list.indexOf(r), next = list[i+1];
-  const ls = lines(L);
+  const pricing = kind === 'v1', list = sectionsFor(L, pricing ? PRICING : ROOMS);
+  if(!list.length) return '<div class="card"><p class="muted">Nothing to choose for this home.</p></div>';
+  const r = list.find(x=>x.id===roomId) || list[0], i = list.indexOf(r), next = list[i+1], prev = list[i-1];
+  if(r.id !== roomId) roomId = r.id;
+  const ls = lines(L), lock = locked(L);
   const nav = list.map(x=>{ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length + L.custom.filter(c=>c.room === x.id).length;
     return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? `<span class="done" style="font-size:12px">${n}</span>` : ''}</div></button>`; }).join('');
   const qs = r.qs.filter(q=>asked(q, L));
-  openDefault(qs);
   const nk = noteKey(r), note = L.answers[nk];
-  const done = pricing && !next && !locked(L) ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+  const guide = modeOf() === 'guide';
+  const hasbar = PRESENT ? '' : `<div class="hasbar noprint"><span>This home has:</span>${FEATURES.map(f=>{ const on = hasFeat(L, f), n = featCount(L, f);
+      return `<button type="button" class="${on ? 'on' : ''}" data-has="${f.id}" ${lock ? 'disabled' : ''} title="${on ? 'Its selections are on the sheet' : 'Its selections are left off the sheet'}">${on ? '&#10003; ' : ''}${esc(f.name)}${n ? ' · ' + n : ''}</button>`; }).join('')}
+      <div class="grow"></div><div class="modesw"><button type="button" class="${guide ? 'on' : ''}" data-mode="guide">One at a time</button><button type="button" class="${guide ? '' : 'on'}" data-mode="list">Whole section</button></div></div>`;
+  const notes = `<div class="sel"><div class="sel-h" style="cursor:default"><b style="font-size:15.5px;font-family:inherit">Notes for ${esc(r.name)}</b></div><textarea data-note="${esc(nk)}" maxlength="600" style="margin-top:8px;min-height:54px;resize:vertical" ${lock ? 'disabled' : ''}>${esc(note ? note.label : '')}</textarea></div>`;
+  const finish = pricing && !next && !lock ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <p style="flex:1 1 260px"><strong>That's the whole pricing sheet.</strong> Anything left untouched stays at standard. It's saved as a lead either way, and everything picked here is already on the selections sheet for the next meeting.</p>
       ${PRESENT ? '' : '<button type="button" class="btn" id="saveClose">Save &amp; close</button>'}
       <button type="button" class="btn primary" id="toFull">Carry on to selections</button></div>` : '';
-  return `<div class="rooms">
-    <div class="roomnav noprint">${nav}</div>
-    <div>
-      <div class="eyebrow">${pricing ? 'Pricing · first meeting' : 'Selections · the deep dive'} · ${i+1} of ${list.length}</div>
-      <h2 style="font-size:22px;margin-top:4px">${esc(r.name)}</h2>
-      ${i === 0 ? `<p class="lede">${pricing ? 'The pricing sheet, section by section. Tap what they want and skip the rest. Anything left alone stays at standard.' : 'Every selection for this home. What was picked at pricing is already filled in. Go as deep as they want to.'}</p>` : ''}
-      <div class="q" style="padding:6px 18px 12px">${qs.map(q=>prow(q, L)).join('') || '<p class="muted" style="padding:10px 0">Nothing to choose here for this home.</p>'}
-        <div class="sel"><div class="sel-h"><b>Notes for ${esc(r.name)}</b></div><textarea data-note="${esc(nk)}" maxlength="600" style="margin-top:8px;min-height:54px;resize:vertical" ${locked(L) ? 'disabled' : ''}>${esc(note ? note.label : '')}</textarea></div></div>
+  let body;
+  if(guide){
+    gIdx = Math.max(0, Math.min(qs.length - 1, gIdx));
+    const q = qs[gIdx], atEnd = gIdx >= qs.length - 1;
+    const picked = q ? choicesOf(q, L).some(c=>(L.answers[q.id + '#' + c.i] || {}).qty) : false;
+    const fwd = !atEnd ? (picked ? 'Next' : 'Keep standard') : next ? 'On to ' + next.name : pricing ? 'Finish pricing' : 'See the summary';
+    body = `<div class="guide">
+      <div class="g-top"><span>${esc(r.name)} · ${qs.length ? gIdx + 1 : 0} of ${qs.length}</span><div class="bar"><span style="width:${qs.length ? (gIdx + 1) / qs.length * 100 : 0}%"></span></div></div>
+      <div class="q">${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
+        ${q && !picked && !lock ? '<div class="g-std">Nothing picked means this stays standard.</div>' : ''}</div>
+      <div class="g-nav noprint">
+        ${gIdx > 0 || prev ? `<button type="button" class="btn" data-g="-1">&larr; Back</button>` : ''}
+        <div class="grow"></div>
+        <button type="button" class="btn primary" data-g="1">${esc(fwd)} &rarr;</button></div>
+      ${atEnd ? `<div class="q" style="padding:6px 18px 12px;margin-top:16px">${notes}</div>${customBlock(L, r)}${finish}` : ''}
+    </div>`;
+  } else {
+    openDefault(qs);
+    body = `<div class="q" style="padding:6px 18px 12px">${qs.map(q=>prow(q, L)).join('') || '<p class="muted" style="padding:10px 0">Nothing to choose here for this home.</p>'}${notes}</div>
       ${customBlock(L, r)}
-      ${done}
+      ${finish}
       <div class="noprint" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-        ${i > 0 ? `<button type="button" class="btn" data-room="${list[i-1].id}">&larr; ${esc(list[i-1].name)}</button>` : ''}
+        ${prev ? `<button type="button" class="btn" data-room="${prev.id}">&larr; ${esc(prev.name)}</button>` : ''}
         <div class="grow"></div>
         ${next ? `<button type="button" class="btn primary" data-room="${next.id}">Next: ${esc(next.name)} &rarr;</button>` : (pricing ? '' : `<button type="button" class="btn primary" data-tab="summary">See the summary &rarr;</button>`)}
-      </div>
+      </div>`;
+  }
+  return `${hasbar}<div class="rooms">
+    <div class="roomnav noprint">${nav}</div>
+    <div>
+      <div class="eyebrow">${pricing ? 'Pricing · first meeting' : 'Selections · the deep dive'} · section ${i+1} of ${list.length}</div>
+      <h2 style="font-size:22px;margin-top:4px">${esc(r.name)}</h2>
+      ${body}
     </div></div>`;
 }
 
@@ -1232,7 +1334,7 @@ document.addEventListener('click', e=>{
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
     leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
-  const open = t.closest('[data-open]'); if(open){ cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; render(); window.scrollTo(0, 0); return; }
+  const open = t.closest('[data-open]'); if(open){ cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
   if(!PRESENT){
     const setFollow = date=>{ L.follow = { date, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(date)); };
@@ -1245,6 +1347,39 @@ document.addEventListener('click', e=>{
     }
     const dn = t.closest('[data-delnote]'); if(dn){ L.notes = noteList(L).filter(nt=>(nt.at + '|' + nt.text.slice(0, 20)) !== dn.dataset.delnote); render(); return; }
   }
+  const md = t.closest('[data-mode]');
+  if(md && (tab === 'v1' || tab === 'full')){
+    const list = sectionsFor(L, tab === 'v1' ? PRICING : ROOMS), r = list.find(x=>x.id === roomId) || list[0], qs = r ? r.qs.filter(q=>asked(q, L)) : [];
+    // switching views keeps your place: the selection you were on is the one that's open
+    if(md.dataset.mode === 'list'){ const q = qs[gIdx]; openFor = cur + '|' + tab + '|' + roomId; openSel = new Set(q ? [q.id] : []); }
+    else { const first = qs.findIndex(q=>openSel.has(q.id)); gIdx = first >= 0 ? first : 0; }
+    modes[tab] = md.dataset.mode; followGuide = null;
+    try{ localStorage.setItem('aldenDemoModes', JSON.stringify(modes)); } catch(err){}
+    render(); return;
+  }
+  const gb = t.closest('[data-g]');
+  if(gb && (tab === 'v1' || tab === 'full')){
+    const list = sectionsFor(L, tab === 'v1' ? PRICING : ROOMS), i = Math.max(0, list.findIndex(x=>x.id === roomId)), qs = list[i] ? list[i].qs.filter(q=>asked(q, L)) : [];
+    const d = Number(gb.dataset.g);
+    if(d > 0){
+      if(gIdx < qs.length - 1) gIdx++;
+      else if(list[i + 1]){ roomId = list[i + 1].id; gIdx = 0; }
+      else if(tab === 'full'){ tab = 'summary'; }
+      else { const fin = document.getElementById('toFull'); if(fin){ fin.scrollIntoView({ block:'center' }); return; } }
+    } else {
+      if(gIdx > 0) gIdx--;
+      else if(list[i - 1]){ roomId = list[i - 1].id; gIdx = list[i - 1].qs.filter(q=>asked(q, L)).length - 1; }
+    }
+    render(); window.scrollTo(0, 0); return;
+  }
+  const hb = t.closest('[data-has]');
+  if(hb && !locked(L)){
+    const f = FEATURES.find(x=>x.id === hb.dataset.has), on = hasFeat(L, f), count = featCount(L, f);
+    // switching something off would silently drop what's been chosen in it, so that has to be cleared first
+    if(on && count){ toast(f.name + ' has ' + count + ' choice' + (count === 1 ? '' : 's') + ' on this sheet. Take ' + (count === 1 ? 'it' : 'them') + ' off first.'); return; }
+    L.answers['has:' + f.id] = { qty: on ? -1 : 1, price:0 };
+    gIdx = 0; touch(L); render(); toast(f.name + (on ? ' left off the sheet' : ' added to the sheet')); return;
+  }
   const sh = t.closest('[data-sel]');
   if(sh){ const id = sh.dataset.sel; if(openSel.has(id)) openSel.delete(id); else openSel.add(id); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   if(t.closest('#shareBtn')){
@@ -1256,7 +1391,7 @@ document.addEventListener('click', e=>{
   if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); cur = null; render(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
   const tb = t.closest('[data-tab]'); if(tb){ tab = tb.dataset.tab; if(tab === 'v1' && !PRICING.some(x=>x.id === roomId)) roomId = PRICING[0].id; if(tab === 'full' && !ROOMS.some(x=>x.id === roomId)) roomId = ROOMS[0].id; render(); window.scrollTo(0, 0); return; }
-  const rm = t.closest('[data-room]'); if(rm){ roomId = rm.dataset.room; if(tab !== 'v1' && tab !== 'full') tab = 'full'; render(); window.scrollTo(0, 0); return; }
+  const rm = t.closest('[data-room]'); if(rm){ gIdx = 0; roomId = rm.dataset.room; if(tab !== 'v1' && tab !== 'full') tab = 'full'; render(); window.scrollTo(0, 0); return; }
   const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#printBtn')){ window.print(); return; }
   if(t.closest('#docPrint')){ window.print(); return; }
@@ -1352,6 +1487,12 @@ document.addEventListener('click', e=>{
 document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); });
 document.addEventListener('change', e=>{
   if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); return; }
+  if(e.target.dataset && e.target.dataset.lotprem){
+    const L2 = lead(); if(!L2 || locked(L2)) return;
+    const k = e.target.dataset.lotprem + '#0', v = Math.max(0, Math.round(Number(e.target.value) || 0));
+    if(v) L2.answers[k] = { qty:1, price:v }; else delete L2.answers[k];
+    touch(L2); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
   if(e.target.dataset && (e.target.dataset.btNum || e.target.dataset.note)){
     const L1 = lead(); if(!L1 || locked(L1)) return;
     if(e.target.dataset.note){ const v = e.target.value.trim(); if(v) L1.answers[e.target.dataset.note] = { label:v, qty:0, price:0 }; else delete L1.answers[e.target.dataset.note]; }
@@ -1429,7 +1570,7 @@ function start(){
   if(SHOW){ loadShow(); return; }
   if(QUOTE){ loadShared(QUOTE, st=>{ quoteState = st; }); return; }
   // the customer's screen opens on whatever the office is looking at
-  if(PRESENT){ try{ const nv = JSON.parse(localStorage.getItem(NAV) || 'null'); if(nv && nv.id === PRESENT){ tab = nv.tab; roomId = nv.roomId; } } catch(e){} }
+  if(PRESENT){ try{ const nv = JSON.parse(localStorage.getItem(NAV) || 'null'); if(nv && nv.id === PRESENT){ tab = nv.tab; setNavRoom(nv.roomId); } } catch(e){} }
   render();
 }
 document.addEventListener('click', async e=>{ if(e.target.closest('#gateGo')){ const code = ($('gateCode').value || '').trim(); if(!code) return; if(await tryCode(code)) start(); } });
