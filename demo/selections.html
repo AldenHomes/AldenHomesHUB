@@ -274,6 +274,14 @@
   .sel:first-child{border-top:none;padding-top:4px}
   .sel-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
   .sel-h b{font-size:15.5px;color:var(--navy)}
+  /* a selection's heading is a button: closed, it's one line saying what (if anything) was picked */
+  .sel-h{width:100%;border:none;background:none;padding:0;text-align:left;font-family:inherit;cursor:pointer;color:inherit}
+  .sel-h .arrow{margin-left:auto;flex:none;color:var(--ink-soft);transition:transform .12s}
+  .sel.open .sel-h .arrow{transform:rotate(180deg)}
+  .sel-h .picked{font-size:13px;color:#27573a;background:var(--good-soft);border-radius:20px;padding:2px 10px;font-weight:700}
+  .sel-h .cnt{font-size:12.5px;color:var(--ink-soft)}
+  .sel:not(.open){padding:11px 0}
+  .sel-h:hover b{text-decoration:underline}
   .cho{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;border:2px solid var(--line);border-radius:10px;padding:8px 12px;background:#fff}
   .cho.on{border-color:var(--good);background:var(--good-soft)}
   .cho .ct{flex:1 1 200px;min-width:0;font-size:14.5px;font-weight:600}
@@ -533,6 +541,8 @@ function drift(L){
   if(locked(L)) return [];
   return Object.entries(L.answers).filter(([k,a])=>k.includes('#') && a.qty).map(([k,a])=>{ const t = todayPrice(k, a); return { k, a, t, diff:(t.price - a.price) * a.qty }; }).filter(x=>x.diff !== 0);
 }
+let openSel = new Set(), openFor = '';
+function openDefault(list){ const key = cur + '|' + tab + '|' + roomId; if(openFor !== key){ openFor = key; openSel = new Set(list.length ? [list[0].id] : []); } }
 // one selection: its choices, each one tap to take (or a count / square feet where that's how it's priced)
 function prow(q, L){
   if(!asked(q, L)) return '';
@@ -548,9 +558,13 @@ function prow(q, L){
         + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
     return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
   }).join('');
-  return `<div class="sel" id="q-${q.id}"><div class="sel-h"><b>${esc(q.t)}</b>${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${changed}
-      ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}</div>
-    ${rows || '<div class="q-sub">No choices are set up for this one yet.</div>'}</div>`;
+  const isOpen = openSel.has(q.id), shown = choicesOf(q, L);
+  const got = shown.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty), sum = got.reduce((t, c)=>{ const a = L.answers[q.id + '#' + c.i]; return t + a.price * a.qty; }, 0);
+  const picked = got.length ? `<span class="picked">${got.length === 1 ? esc(got[0].t.length > 34 ? got[0].t.slice(0, 32) + '…' : got[0].t) : got.length + ' chosen'}${sum ? ' · ' + plus(sum) : ''}</span>` : '';
+  return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" data-sel="${esc(q.id)}" aria-expanded="${isOpen}"><b>${esc(q.t)}</b>${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
+      ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}${isOpen || got.length ? '' : `<span class="cnt">${shown.length} choice${shown.length === 1 ? '' : 's'}</span>`}
+      <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
+    ${isOpen ? (rows || '<div class="q-sub">No choices are set up for this one yet.</div>') : ''}</div>`;
 }
 
 // follow-up: how soon, in words and colour
@@ -935,6 +949,7 @@ function sheetView(L, kind){
   const nav = list.map(x=>{ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length + L.custom.filter(c=>c.room === x.id).length;
     return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? `<span class="done" style="font-size:12px">${n}</span>` : ''}</div></button>`; }).join('');
   const qs = r.qs.filter(q=>asked(q, L));
+  openDefault(qs);
   const nk = noteKey(r), note = L.answers[nk];
   const done = pricing && !next && !locked(L) ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <p style="flex:1 1 260px"><strong>That's the whole pricing sheet.</strong> Anything left untouched stays at standard. It's saved as a lead either way, and everything picked here is already on the selections sheet for the next meeting.</p>
@@ -1230,6 +1245,8 @@ document.addEventListener('click', e=>{
     }
     const dn = t.closest('[data-delnote]'); if(dn){ L.notes = noteList(L).filter(nt=>(nt.at + '|' + nt.text.slice(0, 20)) !== dn.dataset.delnote); render(); return; }
   }
+  const sh = t.closest('[data-sel]');
+  if(sh){ const id = sh.dataset.sel; if(openSel.has(id)) openSel.delete(id); else openSel.add(id); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   if(t.closest('#shareBtn')){
     shareOpen = !shareOpen;
     if(shareOpen && !shared[L.id]){ shared[L.id] = true; try{ localStorage.setItem(SHARED, JSON.stringify(shared)); } catch(err){} syncTick(); }
