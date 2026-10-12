@@ -378,7 +378,7 @@ const PRICING = [
   { id:'lot', name:'Lot & home', qs:[ tx('phase','', 'Phase'), al('lotprem','', 'Lot premium', 2, { nocost:1 }), nts('lot') ] },
   { id:'bsmt', name:'Basement', bt:'126–148', qs:[
     yn('b126','126','Basement',14,18500,13900),
-    ch('b128','128','Basement ceiling height',14,[["8'",0,0],["9'",3200,2300]], Y('b126')),
+    ch('b128','128','Basement ceiling height',14,[["8'",0,0],["9'",3200,2300],["10'",6100,4400]], Y('b126')),
     qt('b134','134','Extra basement windows',32,'window',480,310,10, Y('b126')),
     sf('b136','136','Finished basement',56,'sq ft',42,31, Y('b126')),
     ch('b138','138','Basement bath',50,[['None',0,0],['Rough-in only',1450,950],['Finished bath',14800,11200]], Y('b126')),
@@ -432,7 +432,7 @@ const PRICING = [
     ch('d236','236','Storm door',32,[['None',0,0],['Full view',540,370],['Hide-away screen',680,470]]),
     nts('doors') ]},
   { id:'ceil', name:'Ceilings', bt:'244–246', qs:[
-    ch('c244','244','Ceiling height',34,[["8'",0,0],["9'",6800,4900]]),
+    ch('c244','244','Ceiling height',34,[["8'",0,0],["9'",6800,4900],["10'",12900,9300]]),
     ch('c246','246','Ceiling style',34,[['Standard',0,0],['Vault',4200,3000],['Cathedral',6900,5000]]),
     tx('c246c','246','Custom vault or cathedral'),
     nts('ceil') ]},
