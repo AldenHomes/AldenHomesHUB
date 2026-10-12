@@ -1105,7 +1105,7 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
    security rule). The sheet's id is the key — anyone with the link can open that sample sheet.
    REMOVE this function and delete that collection when the demo is retired or merged.
    ============================================================ */
-const DEMO_FIELDS = ['name', 'name2', 'phone', 'email', 'dev', 'lot', 'model', 'stage', 'created', 'v1Date', 'updated', 'pricedOn', 'v1Snap', 'custom', 'favs', 'cos', 'signedOn'];
+const DEMO_FIELDS = ['name', 'name2', 'phone', 'email', 'dev', 'lot', 'model', 'stage', 'created', 'v1Date', 'updated', 'pricedOn', 'v1Snap', 'custom', 'favs', 'cos', 'signedOn', 'quoteOk'];
 exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (req, res)=>{
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
   const b = req.body || {};

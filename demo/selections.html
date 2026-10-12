@@ -231,6 +231,45 @@
   body.present .prow .pt{font-size:18px}
   body.present .seg{font-size:16px;padding:10px 16px}
   .sh-tile .art .noart{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#eef0e8,#dfe3d0);color:var(--sage-2);font-family:Georgia,serif;font-size:17px;font-weight:700;text-align:center;padding:10px}
+  /* custom items: the + button on every section */
+  .addbtn{display:inline-flex;align-items:center;gap:8px;border:2px dashed var(--line);background:none;border-radius:var(--radius);padding:10px 16px;font-weight:700;font-size:14.5px;color:var(--navy);margin-top:14px}
+  .addbtn:hover{border-color:var(--navy)}
+  .addbtn b{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;align-items:center;justify-content:center;font-size:17px;line-height:1}
+  .custom{background:var(--paper-2);box-shadow:var(--shadow);border-radius:var(--radius);padding:14px 18px;margin-top:14px;border-left:4px solid var(--sage)}
+  .custom.wait{border-left-color:var(--amber)}
+  .custom .row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .custom .row2 input[type=number]{width:120px}
+  .radio2{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .radio2 label{display:flex;align-items:center;gap:7px;border:2px solid var(--line);border-radius:22px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer;background:#fff}
+  .radio2 input{accent-color:var(--navy)}
+  /* the pricing sheet as a document: for review, for printing, for sending */
+  .docbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px}
+  .doc{background:#fff;box-shadow:var(--shadow);border-radius:4px;max-width:860px;margin:16px auto 0;padding:clamp(20px,5vw,48px);color:#222;font-size:14.5px}
+  .doc, .doc *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid var(--sage);padding-bottom:16px}
+  .doc-head img{height:62px;display:block}
+  .doc-head h1{font-family:Georgia,serif;font-size:28px;margin:0;color:var(--navy);text-align:right}
+  .doc-head .sub{font-size:12.5px;color:var(--ink-soft);text-align:right;margin-top:4px}
+  .doc-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 22px;margin-top:18px}
+  .doc-facts div span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-soft)}
+  .doc-facts div b{font-size:15.5px;color:var(--navy)}
+  .doc h3{font-family:Georgia,serif;font-size:17px;color:var(--navy);margin:22px 0 4px;display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:4px;break-after:avoid}
+  .doc h3 span{font-family:"Courier New",monospace;font-size:14px}
+  .doc table{font-size:14px;table-layout:fixed;width:100%}
+  .doc td:first-child{width:46%}
+  .doc td.num{width:122px}
+  .doc td{padding:5px 6px;border-bottom:1px solid #f0ede4}
+  .doc tr{break-inside:avoid}
+  .doc .dn{font-style:italic;color:var(--ink-soft)}
+  .doc .dstd{color:var(--ink-soft)}
+  .doc-total{margin-top:24px;border-top:3px solid var(--navy);padding-top:12px;break-inside:avoid}
+  .doc-total div{display:flex;justify-content:space-between;gap:12px;padding:3px 6px}
+  .doc-total .grand{font-family:Georgia,serif;font-size:24px;font-weight:700;color:var(--navy);margin-top:6px}
+  .doc-fine{font-size:12px;color:var(--ink-soft);margin-top:20px;line-height:1.5}
+  .doc .officecopy{background:var(--staff-soft);color:var(--staff);font-weight:700;font-size:12.5px;text-align:center;padding:6px;border-radius:4px;margin-bottom:14px}
+  body.quote{background:#eceae3;padding-bottom:30px}
+  body.quote .top, body.quote .totalbar{display:none!important}
+  @media print{ body.printdoc #root > :not(.docwrap){display:none!important} body.printdoc .doc, body.quote .doc{box-shadow:none;max-width:none;margin:0;padding:10mm 12mm} body.quote{background:#fff} }
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
 </head>
@@ -753,7 +792,7 @@ const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name :
    new. Only the changes travel, so two people tapping at once don't undo each other. */
 const SYNC_URL = 'https://us-central1-alden-homes-hub.cloudfunctions.net/demoSync';
 const SHARED = STORE + '.shared';
-const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn'];
+const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn','quoteOk'];
 let shared = {};                                  // ids of the sheets this device has shared
 try{ shared = JSON.parse(localStorage.getItem(SHARED) || '{}') || {}; } catch(e){}
 let sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 };   // state: off | connecting | live | lost | missing
@@ -766,7 +805,7 @@ function diffSheet(from, to){
   SYNC_FIELDS.forEach(f=>{ if(!from || !same(from[f], to[f])) top[f] = to[f] === undefined ? null : to[f]; });
   return { ans, del, top, any: !!(Object.keys(ans).length || del.length || (from && Object.keys(top).length)) };
 }
-const syncOn = ()=>!SHOW && !!(PRESENT || (cur && shared[cur]));
+const syncOn = ()=>!SHOW && !QUOTE && !!(PRESENT || (cur && shared[cur]));
 async function syncTick(){
   if(!syncOn()){ if(sync.state !== 'off'){ sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 }; } return; }
   if(sync.busy) return;
@@ -942,6 +981,8 @@ function shareSheetCard(L){
 
 /* ---------- screens ---------- */
 function render(){
+  if(QUOTE){ document.body.classList.add('quote'); cur = QUOTE; view = 'customer'; $('totalbar').style.display = 'none'; $('root').innerHTML = quoteScreen(); return; }
+  document.body.classList.toggle('printdoc', tab === 'quote');
   if(SHOW){ document.body.classList.add('show'); cur = SHOW; $('totalbar').style.display = 'none'; $('root').innerHTML = showScreen(); return; }
   document.querySelectorAll('#viewSw button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
   document.body.classList.toggle('present', !!PRESENT);
@@ -971,7 +1012,7 @@ function leadsScreen(){
         <div class="muted" style="font-size:12.5px;margin-top:2px">${[L.phone, L.email].filter(Boolean).map(esc).join(' · ')}</div>
         ${(f=>f ? `<div style="margin-top:6px"><span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? ` <span class="muted" style="font-size:13px">${esc(f.what)}</span>` : ''}</div>` : '')(followInfo(L))}
         ${noteList(L).length ? `<div class="muted" style="font-size:13px;margin-top:5px;font-style:italic">Last note, ${esc(ago(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].at))}: ${esc(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].text.slice(0, 110))}</div>` : ''}</div>
-      <div>${stageChip(L)}<div class="muted" style="font-size:12.5px;margin-top:4px">Last in ${esc(ago(L.updated))}${drift(L).some(d=>d.diff) ? ' · <span style="color:#8a5d14">prices have changed</span>' : ''}</div></div>
+      <div>${stageChip(L)}${waiting(L).length ? ` <span class="chip soon">${waiting(L).length} to price</span>` : ''}<div class="muted" style="font-size:12.5px;margin-top:4px">Last in ${esc(ago(L.updated))}${drift(L).some(d=>d.diff) ? ' · <span style="color:#8a5d14">prices have changed</span>' : ''}</div></div>
       <div class="amt">${money(total(L))}<div class="muted" style="font-size:11.5px;font-family:inherit;font-weight:400">${L.stage === 'signed' ? 'contract' : 'so far'}</div></div>
       <button type="button" class="btn sm" data-open="${L.id}">Open</button>
     </div>`).join('');
@@ -1006,10 +1047,10 @@ function leadsScreen(){
 function leadScreen(L){
   const left = todo(L).length, staff = view === 'staff';
   const d = drift(L).filter(x=>x.diff), dSum = d.reduce((s,x)=>s+x.diff,0);
-  const tabs = [['v1','Pricing'],['full','Selections'],['summary','Summary'],['sign', locked(L) ? 'Signed copy' : 'Sign']]
-    .map(([id, label])=>`<button type="button" class="tab ${tab===id?'on':''}" data-tab="${id}">${label}${id==='full' && left && !locked(L) ? `<span class="n">${left} to choose</span>` : ''}</button>`).join('')
+  const tabs = [['v1','Pricing'],['quote','Pricing sheet'],['full','Selections'],['summary','Summary'],['sign', locked(L) ? 'Signed copy' : 'Sign']]
+    .map(([id, label])=>`<button type="button" class="tab ${tab===id?'on':''}" data-tab="${id}">${label}${id==='full' && left && !locked(L) ? `<span class="n">${left} to choose</span>` : ''}${id==='quote' && waiting(L).length ? `<span class="n">${waiting(L).length} to price</span>` : ''}</button>`).join('')
     + (staff ? [['vendors','For vendors'],['codes','By cost code']].map(([id,label])=>`<button type="button" class="tab staff ${tab===id?'on':''}" data-tab="${id}">${label}</button>`).join('') : '');
-  const body = tab === 'v1' ? sheetView(L, 'v1') : tab === 'full' ? sheetView(L, 'full') : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
+  const body = tab === 'v1' ? sheetView(L, 'v1') : tab === 'full' ? sheetView(L, 'full') : tab === 'quote' ? quoteTab(L) : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
   return `
     <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
@@ -1113,17 +1154,7 @@ function sheetView(L, kind){
       ${pricing && i === 0 ? `<p class="lede">The pricing sheet, section by section. Go through what matters to them and skip the rest. Anything left alone stays at standard, and the total at the bottom keeps up as you go.</p>` : ''}
       ${!pricing && r.by && !locked(L) ? `<div class="deadline">Choose by <strong>${esc(nice(daysAhead(r.by.days)))}</strong> — that's when ${esc(r.by.why)}.</div>` : ''}
       ${body}
-      ${mine.map(({c, ci})=>`<div class="q"><div class="q-head"><h3>${esc(c.desc)}</h3><span class="chip plain">special request</span></div>
-        <div style="margin-top:8px"><span class="mono" style="font-weight:700;color:var(--navy)">+ ${money(c.price)}</span>${staff ? ` <span class="staffline" style="display:inline-block">our cost ${money(c.cost)} · margin ${money(c.price - c.cost)} · code ${c.cc}</span>` : ''}
-        ${staff && !locked(L) ? ` <button type="button" class="btn sm" data-delcustom="${ci}" style="margin-left:8px">Remove</button>` : ''}</div></div>`).join('')}
-      ${staff && !locked(L) ? `<div class="q" style="border:1px dashed var(--staff);box-shadow:none;background:var(--staff-soft)"><div class="q-head"><h3 style="color:var(--staff)">Something not on the list</h3><span class="chip" style="background:#fff;color:var(--staff)">office only</span></div>
-        <div class="grid" style="margin-top:10px">
-          <div style="grid-column:1/-1"><label class="f">What is it</label><input type="text" id="cuDesc" placeholder="e.g. Built-in bench in the mudroom"></div>
-          <div><label class="f">Customer price ($)</label><input type="number" id="cuPrice" min="0" step="1"></div>
-          <div><label class="f">Our cost ($)</label><input type="number" id="cuCost" min="0" step="1"></div>
-          <div><label class="f">Cost code</label><select id="cuCode">${Object.entries(CODE_NAMES).map(([c,n])=>`<option value="${c}">${c} — ${n}</option>`).join('')}</select></div>
-        </div><div style="margin-top:10px"><button type="button" class="btn sm" id="cuAdd">Add to this sheet</button></div></div>`
-        : (!locked(L) && !pricing ? `<p class="muted" style="font-size:13.5px;margin-top:14px">Want something that isn't shown? Ask, and we'll price it and add it to your sheet.</p>` : '')}
+      ${customBlock(L, r)}
       ${done}
       <div class="noprint" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
         ${i > 0 ? `<button type="button" class="btn" data-room="${list[i-1].id}">&larr; ${esc(list[i-1].name)}</button>` : ''}
@@ -1131,6 +1162,145 @@ function sheetView(L, kind){
         ${next ? `<button type="button" class="btn primary" data-room="${next.id}">Next: ${esc(next.name)} &rarr;</button>` : (pricing ? '' : `<button type="button" class="btn primary" data-tab="summary">See the summary &rarr;</button>`)}
       </div>
     </div></div>`;
+}
+
+/* ---------- custom items: the + on every section ----------
+   Anyone can add something that isn't on the sheet. Either type a price on the spot, or mark it "needs a price" and pick who
+   should price it. Until it has a price it shows as "price to come", stays out of the total, and the sheet can't be confirmed
+   or signed. (In the real hub the person picked would be notified; here it only shows their name.) */
+const TEAM = ['Chase', 'Rhoda', 'Greg'];          // demo stand-ins for the hub's real logins
+let cuOpen = false, cuMode = 'now';
+const waiting = L=>L.custom.filter(c=>c.pending);
+function customBlock(L, r){
+  const staff = view === 'staff', lock = locked(L);
+  const mine = L.custom.map((c, ci)=>({ c, ci })).filter(x=>x.c.room === r.id);
+  const items = mine.map(({ c, ci })=>`<div class="custom ${c.pending ? 'wait' : ''}">
+      <div class="q-head"><h3 style="font-size:16px;color:var(--navy)">${esc(c.desc)}</h3><span class="chip plain">custom item</span>${c.pending ? `<span class="chip soon">price to come${c.ask ? ' · asked ' + esc(c.ask) : ''}</span>` : ''}</div>
+      ${c.pending ? (PRESENT ? '<div class="q-sub">We\'re getting a price on this for you.</div>'
+          : `<div class="row2 noprint"><span class="muted">$</span><input type="number" min="0" step="1" placeholder="Price" data-cuprice="${ci}">${staff ? `<input type="number" min="0" step="1" placeholder="Our cost" data-cucost="${ci}">` : ''}<button type="button" class="btn sm primary" data-cuset="${ci}">Set price</button>${lock ? '' : `<button type="button" class="btn sm" data-delcustom="${ci}">Remove</button>`}</div>`)
+        : `<div class="row2"><span class="mono" style="font-weight:700;color:var(--navy)">${plus(c.price)}</span>${staff ? `<span class="staffline">our cost ${money(c.cost)} · margin ${money(c.price - c.cost)} · code ${c.cc}</span>` : ''}${!lock && !PRESENT ? `<button type="button" class="btn sm noprint" data-delcustom="${ci}">Remove</button>` : ''}</div>`}
+    </div>`).join('');
+  if(lock || PRESENT) return items;
+  const form = cuOpen ? `<div class="custom" style="border-left-color:var(--navy)"><div class="q-head"><h3 style="font-size:16px;color:var(--navy)">Add a custom item to ${esc(r.name)}</h3></div>
+      <div style="margin-top:10px"><label class="f">What is it</label><input type="text" id="cuDesc" maxlength="200" placeholder="e.g. Built-in bench with cubbies"></div>
+      <div class="radio2"><label><input type="radio" name="cuMode" value="now" ${cuMode === 'now' ? 'checked' : ''}> I have a price</label><label><input type="radio" name="cuMode" value="ask" ${cuMode === 'ask' ? 'checked' : ''}> It needs a price</label></div>
+      ${cuMode === 'now' ? `<div class="grid" style="margin-top:10px">
+          <div><label class="f">Customer price ($)</label><input type="number" id="cuPrice" min="0" step="1"></div>
+          ${staff ? `<div><label class="f">Our cost ($)</label><input type="number" id="cuCost" min="0" step="1"></div>
+          <div><label class="f">Cost code</label><select id="cuCode">${Object.entries(CODE_NAMES).map(([c,n])=>`<option value="${c}">${c} — ${n}</option>`).join('')}</select></div>` : ''}</div>`
+        : `<div style="margin-top:10px;max-width:320px"><label class="f">Who should price it</label><select id="cuAsk">${TEAM.map(p=>`<option>${p}</option>`).join('')}</select>
+           <div class="q-sub">They'd get a notice in the hub that this item needs a price. The sheet can't be confirmed until it has one.</div></div>`}
+      <div style="margin-top:12px;display:flex;gap:8px"><button type="button" class="btn primary" id="cuAdd">Add it</button><button type="button" class="btn" id="cuCancel">Cancel</button></div></div>`
+    : `<button type="button" class="addbtn noprint" id="cuOpenBtn"><b>+</b> Add a custom item</button>`;
+  return items + form;
+}
+
+/* ---------- the pricing sheet as a document ----------
+   Everything that was chosen, section by section, with prices: something to review, print across the table, or send.
+   Office view prints an office copy (BT numbers, cost, margin); Customer view prints the customer's copy.
+   The office CONFIRMS it before it goes out; any change afterwards un-confirms it. The customer's link is …?quote=LEAD. */
+const QUOTE = new URLSearchParams(location.search).get('quote');
+let docAll = false;                                   // also list the lines left at standard
+const quoteUrl = L=>location.href.split('?')[0].split('#')[0] + '?quote=' + encodeURIComponent(L.id);
+function quoteDoc(L, forCustomer){
+  const staff = !forCustomer && view === 'staff';
+  const ls = lines(L), cols = staff ? 6 : 3;
+  const dname = (DEVS.find(d=>d.code === L.dev) || {}).name || '';
+  const phase = (L.answers.phase || {}).label || '';
+  const stdRow = q=>{                                 // a line nobody touched, for the "every line" version
+    if(q.type === 'text' || q.type === 'money' || q.id === 'lotprem') return '';
+    const what = q.type === 'qty' ? 'None added' : q.o[0][0];
+    return `<tr class="dstd"><td>${staff && q.bt ? `<span class="mono" style="font-size:12px">${esc(q.bt)}</span> ` : ''}${esc(q.t)}</td><td>${esc(what)}</td><td class="num">${q.type === 'qty' ? '' : 'standard'}</td>${staff ? '<td></td><td></td>' : ''}</tr>`;
+  };
+  const secs = SECTIONS.map(r=>{
+    const mine = ls.filter(l=>l.q.room.id === r.id), cu = L.custom.filter(c=>c.room === r.id);
+    const rows = [];
+    r.qs.forEach(q=>{ if(!asked(q, L)) return; const got = mine.filter(l=>l.q.id === q.id);
+      if(got.length) got.forEach(l=>rows.push(l.typed
+        ? `<tr><td colspan="${staff ? 5 : 3}" class="dn">${/_n$/.test(l.q.id) || l.q.id === 'misc' ? 'Note: ' : esc(l.q.t) + ': '}${esc(l.label)}</td></tr>`
+        : `<tr><td>${staff && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(l.label)}</td><td class="num">${l.price ? plus(l.price) : (l.std ? 'standard' : 'no charge')}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
+      else if(docAll && PRICING.includes(r)) rows.push(stdRow(q));
+    });
+    cu.forEach(c=>rows.push(`<tr><td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`));
+    if(!rows.join('')) return '';
+    const sub = mine.reduce((s,l)=>s+l.price,0) + cu.reduce((s,c)=>s+c.price,0);
+    return `<h3>${esc(r.name)}<span>${sub ? plus(sub) : ''}</span></h3><table><tbody>${rows.join('')}</tbody></table>`;
+  }).join('');
+  const up = upgrades(L), co = coTotal(L), wait = waiting(L).length;
+  return `<div class="doc" id="quoteDoc">
+    ${staff ? '<div class="officecopy">OFFICE COPY — shows cost and margin. Switch to Customer view for the copy that goes to the buyer.</div>' : ''}
+    <div class="doc-head"><img src="../icons/logo.png" alt="Alden Homes">
+      <div><h1>Pricing Sheet</h1><div class="sub">${L.quoteOk ? 'Confirmed ' + esc(nice(L.quoteOk)) : 'Draft · not yet confirmed'} · prices as of ${esc(nice(L.pricedOn))}</div></div></div>
+    <div class="doc-facts">
+      <div><span>Prepared for</span><b>${esc([L.name, L.name2].filter(Boolean).join(' & '))}</b></div>
+      <div><span>Community</span><b>${esc(dname || 'To be decided')}</b></div>
+      <div><span>Lot</span><b>${esc(L.lot ? '#' + L.lot : 'To be decided')}${phase ? ' · Phase ' + esc(phase) : ''}</b></div>
+      <div><span>Home style</span><b>${esc(L.model || '')}</b></div>
+      <div><span>Base price</span><b>${money(base(L))}</b></div>
+    </div>
+    ${secs || '<p class="muted" style="margin-top:20px">Nothing has been added to the base home yet.</p>'}
+    ${L.cos.length ? `<h3>Change orders<span>${plus(co)}</span></h3><table><tbody>${L.cos.map(c=>`<tr><td>${esc(nice(c.date))}</td><td>${esc(c.desc)}</td><td class="num">${plus(c.price)}</td>${staff ? `<td class="num st">${money(c.cost)}</td><td class="num st">${money(c.price - c.cost)}</td>` : ''}</tr>`).join('')}<tr><td colspan="2">Change order fees</td><td class="num">${plus(L.cos.length * CO_FEE)}</td>${staff ? '<td></td><td></td>' : ''}</tr></tbody></table>` : ''}
+    <div class="doc-total">
+      <div><span>Base price · ${esc(L.model || '')}</span><span class="mono">${money(base(L))}</span></div>
+      <div><span>Options, upgrades &amp; lot premium</span><span class="mono">${plus(up)}</span></div>
+      ${co ? `<div><span>Change orders</span><span class="mono">${plus(co)}</span></div>` : ''}
+      ${staff ? `<div style="color:var(--staff)"><span>Our cost of the options · margin on them</span><span class="mono">${money(upgradeCost(L))} · ${money(up - upgradeCost(L))}</span></div>` : ''}
+      <div class="grand"><span>Total</span><span>${money(total(L))}</span></div>
+      ${wait ? `<div style="color:#8a5d14"><span>${wait} custom item${wait === 1 ? ' is' : 's are'} still being priced and ${wait === 1 ? 'is' : 'are'} not in this total.</span><span></span></div>` : ''}
+    </div>
+    <div class="doc-fine">This is a pricing summary for discussion, not a contract. Prices are as of ${esc(nice(L.pricedOn))} and can change until selections are signed. Anything not listed here is built to the standard for this home style.<br>Alden Homes · Handcrafted Homes &amp; Communities</div>
+  </div>`;
+}
+function quoteTab(L){
+  const staff = view === 'staff', wait = waiting(L).length;
+  const status = L.quoteOk ? `<span class="chip signed">Confirmed ${esc(nice(L.quoteOk))}</span>` : '<span class="chip v1">Draft · for review</span>';
+  const send = L.quoteOk && !PRESENT ? `<div class="sharebox noprint" style="margin-top:12px"><strong>Send it to the customer.</strong> This link opens their copy of the pricing sheet, with prices and no office figures. They can print it or save it as a PDF.
+      <div class="sharelink"><input type="text" readonly value="${esc(quoteUrl(L))}" onclick="this.select()"><button type="button" class="btn sm" id="quoteCopy">Copy link</button>${L.email ? `<a class="btn sm" style="text-decoration:none" href="mailto:${esc(L.email)}?subject=${encodeURIComponent('Your Alden Homes pricing sheet')}&body=${encodeURIComponent('Here is your pricing sheet from our meeting:\n\n' + quoteUrl(L) + '\n\nLet us know if you have any questions.\n\nAlden Homes')}">Email it</a>` : ''}<button type="button" class="btn sm" id="quoteOpen">Open their copy</button></div></div>` : '';
+  return `<div class="docbar noprint">${status}
+      <label style="display:flex;align-items:center;gap:7px;font-size:14px;cursor:pointer"><input type="checkbox" id="docAll" ${docAll ? 'checked' : ''} style="width:18px;height:18px"> Show every line, including standard</label>
+      <div class="grow"></div>
+      <button type="button" class="btn" id="docPrint">Print</button><button type="button" class="btn" id="docPdf">Download PDF</button>
+      ${PRESENT || locked(L) ? '' : L.quoteOk ? '<button type="button" class="btn" id="quoteUndo">Back to draft</button>' : `<button type="button" class="btn good" id="quoteConfirm" ${wait ? 'disabled' : ''}>Confirm pricing</button>`}</div>
+    ${wait && !L.quoteOk && !PRESENT ? `<div class="banner amber noprint"><p><strong>${wait} custom item${wait === 1 ? ' needs' : 's need'} a price</strong> before this can be confirmed: ${waiting(L).map(c=>esc(c.desc) + (c.ask ? ' (' + esc(c.ask) + ')' : '')).join(', ')}.</p></div>` : ''}
+    ${send}
+    <div class="docwrap">${quoteDoc(L, false)}</div>`;
+}
+async function docPdf(btn, name){
+  btn.disabled = true; const was = btn.textContent; btn.textContent = 'Making the PDF…';
+  try{
+    if(typeof html2pdf === 'undefined') await new Promise((res, rej)=>{ const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js'; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+    const el = document.getElementById('quoteDoc'), keep = el.style.cssText;
+    el.style.boxShadow = 'none'; el.style.maxWidth = 'none'; el.style.margin = '0';
+    await html2pdf().set({ margin:[0.35, 0.1, 0.45, 0.1], filename:name, image:{ type:'jpeg', quality:.95 }, html2canvas:{ scale:2, useCORS:true, backgroundColor:'#ffffff' },
+      jsPDF:{ unit:'in', format:'letter', orientation:'portrait' }, pagebreak:{ mode:['css','legacy'], avoid:['tr','h3','.doc-total'] } }).from(el).save();
+    el.style.cssText = keep;
+  } catch(err){ console.error(err); window.print(); }
+  btn.disabled = false; btn.textContent = was;
+}
+// the customer's own copy, opened from the link they were sent
+let quoteState = 'loading';
+function quoteScreen(){
+  const L = lead();
+  document.title = 'Your pricing sheet | Alden Homes';
+  const card = (h, p)=>`<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>${h}</h2>${p ? `<p class="lede" style="margin:8px auto 0">${p}</p>` : ''}</div></div>`;
+  if(!L) return quoteState === 'missing' ? card('This pricing sheet isn\'t available.', 'The link may be mistyped. Ask your Alden Homes rep to send it again.') : card('Opening your pricing sheet…');
+  if(!L.quoteOk) return card('Your pricing sheet is still being reviewed.', 'We\'re double-checking the numbers. It will show here as soon as it\'s confirmed.');
+  return `<div class="wrap"><div class="docbar noprint" style="justify-content:flex-end"><button type="button" class="btn" id="docPrint">Print</button><button type="button" class="btn primary" id="docPdf">Download PDF</button></div>
+    <div class="docwrap">${quoteDoc(L, true)}</div></div>`;
+}
+async function loadShared(id, done){
+  cur = id; render();
+  try{
+    const res = await fetch(SYNC_URL, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action:'get', id, since:0 }) });
+    const data = await res.json();
+    if(data.sheet){
+      ['custom','cos'].forEach(f=>{ if(!Array.isArray(data.sheet[f])) data.sheet[f] = []; });
+      ['answers','favs'].forEach(f=>{ if(!data.sheet[f] || typeof data.sheet[f] !== 'object') data.sheet[f] = {}; });
+      const i = leads.findIndex(l=>l.id === id); if(i >= 0) leads[i] = data.sheet; else leads.push(data.sheet);
+      done('ready');
+    } else if(!lead()) done('missing');
+  } catch(err){ console.warn(err); if(!lead()) done('missing'); }
+  render();
 }
 
 function summary(L){
@@ -1143,7 +1313,7 @@ function summary(L){
       + mine.map(l=>`<tr><td>${esc(l.q.t)}${l.where ? ` <span class="muted">· ${esc(l.where)}</span>` : ''}</td><td>${esc(l.label)}</td>
           <td class="num">${l.price ? plus(l.price) : '<span class="muted">' + (l.std ? 'included' : l.typed ? '' : 'no cost') + '</span>'}</td>
           ${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`).join('')
-      + cu.map(c=>`<tr><td>Special request</td><td>${esc(c.desc)}</td><td class="num">+ ${money(c.price)}</td>${staff ? `<td class="num st">${money(c.cost)}</td><td class="num st">${money(c.price - c.cost)}</td>` : ''}</tr>`).join('');
+      + cu.map(c=>`<tr><td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`).join('');
   }).join('');
   const up = upgrades(L), upCost = upgradeCost(L);
   return `
@@ -1181,7 +1351,7 @@ function sign(L){
   return `
     <div class="card"><div class="eyebrow">Sign</div><h2 style="font-size:22px;margin-top:4px">Approve these selections</h2>
       <p class="lede">Signing makes this sheet the record of what's being built, at the prices shown. After that, changes go through a change order, which is reviewed by the office and carries a ${money(CO_FEE)} fee.</p>
-      ${left.length ? `<div class="banner amber"><p><strong>${left.length} item${left.length===1?'':'s'} still to choose.</strong> The sheet can be signed once everything has an answer.</p><button type="button" class="btn sm" data-tab="summary">See what's left</button></div>` : `
+      ${waiting(L).length ? `<div class="banner amber"><p><strong>${waiting(L).length} custom item${waiting(L).length===1?' is':'s are'} still waiting on a price.</strong> The sheet can be signed once ${waiting(L).length===1?'it has':'they have'} one.</p><button type="button" class="btn sm" data-tab="quote">See the pricing sheet</button></div>` : left.length ? `<div class="banner amber"><p><strong>${left.length} item${left.length===1?'':'s'} still to choose.</strong> The sheet can be signed once everything has an answer.</p><button type="button" class="btn sm" data-tab="summary">See what's left</button></div>` : `
       <div class="grid" style="margin-top:16px">
         <div><label class="f">Buyer</label><input type="text" id="sg1" value="${esc(L.name)}"></div>
         <div><label class="f">Second buyer</label><input type="text" id="sg2" value="${esc(L.name2 || '')}" placeholder="If there is one"></div>
@@ -1227,10 +1397,11 @@ function totalBar(L){
 }
 
 /* ---------- doing things ---------- */
-function touch(L){ L.updated = iso(new Date()); }
+function touch(L){ L.updated = iso(new Date()); if(L.quoteOk && !locked(L)) L.quoteOk = null; }
 document.addEventListener('click', e=>{
   const t = e.target, L = lead();
   const sw = t.closest('#viewSw button'); if(sw){ view = sw.dataset.view; if(view !== 'staff' && ['vendors','codes'].includes(tab)) tab = 'summary'; render(); return; }
+  if(QUOTE){ if(t.closest('#docPrint')) window.print(); else if(t.closest('#docPdf') && L) docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + '.pdf'); return; }
   if(t.closest('#shPdf')){ showPdf(t.closest('#shPdf')); return; }
   if(t.closest('#shShare')){
     const url = location.href, title = document.title;
@@ -1276,6 +1447,16 @@ document.addEventListener('click', e=>{
   const rm = t.closest('[data-room]'); if(rm){ roomId = rm.dataset.room; tab = (PRICING.some(x=>x.id === roomId) ? 'v1' : 'full'); render(); window.scrollTo(0, 0); return; }
   const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = (PRICING.some(x=>x.id === roomId) ? 'v1' : 'full'); render(); window.scrollTo(0, 0); return; }
   if(t.closest('#printBtn')){ window.print(); return; }
+  if(t.closest('#docPrint')){ window.print(); return; }
+  if(t.closest('#docPdf')){ docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + '.pdf'); return; }
+  if(t.closest('#quoteConfirm')){
+    // confirming also puts the sheet on the hub's server, so the customer's link works
+    L.quoteOk = iso(new Date()); shared[L.id] = true; try{ localStorage.setItem(SHARED, JSON.stringify(shared)); } catch(err){}
+    syncTick(); render(); toast('Pricing confirmed. It can go to the customer now.'); return;
+  }
+  if(t.closest('#quoteUndo')){ L.quoteOk = null; render(); return; }
+  if(t.closest('#quoteCopy')){ navigator.clipboard.writeText(quoteUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
+  if(t.closest('#quoteOpen')){ window.open(quoteUrl(L), '_blank'); return; }
   if(t.closest('#showMake')){
     // the sheet has to be on the hub's server for the link to work on someone else's phone
     shared[L.id] = true; try{ localStorage.setItem(SHARED, JSON.stringify(shared)); } catch(err){}
@@ -1315,10 +1496,29 @@ document.addEventListener('click', e=>{
     if(!L.v1Snap) L.v1Snap = Object.fromEntries(Object.entries(L.answers).filter(([k])=>(qById(k.split('@')[0]) || {}).v1).map(([k,v])=>[k, snapVal(v, qById(k.split('@')[0]))]));
     L.stage = 'v2'; tab = 'full'; roomId = ROOMS[0].id; touch(L); render(); window.scrollTo(0, 0); return;
   }
+  if(t.closest('#cuOpenBtn')){ cuOpen = true; cuMode = 'now'; render(); const d = $('cuDesc'); if(d) d.focus(); return; }
+  if(t.closest('#cuCancel')){ cuOpen = false; render(); return; }
   if(t.closest('#cuAdd')){
-    const desc = $('cuDesc').value.trim(), price = Number($('cuPrice').value);
-    if(!desc || $('cuPrice').value === '' || !(price >= 0)){ toast('Say what it is and the price'); return; }
-    L.custom.push({ desc, price, cost:Number($('cuCost').value) || 0, cc:Number($('cuCode').value), room:roomId }); touch(L); render(); toast('Added to the sheet'); return;
+    const desc = $('cuDesc').value.trim();
+    if(!desc){ toast('Say what the item is'); return; }
+    if(cuMode === 'ask'){
+      const who = $('cuAsk').value;
+      L.custom.push({ desc, price:0, cost:0, cc:90, room:roomId, pending:true, ask:who, at:iso(new Date()) });
+      cuOpen = false; touch(L); render(); toast(who + ' would be notified that this needs a price'); return;
+    }
+    const price = Number($('cuPrice').value);
+    if($('cuPrice').value === '' || !(price >= 0)){ toast('Type the price, or choose "It needs a price"'); return; }
+    const costEl = $('cuCost'), codeEl = $('cuCode');
+    L.custom.push({ desc, price, cost: costEl && costEl.value !== '' ? Number(costEl.value) || 0 : Math.round(price * 0.72), cc: codeEl ? Number(codeEl.value) : 90, room:roomId });
+    cuOpen = false; touch(L); render(); toast('Added to the sheet'); return;
+  }
+  const cs = t.closest('[data-cuset]');
+  if(cs){
+    const i = Number(cs.dataset.cuset), c = L.custom[i], pe = document.querySelector('[data-cuprice="' + i + '"]'), ce = document.querySelector('[data-cucost="' + i + '"]');
+    const price = Number(pe.value);
+    if(!c || pe.value === '' || !(price >= 0)){ toast('Type the price first'); return; }
+    c.price = price; c.cost = ce && ce.value !== '' ? Number(ce.value) || 0 : Math.round(price * 0.72); delete c.pending;
+    touch(L); render(); toast('Price set'); return;
   }
   const dc = t.closest('[data-delcustom]'); if(dc){ L.custom.splice(Number(dc.dataset.delcustom), 1); touch(L); render(); return; }
   if(t.closest('#signBtn')){
@@ -1330,6 +1530,8 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); });
 document.addEventListener('change', e=>{
+  if(e.target.name === 'cuMode'){ const keep = ($('cuDesc') || {}).value || ''; cuMode = e.target.value; render(); if($('cuDesc')) $('cuDesc').value = keep; return; }
+  if(e.target.id === 'docAll'){ docAll = e.target.checked; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const el = e.target, L0 = lead();
   if(L0 && !locked(L0) && el.dataset && (el.dataset.num || el.dataset.money || el.dataset.text)){
     const id = el.dataset.num || el.dataset.money || el.dataset.text, q = qById(id);
@@ -1346,9 +1548,10 @@ document.addEventListener('change', e=>{
 
 load();
 if(SHOW) loadShow();
+if(QUOTE) loadShared(QUOTE, st=>{ quoteState = st; });
 // the customer's screen opens on whatever the office is looking at
 if(PRESENT){ try{ const nv = JSON.parse(localStorage.getItem(NAV) || 'null'); if(nv && nv.id === PRESENT){ tab = nv.tab; roomId = nv.roomId; } } catch(e){} }
-if(!SHOW) render();
+if(!SHOW && !QUOTE) render();
 </script>
 </body>
 </html>
