@@ -152,6 +152,49 @@
   @keyframes optFlash{0%{box-shadow:0 0 0 6px rgba(201,138,43,.75)}100%{box-shadow:0 0 0 2px var(--good-soft)}}
   .sharebox{background:var(--staff-soft);border:1px solid #c9d8e6;border-radius:var(--radius);padding:14px 16px;margin-top:14px;color:#2c4a66}
   .sharebox input{font-family:"Courier New",monospace;font-size:13px;margin-top:8px}
+  /* the shareable selection sheet (?show=LEAD): no prices, made to be passed around */
+  body.show{background:#fff;padding-bottom:0}
+  body.show .top, body.show .totalbar{display:none!important}
+  body.show #root{max-width:none;padding:0}
+  .sh, .sh *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sh-hero{background:linear-gradient(155deg,#2b2e31 0%,#4B4F54 55%,#646b4e 100%);color:#fff;padding:40px 0 48px;text-align:center}
+  .sh-logo{display:block;width:fit-content;margin:0 auto;background:#fff;border-radius:10px;padding:12px 22px}
+  .sh-logo img{height:58px;display:block}
+  .sh-kicker{letter-spacing:3.5px;text-transform:uppercase;font-size:12px;font-weight:700;color:#cfd3b8;margin-top:30px}
+  .sh-title{font-family:Georgia,"Times New Roman",serif;font-size:clamp(36px,7vw,62px);font-weight:700;line-height:1.05;margin-top:10px;color:#fff}
+  .sh-sub{color:#e9ebdf;margin-top:14px;font-size:17px}
+  .sh-stats{display:flex;justify-content:center;gap:clamp(22px,6vw,64px);flex-wrap:wrap;margin-top:32px}
+  .sh-stat b{display:block;font-family:Georgia,serif;font-size:38px;line-height:1;color:#fff}
+  .sh-stat span{display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#cfd3b8;margin-top:7px}
+  .sh-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+  .sh-actions button{border:none;border-radius:24px;padding:12px 22px;font-weight:700;font-size:15px;background:#fff;color:var(--navy)}
+  .sh-actions button.alt{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.6)}
+  .sh-sec{padding:40px 0 4px}
+  .sh-sec h2{font-family:Georgia,serif;font-size:29px;color:var(--navy);display:flex;align-items:center;gap:14px}
+  .sh-sec h2:after{content:"";flex:1;height:2px;background:var(--sage)}
+  .sh-lede{color:var(--ink-soft);margin-top:8px;font-size:16px;max-width:680px;line-height:1.5}
+  .sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;margin-top:20px}
+  .sh-grid.big{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .sh-tile{position:relative;border:1px solid var(--line-soft);border-radius:12px;overflow:hidden;background:#fff;box-shadow:var(--shadow);break-inside:avoid;page-break-inside:avoid}
+  .sh-tile .art{height:118px;background:#f7f6f1;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .sh-grid.big .sh-tile .art{height:170px}
+  .sh-tile .art svg{width:100%;height:100%}
+  .sh-tile .art .count{font-family:Georgia,serif;font-size:56px;font-weight:700;color:var(--sage-2)}
+  .sh-tile .txt{padding:12px 14px 14px}
+  .sh-tile .lab{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--sage-2)}
+  .sh-tile .val{font-size:17px;font-weight:700;color:var(--navy);line-height:1.25;margin-top:3px}
+  .sh-grid.big .sh-tile .val{font-family:Georgia,serif;font-size:22px}
+  .sh-tile .up{position:absolute;top:10px;left:10px;background:var(--navy);color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-radius:20px;padding:4px 10px}
+  .sh-made{border-left:5px solid var(--sage);background:#faf8f2;border-radius:0 10px 10px 0;padding:16px 20px;margin-top:14px;font-family:Georgia,serif;font-size:20px;color:var(--navy);break-inside:avoid}
+  .sh-cta{background:var(--sage-soft);border-top:4px solid var(--sage);margin-top:48px;padding:44px 0 50px;text-align:center}
+  .sh-cta h2{font-family:Georgia,serif;font-size:clamp(26px,4.5vw,36px);color:var(--navy)}
+  .sh-cta p{color:var(--ink-soft);margin-top:10px;font-size:17px}
+  .sh-cta .who{margin-top:20px;font-weight:700;color:var(--navy);font-size:18px}
+  .sh-foot{text-align:center;color:var(--ink-soft);font-size:12px;padding:16px 0 26px}
+  .sharelink{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .sharelink input{flex:1 1 280px;font-family:"Courier New",monospace;font-size:13px}
+  body.pdfing .noprint{display:none!important}
+  @page{margin:0}
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
 </head>
@@ -419,7 +462,7 @@ function diffSheet(from, to){
   SYNC_FIELDS.forEach(f=>{ if(!from || !same(from[f], to[f])) top[f] = to[f] === undefined ? null : to[f]; });
   return { ans, del, top, any: !!(Object.keys(ans).length || del.length || (from && Object.keys(top).length)) };
 }
-const syncOn = ()=>!!(PRESENT || (cur && shared[cur]));
+const syncOn = ()=>!SHOW && !!(PRESENT || (cur && shared[cur]));
 async function syncTick(){
   if(!syncOn()){ if(sync.state !== 'off'){ sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 }; } return; }
   if(sync.busy) return;
@@ -487,8 +530,110 @@ setInterval(syncTick, 1000);
 const shareCode = L=>L.id.slice(1).toUpperCase();
 const liveBadge = ()=>sync.state === 'live' ? '<span class="live"><i></i>Live</span>' : sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live" style="color:var(--ink-soft)">Connecting…</span>';
 
+/* ---------- the selection sheet they can share ----------
+   Once a sheet is signed, the office makes a link (…?show=LEAD) to a page built to be passed around: the buyer's
+   choices with pictures, room by room, and no prices — it's as much an advertisement for Alden as a keepsake.
+   It can be saved as a PDF. Like the customer screen, it's read from the hub's demo helper, so the link works anywhere. */
+const SHOW = new URLSearchParams(location.search).get('show');
+const CONTACT = { line:'Your website and phone number go here' };   // demo placeholder — the real sheet carries Alden's contact details
+let showState = 'loading';                                            // loading | ready | missing
+const showUrl = L=>location.href.split('?')[0].split('#')[0] + '?show=' + encodeURIComponent(L.id);
+const familyName = L=>{ const w = String(L.name || '').replace(/&.*/, '').trim().split(/\s+/); const last = (String(L.name2 || L.name || '').trim().split(/\s+/).pop()) || w.pop(); return last || 'Our'; };
+function showScreen(){
+  const L = lead();
+  document.title = L ? 'The ' + familyName(L) + ' Home | Alden Homes' : 'Alden Homes';
+  if(!L) return `<div class="wrap"><div class="card" style="margin-top:60px;text-align:center">${showState === 'missing'
+    ? '<h2>This selection sheet isn\'t available.</h2><p class="lede" style="margin:8px auto 0">The link may be mistyped, or it hasn\'t been shared yet.</p>'
+    : '<h2>Opening the selection sheet…</h2>'}</div></div>`;
+  if(L.stage !== 'signed') return `<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>These selections aren't final yet.</h2><p class="lede" style="margin:8px auto 0">The selection sheet appears here once everything has been chosen and signed.</p></div></div>`;
+  // a page to show off: leave out the things they said no to ("Outdoor living: None", "Fan pre-wire: No")
+  const ls = lines(L).filter(l=>!(l.std && /^(no|none|leave)\b/i.test(l.label)));
+  const artOf = l=>{ if(l.q.type === 'qty') return `<span class="count">${L.answers[l.key].qty}</span>`; const o = l.q.o.find(x=>x[0] === l.label); return (o && o[3]) || ''; };
+  const tile = (l, big)=>`<div class="sh-tile">${l.price > 0 ? '<span class="up">Upgrade</span>' : ''}<div class="art">${artOf(l)}</div>
+      <div class="txt"><div class="lab">${esc(l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</div><div class="val">${esc(l.q.type === 'qty' ? l.label : l.label)}</div></div></div>`;
+  // the three biggest choices lead the page
+  const sig = ls.filter(l=>l.price > 0 && l.q.type !== 'qty').sort((a,b)=>b.price - a.price).slice(0, 3);
+  const made = [...L.custom.map(c=>c.desc), ...L.cos.map(c=>c.desc)];
+  const rooms = ROOMS.map(r=>({ r, mine: ls.filter(l=>l.q.room.id === r.id && !sig.includes(l)) })).filter(x=>x.mine.length);
+  const ups = ls.filter(l=>l.price > 0).length + made.length;
+  const where = [L.model, (DEVS.find(d=>d.code === L.dev) || {}).name, L.lot ? 'Lot ' + L.lot : ''].filter(Boolean).join(' · ');
+  return `<div class="sh">
+    <div class="sh-hero"><div class="wrap">
+      <div class="sh-logo"><img src="../icons/logo.png" alt="Alden Homes"></div>
+      <div class="sh-kicker">Designed with Alden Homes</div>
+      <div class="sh-title">The ${esc(familyName(L))} Home</div>
+      <div class="sh-sub">${esc(where)}</div>
+      <div class="sh-stats">
+        <div class="sh-stat"><b>${ls.length + made.length}</b><span>choices made</span></div>
+        <div class="sh-stat"><b>${ups}</b><span>custom upgrades</span></div>
+        <div class="sh-stat"><b>${ROOMS.filter(r=>ls.some(l=>l.q.room.id === r.id)).length}</b><span>spaces designed</span></div>
+      </div>
+      <div class="sh-actions noprint"><button type="button" id="shPdf">Download as PDF</button><button type="button" class="alt" id="shShare">Share</button></div>
+    </div></div>
+    <div class="wrap">
+      ${sig.length ? `<div class="sh-sec"><h2>Signature choices</h2><p class="sh-lede">The decisions that make this home theirs.</p><div class="sh-grid big">${sig.map(l=>tile(l, true)).join('')}</div></div>` : ''}
+      ${rooms.map(x=>`<div class="sh-sec"><h2>${esc(x.r.name)}</h2><div class="sh-grid">${x.mine.map(l=>tile(l)).join('')}</div></div>`).join('')}
+      ${made.length ? `<div class="sh-sec"><h2>Made just for this home</h2><p class="sh-lede">Not on any list. They asked, and we built it in.</p>${made.map(m=>`<div class="sh-made">${esc(m)}</div>`).join('')}</div>` : ''}
+    </div>
+    <div class="sh-cta"><div class="wrap">
+      <h2>Every Alden home starts like this one.</h2>
+      <p>With your choices, room by room. Handcrafted Homes &amp; Communities.</p>
+      <div class="who">${esc(CONTACT.line)}</div>
+    </div></div>
+    <div class="sh-foot">Selections finalized ${esc(nice(L.signedOn))} · Alden Homes</div>
+  </div>`;
+}
+async function loadShow(){
+  cur = SHOW;
+  if(lead()) showState = 'ready';
+  render();
+  try{
+    const res = await fetch(SYNC_URL, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action:'get', id:SHOW, since:0 }) });
+    const data = await res.json();
+    if(data.sheet){
+      ['custom','cos'].forEach(f=>{ if(!Array.isArray(data.sheet[f])) data.sheet[f] = []; });
+      ['answers','favs'].forEach(f=>{ if(!data.sheet[f] || typeof data.sheet[f] !== 'object') data.sheet[f] = {}; });
+      const i = leads.findIndex(l=>l.id === SHOW); if(i >= 0) leads[i] = data.sheet; else leads.push(data.sheet);
+      showState = 'ready';
+    } else if(!lead()) showState = 'missing';
+  } catch(err){ console.warn(err); if(!lead()) showState = 'missing'; }
+  render();
+}
+async function showPdf(btn){
+  const L = lead(); if(!L) return;
+  btn.disabled = true; const was = btn.textContent; btn.textContent = 'Making the PDF…';
+  try{
+    if(typeof html2pdf === 'undefined') await new Promise((res, rej)=>{ const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js'; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+    document.body.classList.add('pdfing');
+    const toPng = (src, w, h)=>new Promise(res=>{ const im = new Image(); im.onload = ()=>{ const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(im, 0, 0, w, h); res(c.toDataURL('image/png')); }; im.onerror = ()=>res(''); im.src = src; });
+    for(const svg of Array.from(document.querySelectorAll('.sh .art svg'))){
+      const box = svg.getBoundingClientRect(), w = Math.max(2, Math.round(box.width * 2)), h = Math.max(2, Math.round(box.height * 2));
+      const copy = svg.cloneNode(true); copy.setAttribute('width', w); copy.setAttribute('height', h); copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const png = await toPng('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copy)), w, h);
+      if(png){ const im = document.createElement('img'); im.src = png; im.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block'; svg.replaceWith(im); }
+    }
+    const logo = document.querySelector('.sh-logo img');
+    if(logo && logo.naturalWidth){ const png = await toPng(logo.src, logo.naturalWidth, logo.naturalHeight); if(png){ logo.src = png; await new Promise(r=>setTimeout(r, 50)); } }
+    await html2pdf().set({ margin:0, filename:'The ' + familyName(L) + ' Home - Alden Homes selections.pdf', image:{ type:'jpeg', quality:.94 },
+      html2canvas:{ scale:2, useCORS:true, backgroundColor:'#ffffff' }, jsPDF:{ unit:'in', format:'letter', orientation:'portrait' }, pagebreak:{ mode:['css','legacy'], avoid:['.sh-tile','.sh-made','.sh-sec h2'] } })
+      .from(document.querySelector('.sh')).save();
+  } catch(err){ console.error(err); window.print(); }   // if the PDF maker can't load, the browser's own "Save as PDF" still works
+  document.body.classList.remove('pdfing');
+  render();   // put the drawings back as they were
+  const again = document.getElementById('shPdf'); if(again){ again.disabled = false; again.textContent = was; }
+}
+// the box on a signed sheet where the office (or the customer's own screen) gets the link
+function shareSheetCard(L){
+  const on = !!shared[L.id];
+  return `<div class="card noprint"><h2>Their selection sheet to share</h2>
+    <p class="lede">A good-looking page of everything they chose, with pictures and no prices. They can send the link to friends and family or save it as a PDF. It's a keepsake for them and an advertisement for us.</p>
+    ${on ? `<div class="sharelink"><input type="text" readonly value="${esc(showUrl(L))}" onclick="this.select()"><button type="button" class="btn sm" id="showCopy">Copy link</button><button type="button" class="btn sm primary" id="showOpen">Open it</button></div>`
+         : `<div style="margin-top:12px"><button type="button" class="btn primary" id="showMake">Create the share link</button></div>`}</div>`;
+}
+
 /* ---------- screens ---------- */
 function render(){
+  if(SHOW){ document.body.classList.add('show'); cur = SHOW; $('totalbar').style.display = 'none'; $('root').innerHTML = showScreen(); return; }
   document.querySelectorAll('#viewSw button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
   document.body.classList.toggle('present', !!PRESENT);
   if(PRESENT){ cur = PRESENT; view = 'customer'; if(['vendors','codes'].includes(tab)) tab = 'summary'; }
@@ -704,6 +849,7 @@ function sign(L){
     <div class="card"><h2>Signed selection sheet</h2>
       <p class="lede">Signed by ${esc([L.name, L.name2].filter(Boolean).join(' and '))} on ${esc(nice(L.signedOn))}. Total at signing ${money(base(L) + upgrades(L))}.</p>
       <div class="noprint" style="margin-top:12px"><button type="button" class="btn" id="printBtn">Print or save a copy</button></div></div>
+    ${shareSheetCard(L)}
     ${summary(L)}
     <div class="card noprint"><h2>Change orders</h2>
       <p class="lede">Anything added after signing goes through the hub's change orders: the buyer reviews and signs it on their homeowner page, and it carries the ${money(CO_FEE)} fee.</p>
@@ -767,6 +913,13 @@ function touch(L){ L.updated = iso(new Date()); }
 document.addEventListener('click', e=>{
   const t = e.target, L = lead();
   const sw = t.closest('#viewSw button'); if(sw){ view = sw.dataset.view; if(view !== 'staff' && ['vendors','codes'].includes(tab)) tab = 'summary'; render(); return; }
+  if(t.closest('#shPdf')){ showPdf(t.closest('#shPdf')); return; }
+  if(t.closest('#shShare')){
+    const url = location.href, title = document.title;
+    if(navigator.share) navigator.share({ title, text:'Take a look at what we chose for our Alden home.', url }).catch(()=>{});
+    else navigator.clipboard.writeText(url).then(()=>toast('Link copied — paste it anywhere'), ()=>toast('Copy the address from the bar above'));
+    return;
+  }
   if(t.closest('#joinBtn')){
     const code = ($('joinCode').value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
     if(code.length < 4){ toast('Type the code from the rep\'s screen'); return; }
@@ -794,6 +947,13 @@ document.addEventListener('click', e=>{
   const rm = t.closest('[data-room]'); if(rm){ roomId = rm.dataset.room; tab = 'full'; render(); window.scrollTo(0, 0); return; }
   const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#printBtn')){ window.print(); return; }
+  if(t.closest('#showMake')){
+    // the sheet has to be on the hub's server for the link to work on someone else's phone
+    shared[L.id] = true; try{ localStorage.setItem(SHARED, JSON.stringify(shared)); } catch(err){}
+    syncTick(); render(); toast('Share link ready'); return;
+  }
+  if(t.closest('#showCopy')){ navigator.clipboard.writeText(showUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
+  if(t.closest('#showOpen')){ window.open(showUrl(L), '_blank'); return; }
   if(t.closest('#repriceBtn')){
     drift(L).forEach(x=>{ x.a.price = x.t.price; x.a.cost = x.t.cost; });
     L.pricedOn = iso(new Date()); touch(L); render(); toast('Updated to today\'s prices'); return;
@@ -845,9 +1005,10 @@ document.addEventListener('change', e=>{
 });
 
 load();
+if(SHOW) loadShow();
 // the customer's screen opens on whatever the office is looking at
 if(PRESENT){ try{ const nv = JSON.parse(localStorage.getItem(NAV) || 'null'); if(nv && nv.id === PRESENT){ tab = nv.tab; roomId = nv.roomId; } } catch(e){} }
-render();
+if(!SHOW) render();
 </script>
 </body>
 </html>
