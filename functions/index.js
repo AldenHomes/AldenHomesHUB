@@ -1098,6 +1098,63 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
 });
 
 /* ============================================================
+   demoSync — shared storage for the SELECTIONS DEMO only (demo/selections.html).
+   Lets the office's screen and a "customer screen" on another device show the same made-up
+   selection sheet: each screen checks in about once a second. Nothing here touches real homes.
+   Sheets live in the `demo-selections` collection (written only by this function, so it needs no
+   security rule). The sheet's id is the key — anyone with the link can open that sample sheet.
+   REMOVE this function and delete that collection when the demo is retired or merged.
+   ============================================================ */
+const DEMO_FIELDS = ['name', 'name2', 'phone', 'email', 'dev', 'lot', 'model', 'stage', 'created', 'v1Date', 'updated', 'pricedOn', 'v1Snap', 'custom', 'favs', 'cos', 'signedOn'];
+exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (req, res)=>{
+  if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
+  const b = req.body || {};
+  const id = typeof b.id === 'string' && /^L[a-z0-9]{4,12}$/.test(b.id) ? b.id : '';
+  if(!id){ res.status(400).json({ error: 'id' }); return; }
+  const ref = db.collection('demo-selections').doc(id);
+  try{
+    if(b.action === 'get'){
+      const doc = await ref.get();
+      if(!doc.exists){ res.json({ missing: true }); return; }
+      const d = doc.data();
+      res.json(d.rev > (Number(b.since) || 0) ? { rev: d.rev, sheet: JSON.parse(d.sheet), nav: d.nav || null } : { rev: d.rev, nav: d.nav || null });
+      return;
+    }
+    if(b.action === 'patch'){
+      // Only what changed is sent (answers set or removed, whole fields replaced), and it is applied to
+      // the stored copy inside a transaction — so two screens tapping at once don't wipe each other out.
+      const out = await db.runTransaction(async tx=>{
+        const doc = await tx.get(ref);
+        let sheet, rev = 0, nav = null;
+        if(doc.exists){ sheet = JSON.parse(doc.data().sheet); rev = doc.data().rev || 0; nav = doc.data().nav || null; }
+        else if(b.full && typeof b.full === 'object' && !Array.isArray(b.full)) sheet = b.full;
+        else return { missing: true };
+        if(!sheet.answers || typeof sheet.answers !== 'object') sheet.answers = {};
+        const ans = b.ans && typeof b.ans === 'object' ? b.ans : {};
+        Object.keys(ans).slice(0, 300).forEach(k=>{ sheet.answers[k] = ans[k]; });
+        (Array.isArray(b.del) ? b.del : []).slice(0, 300).forEach(k=>{ delete sheet.answers[k]; });
+        const top = b.top && typeof b.top === 'object' ? b.top : {};
+        DEMO_FIELDS.forEach(f=>{ if(f in top) sheet[f] = top[f]; });
+        sheet.id = id;
+        if(b.nav && typeof b.nav === 'object') nav = { tab: String(b.nav.tab || '').slice(0, 20), roomId: String(b.nav.roomId || '').slice(0, 20) };
+        const text = JSON.stringify(sheet);
+        if(text.length > 60000) return { tooBig: true };
+        rev++;
+        tx.set(ref, { sheet: text, rev, nav, at: new Date().toISOString() });
+        return { rev, sheet, nav };
+      });
+      if(out.tooBig){ res.status(413).json({ error: 'size' }); return; }
+      res.json(out);
+      return;
+    }
+    res.status(400).json({ error: 'action' });
+  } catch(err){
+    logger.error('demoSync failed', { error: String(err) });
+    res.status(500).json({ error: 'server' });
+  }
+});
+
+/* ============================================================
    onNoteCreated — someone was @mentioned in a note on a home.
    Email each person mentioned, at the address they sign in to the hub with.
    (The "emails to subs" switch on Admin Settings doesn't affect this — these go to staff.)

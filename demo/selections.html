@@ -400,13 +400,106 @@ const stageChip = L=>L.stage === 'signed' ? '<span class="chip signed">Signed &a
   : L.stage === 'v2' ? '<span class="chip v2">Visit 2 in progress</span>' : '<span class="chip v1">Visit 1 done · not back yet</span>';
 const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name : '', L.lot ? 'Lot ' + L.lot : 'lot not chosen'].filter(Boolean).join(' · ');
 
+/* ---------- two screens on two devices ----------
+   Once the office presses "Open customer screen", this sheet is also kept on the hub's server (a small helper
+   made just for this demo). Every second each screen either sends what it changed or asks whether anything is
+   new. Only the changes travel, so two people tapping at once don't undo each other. */
+const SYNC_URL = 'https://us-central1-alden-homes-hub.cloudfunctions.net/demoSync';
+const SHARED = STORE + '.shared';
+const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn'];
+let shared = {};                                  // ids of the sheets this device has shared
+try{ shared = JSON.parse(localStorage.getItem(SHARED) || '{}') || {}; } catch(e){}
+let sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 };   // state: off | connecting | live | lost | missing
+const clone = o=>JSON.parse(JSON.stringify(o));
+const same = (a, b)=>JSON.stringify(a) === JSON.stringify(b);
+function diffSheet(from, to){
+  const ans = {}, del = [], top = {};
+  Object.keys(to.answers || {}).forEach(k=>{ if(!from || !same((from.answers || {})[k], to.answers[k])) ans[k] = to.answers[k]; });
+  Object.keys((from && from.answers) || {}).forEach(k=>{ if(!(k in (to.answers || {}))) del.push(k); });
+  SYNC_FIELDS.forEach(f=>{ if(!from || !same(from[f], to[f])) top[f] = to[f] === undefined ? null : to[f]; });
+  return { ans, del, top, any: !!(Object.keys(ans).length || del.length || (from && Object.keys(top).length)) };
+}
+const syncOn = ()=>!!(PRESENT || (cur && shared[cur]));
+async function syncTick(){
+  if(!syncOn()){ if(sync.state !== 'off'){ sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 }; } return; }
+  if(sync.busy) return;
+  if(sync.id !== cur) sync = { id:cur, rev:0, last:null, busy:false, nav:'', state:'connecting', fails:0 };
+  const L = lead(), sent = L ? clone(L) : null;
+  let body;
+  const navNow = !PRESENT && L && !['vendors','codes'].includes(tab) ? JSON.stringify({ tab, roomId }) : '';
+  if(!PRESENT && L && !sync.last){
+    // first share from the office: this device's copy is the one that counts
+    body = { action:'patch', id:cur, full:sent, ans:sent.answers, del:[], top:diffSheet(null, sent).top, nav:navNow ? JSON.parse(navNow) : null };
+  } else if(L && sync.last){
+    const d = diffSheet(sync.last, L), navChanged = navNow && navNow !== sync.nav;
+    body = d.any || navChanged ? { action:'patch', id:cur, ans:d.ans, del:d.del, top:d.top, ...(navChanged ? { nav:JSON.parse(navNow) } : {}) } : { action:'get', id:cur, since:sync.rev };
+  } else body = { action:'get', id:cur, since:0 };
+  sync.busy = true;
+  const forId = cur;
+  try{
+    const res = await fetch(SYNC_URL, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+    if(!res.ok) throw new Error('sync ' + res.status);
+    const data = await res.json();
+    if(forId !== cur) return;                      // they opened a different sheet meanwhile
+    sync.fails = 0;
+    const before = sync.state;
+    if(data.missing){ sync.state = 'missing'; }
+    else {
+      sync.state = 'live';
+      if(navNow && body.nav) sync.nav = navNow;
+      if(data.sheet){ takeRemote(data.sheet, sent, body); sync.rev = data.rev; }
+      if(PRESENT && data.nav){
+        const nv = JSON.stringify(data.nav);
+        if(nv !== sync.nav){ sync.nav = nv; if(data.nav.tab !== tab || data.nav.roomId !== roomId){ tab = data.nav.tab || tab; roomId = data.nav.roomId || roomId; render(); window.scrollTo(0, 0); } }
+      }
+    }
+    if(before !== sync.state) render();
+  } catch(err){
+    console.warn('demo sync', err);
+    if(++sync.fails >= 3 && sync.state !== 'lost'){ sync.state = 'lost'; render(); }
+  } finally { sync.busy = false; }
+}
+// The server's copy has arrived. Keep anything tapped here while the request was in the air, and point out what the other screen changed.
+function takeRemote(sheet, sent, body){
+  const now = lead();
+  const mine = sent && now ? diffSheet(sent, now) : { ans:{}, del:[], top:{} };
+  const merged = clone(sheet);
+  merged.answers = merged.answers || {};
+  Object.assign(merged.answers, mine.ans);
+  mine.del.forEach(k=>{ delete merged.answers[k]; });
+  Object.assign(merged, mine.top);
+  ['custom','cos'].forEach(f=>{ if(!Array.isArray(merged[f])) merged[f] = []; });
+  ['answers','favs'].forEach(f=>{ if(!merged[f] || typeof merged[f] !== 'object') merged[f] = {}; });
+  // what changed that this screen didn't do itself
+  const theirs = sent ? Object.keys(sheet.answers || {}).find(k=>!same((sent.answers || {})[k], sheet.answers[k]) && !(body.ans && k in body.ans)) : '';
+  const i = leads.findIndex(l=>l.id === merged.id);
+  if(i >= 0) leads[i] = merged; else leads.push(merged);
+  sync.last = clone(sheet);
+  const changed = !sent || !same(sent, merged);
+  if(theirs){
+    const q = qById(theirs.split('@')[0]), a = sheet.answers[theirs];
+    if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + (theirs.includes('@') ? ' (' + theirs.split('@')[1] + ')' : '') + ' — ' + (q.type === 'qty' ? a.qty : a.label)); }
+  }
+  if(changed){ const y = window.scrollY; render(); window.scrollTo(0, y); }
+  flashKey = '';
+}
+setInterval(syncTick, 1000);
+const shareCode = L=>L.id.slice(1).toUpperCase();
+const liveBadge = ()=>sync.state === 'live' ? '<span class="live"><i></i>Live</span>' : sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live" style="color:var(--ink-soft)">Connecting…</span>';
+
 /* ---------- screens ---------- */
 function render(){
   document.querySelectorAll('#viewSw button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
   document.body.classList.toggle('present', !!PRESENT);
   if(PRESENT){ cur = PRESENT; view = 'customer'; if(['vendors','codes'].includes(tab)) tab = 'summary'; }
   const L = lead();
-  if(PRESENT && !L){ $('totalbar').style.display = 'none'; $('root').innerHTML = '<div class="card" style="margin-top:40px"><h2>This selection sheet isn\'t open on this device.</h2><p class="lede">In this demo the customer screen has to be opened on the same computer as the office screen, from its "Open customer screen" button.</p></div>'; return; }
+  if(PRESENT && !L){
+    $('totalbar').style.display = 'none';
+    $('root').innerHTML = sync.state === 'missing'
+      ? '<div class="card" style="margin-top:40px"><h2>This screen isn\'t connected to a selection sheet yet.</h2><p class="lede">Ask your Alden Homes rep to press "Open customer screen" on their device, then try this link or code again.</p><div style="margin-top:14px"><a class="btn" href="selections.html" style="text-decoration:none;display:inline-block">Back</a></div></div>'
+      : '<div class="card" style="margin-top:40px"><h2>Connecting to your selection sheet…</h2><p class="lede">This takes a second or two.</p></div>';
+    return;
+  }
   tellNav();
   $('totalbar').style.display = L ? '' : 'none';
   $('root').innerHTML = L ? leadScreen(L) : leadsScreen();
@@ -445,6 +538,10 @@ function leadsScreen(){
       </div>` : ''}
       <div style="margin-top:8px">${rows || '<p class="muted" style="padding:14px 0">No leads yet.</p>'}</div>
     </div>
+    <div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1 1 260px"><h2>Join as customer screen</h2><p class="muted" style="font-size:14px;margin-top:4px">For the TV or the customer's iPad. Type the code shown on the rep's device.</p></div>
+      <input type="text" id="joinCode" placeholder="CODE" maxlength="12" autocomplete="off" autocapitalize="characters" style="width:170px;font-family:'Courier New',monospace;font-size:22px;letter-spacing:4px;text-transform:uppercase;text-align:center">
+      <button type="button" class="btn primary" id="joinBtn">Join</button></div>
     <p class="muted noprint" style="font-size:12.5px;margin-top:14px">Demo only: this list is kept in this browser. <a href="#" id="resetDemo">Reset the sample leads</a></p>`;
 }
 
@@ -460,15 +557,21 @@ function leadScreen(L){
       <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
         <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</h1>
         <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${money(base(L))}</div></div>
-      <div style="text-align:right">${PRESENT ? '<span class="live"><i></i>Live with your Alden Homes rep</span>'
+      <div style="text-align:right">${PRESENT ? (sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live"><i></i>Live with your Alden Homes rep</span>')
         : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">First visit ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
-          <button type="button" class="btn sm noprint" id="shareBtn" style="margin-top:8px">${shareOpen ? 'Hide' : 'Open customer screen'}</button>`}</div>
+          <div class="noprint" style="margin-top:8px;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap">${shared[L.id] ? liveBadge() : ''}<button type="button" class="btn sm" id="shareBtn">${shareOpen ? 'Hide' : shared[L.id] ? 'Customer screen' : 'Open customer screen'}</button></div>`}</div>
     </div>
-    ${!PRESENT && shareOpen ? `<div class="sharebox noprint"><strong>A second screen for the customer.</strong>
-        They open this link on their own iPad and see the same sheet in a big, customer-only view. Whatever either of you taps shows on both screens straight away, and their screen follows the room you're on.
-        <input type="text" readonly value="${esc(presentUrl(L))}" onclick="this.select()">
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="btn sm primary" id="shareOpenBtn">Open it in a new window</button>
-          <span style="font-size:12.5px">Demo note: here it only works in a second window on this same computer. Put the two windows side by side to try it. The real version would work between any two devices.</span></div></div>` : ''}
+    ${!PRESENT && shareOpen ? `<div class="sharebox noprint"><strong>A second screen for the customer.</strong> ${liveBadge()}
+        <div style="margin-top:6px;line-height:1.5">Put this sheet on the customer's iPad or the TV in a big, customer-only view. Whatever either of you taps shows on both screens about a second later, and their screen follows the room you're on.</div>
+        <div style="margin-top:12px;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
+          <div><label class="f" style="color:inherit">On a TV or another iPad</label>
+            <div style="font-size:14px;line-height:1.5">Open the selections demo there, press <strong>Join as customer screen</strong>, and type this code:</div>
+            <div class="mono" style="font-size:30px;font-weight:700;letter-spacing:5px;margin-top:6px;color:var(--navy)">${esc(shareCode(L))}</div></div>
+          <div><label class="f" style="color:inherit">Or send the link</label>
+            <input type="text" readonly value="${esc(presentUrl(L))}" onclick="this.select()">
+            <div style="margin-top:8px"><button type="button" class="btn sm" id="shareCopy">Copy link</button> <button type="button" class="btn sm" id="shareOpenBtn">Open in a new window here</button></div></div>
+        </div>
+        <div style="font-size:12.5px;margin-top:12px">Demo note: the sample sheet is kept on the hub's server while it's shared, and anyone with the code or link can open it. It's made-up data.</div></div>` : ''}
     ${d.length && !PRESENT ? `<div class="banner amber noprint"><p><strong>${d.length} price${d.length===1?' has':'s have'} changed since this sheet was priced on ${esc(nice(L.pricedOn))}.</strong>
         At today's prices the same choices come to ${money(Math.abs(dSum))} ${dSum >= 0 ? 'more' : 'less'}. The sheet keeps the prices it was quoted at until someone decides.
         <span class="muted" style="display:block;font-size:13px;margin-top:4px">${d.map(x=>esc(qById(x.k.split('@')[0]).t) + ': ' + money(x.a.price) + ' → ' + money(x.t.price)).join(' · ')}</span></p>
@@ -664,6 +767,11 @@ function touch(L){ L.updated = iso(new Date()); }
 document.addEventListener('click', e=>{
   const t = e.target, L = lead();
   const sw = t.closest('#viewSw button'); if(sw){ view = sw.dataset.view; if(view !== 'staff' && ['vendors','codes'].includes(tab)) tab = 'summary'; render(); return; }
+  if(t.closest('#joinBtn')){
+    const code = ($('joinCode').value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if(code.length < 4){ toast('Type the code from the rep\'s screen'); return; }
+    location.href = location.href.split('?')[0].split('#')[0] + '?present=L' + encodeURIComponent(code); return;
+  }
   if(t.closest('#resetDemo')){ e.preventDefault(); leads = seedLeads(); render(); toast('Sample leads put back'); return; }
   if(t.closest('#newLeadBtn')){ newOpen = !newOpen; render(); if(newOpen) $('nName').focus(); return; }
   if(t.closest('#nStart')){
@@ -674,7 +782,12 @@ document.addEventListener('click', e=>{
   }
   const open = t.closest('[data-open]'); if(open){ cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = 'home'; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
-  if(t.closest('#shareBtn')){ shareOpen = !shareOpen; render(); return; }
+  if(t.closest('#shareBtn')){
+    shareOpen = !shareOpen;
+    if(shareOpen && !shared[L.id]){ shared[L.id] = true; try{ localStorage.setItem(SHARED, JSON.stringify(shared)); } catch(err){} syncTick(); }
+    render(); return;
+  }
+  if(t.closest('#shareCopy')){ navigator.clipboard.writeText(presentUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
   if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); cur = null; render(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
   const tb = t.closest('[data-tab]'); if(tb){ tab = tb.dataset.tab; render(); window.scrollTo(0, 0); return; }
@@ -726,6 +839,7 @@ document.addEventListener('click', e=>{
     L.stage = 'signed'; L.signedOn = iso(new Date()); L.pricedOn = L.signedOn; touch(L); tab = 'sign'; render(); window.scrollTo(0, 0); toast('Signed and locked');
   }
 });
+document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); });
 document.addEventListener('change', e=>{
   if(e.target.id === 'nDev'){ const d = e.target.value; $('nLot').innerHTML = '<option value="">Not chosen yet</option>' + LOTS.filter(l=>l.dev === d).map(l=>`<option value="${l.lot}">Lot ${l.lot} — ${esc(l.addr)}</option>`).join(''); }
 });
