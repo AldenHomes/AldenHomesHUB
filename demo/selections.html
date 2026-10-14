@@ -309,6 +309,9 @@
   .tri button.on{background:var(--navy);color:#fff}
   .tri button.on.incl{background:var(--sage-2)}
   .tri button.on.hide{background:#a94438}
+  .cho.std .nochg{font-weight:700;color:var(--good);white-space:nowrap;font-size:14px}
+  .cho .stdmark{border:2px solid var(--good);background:var(--good);color:#fff;border-radius:20px;padding:6px 14px;font-weight:700;font-size:13.5px;white-space:nowrap}
+  .guide .cho .stdmark{padding:9px 20px;font-size:15px}
   .incl-row{display:flex;gap:10px;align-items:center;padding:10px 12px;margin-top:8px;border-radius:10px;background:var(--sage-soft);color:var(--sage-2);font-weight:700;font-size:14.5px}
   .modesw{display:inline-flex;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff}
   .modesw button{border:none;background:none;padding:6px 13px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
@@ -627,6 +630,15 @@ const base = L=>Number(L.basePrice) || 0;
 const locked = L=>L.stage === 'signed';
 const plus = n=>n < 0 ? '− ' + money(-n) + ' credit' : '+ ' + money(n);
 const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2);
+/* Standards shown as a choice (owner, 2026-10-14: "show it like the other options, just preset to it and marked no charge"):
+   the toilet's "Standard toilet", the finish's chrome, the home's standard ceiling height. The standard is "picked" while nothing else
+   is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
+const stdOf = (q, L)=>q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
+  : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') } : null;
+function stdRow(q, L, std, active, lock){
+  return `<div class="cho std ${active ? 'on' : ''}"><span class="ct">${esc(std.label)}</span><span class="nochg">No charge</span>
+    ${active ? '<span class="stdmark">&#10003; Standard</span>' : `<button type="button" class="tog" data-std="${esc(q.id)}" ${lock ? 'disabled' : ''}>Use standard</button>`}</div>`;
+}
 // a selection that belongs to the other collection isn't asked
 const isLotPrem = q=>!q.num && /lot premium/i.test(q.t);
 const asked = (q, L)=>{
@@ -683,12 +695,15 @@ function prow(q, L, force){
   }
   if(isIncl(q, L)){                               // comes with this home style: nothing to choose, nothing to pay
     return `<div class="sel open" id="q-${q.id}"><div class="sel-h" style="cursor:default"><b>${esc(q.t)}</b>${view === 'staff' ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}</div>
-      <div class="incl-row">&#10003; Included with the ${esc(L.model)} · standard, no charge</div></div>`;
+      <div class="cho std on"><span class="ct">${esc((choicesOf(q, L)[0] || {}).t || q.t)}</span><span class="nochg">No charge</span><span class="stdmark">&#10003; Included</span></div>
+      <div class="q-sub">Comes with the ${esc(L.model)}.</div></div>`;
   }
   const staff = view === 'staff', lock = locked(L);
   const was = L.v1Snap ? (L.v1Snap[q.id] || '') : null, now = snapQ(q, L);
   const changed = q.v1 && was !== null && was !== now ? `<span class="chip soon">changed since pricing${was ? ' · was ' + esc(was) : ' · added'}</span>` : '';
-  const rows = choicesOf(q, L).map(c=>{
+  const std = stdOf(q, L);
+  const stdActive = std && !choicesOf(q, L).some(c=>c.i !== std.idx && (L.answers[q.id + '#' + c.i] || {}).qty);
+  const rows = (std ? stdRow(q, L, std, stdActive, lock) : '') + choicesOf(q, L).filter(c=>!std || c.i !== std.idx).map(c=>{
     const k = q.id + '#' + c.i, a = L.answers[k], n = a ? a.qty : 0, p = a ? a.price : c.p;
     const price = view === 'customer' ? '' : c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
     if(isAllow(q, c)){
@@ -699,19 +714,17 @@ function prow(q, L, force){
     }
     const ctl = c.unit
       ? `<input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.unit}</span>${n && view !== 'customer' ? `<span class="cp">= ${plus(p * n)}</span>` : ''}`
-      : (n ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
+      : (n && !(q.one || q.opts || q.ceil) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
         + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
     return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
   }).join('');
   const isOpen = force || openSel.has(q.id), shown = choicesOf(q, L);
-  const stdNote = q.ceil ? `<div class="q-sub">Standard on the ${esc(L.model || 'home')}: ${ceilStd(L)}' ceilings. Pick one only if it changes.</div>`
-    : q.fin ? '<div class="q-sub">Standard: chrome, no charge. A finish picked here covers the shower door, faucets and hardware in this bathroom.</div>'
-    : q.one && /toilet/i.test(q.t) ? '<div class="q-sub">Standard toilet at no charge unless another one is picked.</div>' : '';
+  const stdNote = q.fin ? '<div class="q-sub">The finish covers the shower door, faucets and hardware in this bathroom.</div>' : '';
   const autoNow = q.tw && !L.answers['own:' + q.id] && shown.some(c=>(L.answers[q.id + '#' + c.i] || {}).auto);
   const got = shown.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty), sum = got.reduce((t, c)=>{ const a = L.answers[q.id + '#' + c.i]; return t + a.price * a.qty; }, 0);
-  const picked = got.length ? `<span class="picked">${got.length === 1 ? esc(got[0].t.length > 34 ? got[0].t.slice(0, 32) + '…' : got[0].t) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
+  const picked = std && stdActive ? `<span class="picked">Standard: ${esc(std.label)}</span>` : got.length ? `<span class="picked">${got.length === 1 ? esc(got[0].t.length > 34 ? got[0].t.slice(0, 32) + '…' : got[0].t) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
   return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" ${force ? '' : `data-sel="${esc(q.id)}"`} aria-expanded="${isOpen}"><b>${esc(q.t)}</b>${autoNow ? '<span class="chip plain">same as master bath</span>' : ''}${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
-      ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}${isOpen || got.length ? '' : `<span class="cnt">${shown.length} choice${shown.length === 1 ? '' : 's'}</span>`}
+      ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}${isOpen || got.length || std ? '' : `<span class="cnt">${shown.length} choice${shown.length === 1 ? '' : 's'}</span>`}
       <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
     ${isOpen ? stdNote + (rows || '<div class="q-sub">No choices are set up for this one yet.</div>') : ''}</div>`;
 }
@@ -1239,7 +1252,7 @@ function sheetView(L, kind){
     body = `<div class="guide">
       <div class="g-top"><span>${esc(r.name)} · ${qs.length ? gIdx + 1 : 0} of ${qs.length}</span><div class="bar"><span style="width:${qs.length ? (gIdx + 1) / qs.length * 100 : 0}%"></span></div></div>
       <div class="q">${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
-        ${q && !picked && !lock ? '<div class="g-std">Nothing picked means this stays standard.</div>' : ''}
+        ${q && !picked && !lock && !stdOf(q, L) && !isIncl(q, L) ? '<div class="g-std">Nothing picked means this stays standard.</div>' : ''}
         ${q ? customBlock(L, r, q) : ''}</div>
       <div class="g-nav noprint">
         ${gIdx > 0 || prev ? `<button type="button" class="btn" data-g="-1">&larr; Back</button>` : ''}
@@ -1629,6 +1642,8 @@ document.addEventListener('click', e=>{
     }
     return;
   }
+  const sd = t.closest('[data-std]');
+  if(sd && !locked(L)){ const q = qById(sd.dataset.std); if(q){ q.c.forEach((c, j)=>delete L.answers[q.id + '#' + j]); markOwn(L, q); touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); } return; }
   const tg = t.closest('[data-bt-tog]'), stp = t.closest('[data-bt-step]');
   if(tg || stp){
     const k = tg ? tg.dataset.btTog : stp.dataset.btStep, q = qOfKey(k), c = q && q.c[Number(k.split('#')[1])];
