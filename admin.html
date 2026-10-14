@@ -208,6 +208,19 @@ html, body{max-width:100%; overflow-x:clip;}
       </div>
     </div>
 
+    <!-- ===================== JOB COSTING ===================== -->
+    <div class="section">
+      <h2>Job costing</h2>
+      <p class="lead">Numbers used when the hub works out what a home has cost and how much of the sale price is left.</p>
+      <div class="setting">
+        <div class="txt">
+          <div class="name">Overhead charged to every house</div>
+          <div class="what">Added to every home's costs, on top of its invoices: on the home's Job Costs card, in Job Costing, and when a home is added to Cost History. Change it here and every house uses the new amount.</div>
+        </div>
+        <span class="unit">$</span><input type="number" id="overhead" min="0" step="1" style="width:120px;" disabled>
+      </div>
+    </div>
+
     <!-- ===================== TEAM ===================== -->
     <div class="section">
       <h2>Team</h2>
@@ -300,6 +313,7 @@ firebase.auth().onAuthStateChanged(user=>{
         renderNotices();
       }, err=>{ console.error('notification choices listener error', err); $('myNotices').innerHTML = '<div class="note">Couldn\'t load your choices just now. Check your connection and reload the page.</div>'; });
       loadTeam();
+      loadOverhead();
     }
   } else {
     showLoginGate();
@@ -406,6 +420,28 @@ $('emailNote').addEventListener('change', e=>save({ emailNote: e.target.value.tr
    the server can read or change, so this goes through the hub's server.
    ============================================================ */
 const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
+/* ---- job costing: the overhead per house is kept by the hub's server (settings/job-costing) ---- */
+async function costSettings(body){
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ action:'costSettings', ...body }) });
+  if(!res.ok) throw new Error('costSettings ' + res.status);
+  return res.json();
+}
+let overheadNow = null;
+async function loadOverhead(){
+  try{ overheadNow = (await costSettings({})).overhead; $('overhead').value = overheadNow; $('overhead').disabled = false; }
+  catch(err){ console.error(err); }
+}
+$('overhead').addEventListener('change', async e=>{
+  const v = Math.round(Number(e.target.value));
+  if(!Number.isFinite(v) || v < 0 || v > 1000000){ e.target.value = overheadNow; alert('Enter a dollar amount, like 3200.'); return; }
+  setSyncStatus('saving');
+  try{
+    overheadNow = (await costSettings({ overhead: v })).overhead; e.target.value = overheadNow;
+    $('savedNote').classList.add('show'); clearTimeout(savedTimer); savedTimer = setTimeout(()=>$('savedNote').classList.remove('show'), 1800);
+  } catch(err){ console.error(err); e.target.value = overheadNow; alert('Could not save — check your connection and try again.'); }
+  setSyncStatus('idle');
+});
 let team = [];
 function esc(s){
   return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));

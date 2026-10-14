@@ -289,10 +289,11 @@ function codeFlags(byCode, target){
     return u && b.total > u.avg * 1.1 && b.total - u.avg >= 1000 ? { code, name: b.name || u.name, spent: b.total, avg: u.avg, n: u.n } : null;
   }).filter(Boolean).sort((a, b)=>(b.spent - b.avg) - (a.spent - a.avg));
 }
+let overhead = 0;   // base overhead charged to every house (Admin Settings → Job costing)
 let targets = {};   // houseId -> { style, gp, codes } from Cost History
 let sold = {};   // houseId -> sale price (job-sales), set here or on the home's page
 async function loadHomes(){
-  try{ const r = await api({ action:'costsList' }); homes = r.homes || []; sold = r.sold || {}; targets = r.targets || {}; $('blockedNotice').classList.remove('show'); }
+  try{ const r = await api({ action:'costsList' }); homes = r.homes || []; sold = r.sold || {}; targets = r.targets || {}; overhead = r.overhead || 0; $('blockedNotice').classList.remove('show'); }
   catch(err){ console.error(err); $('blockedNotice').classList.add('show'); homes = []; }
   renderHomes();
 }
@@ -464,7 +465,7 @@ function renderHomes(){
     return `<div class="home"><button type="button" class="home-h" data-home="${esc(h.houseId)}">
         <div><b>${esc(h.job ? homeLabel(h.job) : h.label || h.project)}</b><div class="sub">QuickBooks: ${esc(h.project)} · ${h.lines} line${h.lines === 1 ? '' : 's'} · imported ${esc(new Date(h.importedAt).toLocaleDateString())}</div>
           ${flags.length ? `<div class="sub" style="color:var(--danger); font-weight:600;">&#9873; ${flags.length} cost code${flags.length === 1 ? '' : 's'} over the last build: ${flags.slice(0, 3).map(f=>esc(f.name)).join(', ')}${flags.length > 3 ? '…' : ''}</div>` : ''}
-          ${sold[h.houseId] ? `<div class="sub">Sold for ${money(sold[h.houseId])}${h.lotCost ? ' · lot ' + money(h.lotCost) : ''} · ${money(sold[h.houseId] - (h.total || 0) - (h.lotCost || 0))} left (${Math.round((sold[h.houseId] - (h.total || 0) - (h.lotCost || 0)) / sold[h.houseId] * 1000) / 10}%)</div>` : ''}</div>
+          ${sold[h.houseId] ? `<div class="sub">Sold for ${money(sold[h.houseId])}${h.lotCost ? ' · lot ' + money(h.lotCost) : ''}${overhead ? ' · overhead ' + money(overhead) : ''} · ${money(sold[h.houseId] - (h.total || 0) - (h.lotCost || 0) - overhead)} left (${Math.round((sold[h.houseId] - (h.total || 0) - (h.lotCost || 0) - overhead) / sold[h.houseId] * 1000) / 10}%)</div>` : ''}</div>
         <div class="bar" style="flex:0 1 160px;"><span style="width:${Math.round((h.total || 0) / top * 100)}%"></span></div>
         <span class="amt">${money(h.total || 0)}</span></button>
       ${open ? `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th><th class="num">Material</th><th class="num">Labor</th><th class="num">Total</th>${tg ? '<th class="num">Last ' + esc(tg.style) + '</th><th class="num">Average</th>' : ''}</tr></thead><tbody>

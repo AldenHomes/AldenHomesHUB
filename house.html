@@ -1031,7 +1031,9 @@ function renderCosts(){
   const m = n=>(n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
   const pct = n=>Math.round(n * 100) + '%';
   const c = costInfo.costs, sale = costInfo.sale, target = costInfo.target;
-  const spent = c ? c.total || 0 : 0;
+  // what the home has cost: its invoices plus the base overhead charged to every house (Admin Settings → Job costing)
+  const invoices = c ? c.total || 0 : 0, overhead = c ? costInfo.overhead || 0 : 0;
+  const spent = invoices + overhead;
   // change orders the buyer signed in the hub after the sale price was set are added to it
   const cos = sale ? changeOrders.filter(o=>o.status === 'approved' && o.decision && o.decision.at && o.decision.at > sale.setAt) : [];
   const coTotal = cos.reduce((t, o)=>t + (Number(o.decision.totalAgreed != null ? o.decision.totalAgreed : o.total) || 0), 0);
@@ -1050,7 +1052,7 @@ function renderCosts(){
     : `<div class="jc-stat"><div class="l">Sold for</div><div class="v">${m(sold)}</div>
         <div class="s">${coTotal ? `incl. ${m(coTotal)} in change orders · ` : ''}<a href="#" data-sale="edit">change</a></div></div>`;
   const spentTile = `<div class="jc-stat"><div class="l">Spent so far</div><div class="v">${c ? m(spent) : '—'}</div>
-      <div class="s">${c ? (lot ? 'building · plus ' + m(lot) + ' for the lot' : sold ? pct(spent / sold) + ' of the sale price' : 'from QuickBooks invoices') : 'No invoices imported yet'}</div></div>`;
+      <div class="s">${c ? m(invoices) + ' invoices' + (overhead ? ' + ' + m(overhead) + ' overhead' : '') + (lot ? ' · plus ' + m(lot) + ' for the lot' : sold ? ' · ' + pct(spent / sold) + ' of the sale price' : '') : 'No invoices imported yet'}</div></div>`;
   const leftTile = !c || !sold ? `<div class="jc-stat"><div class="l">Budget left</div><div class="v">—</div><div class="s">${sold ? 'Waiting for invoices' : 'Needs the sale price'}</div></div>`
     : budget ? `<div class="jc-stat ${spent > budget ? 'bad' : 'good'}"><div class="l">${spent > budget ? 'Over budget' : 'Budget left'}</div><div class="v">${m(Math.abs(budget - spent))}</div>
         <div class="s">of ${m(budget)} · keeps ${(target.gp * 100).toFixed(1)}% like past ${esc(target.style)}s</div></div>`

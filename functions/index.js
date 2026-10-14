@@ -813,6 +813,16 @@ async function useBtGp(){
   await batch.commit();
   logger.info('Gross profit from BuilderTrend prices', { done });
 }
+/* Base overhead charged to every house (owner, 2026-10-14: $3,200, changeable in Admin Settings → Job costing). Kept in
+   settings/job-costing { overhead } and read/written only through hubApi (costSettings), so no security rule is needed.
+   It is added to a home's costs wherever costs are compared with the sale price (home card, Job Costing, Cost History gp); the
+   cost codes themselves don't include it. */
+const OVERHEAD_DEFAULT = 3200;
+async function getOverhead(){
+  const d = await db.collection('settings').doc('job-costing').get();
+  const v = d.exists ? d.data().overhead : null;
+  return typeof v === 'number' && v >= 0 ? v : OVERHEAD_DEFAULT;
+}
 async function historyBuilds(){
   let builds = (await db.collection('cost-history').get()).docs.map(d=>d.data());
   if(!builds.length){ try{ builds = require('./cost-history-seed.json'); } catch(e){ /* no starting list deployed */ } }
@@ -977,7 +987,9 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         sqft: num(body.sqft) || num(j.sqft), gp: null, total: c.total || 0, byCode, source: 'quickbooks', houseId, project: c.project || '',
         addedAt: new Date().toISOString(), addedBy: who.email || who.uid };
       if(typeof body.gp === 'number' && body.gp > -1 && body.gp < 1) row.gp = body.gp;
-      else if(saleDoc.exists && saleDoc.data().price > 0){ row.sale = saleDoc.data().price; row.gp = Math.round((row.sale - row.total - (c.lotCost || 0)) / row.sale * 10000) / 10000; }
+      row.overhead = await getOverhead();
+      if(typeof body.gp === 'number' && body.gp > -1 && body.gp < 1){ /* given */ }
+      else if(saleDoc.exists && saleDoc.data().price > 0){ row.sale = saleDoc.data().price; row.gp = Math.round((row.sale - row.total - row.overhead - (c.lotCost || 0)) / row.sale * 10000) / 10000; }
       if(c.lotCost) row.lotCost = c.lotCost;
       await db.collection('cost-history').doc('qb-' + houseId).set(row);
       res.json({ ok: true, id: 'qb-' + houseId });
@@ -1019,14 +1031,23 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       const jobData = {}; jobsSnap.docs.forEach(d=>{ jobData[d.id] = d.data(); });
       const targets = {};
       for(const d of snap.docs) targets[d.id] = await profitTarget((jobData[d.id] || {}).model, builds, { id: d.id, ...(jobData[d.id] || {}) });
-      res.json({ sold, targets, homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, lotCost: c.lotCost || 0, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
+      res.json({ sold, targets, overhead: await getOverhead(), homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, lotCost: c.lotCost || 0, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
+      return;
+    }
+    if(body.action === 'costSettings'){
+      if(body.overhead !== undefined){
+        const v = Math.round(Number(body.overhead) * 100) / 100;
+        if(!isFinite(v) || v < 0 || v > 1000000){ res.status(400).json({ error: 'overhead' }); return; }
+        await db.collection('settings').doc('job-costing').set({ overhead: v, updatedAt: new Date().toISOString(), updatedBy: who.email || who.uid }, { merge: true });
+      }
+      res.json({ overhead: await getOverhead() });
       return;
     }
     if(body.action === 'costsGet'){
       const id = typeof body.houseId === 'string' ? body.houseId : '';
       if(!id){ res.status(400).json({ error: 'house' }); return; }
       const [doc, saleDoc, jobDoc] = await Promise.all([db.collection('job-costs').doc(id).get(), db.collection('job-sales').doc(id).get(), db.collection('jobs').doc(id).get()]);
-      res.json({ costs: doc.exists ? doc.data() : null, sale: saleDoc.exists ? saleDoc.data() : null,
+      res.json({ costs: doc.exists ? doc.data() : null, sale: saleDoc.exists ? saleDoc.data() : null, overhead: await getOverhead(),
         target: await profitTarget(jobDoc.exists ? jobDoc.data().model : '', null, { id, ...(jobDoc.exists ? jobDoc.data() : {}) }) });
       return;
     }
