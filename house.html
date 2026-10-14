@@ -85,6 +85,15 @@
   .line{display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-top:1px solid #f1ede3; font-size:13px;}
   .line:first-of-type{border-top:none;}
   .line .d{font-family:"Courier New",monospace; color:var(--ink-soft); white-space:nowrap;}
+  .track{position:relative; height:12px; border-radius:6px; background:#efece4; margin:8px 0 4px; overflow:visible;}
+  .track > span{position:absolute; left:0; top:0; bottom:0; border-radius:6px; background:var(--navy);}
+  .track > span.over{background:var(--danger);}
+  .track > i{position:absolute; top:-4px; bottom:-4px; width:2px; background:#c58a1a;}
+  .track-key{display:flex; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--ink-soft);}
+  .cost-verdict{margin-top:8px; padding:8px 10px; border-radius:8px; font-size:13px; background:#eef5ee; color:#2f6b3a;}
+  .cost-verdict.warn{background:#fbefe9; color:var(--danger);}
+  .sale-form{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .sale-form input{flex:1 1 140px; padding:8px 10px; border:1px solid var(--steel-line); border-radius:8px; font-size:15px;}
   .label{font-size:10.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); margin:10px 0 4px;}
   .bar{height:7px; background:#e7e2d5; border-radius:4px; overflow:hidden; margin:8px 0 2px;}
   .bar div{height:100%; background:var(--good); border-radius:4px;}
@@ -465,7 +474,7 @@ html, body{max-width:100%; overflow-x:clip;}
           <a class="btn btn-ghost" id="filesBtn" href="#" target="_blank" rel="noopener" style="display:none;">Open OneDrive folder</a>
         </div>
 
-        <!-- Job costs: what this home has cost so far, from the last QuickBooks import (budget comes later) -->
+        <!-- Job costs: what this home has cost so far (QuickBooks import) against what it sold for, and how far along the build is -->
         <div class="card">
           <div class="card-head">
             <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
@@ -887,6 +896,7 @@ function renderService(){
 
 /* ---- render ---- */
 function render(){
+  if(costInfo && !saleEditing) renderCosts();
   if(!jobLoaded) return;
   $('missing').style.display = job ? 'none' : 'block';
   $('home').style.display = job ? 'block' : 'none';
@@ -955,24 +965,93 @@ async function loadStaff(){
   render();
 }
 function myUid(){ const u = firebase.auth().currentUser; return u ? u.uid : ''; }
-/* ---- job costs: read through the hub's server (QuickBooks imports live there), shown as a short summary ---- */
-let costsLoaded = false;
+/* ---- job costs: read through the hub's server (QuickBooks imports and sale prices live there) ----
+   "Sold for" = the sale price (typed here or on Job Costing for now; later the hub's own final sale sheet) plus change orders signed
+   in the hub after it was set. Spending is checked against a budget = sold for x (1 - the profit past builds of this style kept,
+   from Cost History), and against how far the build is (jobs done on the build schedule). */
+let costInfo = null, costsLoaded = false, saleEditing = false;
+async function costsApi(body){
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify(body) });
+  if(!res.ok) throw new Error('hubApi ' + res.status);
+  return res.json();
+}
 async function loadCosts(){
   if(costsLoaded) return; costsLoaded = true;
-  const box = $('costsBody');
-  try{
-    const token = await firebase.auth().currentUser.getIdToken();
-    const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ action:'costsGet', houseId }) });
-    if(!res.ok) throw new Error('costs ' + res.status);
-    const c = (await res.json()).costs;
-    if(!c){ box.innerHTML = '<span class="muted">No costs imported for this home yet. They come in from the QuickBooks report on the Job Costing page.</span>'; return; }
-    const m = n=>(n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
-    const top = Object.entries(c.byCode || {}).sort((a, b)=>b[1].total - a[1].total).slice(0, 5);
-    box.innerHTML = `<div class="muted" style="font-size:12px;">Spent so far</div><div class="big">${m(c.total || 0)}</div>
-      <div class="muted" style="font-size:12px;">${(c.lines || []).length} lines · QuickBooks project ${esc(c.project || '')} · imported ${esc(new Date(c.importedAt).toLocaleDateString())}</div>
-      <div class="label">Largest cost codes</div>${top.map(([code, b])=>`<div class="line"><span>${esc(code === '0' ? '' : code + ' · ')}${esc(b.name || '')}</span><span class="d">${m(b.total)}</span></div>`).join('')}`;
-  } catch(err){ console.error('Could not load job costs', err); box.innerHTML = '<span class="muted">Job costs couldn\'t be loaded right now.</span>'; }
+  try{ costInfo = await costsApi({ action:'costsGet', houseId }); }
+  catch(err){ console.error('Could not load job costs', err); $('costsBody').innerHTML = '<span class="muted">Job costs couldn\'t be loaded right now.</span>'; return; }
+  renderCosts();
 }
+function renderCosts(){
+  const box = $('costsBody');
+  if(!costInfo || !box) return;
+  const m = n=>(n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+  const pct = n=>Math.round(n * 100) + '%';
+  const c = costInfo.costs, sale = costInfo.sale, target = costInfo.target;
+  const spent = c ? c.total || 0 : 0;
+  // change orders the buyer signed in the hub after the sale price was set are added to it
+  const cos = sale ? changeOrders.filter(o=>o.status === 'approved' && o.decision && o.decision.at && o.decision.at > sale.setAt) : [];
+  const coTotal = cos.reduce((t, o)=>t + (Number(o.decision.totalAgreed != null ? o.decision.totalAgreed : o.total) || 0), 0);
+  const sold = sale ? sale.price + coTotal : 0;
+  const tasks = (sched && sched.tasks) || [], doneN = tasks.filter(t=>t.done).length;
+  const built = tasks.length ? doneN / tasks.length : null;
+  let html = '';
+  if(saleEditing || !sale){
+    html += `<div class="label" style="margin-top:0;">Sold for</div>
+      ${sale ? '' : '<div class="muted" style="font-size:12.5px;">Type the final sale price (base price plus selections) to track spending against it.</div>'}
+      <div class="sale-form"><input id="saleInput" inputmode="decimal" placeholder="e.g. 445,947" value="${sale ? sale.price : ''}" aria-label="Sale price">
+        <button class="btn btn-primary" data-sale="save">Save</button>${sale ? '<button class="btn btn-ghost" data-sale="cancel">Cancel</button>' : ''}</div>`;
+  } else {
+    html += `<div class="line" style="border-top:none;"><span>Sold for</span><span class="d" style="color:var(--navy); font-weight:700;">${m(sold)}</span></div>
+      ${coTotal ? `<div class="muted" style="font-size:12px;">${m(sale.price)} sale price + ${m(coTotal)} in ${cos.length} signed change order${cos.length === 1 ? '' : 's'}</div>` : ''}`;
+  }
+  if(!c){
+    html += '<div class="muted" style="margin-top:10px;">No invoices imported for this home yet. They come in from the QuickBooks report on the Job Costing page.</div>';
+  } else {
+    html += `<div class="line"><span>Spent so far</span><span class="d">${m(spent)}</span></div>`;
+    if(sold){
+      const budget = target ? sold * (1 - target.gp) : 0, left = sold - spent;
+      const scale = Math.max(sold, spent);
+      html += `<div class="line"><span>Left if no more bills came in</span><span class="d">${m(left)} (${pct(left / sold)})</span></div>
+        <div class="track" title="Spent so far against the sale price"><span class="${budget && spent > budget ? 'over' : ''}" style="width:${Math.min(100, spent / scale * 100)}%"></span>${budget ? `<i style="left:${budget / scale * 100}%" title="Budget"></i>` : ''}</div>
+        <div class="track-key"><span>${pct(spent / sold)} of the sale price spent</span>${budget ? '<span style="color:#9a6a10;">| budget</span>' : ''}</div>`;
+      if(budget){
+        html += `<div class="line" style="margin-top:6px;"><span>Budget <span class="muted" style="font-size:11.5px;">(past ${esc(target.style)} builds kept ${(target.gp * 100).toFixed(1)}%)</span></span><span class="d">${m(budget)}</span></div>`;
+        const usedB = spent / budget;
+        let verdict = '', warn = false;
+        if(spent > budget){ warn = true; verdict = `Over budget by ${m(spent - budget)}. This home is now on track to keep ${pct(left / sold)} instead of ${(target.gp * 100).toFixed(1)}%.`; }
+        else if(built != null){
+          const ahead = usedB - built;
+          if(ahead > 0.15){ warn = true; verdict = `${pct(usedB)} of the budget is spent but the build is only ${pct(built)} done (${doneN} of ${tasks.length} jobs). Worth a look.`; }
+          else verdict = `On track: ${pct(usedB)} of the budget spent, build ${pct(built)} done (${doneN} of ${tasks.length} jobs). ${m(budget - spent)} left to spend.`;
+        } else verdict = `${pct(usedB)} of the budget spent, ${m(budget - spent)} left to spend.`;
+        html += `<div class="cost-verdict${warn ? ' warn' : ''}">${verdict}</div>`;
+      } else if(built != null){
+        html += `<div class="muted" style="font-size:12px; margin-top:4px;">Build ${pct(built)} done (${doneN} of ${tasks.length} jobs).</div>`;
+      }
+    }
+    const top = Object.entries(c.byCode || {}).sort((a, b)=>b[1].total - a[1].total).slice(0, 5);
+    html += `<div class="label">Largest cost codes</div>${top.map(([code, b])=>`<div class="line"><span>${esc(code === '0' ? '' : code + ' · ')}${esc(b.name || '')}</span><span class="d">${m(b.total)}</span></div>`).join('')}
+      <div class="muted" style="font-size:11.5px; margin-top:6px;">${(c.lines || []).length} invoice lines · QuickBooks project ${esc(c.project || '')} · imported ${esc(new Date(c.importedAt).toLocaleDateString())}</div>`;
+  }
+  if(sale && !saleEditing) html += `<div class="muted" style="font-size:11.5px; margin-top:4px;">Sale price set by ${esc(sale.setBy || '')} on ${esc(new Date(sale.setAt).toLocaleDateString())} · <a href="#" data-sale="edit">change</a></div>`;
+  box.innerHTML = html;
+}
+$('costsBody').addEventListener('click', async e=>{
+  const b = e.target.closest('[data-sale]');
+  if(!b) return;
+  e.preventDefault();
+  const act = b.dataset.sale;
+  if(act === 'edit'){ saleEditing = true; renderCosts(); const i = $('saleInput'); if(i) i.focus(); return; }
+  if(act === 'cancel'){ saleEditing = false; renderCosts(); return; }
+  const raw = ($('saleInput').value || '').replace(/[^\d.]/g, ''), price = Number(raw);
+  if(!raw || !(price > 0)){ alert('Type the sale price as a number, like 445947.'); return; }
+  b.disabled = true; b.textContent = 'Saving…';
+  try{ costInfo.sale = (await costsApi({ action:'saleSet', houseId, price })).sale; saleEditing = false; }
+  catch(err){ console.error(err); alert('Couldn\'t save the sale price. Check your connection and try again.'); }
+  renderCosts();
+});
+$('costsBody').addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'saleInput'){ const s = $('costsBody').querySelector('[data-sale="save"]'); if(s) s.click(); } });
 function noteTime(iso){
   const d = new Date(iso);
   if(isNaN(d)) return '';

@@ -701,6 +701,21 @@ function staffName(user){
   return user.displayName || String(user.email || '').split('@')[0] || 'Someone';
 }
 
+/* The share of the sale price past builds of the same home style kept as gross profit (average of the latest 8 in Cost History),
+   so a home being built can be checked against it: spend no more than sale price x (1 - that). "Stanford B" matches "Stanford";
+   the longest matching style wins ("Alden 2.1 B" -> "Alden 2.1", not "Alden"). */
+async function profitTarget(model){
+  const m = String(model || '').trim().toLowerCase();
+  if(!m) return null;
+  let builds = (await db.collection('cost-history').get()).docs.map(d=>d.data());
+  if(!builds.length){ try{ builds = require('./cost-history-seed.json'); } catch(e){ /* no starting list deployed */ } }
+  builds = builds.filter(b=>typeof b.gp === 'number' && b.base);
+  const style = builds.map(b=>String(b.base)).filter(b=>m === b.toLowerCase() || m.startsWith(b.toLowerCase() + ' ') || m.startsWith(b.toLowerCase() + '('))
+    .sort((a, b)=>b.length - a.length)[0];
+  if(!style) return null;
+  const same = builds.filter(b=>b.base === style).sort((a, b)=>String(b.date).localeCompare(String(a.date))).slice(0, 8);
+  return { style, n: same.length, gp: Math.round(same.reduce((t, b)=>t + b.gp, 0) / same.length * 10000) / 10000 };
+}
 exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (req, res)=>{
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
   try{
@@ -799,7 +814,8 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
     if(body.action === 'historyAdd'){
       // a home that's closed: its imported costs become a history row (replacing any earlier row for the same home)
       const houseId = typeof body.houseId === 'string' ? body.houseId : '';
-      const [costDoc, jobDoc] = await Promise.all([db.collection('job-costs').doc(houseId || '-').get(), db.collection('jobs').doc(houseId || '-').get()]);
+      const [costDoc, jobDoc, saleDoc] = await Promise.all([db.collection('job-costs').doc(houseId || '-').get(), db.collection('jobs').doc(houseId || '-').get(),
+        db.collection('job-sales').doc(houseId || '-').get()]);
       if(!houseId || !costDoc.exists || !jobDoc.exists){ res.status(404).json({ error: 'house' }); return; }
       const c = costDoc.data(), j = jobDoc.data();
       const num = v=>{ const x = Number(v); return isFinite(x) && x > 0 ? x : null; };
@@ -811,6 +827,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         sqft: num(body.sqft) || num(j.sqft), gp: null, total: c.total || 0, byCode, source: 'quickbooks', houseId, project: c.project || '',
         addedAt: new Date().toISOString(), addedBy: who.email || who.uid };
       if(typeof body.gp === 'number' && body.gp > -1 && body.gp < 1) row.gp = body.gp;
+      else if(saleDoc.exists && saleDoc.data().price > 0){ row.sale = saleDoc.data().price; row.gp = Math.round((row.sale - row.total) / row.sale * 10000) / 10000; }
       await db.collection('cost-history').doc('qb-' + houseId).set(row);
       res.json({ ok: true, id: 'qb-' + houseId });
       return;
@@ -823,16 +840,37 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       res.json({ ok: true });
       return;
     }
+    /* ---- What a home sold for: job-sales/{houseId} = { price, lines?:[{ bt, title, choice, price }], source:'typed'|'buildertrend'|'hub',
+       note, setAt, setBy }. Typed for now (or brought over from BuilderTrend's Job Price Summary); later the hub's own final sale sheet
+       will write it. Server-side only like job-costs, so no Firestore rule. */
+    if(body.action === 'saleSet'){
+      const houseId = typeof body.houseId === 'string' ? body.houseId : '';
+      if(!houseId || !(await db.collection('jobs').doc(houseId).get()).exists){ res.status(404).json({ error: 'house' }); return; }
+      const ref = db.collection('job-sales').doc(houseId);
+      if(body.price === null){ await ref.delete(); res.json({ sale: null }); return; }
+      const price = Math.round(Number(body.price) * 100) / 100;
+      if(!isFinite(price) || price <= 0 || price > 50000000){ res.status(400).json({ error: 'price' }); return; }
+      const cut = (v, n)=>String(v == null ? '' : v).trim().slice(0, n);
+      const sale = { price, source: ['typed', 'buildertrend', 'hub'].includes(body.source) ? body.source : 'typed', note: cut(body.note, 200),
+        setAt: new Date().toISOString(), setBy: who.email || who.uid };
+      if(Array.isArray(body.lines)) sale.lines = body.lines.slice(0, 500).map(l=>({ bt: cut(l.bt, 10), title: cut(l.title, 120), choice: cut(l.choice, 200),
+        price: Math.round((Number(l.price) || 0) * 100) / 100 }));
+      await ref.set(sale);
+      res.json({ sale });
+      return;
+    }
     if(body.action === 'costsList'){
-      const snap = await db.collection('job-costs').get();
-      res.json({ homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
+      const [snap, sales] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get()]);
+      const sold = {}; sales.docs.forEach(d=>{ sold[d.id] = d.data().price; });
+      res.json({ sold, homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
       return;
     }
     if(body.action === 'costsGet'){
       const id = typeof body.houseId === 'string' ? body.houseId : '';
       if(!id){ res.status(400).json({ error: 'house' }); return; }
-      const doc = await db.collection('job-costs').doc(id).get();
-      res.json({ costs: doc.exists ? doc.data() : null });
+      const [doc, saleDoc, jobDoc] = await Promise.all([db.collection('job-costs').doc(id).get(), db.collection('job-sales').doc(id).get(), db.collection('jobs').doc(id).get()]);
+      res.json({ costs: doc.exists ? doc.data() : null, sale: saleDoc.exists ? saleDoc.data() : null,
+        target: await profitTarget(jobDoc.exists ? jobDoc.data().model : '') });
       return;
     }
     res.status(400).json({ error: 'action' });
