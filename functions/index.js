@@ -735,6 +735,39 @@ async function applyBtSales(){
   await batch.commit();
   logger.info('BuilderTrend sale prices applied', { rows, homes });
 }
+/* The same 27 homes as ordinary CLOSED homes (owner, 2026-10-14: "treated like any other home" — home page, notes, files, homeowner
+   link). A home already in the hub's list (same development + lot) is left alone. New ones get a jobs doc with the settlement date
+   from Cost History (a settle date in the past is what makes a home "closed" across the hub), the style, the street address and the
+   buyers/contact from BuilderTrend, plus their job-sales record. Once only: marker import-log/bt-homes-2026-10. */
+async function addClosedHomes(){
+  if(!BT_SALES) return;
+  const mark = db.collection('import-log').doc('bt-homes-2026-10');
+  if((await mark.get()).exists) return;
+  const [hist, jobs, sales] = await Promise.all([db.collection('cost-history').get(), db.collection('jobs').get(), db.collection('job-sales').get()]);
+  if(hist.empty) return;
+  const lotKey = l=>String(l == null ? '' : l).toLowerCase().replace(/lot|#|\s/g, '').replace(/^0+(?=\d)/, '');
+  const same = (c1, l1, c2, l2)=>String(c1 || '').toUpperCase() === String(c2 || '').toUpperCase() && lotKey(l1) === lotKey(l2);
+  const now = new Date().toISOString(), had = new Set(sales.docs.map(d=>d.id));
+  const batch = db.batch(); const added = [], already = [];
+  for(const [k, x] of Object.entries(BT_SALES)){
+    const [comm, lot] = k.split(' ');
+    const existing = jobs.docs.find(d=>same(d.data().community, d.data().lot, comm, lot));
+    if(existing){ already.push(k); continue; }
+    const h = (hist.docs.find(d=>same(d.data().comm, d.data().lot, comm, lot)) || { data: ()=>({}) }).data();
+    const ref = db.collection('jobs').doc();
+    const home = x.home || {};
+    batch.set(ref, { community: comm, lot, model: h.model || '', client: home.client || '', address: home.address || '', phone: home.phone || '', email: home.email || '',
+      filesUrl: '', plan: '', draftsman: '', fndn: '', walk: '', move: '', settle: /^\d{4}-\d{2}-\d{2}$/.test(h.date || '') ? h.date : '',
+      btJobId: x.btId, addedFrom: 'buildertrend', addedAt: now });
+    if(!had.has(ref.id)) batch.set(db.collection('job-sales').doc(ref.id), { price: x.final, lines: [{ bt: '', title: 'Base price', choice: '', price: x.base }, ...x.lines,
+      ...x.cos.map(c=>({ bt: 'CO', title: 'Change order', choice: c.title, price: c.price }))], source: 'buildertrend',
+      note: 'From the BuilderTrend Job Price Summary', setAt: now, setBy: 'BuilderTrend import' });
+    added.push(k);
+  }
+  batch.set(mark, { at: now, added, already });
+  await batch.commit();
+  logger.info('Closed homes added from BuilderTrend', { added: added.length, already });
+}
 async function historyBuilds(){
   let builds = (await db.collection('cost-history').get()).docs.map(d=>d.data());
   if(!builds.length){ try{ builds = require('./cost-history-seed.json'); } catch(e){ /* no starting list deployed */ } }
@@ -877,7 +910,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         }
         if(seed.length) snap = await col.get();
       }
-      if(BT_SALES){ await applyBtSales(); snap = await col.get(); }
+      if(BT_SALES){ await applyBtSales(); await addClosedHomes(); snap = await col.get(); }
       res.json({ builds: snap.docs.map(d=>({ id: d.id, ...d.data() })) });
       return;
     }
@@ -930,7 +963,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       return;
     }
     if(body.action === 'costsList'){
-      await applyBtSales().catch(err=>logger.error('BuilderTrend sale prices not applied', err));
+      await applyBtSales().then(addClosedHomes).catch(err=>logger.error('BuilderTrend sale prices / closed homes not applied', err));
       const [snap, sales, jobsSnap, builds] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get(), db.collection('jobs').get(), historyBuilds()]);
       const sold = {}; sales.docs.forEach(d=>{ sold[d.id] = d.data().price; });
       // the usual cost per code for each home's style, so the list can flag codes running over
