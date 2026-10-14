@@ -54,6 +54,8 @@
   .hero-top{display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap;}
   .tag{display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; letter-spacing:.3px; color:#fff; margin-top:5px;}
   .hero h2{margin:0; font-size:clamp(20px,3vw,26px); color:var(--navy);}
+  .home-status{display:inline-block; vertical-align:middle; margin-left:10px; padding:3px 11px; border-radius:20px; font-size:11.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; background:#e7e9ec; color:#4B4F54; white-space:nowrap;}
+  .home-status span{font-weight:400; text-transform:none; letter-spacing:0; margin-left:4px;}
   .hero .where{font-size:14px; color:var(--ink-soft); margin-top:4px;}
   .hero .contact{font-size:13px; color:var(--ink-soft); margin-top:6px;}
   .hero .contact a{color:var(--rust-2); text-decoration:none; font-weight:600;}
@@ -405,7 +407,7 @@ html, body{max-width:100%; overflow-x:clip;}
         <div class="hero-top">
           <span class="tag" id="hTag"></span>
           <div>
-            <h2 id="hTitle"></h2>
+            <h2><span id="hTitle"></span><span class="home-status" id="hStatus" style="display:none;"></span></h2>
             <div class="where" id="hWhere"></div>
             <div class="contact" id="hContact"></div>
           </div>
@@ -942,6 +944,10 @@ function render(){
   ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
   const settleIn = daysFromToday(job.settle);
+  // settled = closed: the same rule the hub uses to take a home off the Active Homes list
+  const closed = settleIn !== null && settleIn < 0;
+  $('hStatus').style.display = closed ? '' : 'none';
+  $('hStatus').innerHTML = closed ? `Closed<span>· settled ${esc(fmtDate(job.settle))}</span>` : '';
   // No foundation date typed on the Job Production Schedule: use the build schedule's
   // (its first Foundation job, or the schedule's start) rather than saying "not set".
   const schedTasks = ((sched && sched.tasks) || []).filter(t=>t.start);
