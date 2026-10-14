@@ -11,7 +11,7 @@
    - Everything else (Firestore, Storage, sign-in, QR images) is
      left completely alone.
    ============================================================ */
-const CACHE = 'alden-hub-v9';
+const CACHE = 'alden-hub-v10';
 
 const SHELL = [
   'index.html',
@@ -22,6 +22,7 @@ const SHELL = [
   'house.html',
   'admin.html',
   'punch.html',
+  'jobcost.html',
   'mywork.html',
   'assistant.js',
   'hubsearch.js',

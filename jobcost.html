@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | Job Costing</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  .titlebar{background:var(--paper-2); padding:20px clamp(16px,4vw,40px); border-bottom:4px solid var(--rust);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;}
+  .brand-mark{height:40px; flex:none; display:flex; align-items:center;}
+  .brand-mark img{height:100%; width:auto; display:block;}
+  h1{font-size:clamp(19px,2.4vw,24px); margin:0; font-weight:700; color:var(--navy);}
+  .subtitle{font-size:12px; color:var(--ink-soft); margin-top:3px; letter-spacing:.6px; text-transform:uppercase;}
+  .titlebar-stats{display:flex; gap:22px;}
+  .stat{text-align:center;}
+  .stat .n{font-size:22px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace;}
+  .stat .l{font-size:10px; color:var(--ink-soft); letter-spacing:.6px; text-transform:uppercase; margin-top:3px;}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+  .sync-badge{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-soft); font-family:"Courier New",monospace;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.offline{background:var(--danger);}
+  .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
+  .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
+
+  .wrap{max-width:880px; margin:0 auto; padding:22px clamp(14px,4vw,40px) 60px;}
+  .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
+  .back-link:hover{color:var(--navy);}
+  .btn{padding:11px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-primary:hover{background:var(--navy-2);}
+  .btn:disabled{opacity:.5; cursor:default;}
+  input[type=text], input[type=password], select{padding:11px 11px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; color:var(--ink); background:#fff; font-family:inherit; min-width:0;}
+  input:focus, select:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+
+  /* add an item */
+  .add{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-top:4px solid var(--rust); padding:16px; margin-bottom:16px;}
+  .add-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .add-row #newText{flex:1 1 100%;}
+  .add-row select{flex:1 1 170px;}
+  .add-row .btn{flex:0 0 auto;}
+  .add-extras{display:flex; gap:10px 16px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:14px; color:var(--ink);}
+  .add-extras label{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
+  .add-extras input[type=date]{padding:8px 9px; font-size:14px;}
+  .add-extras input[type=checkbox]{width:18px; height:18px; accent-color:var(--danger);}
+  .pick-photo{border:1px dashed var(--steel-line); border-radius:var(--radius); padding:8px 12px; font-weight:600; color:var(--navy);}
+  /* high priority: red outline so it can't be missed */
+  .item.high{box-shadow:inset 0 0 0 2px var(--danger); background:#fff8f6;}
+  .tag{display:inline-block; border-radius:20px; padding:1px 9px; margin-right:6px; font-weight:700; font-size:11.5px;}
+  .tag.high{background:var(--danger); color:#fff;}
+  .tag.due{background:#ece8dd; color:var(--ink-soft);}
+  .tag.due.soon{background:#fdf0dc; color:#96661a;}
+  .tag.due.late{background:#fbeae4; color:var(--danger);}
+  .item-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .item-photos a{display:block; width:76px; height:76px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--steel-line);}
+  .item-photos img{width:100%; height:100%; object-fit:cover; display:block;}
+  .item-tools{display:flex; gap:14px; flex-wrap:wrap; margin-top:7px;}
+  .item-tools button{background:none; border:none; padding:0; font-size:12.5px; font-weight:700; color:var(--rust-2); cursor:pointer; font-family:inherit;}
+  .item-tools button:hover{text-decoration:underline;}
+  .item-tools button.warn{color:var(--danger);}
+  /* an item being edited: its wording, home and person become boxes */
+  .item-edit textarea{width:100%; min-height:64px; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; line-height:1.45; font-family:inherit; color:var(--ink); resize:vertical;}
+  .item-edit .row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .item-edit select{flex:1 1 180px; min-width:0; padding:8px 9px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; background:#fff; color:var(--ink);}
+  .item-edit .btns{display:flex; gap:8px; margin-top:10px;}
+  .item-edit .btns button{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:8px 16px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:var(--navy);}
+  .item-edit .btns button.save{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .hint{font-size:12.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
+
+  .filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .filters input{flex:1 1 200px;}
+  .filters select{flex:0 1 200px;}
+
+  /* the list: grouped by home, each item one big tap target */
+  .group{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); margin-bottom:14px; overflow:hidden;}
+  .group-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 14px; background:#f3f5ee; border-bottom:1px solid #dfe3d3; font-size:14px; font-weight:700; color:var(--rust-2);}
+  .group-head a{color:inherit; text-decoration:none;}
+  .group-head a:hover{text-decoration:underline;}
+  .group-head .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; color:var(--ink-soft);}
+  .item{display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-top:1px solid #f1ede3;}
+  .item:first-of-type{border-top:none;}
+  .check{flex:none; width:28px; height:28px; margin-top:1px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff; font-size:17px; font-weight:800; line-height:1; padding:0;}
+  .check:hover{border-color:var(--good);}
+  .check.on{background:var(--good); border-color:var(--good);}
+  .item-main{flex:1; min-width:0;}
+  .item-text{font-size:15.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word;}
+  .item.done .item-text{text-decoration:line-through; color:var(--ink-soft);}
+  .item-meta{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+  .who{display:inline-block; background:#eef0e8; color:var(--rust-2); font-weight:700; border-radius:20px; padding:1px 9px; margin-right:6px;}
+  .who.me{background:#fdf0dc; color:#96661a;}
+  .x-btn{flex:none; border:none; background:none; color:#b9b4a5; font-size:20px; line-height:1; cursor:pointer; padding:2px 4px;}
+  .x-btn:hover{color:var(--danger);}
+  .empty{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:36px 20px; text-align:center; color:var(--ink-soft); font-size:14.5px;}
+  .done-toggle{display:flex; align-items:center; gap:8px; width:100%; margin:22px 0 10px; padding:12px 14px; background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit; text-align:left;}
+  .done-toggle .arrow{display:inline-block; transition:transform .15s; font-size:11px;}
+  .done-toggle.open .arrow{transform:rotate(90deg);}
+  .done-toggle .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
+  .notice{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:13.5px; padding:11px 13px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .notice.show{display:block;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-gate.hidden{display:none;}
+  .auth-card{width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;}
+  .auth-card .brand{margin-bottom:22px; pointer-events:none;}
+  .auth-card h2{margin:0; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .auth-field input{width:100%;}
+  .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .auth-error.show{display:block;}
+  .auth-card .btn-primary{width:100%;}
+  .app-shell.locked{display:none;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  @media (max-width:640px){ .titlebar-stats{display:none;} }
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  @media (max-width:640px){
+    /* header buttons wrap instead of running off the side; the signed-in email drops to its own line */
+    .titlebar-account{flex-wrap:wrap; width:100%; gap:8px 10px;}
+    .titlebar-account #currentUserEmail{order:20; flex:1 1 100%; overflow-wrap:anywhere;}
+    /* the green "Synced" light sits up beside the page title, out of the button row */
+    .titlebar{position:relative;}
+    .titlebar .sync-badge{position:absolute; top:16px; right:14px;}
+    .titlebar .brand{padding-right:74px;}
+  }
+  .item-text, .group-head{overflow-wrap:anywhere;}
+  @media (max-width:640px){
+    .add-row select{flex:1 1 100%;}
+    .add-row .btn{flex:1 1 100%;}
+    .filters select{flex:1 1 100%;}
+    .item-tools{gap:6px 14px;}
+  }
+  /* job costing */
+  .card2{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:18px 20px; margin-top:16px;}
+  .card2 h2{font-size:17px; color:var(--navy); margin:0;}
+  .lede{color:var(--ink-soft); font-size:14px; line-height:1.5; margin-top:6px;}
+  .imp-row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;}
+  .imp-warn{background:#fdf3e2; border:1px solid #ecd9b0; color:#6e4a10; border-radius:var(--radius); padding:10px 12px; font-size:14px; margin-top:12px; line-height:1.45;}
+  .imp-ok{background:#eaf1ec; border:1px solid #c5dccb; color:#27573a; border-radius:var(--radius); padding:10px 12px; font-size:14px; margin-top:12px;}
+  table.jc{width:100%; border-collapse:collapse; font-size:14px; margin-top:10px;}
+  table.jc th{text-align:left; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); padding:7px 8px; border-bottom:2px solid var(--steel-line);}
+  table.jc td{padding:8px; border-bottom:1px solid #f1ede3; vertical-align:middle;}
+  table.jc .num{text-align:right; font-family:"Courier New",monospace; white-space:nowrap;}
+  table.jc tr.tot td{font-weight:700; border-top:2px solid var(--steel-line); border-bottom:none;}
+  table.jc select{max-width:260px; padding:6px 8px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:13.5px; font-family:inherit;}
+  .home{border-top:1px solid #f1ede3; padding:12px 0;}
+  .home:first-child{border-top:none;}
+  .home-h{display:flex; gap:12px; align-items:center; flex-wrap:wrap; width:100%; background:none; border:none; padding:0; text-align:left; cursor:pointer; font-family:inherit; color:inherit;}
+  .home-h b{font-size:15.5px; color:var(--navy);}
+  .home-h .amt{margin-left:auto; font-family:"Courier New",monospace; font-weight:700; color:var(--navy); font-size:16px;}
+  .home-h .sub{font-size:12.5px; color:var(--ink-soft);}
+  .bar{height:6px; background:#ece8dd; border-radius:3px; overflow:hidden; min-width:60px;}
+  .bar span{display:block; height:100%; background:var(--rust-2, #6B7355);}
+  .muted{color:var(--ink-soft);}
+  @media (max-width:700px){ table.jc{display:block; overflow-x:auto; white-space:nowrap;} }
+</style>
+</head>
+<body>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div><h2>Job Costing</h2></div>
+    </div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="auth-error" id="loginError"></div>
+    <div class="auth-field">
+      <label for="loginEmail">Email</label>
+      <input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+  <div class="titlebar">
+    <a class="brand" href="index.html" title="Back to Alden Homes Hub">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div>
+        <h1>Job Costing</h1>
+        <div class="subtitle">What each home has cost, from QuickBooks</div>
+      </div>
+    </a>
+    <div class="titlebar-stats">
+      <div class="stat"><div class="n" id="statHomes">0</div><div class="l">Homes</div></div>
+      <div class="stat"><div class="n" id="statTotal">$0</div><div class="l">Costs in</div></div>
+    </div>
+    <div class="titlebar-account">
+      <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+      <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; Back to the hub</a>
+    <div class="notice" id="blockedNotice">Job costs couldn't be loaded. Check your connection and reload the page.</div>
+
+    <div class="card2">
+      <h2>Import from QuickBooks</h2>
+      <p class="lede">Use the QuickBooks report <strong>Project costs detail</strong>, saved as Excel. Run it for <strong>All Dates</strong>: each import replaces the costs of every home in the file, so nothing is ever counted twice.</p>
+      <div class="imp-row">
+        <label class="btn btn-primary" style="cursor:pointer;">Choose the report<input type="file" id="qbFile" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+        <span class="muted" id="qbFileName" style="font-size:13.5px;"></span>
+      </div>
+      <div id="impPreview"></div>
+    </div>
+
+    <div class="card2">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;"><h2>Homes with costs</h2><div style="flex:1"></div><input type="text" id="search" placeholder="Search homes…" style="padding:8px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit;"></div>
+      <div id="homesList"><p class="muted" style="margin-top:12px;">Loading…</p></div>
+    </div>
+
+    <footer>Alden Homes internal tools — costs come from QuickBooks and are the same for everyone on the team.</footer>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+
+/* ============================================================
+   JOB COSTING
+   What each home has cost, from QuickBooks. The office runs QuickBooks' "Project costs detail" report as Excel and
+   imports it here. Each line has the project (e.g. "20-219 MODEL" or "AP-219 Smith"), the vendor, the bill, the amount and
+   the cost code (QuickBooks' Product/Service, e.g. "30 - Lumber" / "30 - Lumber Labor"). The project is matched to a home by
+   development + lot; anything that can't be matched is shown so someone can pick the home or skip it.
+   Costs live on the server (job-costs, through hubApi), not in a collection the pages read directly.
+   ============================================================ */
+const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
+// old QuickBooks development numbers → the letters the hub uses (owner: "20" was Alden Place)
+const OLD_DEV = { '20':'AP' };
+let jobs = [], homes = [], plan = null, openHome = '';
+const $ = id => document.getElementById(id);
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+const money = n=>(n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const money2 = n=>(n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+function setSyncStatus(state){ $('syncDot').classList.toggle('offline', state==='offline'); $('syncLabel').textContent = state==='offline' ? 'Offline' : (state==='saving' ? 'Saving…' : 'Synced'); }
+function homeLabel(j){ return [j.community, j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') || 'Unnamed home'; }
+const lotKey = l=>String(l == null ? '' : l).toLowerCase().replace(/lot|#|\s/g, '').replace(/^0+(?=\d)/, '');
+async function api(body){
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify(body) });
+  if(!res.ok) throw new Error('hubApi ' + res.status);
+  return res.json();
+}
+async function loadHomes(){
+  try{ homes = (await api({ action:'costsList' })).homes || []; $('blockedNotice').classList.remove('show'); }
+  catch(err){ console.error(err); $('blockedNotice').classList.add('show'); homes = []; }
+  renderHomes();
+}
+
+/* ---- reading the report ---- */
+function loadSheetJS(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((res, rej)=>{ const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+}
+// "20-219 MODEL" / "AP-219 Smith" / "MM-070 Sherman (B)" → { dev, lot }
+function parseProject(p){
+  const m = String(p || '').trim().match(/^([A-Za-z]{2}|\d{1,3})\s*[-–]\s*0*(\d+[A-Za-z]?)/);
+  if(!m) return null;
+  const dev = /^\d+$/.test(m[1]) ? (OLD_DEV[m[1]] || '') : m[1].toUpperCase();
+  return { dev, lot: m[2] };
+}
+function matchHome(project){
+  const p = parseProject(project);
+  if(!p || !p.dev) return '';
+  const hits = jobs.filter(j=>String(j.community || '').toUpperCase() === p.dev && lotKey(j.lot) === lotKey(p.lot));
+  return hits.length === 1 ? hits[0].id : '';
+}
+function toIso(d){
+  if(d instanceof Date && !isNaN(d)) return d.toISOString().slice(0, 10);
+  const m = String(d || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return m ? m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0') : String(d || '').slice(0, 10);
+}
+async function readReport(file){
+  await loadSheetJS();
+  const wb = XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:true });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, raw:true, defval:'' });
+  const hi = rows.findIndex(r=>r.some(c=>/^project$/i.test(String(c).trim())) && r.some(c=>/^amount$/i.test(String(c).trim())));
+  if(hi < 0) throw new Error('This doesn\'t look like the Project costs detail report: there\'s no row with "Project" and "Amount" headings.');
+  const head = rows[hi].map(c=>String(c).trim().toLowerCase());
+  const col = names=>head.findIndex(h=>names.includes(h));
+  const C = { project:col(['project']), vendor:col(['vendor','name']), type:col(['transaction type']), date:col(['date','transaction date']), num:col(['num','no.']),
+              account:col(['distribution account','account']), memo:col(['memo/description','memo']), amount:col(['amount']), item:col(['product/service','item']) };
+  if(C.item < 0) throw new Error('The report needs the "Product/Service" column — that\'s where the cost code is.');
+  const range = rows.slice(0, hi).map(r=>r.filter(Boolean).join(' ')).find(t=>/dates|\d{4}/i.test(t)) || '';
+  const byProject = {};
+  rows.slice(hi + 1).forEach(r=>{
+    const project = String(r[C.project] || '').trim(), amount = Number(r[C.amount]);
+    if(!project || !isFinite(amount) || r[C.date] === '' || /^total/i.test(project)) return;
+    (byProject[project] = byProject[project] || []).push({ date: toIso(r[C.date]), vendor: r[C.vendor], type: r[C.type], num: r[C.num], account: r[C.account], memo: r[C.memo], item: r[C.item], amount });
+  });
+  const projects = Object.keys(byProject).sort((a, b)=>a.localeCompare(b, undefined, { numeric:true }));
+  if(!projects.length) throw new Error('No cost lines were found in this file.');
+  return { range, source: file.name, projects: projects.map(p=>({ project:p, lines:byProject[p], total: byProject[p].reduce((t, l)=>t + l.amount, 0), houseId: matchHome(p),
+    noCode: byProject[p].filter(l=>!/^\d{1,3}\s*-|roofing|trim|siding/i.test(String(l.item))).length })) };
+}
+
+/* ---- the preview before anything is saved ---- */
+function renderPlan(){
+  const box = $('impPreview');
+  if(!plan){ box.innerHTML = ''; return; }
+  const sorted = jobs.slice().sort((a, b)=>homeLabel(a).localeCompare(homeLabel(b), undefined, { numeric:true }));
+  const opts = sel=>`<option value="">Skip — don't import</option>` + sorted.map(j=>`<option value="${esc(j.id)}" ${j.id === sel ? 'selected' : ''}>${esc(homeLabel(j))}</option>`).join('');
+  const go = plan.projects.filter(p=>p.houseId), unmatched = plan.projects.filter(p=>!p.houseId), replacing = go.filter(p=>homes.some(h=>h.houseId === p.houseId));
+  box.innerHTML = `
+    ${!/all dates/i.test(plan.range) ? `<div class="imp-warn"><strong>This file covers ${esc(plan.range || 'a limited period')}, not All Dates.</strong> Importing replaces each home's costs with only the lines in this file, so anything earlier would drop off. Re-run the report for All Dates unless that's what you mean to do.</div>` : ''}
+    ${unmatched.length ? `<div class="imp-warn"><strong>${unmatched.length} project${unmatched.length === 1 ? '' : 's'} couldn't be matched to a home.</strong> Pick the home for each one, or leave it on Skip.</div>` : ''}
+    <table class="jc"><thead><tr><th>QuickBooks project</th><th>Home in the hub</th><th class="num">Lines</th><th class="num">Total</th></tr></thead><tbody>
+      ${plan.projects.map((p, i)=>`<tr><td><strong>${esc(p.project)}</strong>${p.noCode ? `<div class="muted" style="font-size:12px;">${p.noCode} line${p.noCode === 1 ? '' : 's'} without a cost code</div>` : ''}</td>
+        <td><select data-pick="${i}">${opts(p.houseId)}</select></td><td class="num">${p.lines.length}</td><td class="num">${money2(p.total)}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="2">${go.length} home${go.length === 1 ? '' : 's'} will be imported${replacing.length ? ` (${replacing.length} already ha${replacing.length === 1 ? 's' : 've'} costs, which will be replaced)` : ''}</td><td class="num">${go.reduce((t, p)=>t + p.lines.length, 0)}</td><td class="num">${money2(go.reduce((t, p)=>t + p.total, 0))}</td></tr>
+    </tbody></table>
+    <div class="imp-row"><button class="btn btn-primary" id="impGo" ${go.length ? '' : 'disabled'}>Import ${go.length} home${go.length === 1 ? '' : 's'}</button><button class="btn" id="impCancel" style="border:1px solid var(--steel-line); background:#fff;">Cancel</button></div>`;
+}
+$('qbFile').addEventListener('change', async e=>{
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  $('qbFileName').textContent = 'Reading ' + f.name + '…';
+  try{ plan = await readReport(f); $('qbFileName').textContent = f.name + ' · ' + plan.projects.length + ' project' + (plan.projects.length === 1 ? '' : 's') + (plan.range ? ' · ' + plan.range : ''); }
+  catch(err){ console.error(err); plan = null; $('qbFileName').textContent = ''; $('impPreview').innerHTML = `<div class="imp-warn">${esc(err.message || 'That file couldn\'t be read.')}</div>`; return; }
+  renderPlan();
+});
+$('impPreview').addEventListener('change', e=>{ const s = e.target.closest('[data-pick]'); if(s && plan){ plan.projects[Number(s.dataset.pick)].houseId = s.value; renderPlan(); } });
+$('impPreview').addEventListener('click', async e=>{
+  if(e.target.closest('#impCancel')){ plan = null; $('qbFileName').textContent = ''; renderPlan(); return; }
+  if(!e.target.closest('#impGo') || !plan) return;
+  const go = plan.projects.filter(p=>p.houseId);
+  e.target.disabled = true; e.target.textContent = 'Importing…'; setSyncStatus('saving');
+  try{
+    // a few homes per call, so a large report doesn't make one huge request
+    let done = 0;
+    for(let i = 0; i < go.length; i += 10){
+      const part = go.slice(i, i + 10).map(p=>({ houseId:p.houseId, project:p.project, label: homeLabel(jobs.find(j=>j.id === p.houseId) || {}), lines:p.lines }));
+      done += ((await api({ action:'costsImport', source: plan.source, houses: part })).done || []).length;
+    }
+    $('impPreview').innerHTML = `<div class="imp-ok">Imported ${done} home${done === 1 ? '' : 's'} from ${esc(plan.source)}.</div>`;
+    plan = null; $('qbFileName').textContent = '';
+    await loadHomes();
+  } catch(err){ console.error(err); alert('The import didn\'t go through. Check your connection and try again.'); renderPlan(); }
+  setSyncStatus('idle');
+});
+
+/* ---- the homes ---- */
+function renderHomes(){
+  const q = ($('search').value || '').trim().toLowerCase();
+  const list = homes.map(h=>({ ...h, job: jobs.find(j=>j.id === h.houseId) })).filter(h=>!q || [h.label, h.project, h.job ? homeLabel(h.job) + ' ' + (h.job.address || '') : ''].join(' ').toLowerCase().includes(q))
+    .sort((a, b)=>(a.job ? homeLabel(a.job) : a.label || '').localeCompare(b.job ? homeLabel(b.job) : b.label || '', undefined, { numeric:true }));
+  $('statHomes').textContent = homes.length;
+  $('statTotal').textContent = money(homes.reduce((t, h)=>t + (h.total || 0), 0));
+  const top = Math.max(1, ...homes.map(h=>h.total || 0));
+  $('homesList').innerHTML = list.length ? list.map(h=>{
+    const open = openHome === h.houseId, codes = Object.entries(h.byCode || {}).sort((a, b)=>Number(a[0]) - Number(b[0]));
+    return `<div class="home"><button type="button" class="home-h" data-home="${esc(h.houseId)}">
+        <div><b>${esc(h.job ? homeLabel(h.job) : h.label || h.project)}</b><div class="sub">QuickBooks: ${esc(h.project)} · ${h.lines} line${h.lines === 1 ? '' : 's'} · imported ${esc(new Date(h.importedAt).toLocaleDateString())}</div></div>
+        <div class="bar" style="flex:0 1 160px;"><span style="width:${Math.round((h.total || 0) / top * 100)}%"></span></div>
+        <span class="amt">${money(h.total || 0)}</span></button>
+      ${open ? `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th><th class="num">Material</th><th class="num">Labor</th><th class="num">Total</th></tr></thead><tbody>
+          ${codes.map(([c, b])=>`<tr><td class="num" style="text-align:left;">${c === '0' ? '—' : esc(c)}</td><td>${esc(b.name || '')}</td><td class="num">${b.material ? money2(b.material) : ''}</td><td class="num">${b.labor ? money2(b.labor) : ''}</td><td class="num">${money2(b.total)}</td></tr>`).join('')}
+          <tr class="tot"><td colspan="2">Total</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.material, 0))}</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.labor, 0))}</td><td class="num">${money2(h.total || 0)}</td></tr></tbody></table>
+        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><button class="btn" data-lines="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">Show every line</button><a class="btn" href="house.html?id=${encodeURIComponent(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff; text-decoration:none;">Open the home</a></div>
+        <div id="lines-${esc(h.houseId)}"></div>` : ''}</div>`;
+  }).join('') : `<p class="muted" style="margin-top:12px;">${homes.length ? 'No homes match.' : 'Nothing imported yet. Choose the QuickBooks report above to bring costs in.'}</p>`;
+}
+$('search').addEventListener('input', renderHomes);
+$('homesList').addEventListener('click', async e=>{
+  const h = e.target.closest('[data-home]');
+  if(h){ openHome = openHome === h.dataset.home ? '' : h.dataset.home; renderHomes(); return; }
+  const lb = e.target.closest('[data-lines]');
+  if(lb){
+    const id = lb.dataset.lines, box = document.getElementById('lines-' + id);
+    box.innerHTML = '<p class="muted">Loading…</p>';
+    try{
+      const c = (await api({ action:'costsGet', houseId:id })).costs;
+      const ls = (c && c.lines || []).slice().sort((a, b)=>String(b.date).localeCompare(String(a.date)));
+      box.innerHTML = `<table class="jc"><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Cost code</th><th class="num">Amount</th></tr></thead><tbody>
+        ${ls.map(l=>`<tr><td>${esc(l.date)}</td><td>${esc(l.vendor)}${l.type && !/^expense|^bill$/i.test(l.type) ? ` <span class="muted">(${esc(l.type)})</span>` : ''}${l.memo ? `<div class="muted" style="font-size:12px;">${esc(l.memo)}</div>` : ''}</td><td>${esc(l.num)}</td><td>${esc(l.item)}</td><td class="num">${money2(l.amount)}</td></tr>`).join('')}</tbody></table>`;
+    } catch(err){ console.error(err); box.innerHTML = '<p class="muted">Couldn\'t load the lines.</p>'; }
+  }
+});
+
+/* ---- sign-in ---- */
+function showLoginGate(){ $('loginGate').classList.remove('hidden'); $('appShell').classList.add('locked'); }
+function showApp(user){
+  $('loginGate').classList.add('hidden');
+  $('appShell').classList.remove('locked');
+  $('currentUserEmail').textContent = user.email || '';
+}
+function doLogin(){
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const errBox = $('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){
+    errBox.textContent = 'Enter both an email and a password.';
+    errBox.classList.add('show');
+    return;
+  }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(err.code)
+      ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show');
+  });
+}
+$('loginSubmitBtn').addEventListener('click', doLogin);
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let started = false;
+firebase.auth().onAuthStateChanged(user=>{
+  // Homeowners using the public request form are signed in anonymously — they are not staff.
+  if(user && !user.isAnonymous){
+    showApp(user);
+    if(started) return;
+    started = true;
+    db.collection('jobs').onSnapshot(s=>{ jobs = s.docs.map(d=>({ id: d.id, ...d.data() })); renderHomes(); renderPlan(); }, err=>console.error('jobs listener error', err));
+    loadHomes();
+  } else {
+    showLoginGate();
+  }
+});
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('Service worker registration failed', err));
+  });
+}
+</script>
+<script src="hubsearch.js"></script>
+<script src="assistant.js"></script>
+</body>
+</html>

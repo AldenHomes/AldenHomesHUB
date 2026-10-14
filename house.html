@@ -465,14 +465,14 @@ html, body{max-width:100%; overflow-x:clip;}
           <a class="btn btn-ghost" id="filesBtn" href="#" target="_blank" rel="noopener" style="display:none;">Open OneDrive folder</a>
         </div>
 
-        <!-- Budget (not built yet) -->
-        <div class="card soon">
+        <!-- Job costs: what this home has cost so far, from the last QuickBooks import (budget comes later) -->
+        <div class="card">
           <div class="card-head">
             <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
-            <h3>Budget</h3>
-            <span class="badge">Coming soon</span>
+            <h3>Job Costs</h3>
           </div>
-          <div class="card-body muted">Settlement, budget, actuals and margin for this home will show here once job costing is built.</div>
+          <div class="card-body" id="costsBody"><span class="muted">Loading…</span></div>
+          <a class="btn btn-ghost" href="jobcost.html" style="text-decoration:none;">Open Job Costing</a>
         </div>
 
         <!-- Photos: from the office and from subs on site -->
@@ -945,6 +945,7 @@ let staff = [];               // everyone with a hub login: { uid, email, name }
 let scrolledToNotes = false;
 
 async function loadStaff(){
+  loadCosts();
   try{
     const token = await firebase.auth().currentUser.getIdToken();
     const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ action:'staff' }) });
@@ -954,6 +955,24 @@ async function loadStaff(){
   render();
 }
 function myUid(){ const u = firebase.auth().currentUser; return u ? u.uid : ''; }
+/* ---- job costs: read through the hub's server (QuickBooks imports live there), shown as a short summary ---- */
+let costsLoaded = false;
+async function loadCosts(){
+  if(costsLoaded) return; costsLoaded = true;
+  const box = $('costsBody');
+  try{
+    const token = await firebase.auth().currentUser.getIdToken();
+    const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ action:'costsGet', houseId }) });
+    if(!res.ok) throw new Error('costs ' + res.status);
+    const c = (await res.json()).costs;
+    if(!c){ box.innerHTML = '<span class="muted">No costs imported for this home yet. They come in from the QuickBooks report on the Job Costing page.</span>'; return; }
+    const m = n=>(n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+    const top = Object.entries(c.byCode || {}).sort((a, b)=>b[1].total - a[1].total).slice(0, 5);
+    box.innerHTML = `<div class="muted" style="font-size:12px;">Spent so far</div><div class="big">${m(c.total || 0)}</div>
+      <div class="muted" style="font-size:12px;">${(c.lines || []).length} lines · QuickBooks project ${esc(c.project || '')} · imported ${esc(new Date(c.importedAt).toLocaleDateString())}</div>
+      <div class="label">Largest cost codes</div>${top.map(([code, b])=>`<div class="line"><span>${esc(code === '0' ? '' : code + ' · ')}${esc(b.name || '')}</span><span class="d">${m(b.total)}</span></div>`).join('')}`;
+  } catch(err){ console.error('Could not load job costs', err); box.innerHTML = '<span class="muted">Job costs couldn\'t be loaded right now.</span>'; }
+}
 function noteTime(iso){
   const d = new Date(iso);
   if(isNaN(d)) return '';

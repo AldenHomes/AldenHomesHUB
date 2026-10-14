@@ -737,6 +737,56 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       res.json({ uid: body.uid, name });
       return;
     }
+    /* ---- Job costing: what each home has cost, from QuickBooks' "Project costs detail" report ----
+       The office imports the report (one sheet, a line per bill/expense line). Each import REPLACES the costs of every home
+       it covers, so importing the full ("All Dates") report again never counts anything twice. One doc per home:
+       job-costs/{houseId} = { houseId, project, label, lines:[{date, vendor, type, num, account, memo, item, code, labor, amount}],
+       total, byCode:{ code:{ name, material, labor, total } }, importedAt, importedBy, source } */
+    if(body.action === 'costsImport'){
+      const houses = Array.isArray(body.houses) ? body.houses.slice(0, 300) : [];
+      if(!houses.length){ res.status(400).json({ error: 'empty' }); return; }
+      const jobIds = new Set((await db.collection('jobs').get()).docs.map(d=>d.id));
+      const cut = (v, n)=>String(v == null ? '' : v).trim().slice(0, n);
+      const now = new Date().toISOString();
+      const done = [], skipped = [];
+      for(const h of houses){
+        const houseId = cut(h && h.houseId, 120);
+        if(!houseId || !jobIds.has(houseId)){ skipped.push(cut(h && h.project, 80) || '?'); continue; }
+        const lines = (Array.isArray(h.lines) ? h.lines : []).slice(0, 5000).map(l=>{
+          const item = cut(l.item, 80), amount = Math.round((Number(l.amount) || 0) * 100) / 100;
+          const m = item.match(/^(\d{1,3})\s*-/);
+          const code = m ? Number(m[1]) : /roofing/i.test(item) ? 36 : /trim/i.test(item) ? 58 : /siding/i.test(item) ? 40 : 0;
+          return { date: cut(l.date, 10), vendor: cut(l.vendor, 120), type: cut(l.type, 40), num: cut(l.num, 60), account: cut(l.account, 80),
+                   memo: cut(l.memo, 200), item, code, labor: /labor/i.test(item), amount };
+        }).filter(l=>l.amount !== 0 || l.item);
+        const byCode = {};
+        lines.forEach(l=>{
+          const b = byCode[l.code] = byCode[l.code] || { name: '', material: 0, labor: 0, total: 0 };
+          if(!b.name || !l.labor) b.name = l.item.replace(/^\d+\s*-\s*/, '').replace(/\s*labor$/i, '').trim() || b.name;
+          b[l.labor ? 'labor' : 'material'] += l.amount; b.total += l.amount;
+        });
+        Object.values(byCode).forEach(b=>{ ['material','labor','total'].forEach(k=>{ b[k] = Math.round(b[k] * 100) / 100; }); });
+        const total = Math.round(lines.reduce((t, l)=>t + l.amount, 0) * 100) / 100;
+        await db.collection('job-costs').doc(houseId).set({ houseId, project: cut(h.project, 80), label: cut(h.label, 120), lines, total, byCode,
+          importedAt: now, importedBy: who.email || who.uid, source: cut(body.source, 120) });
+        done.push({ houseId, lines: lines.length, total });
+      }
+      logger.info('Job costs imported', { by: who.email, homes: done.length, skipped, source: body.source });
+      res.json({ done, skipped });
+      return;
+    }
+    if(body.action === 'costsList'){
+      const snap = await db.collection('job-costs').get();
+      res.json({ homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
+      return;
+    }
+    if(body.action === 'costsGet'){
+      const id = typeof body.houseId === 'string' ? body.houseId : '';
+      if(!id){ res.status(400).json({ error: 'house' }); return; }
+      const doc = await db.collection('job-costs').doc(id).get();
+      res.json({ costs: doc.exists ? doc.data() : null });
+      return;
+    }
     res.status(400).json({ error: 'action' });
   } catch(err){
     logger.error('hubApi failed', err);
