@@ -348,7 +348,7 @@ async function readReport(file){
    Rows: Billing Item | Cost Code "10-030" | Category (Material / Subcontract / Other/Utilts) | Date | Description | Vendor | Invoice | Amount
    (a trailing "-" = negative; "(Rev)" lines reverse an earlier one). Code "10-030" = cost code 30; Subcontract counts as labor.
    Columns are found from the heading row's positions on each page. Lines in code 10 from the same vendor + invoice as a code-10 line of
-   $50,000 or more are treated as the LOT PURCHASE and left out unless "Include the lot purchase" is ticked (owner's report for
+   $50,000 or more are treated as the LOT PURCHASE, ALWAYS left out of the costs (owner, 2026-10-14) and sent as lotCost (owner's report for
    CL 109 had $169,900 + $9,075.49 for the lot under Permits). */
 const CODE_NAMES = { 5:'Engineering', 10:'Permits', 12:'Excavation', 14:'Footers/Found.', 16:'Concrete', 30:'Lumber', 32:'Windows & Doors', 34:'Framing',
   36:'Shingles', 38:'Insulation', 40:'Siding/Fascia', 41:'Railing', 42:'Brick', 44:'Spouting', 50:'Plumbing', 51:'Sprinklers', 52:'Heating', 54:'Electrical',
@@ -414,8 +414,7 @@ function renderPlan(){
   box.innerHTML = `
     ${!/all dates/i.test(plan.range) ? `<div class="imp-warn"><strong>This file covers ${esc(plan.range || 'a limited period')}, not All Dates.</strong> Importing replaces each home's costs with only the lines in this file, so anything earlier would drop off. Re-run the report for All Dates unless that's what you mean to do.</div>` : ''}
     ${plan.projects.filter(p=>p.reportTotal != null && Math.abs(p.total - p.reportTotal) > 0.5).map(p=>`<div class="imp-warn"><strong>${esc(p.project)}: the lines read add up to ${money2(p.total)} but the report's total is ${money2(p.reportTotal)}.</strong> Something on the PDF wasn't read; don't import until it's checked.</div>`).join('')}
-    ${plan.projects.filter(p=>p.lotTotal).map(p=>`<div class="imp-warn"><strong>${esc(p.project)}: ${money2(p.lotTotal)} under code 10 looks like the lot purchase.</strong> It's left out so the home compares fairly with past builds.
-      <label style="display:block; margin-top:6px; cursor:pointer;"><input type="checkbox" data-lot="${plan.projects.indexOf(p)}" ${p.withLot ? 'checked' : ''}> Include the lot purchase</label></div>`).join('')}
+    ${plan.projects.filter(p=>p.lotTotal).map(p=>`<div class="imp-warn"><strong>${esc(p.project)}: ${money2(p.lotTotal)} under code 10 looks like the lot purchase.</strong> It's always left out of the costs, so the home compares fairly with past builds, and it's taken off the sale price instead.</div>`).join('')}
     ${unmatched.length ? `<div class="imp-warn"><strong>${unmatched.length} project${unmatched.length === 1 ? '' : 's'} couldn't be matched to a home.</strong> Pick the home for each one, or leave it on Skip.</div>` : ''}
     <table class="jc"><thead><tr><th>QuickBooks project</th><th>Home in the hub</th><th class="num">Lines</th><th class="num">Total</th></tr></thead><tbody>
       ${plan.projects.map((p, i)=>`<tr><td><strong>${esc(p.project)}</strong>${p.noCode ? `<div class="muted" style="font-size:12px;">${p.noCode} line${p.noCode === 1 ? '' : 's'} without a cost code</div>` : ''}</td>
@@ -442,7 +441,7 @@ $('impPreview').addEventListener('click', async e=>{
     // a few homes per call, so a large report doesn't make one huge request
     let done = 0;
     for(let i = 0; i < go.length; i += 10){
-      const part = go.slice(i, i + 10).map(p=>({ houseId:p.houseId, project:p.project, label: homeLabel(jobs.find(j=>j.id === p.houseId) || {}), lines: projLines(p).map(({ lot, ...l })=>l) }));
+      const part = go.slice(i, i + 10).map(p=>({ houseId:p.houseId, project:p.project, label: homeLabel(jobs.find(j=>j.id === p.houseId) || {}), lines: projLines(p).map(({ lot, ...l })=>l), lotCost: p.lotTotal && !p.withLot ? p.lotTotal : 0 }));
       done += ((await api({ action:'costsImport', source: plan.source, houses: part })).done || []).length;
     }
     $('impPreview').innerHTML = `<div class="imp-ok">Imported ${done} home${done === 1 ? '' : 's'} from ${esc(plan.source)}.</div>`;
@@ -466,7 +465,7 @@ function renderHomes(){
     return `<div class="home"><button type="button" class="home-h" data-home="${esc(h.houseId)}">
         <div><b>${esc(h.job ? homeLabel(h.job) : h.label || h.project)}</b><div class="sub">QuickBooks: ${esc(h.project)} · ${h.lines} line${h.lines === 1 ? '' : 's'} · imported ${esc(new Date(h.importedAt).toLocaleDateString())}</div>
           ${flags.length ? `<div class="sub" style="color:var(--danger); font-weight:600;">&#9873; ${flags.length} cost code${flags.length === 1 ? '' : 's'} over the last build: ${flags.slice(0, 3).map(f=>esc(f.name)).join(', ')}${flags.length > 3 ? '…' : ''}</div>` : ''}
-          ${sold[h.houseId] ? `<div class="sub">Sold for ${money(sold[h.houseId])} · ${money(sold[h.houseId] - (h.total || 0))} left (${Math.round((sold[h.houseId] - (h.total || 0)) / sold[h.houseId] * 1000) / 10}%)</div>` : ''}</div>
+          ${sold[h.houseId] ? `<div class="sub">Sold for ${money(sold[h.houseId])}${h.lotCost ? ' · lot ' + money(h.lotCost) : ''} · ${money(sold[h.houseId] - (h.total || 0) - (h.lotCost || 0))} left (${Math.round((sold[h.houseId] - (h.total || 0) - (h.lotCost || 0)) / sold[h.houseId] * 1000) / 10}%)</div>` : ''}</div>
         <div class="bar" style="flex:0 1 160px;"><span style="width:${Math.round((h.total || 0) / top * 100)}%"></span></div>
         <span class="amt">${money(h.total || 0)}</span></button>
       ${open ? `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th><th class="num">Material</th><th class="num">Labor</th><th class="num">Total</th>${tg ? '<th class="num">Last ' + esc(tg.style) + '</th><th class="num">Average</th>' : ''}</tr></thead><tbody>

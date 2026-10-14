@@ -739,6 +739,33 @@ async function applyBtSales(){
    link). A home already in the hub's list (same development + lot) is left alone. New ones get a jobs doc with the settlement date
    from Cost History (a settle date in the past is what makes a home "closed" across the hub), the style, the street address and the
    buyers/contact from BuilderTrend, plus their job-sales record. Once only: marker import-log/bt-homes-2026-10. */
+/* Homes the owner sent paperwork for by hand. Each is added once (marker import-log/manual-<key>) as a closed home if the hub doesn't
+   have it (same development + lot), and gets its sale price in job-sales if it has none. CL 109: the Rivet model, sold to the
+   Wamshers by agreement of sale 5/30/2026 for $766,800 (incl. building a 3rd car garage), settlement 6/30/2026; at the Cliffs the
+   price includes the lot. Buyer contact details are not on file. */
+const MANUAL_HOMES = [
+  { key: 'CL 109', model: 'Rivet', settle: '2026-06-30', client: 'Lonnie & Jenine Wamsher', address: '412 Cannon Way', price: 766800,
+    note: 'Agreement of sale 5/30/2026, incl. building a 3rd car garage; the price includes the lot' },
+];
+async function addManualHomes(){
+  const lotKey = l=>String(l == null ? '' : l).toLowerCase().replace(/lot|#|\s/g, '').replace(/^0+(?=\d)/, '');
+  let jobs = null;
+  for(const h of MANUAL_HOMES){
+    const mark = db.collection('import-log').doc('manual-' + h.key.replace(/\s+/g, '-'));
+    if((await mark.get()).exists) continue;
+    jobs = jobs || await db.collection('jobs').get();
+    const [comm, lot] = h.key.split(' ');
+    const found = jobs.docs.find(d=>String(d.data().community || '').toUpperCase() === comm && lotKey(d.data().lot) === lotKey(lot));
+    const now = new Date().toISOString();
+    const ref = found ? found.ref : db.collection('jobs').doc();
+    if(!found) await ref.set({ community: comm, lot, model: h.model, client: h.client, address: h.address, phone: '', email: '', filesUrl: '', plan: '',
+      draftsman: '', fndn: '', walk: '', move: '', settle: h.settle, addedFrom: 'contract', addedAt: now });
+    const sale = db.collection('job-sales').doc(ref.id);
+    if(!(await sale.get()).exists) await sale.set({ price: h.price, source: 'typed', note: h.note, setAt: now, setBy: 'From the contract' });
+    await mark.set({ at: now, houseId: ref.id, created: !found });
+    logger.info('Home from a contract', { key: h.key, houseId: ref.id, created: !found });
+  }
+}
 async function addClosedHomes(){
   if(!BT_SALES) return;
   const mark = db.collection('import-log').doc('bt-homes-2026-10');
@@ -895,7 +922,8 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         const before = new Set(prev.exists && Array.isArray(prev.data().flagged) ? prev.data().flagged : []);
         const target = await profitTarget(jobData[houseId].model, builds, { id: houseId, community: jobData[houseId].community, lot: jobData[houseId].lot });
         const over = target ? Object.entries(byCode).filter(([code, b])=>{ const u = target.codes[code]; return u && b.total > u.avg * 1.1 && b.total - u.avg >= 1000; }) : [];
-        await ref.set({ houseId, project: cut(h.project, 80), label: cut(h.label, 120), lines, total, byCode, flagged: over.map(([code])=>code),
+        const lotCost = Math.round((Number(h.lotCost) || 0) * 100) / 100;
+        await ref.set({ houseId, project: cut(h.project, 80), label: cut(h.label, 120), lines, total, byCode, flagged: over.map(([code])=>code), lotCost,
           importedAt: now, importedBy: who.email || who.uid, source: cut(body.source, 120) });
         const fresh = over.filter(([code])=>!before.has(code));
         if(fresh.length && overWanted.length){
@@ -929,6 +957,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         if(seed.length) snap = await col.get();
       }
       if(BT_SALES){ await applyBtSales(); await addClosedHomes(); await useBtGp(); snap = await col.get(); }
+      await addManualHomes().catch(err=>logger.error('Homes from contracts not added', err));
       res.json({ builds: snap.docs.map(d=>({ id: d.id, ...d.data() })) });
       return;
     }
@@ -948,7 +977,8 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         sqft: num(body.sqft) || num(j.sqft), gp: null, total: c.total || 0, byCode, source: 'quickbooks', houseId, project: c.project || '',
         addedAt: new Date().toISOString(), addedBy: who.email || who.uid };
       if(typeof body.gp === 'number' && body.gp > -1 && body.gp < 1) row.gp = body.gp;
-      else if(saleDoc.exists && saleDoc.data().price > 0){ row.sale = saleDoc.data().price; row.gp = Math.round((row.sale - row.total) / row.sale * 10000) / 10000; }
+      else if(saleDoc.exists && saleDoc.data().price > 0){ row.sale = saleDoc.data().price; row.gp = Math.round((row.sale - row.total - (c.lotCost || 0)) / row.sale * 10000) / 10000; }
+      if(c.lotCost) row.lotCost = c.lotCost;
       await db.collection('cost-history').doc('qb-' + houseId).set(row);
       res.json({ ok: true, id: 'qb-' + houseId });
       return;
@@ -981,6 +1011,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       return;
     }
     if(body.action === 'costsList'){
+      await addManualHomes().catch(err=>logger.error('Homes from contracts not added', err));
       await applyBtSales().then(addClosedHomes).then(useBtGp).catch(err=>logger.error('BuilderTrend sale prices / closed homes not applied', err));
       const [snap, sales, jobsSnap, builds] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get(), db.collection('jobs').get(), historyBuilds()]);
       const sold = {}; sales.docs.forEach(d=>{ sold[d.id] = d.data().price; });
@@ -988,7 +1019,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       const jobData = {}; jobsSnap.docs.forEach(d=>{ jobData[d.id] = d.data(); });
       const targets = {};
       for(const d of snap.docs) targets[d.id] = await profitTarget((jobData[d.id] || {}).model, builds, { id: d.id, ...(jobData[d.id] || {}) });
-      res.json({ sold, targets, homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
+      res.json({ sold, targets, homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, lotCost: c.lotCost || 0, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
       return;
     }
     if(body.action === 'costsGet'){
