@@ -1058,8 +1058,8 @@ function renderCosts(){
       <div class="s">${c ? m(invoices) + ' invoices' + (overhead ? ' + ' + m(overhead) + ' overhead' : '') + (lot ? ' · plus ' + m(lot) + ' for the lot' : sold ? ' · ' + pct(spent / sold) + ' of the sale price' : '') : 'No invoices imported yet'}</div></div>`;
   const leftTile = !c || !sold ? `<div class="jc-stat"><div class="l">Budget left</div><div class="v">—</div><div class="s">${sold ? 'Waiting for invoices' : 'Needs the sale price'}</div></div>`
     : budget ? `<div class="jc-stat ${spent > budget ? 'bad' : 'good'}"><div class="l">${spent > budget ? 'Over budget' : 'Budget left'}</div><div class="v">${m(Math.abs(budget - spent))}</div>
-        <div class="s">of ${m(budget)} · keeps ${(target.gp * 100).toFixed(1)}% like past ${esc(target.style)}s</div></div>`
-    : `<div class="jc-stat"><div class="l">Left of the sale price</div><div class="v">${m(sold - spent - lot)}</div><div class="s">${(gpNow * 100).toFixed(1)}% gross profit${lot ? ' (sale price less the lot)' : ''} · no past builds of this style to set a budget</div></div>`;
+        <div class="s">of ${m(budget)} · keeps ${(target.gp * 100).toFixed(2)}% like past ${esc(target.style)}s</div></div>`
+    : `<div class="jc-stat"><div class="l">Left of the sale price</div><div class="v">${m(sold - spent - lot)}</div><div class="s">${(gpNow * 100).toFixed(2)}% gross profit${lot ? ' (sale price less the lot)' : ''} · no past builds of this style to set a budget</div></div>`;
   let html = `<div class="jc-stats">${soldTile}${spentTile}${leftTile}</div>`;
 
   if(c){
@@ -1070,7 +1070,7 @@ function renderCosts(){
       left += `<div class="jc-prog"><div class="t"><span>Budget used</span><b>${pct(usedB)}</b></div><div class="jc-bar"><span class="${usedB > 1 ? 'bad' : ''}" style="width:${Math.min(100, usedB * 100)}%"></span></div></div>`;
       if(built != null) left += `<div class="jc-prog"><div class="t"><span>Build done <span class="muted" style="font-size:12px;">(${doneN} of ${tasks.length} jobs)</span></span><b>${pct(built)}</b></div><div class="jc-bar"><span class="build" style="width:${built * 100}%"></span></div></div>`;
       let verdict = '', warn = false;
-      if(spent > budget){ warn = true; verdict = `Over budget by ${m(spent - budget)}. On track to keep ${(gpNow * 100).toFixed(1)}% instead of ${(target.gp * 100).toFixed(1)}%.`; }
+      if(spent > budget){ warn = true; verdict = `Over budget by ${m(spent - budget)}. On track to keep ${(gpNow * 100).toFixed(2)}% instead of ${(target.gp * 100).toFixed(2)}%.`; }
       else if(built != null && usedB - built > 0.15){ warn = true; verdict = `Spending is ahead of the build. Worth a look.`; }
       else if(built != null) verdict = `On track. Spending is keeping pace with the build.`;
       else verdict = `Within budget so far. Start a build schedule to compare spending with progress.`;

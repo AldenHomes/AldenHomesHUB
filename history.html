@@ -301,7 +301,7 @@ let openSale = '';
 function saleRow(b){
   const lines = (b.saleLines || []).filter(l=>l.price), free = (b.saleLines || []).length - lines.length;
   return `<tr><td colspan="9" style="background:#faf8f2;">
-    <div style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin-bottom:6px;"><span>Base price <b>${money(b.saleBase || 0)}</b></span><span>Selections <b>${money(b.saleSelections || 0)}</b></span><span>Change orders <b>${money(b.saleChangeOrders || 0)}</b></span><span>Sold for <b>${money(b.sale)}</b></span>${b.total ? `<span>Sale minus cost <b>${((b.sale - b.total) / b.sale * 100).toFixed(1)}%</b></span>` : ''}</div>
+    <div style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin-bottom:6px;"><span>Base price <b>${money(b.saleBase || 0)}</b></span><span>Selections <b>${money(b.saleSelections || 0)}</b></span><span>Change orders <b>${money(b.saleChangeOrders || 0)}</b></span><span>Sold for <b>${money(b.sale)}</b></span>${b.total ? `<span>Sale minus cost <b>${((b.sale - b.total) / b.sale * 100).toFixed(2)}%</b></span>` : ''}</div>
     <table class="jc" style="margin:0;"><tbody>${lines.map(l=>`<tr><td style="width:46px;">${esc(l.bt)}</td><td>${esc(l.title)}</td><td>${esc(l.choice)}</td><td class="num">${money(l.price)}</td></tr>`).join('')}
       ${(b.saleCOs || []).map(c=>`<tr><td>CO</td><td>Change order</td><td>${esc(c.title)}</td><td class="num">${money(c.price)}</td></tr>`).join('')}</tbody></table>
     <div class="muted" style="font-size:12px; margin-top:4px;">From BuilderTrend's Job Price Summary${free ? ` · ${free} no-charge choice${free === 1 ? '' : 's'} not listed` : ''}.</div></td></tr>`;
@@ -316,14 +316,14 @@ function render(){
     <div class="kpi"><div class="l">Builds</div><div class="v">${list.length}</div></div>
     <div class="kpi"><div class="l">Average cost</div><div class="v">${list.length ? money(avg(list.map(b=>b.total))) : '—'}</div></div>
     <div class="kpi"><div class="l">Average per sq ft</div><div class="v">${withSf.length ? '$' + avg(withSf.map(b=>b.total / b.sqft)).toFixed(2) : '—'}</div></div>
-    <div class="kpi"><div class="l">Average gross profit</div><div class="v">${gps.length ? (avg(gps.map(b=>b.gp)) * 100).toFixed(1) + '%' : '—'}</div></div>`;
+    <div class="kpi"><div class="l">Average gross profit</div><div class="v">${gps.length ? (avg(gps.map(b=>b.gp)) * 100).toFixed(2) + '%' : '—'}</div></div>`;
   // the builds themselves
   $('buildsTitle').textContent = list.length === builds.length ? 'Every build' : list.length + ' build' + (list.length === 1 ? '' : 's');
   $('builds').innerHTML = list.length ? `<table class="jc"><thead><tr><th>Finished</th><th>Home</th><th>Style</th><th class="num">Sq ft</th><th class="num">${norm === 'sqft' ? 'Per sq ft' : 'Total cost'}</th><th class="num">${norm === 'sqft' ? 'Total cost' : 'Per sq ft'}</th><th class="num">Sold for</th><th class="num">Gross profit</th><th></th></tr></thead><tbody>
     ${list.map(b=>`<tr><td>${esc(b.date)} ${ageTag(b.date)}</td><td>${esc(b.comm)} · Lot ${esc(b.lot)}</td><td>${esc(b.model)}</td><td class="num">${b.sqft ? b.sqft.toLocaleString('en-US') : '—'}</td>
       <td class="num"><strong>${norm === 'sqft' ? (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—') : money(b.total)}</strong></td><td class="num">${norm === 'sqft' ? money(b.total) : (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—')}</td>
       <td class="num">${b.sale ? `<a href="#" data-sold="${esc(b.id)}" title="See the selections">${money(b.sale)}</a>` : '—'}</td>
-      <td class="num"${b.gpSource === 'buildertrend' ? ` title="From BuilderTrend's final price${typeof b.gpSheet === 'number' ? '; the spreadsheet said ' + (b.gpSheet * 100).toFixed(1) + '%' : ''}"` : ''}>${typeof b.gp === 'number' ? (b.gp * 100).toFixed(1) + '%' + (b.gpSource === 'buildertrend' ? '<span class="muted" style="font-size:11px;"> BT</span>' : '') : '—'}</td>
+      <td class="num"${b.gpSource === 'buildertrend' ? ` title="From BuilderTrend's final price${typeof b.gpSheet === 'number' ? '; the spreadsheet said ' + (b.gpSheet * 100).toFixed(2) + '%' : ''}"` : ''}>${typeof b.gp === 'number' ? (b.gp * 100).toFixed(2) + '%' + (b.gpSource === 'buildertrend' ? '<span class="muted" style="font-size:11px;"> BT</span>' : '') : '—'}</td>
       <td>${b.source === 'quickbooks' ? `<span class="src">from QuickBooks</span> <button type="button" class="linkbtn" data-remove="${esc(b.id)}">Remove</button>` : ''}</td></tr>${openSale === b.id ? saleRow(b) : ''}`).join('')}</tbody></table>`
     : '<p class="muted" style="margin-top:12px;">No builds match.</p>';
   // one style: its recent builds side by side, by cost code, with the average
