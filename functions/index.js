@@ -1447,8 +1447,47 @@ exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (
         ok = (await db.collection('demo-selections').doc(id).get()).exists;
       }
       if(!ok){ res.status(403).json({ error: 'code' }); return; }
-      res.json(wantComps ? { comps: DEMO_COMPS } : { catalog: DEMO_CATALOG });
+      // each home style's pricing sheet setup travels with the list, so customer screens and links show the same sheet
+      const setup = wantComps ? {} : (await db.collection('demo-config').doc('styles').get()).data() || {};
+      res.json(wantComps ? { comps: DEMO_COMPS } : { catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {} });
     } catch(err){ logger.error('demoSync catalog failed', { error: String(err) }); res.status(500).json({ error: 'server' }); }
+    return;
+  }
+  /* Home style setup (owner, 2026-10-14): per style, which pricing sheet lines are hidden (skip) and which are included in the
+     base price at no charge (incl), e.g. a Percy's basement. demo-config/styles = { styles: { 'Percy': { skip:[selId], incl:[selId] } },
+     allow: { selId#choice: amount } } — allow = the default amount of each allowance.
+     Saved with the demo passcode; the whole set is replaced each time (the page always sends all of it). */
+  if(b.action === 'stylesSet'){
+    try{
+      if(!DEMO_CODE || b.code !== DEMO_CODE){ res.status(403).json({ error: 'code' }); return; }
+      const src = b.styles && typeof b.styles === 'object' ? b.styles : null;
+      if(!src){ res.status(400).json({ error: 'styles' }); return; }
+      const ids = a=>(Array.isArray(a) ? a : []).filter(x=>typeof x === 'string' && /^[A-Za-z0-9_]{1,30}$/.test(x)).slice(0, 600);
+      const styles = {};
+      Object.entries(src).slice(0, 80).forEach(([name, v])=>{
+        if(typeof name !== 'string' || !name.trim() || name.length > 40 || !v || typeof v !== 'object') return;
+        const skip = ids(v.skip), incl = ids(v.incl).filter(x=>!skip.includes(x));
+        const ceil = v.ceil === 8 || v.ceil === 9 ? v.ceil : null;   // the style's standard ceiling height
+        if(skip.length || incl.length || ceil) styles[name.trim()] = { skip, incl, ...(ceil ? { ceil } : {}) };
+      });
+      // allowance default amounts: { 'selId#choice': amount } — what the pricing sheet starts each allowance at
+      const allow = {};
+      Object.entries(b.allow && typeof b.allow === 'object' ? b.allow : {}).slice(0, 200).forEach(([k, v])=>{
+        const n = Math.round(Number(v) * 100) / 100;
+        if(/^[A-Za-z0-9_]{1,30}#\d{1,3}$/.test(k) && isFinite(n) && n >= 0 && n <= 1000000) allow[k] = n;
+      });
+      // ceiling height moves: { '8-9', '8-10', '9-10', '9-8': amount } (a credit is negative)
+      const ceil = {};
+      ['8-9', '8-10', '9-10', '9-8'].forEach(k=>{ const n = Math.round(Number((b.ceil || {})[k]) * 100) / 100; if(b.ceil && b.ceil[k] !== undefined && b.ceil[k] !== '' && isFinite(n) && Math.abs(n) <= 1000000) ceil[k] = n; });
+      // other back-end prices: { 'door-framed': 950, 'fin-bn': 120 } (null/'' = not set yet = "price to come")
+      const prices = {};
+      Object.entries(b.prices && typeof b.prices === 'object' ? b.prices : {}).slice(0, 100).forEach(([k, v])=>{
+        const n = Math.round(Number(v) * 100) / 100;
+        if(/^[a-z0-9_-]{1,30}$/.test(k) && v !== null && v !== '' && isFinite(n) && Math.abs(n) <= 1000000) prices[k] = n;
+      });
+      await db.collection('demo-config').doc('styles').set({ styles, allow, ceil, prices, updatedAt: new Date().toISOString() });
+      res.json({ ok: true, styles, allow, ceil, prices });
+    } catch(err){ logger.error('demoSync stylesSet failed', { error: String(err) }); res.status(500).json({ error: 'server' }); }
     return;
   }
   if(!id){ res.status(400).json({ error: 'id' }); return; }
