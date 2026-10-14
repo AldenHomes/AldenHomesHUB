@@ -319,6 +319,7 @@ const NOTICES = [
   { key: 'subDeclined', name: 'A sub declines a job', what: 'Includes their reason if they gave one. Opens the job so you can choose another vendor.' },
   { key: 'subNote', name: 'A sub sends a note', what: 'A question, or asking to move the dates, sent from their link.' },
   { key: 'subWaiting', name: 'A job has had no answer for 3 weeks', what: 'A sub was asked and still hasn\'t approved or declined after 21 days.' },
+  { key: 'costOver', name: 'A cost code goes over the last build', what: 'After a QuickBooks import, a home\'s cost code (say plumbing) has cost more than 10% over what the last home of that style built spent on it. Bell only, once per code per home.' },
 ];
 const noticeRef = db.collection('settings').doc('staff-notify');
 let myNotices = null;   // null until loaded

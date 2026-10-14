@@ -701,32 +701,43 @@ function staffName(user){
   return user.displayName || String(user.email || '').split('@')[0] || 'Someone';
 }
 
-/* The share of the sale price past builds of the same home style kept as gross profit (average of the latest 8 in Cost History),
-   so a home being built can be checked against it: spend no more than sale price x (1 - that). "Stanford B" matches "Stanford";
-   the longest matching style wins ("Alden 2.1 B" -> "Alden 2.1", not "Alden"). */
+/* What a home being built is checked against, from Cost History, for its home style ("Stanford B" matches "Stanford"; the longest
+   matching style wins, "Alden 2.1 B" -> "Alden 2.1"):
+   - gp: the share of the sale price kept as gross profit, averaged over the latest 8 builds that have it -> budget = sold x (1 - gp)
+   - codes: { code: { name, avg, from, date } } = what each cost code cost on the LAST home of that style built (owner, 2026-10-14:
+     older homes can be years out of date). A code the last home didn't have comes from the most recent home that did. `avg` keeps
+     its name so the pages didn't have to change; it is that one home's amount.
+   - last: { from, date } = the last home built. The home itself is left out when it's already in Cost History. */
 async function historyBuilds(){
   let builds = (await db.collection('cost-history').get()).docs.map(d=>d.data());
   if(!builds.length){ try{ builds = require('./cost-history-seed.json'); } catch(e){ /* no starting list deployed */ } }
-  return builds.filter(b=>typeof b.gp === 'number' && b.base);
+  return builds.filter(b=>b.base);
 }
-/* Also returns codes = { code: { name, avg, n } }: what each cost code usually costs on that style (average over those same builds
-   that had the code), so a home being built can flag a code running well over it (e.g. plumbing at $27k when it's usually $20k). */
-async function profitTarget(model, preloaded){
+// self = { id, community, lot } of the home being checked
+async function profitTarget(model, preloaded, self){
   const m = String(model || '').trim().toLowerCase();
   if(!m) return null;
-  const builds = preloaded || await historyBuilds();
+  const lotKey = l=>String(l == null ? '' : l).toLowerCase().replace(/lot|#|\s/g, '').replace(/^0+(?=\d)/, '');
+  const isSelf = b=>self && ((self.id && b.houseId === self.id)
+    || (self.community && self.lot && String(b.comm || '').toUpperCase() === String(self.community).toUpperCase() && lotKey(b.lot) === lotKey(self.lot)));
+  const builds = (preloaded || await historyBuilds()).filter(b=>!isSelf(b));
   const style = builds.map(b=>String(b.base)).filter(b=>m === b.toLowerCase() || m.startsWith(b.toLowerCase() + ' ') || m.startsWith(b.toLowerCase() + '('))
     .sort((a, b)=>b.length - a.length)[0];
   if(!style) return null;
-  const same = builds.filter(b=>b.base === style).sort((a, b)=>String(b.date).localeCompare(String(a.date))).slice(0, 8);
+  const same = builds.filter(b=>b.base === style).sort((a, b)=>String(b.date).localeCompare(String(a.date)));
+  const label = b=>[b.comm, b.lot].filter(Boolean).join(' ') || b.model || style;
   const codes = {};
   same.forEach(b=>Object.entries(b.byCode || {}).forEach(([code, c])=>{
-    if(!c || !(c.total > 0)) return;
-    const x = codes[code] = codes[code] || { name: c.name || '', sum: 0, n: 0 };
-    x.sum += c.total; x.n++;
+    if(codes[code] || !c || !(c.total > 0)) return;   // newest first, so the first one seen is the latest
+    codes[code] = { name: c.name || '', avg: Math.round(c.total), from: label(b), date: String(b.date || '').slice(0, 10) };
   }));
-  Object.values(codes).forEach(x=>{ x.avg = Math.round(x.sum / x.n); delete x.sum; });
-  return { style, n: same.length, gp: Math.round(same.reduce((t, b)=>t + b.gp, 0) / same.length * 10000) / 10000, codes };
+  // and the average over the latest 8 builds of the style that had the code (mean, meanN), shown next to the last build's figure
+  const recent = same.slice(0, 8), sums = {};
+  recent.forEach(b=>Object.entries(b.byCode || {}).forEach(([code, c])=>{ if(c && c.total > 0){ const x = sums[code] = sums[code] || { t: 0, n: 0 }; x.t += c.total; x.n++; } }));
+  Object.entries(sums).forEach(([code, x])=>{ if(codes[code]){ codes[code].mean = Math.round(x.t / x.n); codes[code].meanN = x.n; } });
+  const withGp = same.filter(b=>typeof b.gp === 'number').slice(0, 8);
+  return { style, n: withGp.length, gp: withGp.length ? Math.round(withGp.reduce((t, b)=>t + b.gp, 0) / withGp.length * 10000) / 10000 : null,
+    recentN: recent.length, codes, last: same.length ? { from: label(same[0]), date: String(same[0].date || '').slice(0, 10) } : null };
 }
 exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (req, res)=>{
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
@@ -772,7 +783,12 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
     if(body.action === 'costsImport'){
       const houses = Array.isArray(body.houses) ? body.houses.slice(0, 300) : [];
       if(!houses.length){ res.status(400).json({ error: 'empty' }); return; }
-      const jobIds = new Set((await db.collection('jobs').get()).docs.map(d=>d.id));
+      const jobsSnap = await db.collection('jobs').get();
+      const jobIds = new Set(jobsSnap.docs.map(d=>d.id)), jobData = {};
+      jobsSnap.docs.forEach(d=>{ jobData[d.id] = d.data(); });
+      // for the "a cost code went over the usual" notice: who wants it, and the past builds to compare with (loaded once)
+      const [overWanted, builds] = await Promise.all([staffWanting('costOver'), historyBuilds()]);
+      const mm = n=>'$' + Math.round(n).toLocaleString('en-US');
       const cut = (v, n)=>String(v == null ? '' : v).trim().slice(0, n);
       const now = new Date().toISOString();
       const done = [], skipped = [];
@@ -794,8 +810,22 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         });
         Object.values(byCode).forEach(b=>{ ['material','labor','total'].forEach(k=>{ b[k] = Math.round(b[k] * 100) / 100; }); });
         const total = Math.round(lines.reduce((t, l)=>t + l.amount, 0) * 100) / 100;
-        await db.collection('job-costs').doc(houseId).set({ houseId, project: cut(h.project, 80), label: cut(h.label, 120), lines, total, byCode,
+        /* Cost codes over what the last home of this style built spent on them (same rule as codeFlags() on the pages: >10% and >= $1,000).
+           `flagged` remembers which codes were already over, so each code tells people once — when it first goes over. */
+        const ref = db.collection('job-costs').doc(houseId);
+        const prev = await ref.get();
+        const before = new Set(prev.exists && Array.isArray(prev.data().flagged) ? prev.data().flagged : []);
+        const target = await profitTarget(jobData[houseId].model, builds, { id: houseId, community: jobData[houseId].community, lot: jobData[houseId].lot });
+        const over = target ? Object.entries(byCode).filter(([code, b])=>{ const u = target.codes[code]; return u && b.total > u.avg * 1.1 && b.total - u.avg >= 1000; }) : [];
+        await ref.set({ houseId, project: cut(h.project, 80), label: cut(h.label, 120), lines, total, byCode, flagged: over.map(([code])=>code),
           importedAt: now, importedBy: who.email || who.uid, source: cut(body.source, 120) });
+        const fresh = over.filter(([code])=>!before.has(code));
+        if(fresh.length && overWanted.length){
+          const text = fresh.map(([code, b])=>{ const u = target.codes[code];
+            return `${code} · ${b.name || u.name}: ${mm(b.total)} so far — the last ${target.style} (${u.from}) spent ${mm(u.avg)} (+${mm(b.total - u.avg)}, +${Math.round((b.total / u.avg - 1) * 100)}%)`; }).join('\n');
+          await db.collection('notes').add({ houseId, houseLabel: cut(h.label, 120) || cut(h.project, 80), text: (fresh.length === 1 ? 'A cost code went over the usual:\n' : fresh.length + ' cost codes went over the usual:\n') + text,
+            by: { uid: '', name: 'Job costing' }, mentions: overWanted, kind: 'costOver', at: now, readBy: {} });
+        }
         done.push({ houseId, lines: lines.length, total });
       }
       logger.info('Job costs imported', { by: who.email, homes: done.length, skipped, source: body.source });
@@ -875,9 +905,9 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       const [snap, sales, jobsSnap, builds] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get(), db.collection('jobs').get(), historyBuilds()]);
       const sold = {}; sales.docs.forEach(d=>{ sold[d.id] = d.data().price; });
       // the usual cost per code for each home's style, so the list can flag codes running over
-      const models = {}; jobsSnap.docs.forEach(d=>{ models[d.id] = d.data().model || ''; });
+      const jobData = {}; jobsSnap.docs.forEach(d=>{ jobData[d.id] = d.data(); });
       const targets = {};
-      for(const d of snap.docs) targets[d.id] = await profitTarget(models[d.id], builds);
+      for(const d of snap.docs) targets[d.id] = await profitTarget((jobData[d.id] || {}).model, builds, { id: d.id, ...(jobData[d.id] || {}) });
       res.json({ sold, targets, homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
       return;
     }
@@ -886,7 +916,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       if(!id){ res.status(400).json({ error: 'house' }); return; }
       const [doc, saleDoc, jobDoc] = await Promise.all([db.collection('job-costs').doc(id).get(), db.collection('job-sales').doc(id).get(), db.collection('jobs').doc(id).get()]);
       res.json({ costs: doc.exists ? doc.data() : null, sale: saleDoc.exists ? saleDoc.data() : null,
-        target: await profitTarget(jobDoc.exists ? jobDoc.data().model : '') });
+        target: await profitTarget(jobDoc.exists ? jobDoc.data().model : '', null, { id, ...(jobDoc.exists ? jobDoc.data() : {}) }) });
       return;
     }
     res.status(400).json({ error: 'action' });
@@ -1343,6 +1373,7 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   const author = (note.by && note.by.uid) || '';
   const uids = [...new Set(Array.isArray(note.mentions) ? note.mentions : [])].filter(uid=>uid && uid !== author);
   if(!uids.length) return;
+  if(note.kind === 'costOver') return;   // cost-code notices are bell only (owner's choice)
 
   const nodemailer = require('nodemailer');
   const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: MAIL_USER.value(), pass: GMAIL_APP_PASSWORD.value().replace(/\s+/g, '') } });

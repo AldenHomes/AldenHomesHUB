@@ -85,18 +85,42 @@
   .line{display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-top:1px solid #f1ede3; font-size:13px;}
   .line:first-of-type{border-top:none;}
   .line .d{font-family:"Courier New",monospace; color:var(--ink-soft); white-space:nowrap;}
-  .track{position:relative; height:12px; border-radius:6px; background:#efece4; margin:8px 0 4px; overflow:visible;}
-  .track > span{position:absolute; left:0; top:0; bottom:0; border-radius:6px; background:var(--navy);}
-  .track > span.over{background:var(--danger);}
-  .track > i{position:absolute; top:-4px; bottom:-4px; width:2px; background:#c58a1a;}
-  .track-key{display:flex; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--ink-soft);}
-  .cost-verdict{margin-top:8px; padding:8px 10px; border-radius:8px; font-size:13px; background:#eef5ee; color:#2f6b3a;}
+  .jc-stats{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;}
+  .jc-stat{background:#faf8f2; border:1px solid #efeadc; border-radius:10px; padding:12px 14px;}
+  .jc-stat .l{font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft);}
+  .jc-stat .v{font-size:24px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace; line-height:1.2; margin-top:2px;}
+  .jc-stat .s{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .jc-stat.good .v{color:#2f6b3a;} .jc-stat.bad .v{color:var(--danger);}
+  .jc-cols{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.3fr); gap:22px; margin-top:16px;}
+  .jc-h{font-size:12px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft); margin-bottom:8px;}
+  .jc-prog{margin-bottom:12px;}
+  .jc-prog .t{display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:4px;}
+  .jc-prog .t b{font-family:"Courier New",monospace;}
+  .jc-bar{height:14px; border-radius:7px; background:#efece4; overflow:hidden;}
+  .jc-bar > span{display:block; height:100%; border-radius:7px; background:var(--navy);}
+  .jc-bar > span.build{background:#7d8a5a;} .jc-bar > span.bad{background:var(--danger);}
+  .cost-verdict{margin-top:4px; padding:10px 12px; border-radius:8px; font-size:13.5px; background:#eef5ee; color:#2f6b3a;}
   .cost-verdict.warn{background:#fbefe9; color:var(--danger);}
-  .sale-form{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .jc-codes{display:grid; grid-template-columns:minmax(90px, 150px) minmax(0, 1fr) auto; gap:6px 10px; align-items:center; font-size:13px;}
+  .jc-codes .n{}
+  .jc-codes .n.over{color:var(--danger); font-weight:700;}
+  .jc-codes .b{position:relative; height:12px; border-radius:6px; background:#f2efe7;}
+  .jc-codes .b > span{position:absolute; left:0; top:0; bottom:0; border-radius:6px; background:#9aa3ad;}
+  .jc-codes .b > span.over{background:var(--danger);}
+  .jc-codes .b > i{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--navy);}
+  .jc-codes .b > i.avg{width:0; background:none; border-left:2px dotted #b08a2e;}
+  .jc-codes .a{font-family:"Courier New",monospace; font-size:12.5px; white-space:nowrap; text-align:right;}
+  .jc-codes .a.over{color:var(--danger); font-weight:700;}
+  .jc-codes .bsub{font-size:10.5px; color:var(--ink-soft); margin-top:2px; font-family:"Courier New",monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .jc-key{font-size:11.5px; color:var(--ink-soft); margin-top:8px;}
+  .jc-key i{display:inline-block; width:2px; height:10px; background:var(--navy); vertical-align:-1px; margin:0 3px;}
+  .jc-key i.avg{width:0; background:none; border-left:2px dotted #b08a2e;}
+  .jc-foot{font-size:11.5px; color:var(--ink-soft); margin-top:14px; padding-top:10px; border-top:1px solid #f1ede3;}
+  .sale-form{display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;}
   .sale-form input{flex:1 1 140px; padding:8px 10px; border:1px solid var(--steel-line); border-radius:8px; font-size:15px;}
-  .flag-line{display:flex; justify-content:space-between; gap:10px; padding:6px 8px; margin-top:4px; border-radius:6px; background:#fbefe9; color:var(--danger); font-size:13px;}
-  .flag-line .d{font-family:"Courier New",monospace; white-space:nowrap;}
-  .line.over span:first-child{color:var(--danger); font-weight:600;}
+  @media (max-width:1100px){ .jc-cols{grid-template-columns:1fr;} }
+  @media (max-width:720px){ .jc-stat .v{font-size:19px;} .jc-stats{gap:6px;} .jc-stat{padding:10px;} }
+  @media (max-width:420px){ .jc-stats{grid-template-columns:1fr;} .jc-codes{grid-template-columns:minmax(70px, 110px) minmax(0, 1fr) auto;} .jc-codes .plus{display:none;} }
   .label{font-size:10.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); margin:10px 0 4px;}
   .bar{height:7px; background:#e7e2d5; border-radius:4px; overflow:hidden; margin:8px 0 2px;}
   .bar div{height:100%; background:var(--good); border-radius:4px;}
@@ -478,7 +502,7 @@ html, body{max-width:100%; overflow-x:clip;}
         </div>
 
         <!-- Job costs: what this home has cost so far (QuickBooks import) against what it sold for, and how far along the build is -->
-        <div class="card">
+        <div class="card wide" id="costs">
           <div class="card-head">
             <div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
             <h3>Job Costs</h3>
@@ -783,6 +807,7 @@ function timelineEvents(){
     const who = (x.by && x.by.name) || 'Someone';
     if(x.kind === 'subDeclined') add(x.at, 'schedule', `${who} declined a job`, clip(x.text, 220), true);
     else if(x.kind === 'subNote') add(x.at, 'notes', `${who} (subcontractor) sent a note${(x.photos || []).length ? ` with ${x.photos.length} photo${x.photos.length === 1 ? '' : 's'}` : ''}`, clip(x.text, 220));
+    else if(x.kind === 'costOver') add(x.at, 'notes', 'A cost code went over what the last build of this style spent', clip(x.text, 220), true);
     else if(x.kind === 'subWaiting') add(x.at, 'schedule', 'A job had no answer from a sub for three weeks', clip(x.text, 220), true);
     else if(x.todo) add(x.at, 'notes', `${who} added a punch list item: ${clip(x.text, 160)}`, [(x.mentionNames || []).length ? 'for ' + x.mentionNames.join(', ') : '', x.priority === 'high' ? 'high priority' : '', x.due ? 'needed by ' + fmtDate(x.due) : ''].filter(Boolean).join(' · '));
     else add(x.at, 'notes', x.forBuyer ? `${who} posted an update for the homeowner: ${clip(x.text, 200)}` : `${who} added a note: ${clip(x.text, 200)}`, (x.photos || []).length ? `${x.photos.length} photo${x.photos.length === 1 ? '' : 's'}` : '');
@@ -972,7 +997,8 @@ function myUid(){ const u = firebase.auth().currentUser; return u ? u.uid : ''; 
    "Sold for" = the sale price (typed here or on Job Costing for now; later the hub's own final sale sheet) plus change orders signed
    in the hub after it was set. Spending is checked against a budget = sold for x (1 - the profit past builds of this style kept,
    from Cost History), and against how far the build is (jobs done on the build schedule). */
-// a cost code is flagged when it has cost more than 10% (and at least $1,000) over what past builds of this style usually spent on it
+const lastBuilt = u=>u ? esc(u.from) + (u.date ? ', ' + new Date(u.date + 'T12:00').toLocaleDateString(undefined, { month:'short', year:'numeric' }) : '') : '';
+// a cost code is flagged when it has cost more than 10% (and at least $1,000) over what the last home of this style built spent on it
 function codeFlags(byCode, target){
   if(!target || !target.codes) return [];
   return Object.entries(byCode || {}).map(([code, b])=>{
@@ -1006,59 +1032,62 @@ function renderCosts(){
   const sold = sale ? sale.price + coTotal : 0;
   const tasks = (sched && sched.tasks) || [], doneN = tasks.filter(t=>t.done).length;
   const built = tasks.length ? doneN / tasks.length : null;
-  let html = '';
-  if(saleEditing || !sale){
-    html += `<div class="label" style="margin-top:0;">Sold for</div>
-      ${sale ? '' : '<div class="muted" style="font-size:12.5px;">Type the final sale price (base price plus selections) to track spending against it.</div>'}
-      <div class="sale-form"><input id="saleInput" inputmode="decimal" placeholder="e.g. 445,947" value="${sale ? sale.price : ''}" aria-label="Sale price">
-        <button class="btn btn-primary" data-sale="save">Save</button>${sale ? '<button class="btn btn-ghost" data-sale="cancel">Cancel</button>' : ''}</div>`;
+  const budget = sold && target && typeof target.gp === 'number' ? sold * (1 - target.gp) : 0;
+
+  // 1. three numbers: sold for, spent, what's left of the budget (or of the sale price when there's no budget)
+  const soldTile = (saleEditing || !sale)
+    ? `<div class="jc-stat"><div class="l">Sold for</div>
+        <div class="sale-form"><input id="saleInput" inputmode="decimal" placeholder="Type the sale price" value="${sale ? sale.price : ''}" aria-label="Sale price">
+        <button class="btn btn-primary" data-sale="save">Save</button>${sale ? '<button class="btn btn-ghost" data-sale="cancel">Cancel</button>' : ''}</div>
+        ${sale ? '' : '<div class="s">Base price plus selections, to track spending against it.</div>'}</div>`
+    : `<div class="jc-stat"><div class="l">Sold for</div><div class="v">${m(sold)}</div>
+        <div class="s">${coTotal ? `incl. ${m(coTotal)} in change orders · ` : ''}<a href="#" data-sale="edit">change</a></div></div>`;
+  const spentTile = `<div class="jc-stat"><div class="l">Spent so far</div><div class="v">${c ? m(spent) : '—'}</div>
+      <div class="s">${c ? (sold ? pct(spent / sold) + ' of the sale price' : 'from QuickBooks invoices') : 'No invoices imported yet'}</div></div>`;
+  const leftTile = !c || !sold ? `<div class="jc-stat"><div class="l">Budget left</div><div class="v">—</div><div class="s">${sold ? 'Waiting for invoices' : 'Needs the sale price'}</div></div>`
+    : budget ? `<div class="jc-stat ${spent > budget ? 'bad' : 'good'}"><div class="l">${spent > budget ? 'Over budget' : 'Budget left'}</div><div class="v">${m(Math.abs(budget - spent))}</div>
+        <div class="s">of ${m(budget)} · keeps ${(target.gp * 100).toFixed(1)}% like past ${esc(target.style)}s</div></div>`
+    : `<div class="jc-stat"><div class="l">Left of the sale price</div><div class="v">${m(sold - spent)}</div><div class="s">${pct((sold - spent) / sold)} · no past builds of this style to set a budget</div></div>`;
+  let html = `<div class="jc-stats">${soldTile}${spentTile}${leftTile}</div>`;
+
+  if(c){
+    // 2. left: how much of the budget is used next to how far the build is, and what that means
+    let left = '';
+    if(budget){
+      const usedB = spent / budget;
+      left += `<div class="jc-prog"><div class="t"><span>Budget used</span><b>${pct(usedB)}</b></div><div class="jc-bar"><span class="${usedB > 1 ? 'bad' : ''}" style="width:${Math.min(100, usedB * 100)}%"></span></div></div>`;
+      if(built != null) left += `<div class="jc-prog"><div class="t"><span>Build done <span class="muted" style="font-size:12px;">(${doneN} of ${tasks.length} jobs)</span></span><b>${pct(built)}</b></div><div class="jc-bar"><span class="build" style="width:${built * 100}%"></span></div></div>`;
+      let verdict = '', warn = false;
+      if(spent > budget){ warn = true; verdict = `Over budget by ${m(spent - budget)}. On track to keep ${pct((sold - spent) / sold)} instead of ${(target.gp * 100).toFixed(1)}%.`; }
+      else if(built != null && usedB - built > 0.15){ warn = true; verdict = `Spending is ahead of the build. Worth a look.`; }
+      else if(built != null) verdict = `On track. Spending is keeping pace with the build.`;
+      else verdict = `Within budget so far. Start a build schedule to compare spending with progress.`;
+      left += `<div class="cost-verdict${warn ? ' warn' : ''}">${verdict}</div>`;
+    } else if(sold){
+      left += `<div class="jc-prog"><div class="t"><span>Sale price spent</span><b>${pct(spent / sold)}</b></div><div class="jc-bar"><span style="width:${Math.min(100, spent / sold * 100)}%"></span></div></div>`;
+      if(built != null) left += `<div class="jc-prog"><div class="t"><span>Build done</span><b>${pct(built)}</b></div><div class="jc-bar"><span class="build" style="width:${built * 100}%"></span></div></div>`;
+    } else left += '<div class="muted" style="font-size:13px;">Type the sale price above to see the budget and whether spending is on track.</div>';
+
+    // 3. right: one bar per cost code (spent so far), with a line for what the last home of this style built spent
+    const flags = codeFlags(c.byCode, target), overSet = new Set(flags.map(x=>x.code));
+    const codes = Object.entries(c.byCode || {}).filter(([, x])=>x.total > 0)
+      .sort((p, q)=>(overSet.has(q[0]) - overSet.has(p[0])) || q[1].total - p[1].total);
+    const shown = showAllCodes ? codes : codes.slice(0, 8);
+    const usual = code=>target && target.codes && target.codes[code] ? target.codes[code].avg : 0;
+    const mean = code=>target && target.codes && target.codes[code] ? target.codes[code].mean || 0 : 0;
+    const top = Math.max(1, ...shown.map(([code, x])=>Math.max(x.total, usual(code), mean(code))));
+    let right = `<div class="jc-h">Cost codes${target && target.codes ? ` <span style="font-weight:400; text-transform:none; letter-spacing:0;">· ${flags.length ? `<span style="color:var(--danger); font-weight:700;">&#9873; ${flags.length} over the last build</span>` : 'none over the last build'}</span>` : ''}</div>
+      <div class="jc-codes">${shown.map(([code, x])=>{ const u = usual(code), over = overSet.has(code);
+        return `<div class="n${over ? ' over' : ''}" title="${esc(code + ' · ' + (x.name || ''))}">${over ? '&#9873; ' : ''}${esc(x.name || 'Code ' + code)}</div>
+          <div class="bw"><div class="b" title="Spent ${m(x.total)}${u ? ' · last ' + esc(target.style) + ' (' + lastBuilt(target.codes[code]) + ') ' + m(u) : ''}${mean(code) ? ' · average ' + m(mean(code)) : ''}"><span class="${over ? 'over' : ''}" style="width:${x.total / top * 100}%"></span>${mean(code) ? `<i class="avg" style="left:${mean(code) / top * 100}%"></i>` : ''}${u ? `<i style="left:${u / top * 100}%"></i>` : ''}</div>${u || mean(code) ? `<div class="bsub">${u ? 'last ' + m(u) : ''}${u && mean(code) ? ' · ' : ''}${mean(code) ? 'avg ' + m(mean(code)) : ''}</div>` : ''}</div>
+          <div class="a${over ? ' over' : ''}">${m(x.total)}${over ? ` <span class="plus" style="font-size:11px;">+${m(x.total - u)}</span>` : ''}</div>`; }).join('')}</div>
+      ${codes.length > 8 ? `<div style="margin-top:8px;"><a href="#" data-codes="1" style="font-size:12.5px;">${showAllCodes ? 'Show fewer' : 'Show all ' + codes.length + ' cost codes'}</a></div>` : ''}
+      ${target && target.codes ? `<div class="jc-key">Bar = spent so far &nbsp;<i></i> = last ${esc(target.style)} built (${lastBuilt(target.last)}) &nbsp;<i class="avg"></i> = average of the latest ${target.recentN || 8}</div>` : '<div class="jc-key">No past builds of this home style to compare against yet.</div>'}`;
+    html += `<div class="jc-cols"><div>${left}</div><div>${right}</div></div>`;
+    html += `<div class="jc-foot">${(c.lines || []).length} invoice lines · QuickBooks project ${esc(c.project || '')} · imported ${esc(new Date(c.importedAt).toLocaleDateString())}${sale && !saleEditing ? ` · sale price set by ${esc(sale.setBy || '')}` : ''}</div>`;
   } else {
-    html += `<div class="line" style="border-top:none;"><span>Sold for</span><span class="d" style="color:var(--navy); font-weight:700;">${m(sold)}</span></div>
-      ${coTotal ? `<div class="muted" style="font-size:12px;">${m(sale.price)} sale price + ${m(coTotal)} in ${cos.length} signed change order${cos.length === 1 ? '' : 's'}</div>` : ''}`;
+    html += '<div class="muted" style="margin-top:12px; font-size:13px;">No invoices imported for this home yet. They come in from the QuickBooks report on the Job Costing page.</div>';
   }
-  if(!c){
-    html += '<div class="muted" style="margin-top:10px;">No invoices imported for this home yet. They come in from the QuickBooks report on the Job Costing page.</div>';
-  } else {
-    html += `<div class="line"><span>Spent so far</span><span class="d">${m(spent)}</span></div>`;
-    if(sold){
-      const budget = target ? sold * (1 - target.gp) : 0, left = sold - spent;
-      const scale = Math.max(sold, spent);
-      html += `<div class="line"><span>Left if no more bills came in</span><span class="d">${m(left)} (${pct(left / sold)})</span></div>
-        <div class="track" title="Spent so far against the sale price"><span class="${budget && spent > budget ? 'over' : ''}" style="width:${Math.min(100, spent / scale * 100)}%"></span>${budget ? `<i style="left:${budget / scale * 100}%" title="Budget"></i>` : ''}</div>
-        <div class="track-key"><span>${pct(spent / sold)} of the sale price spent</span>${budget ? '<span style="color:#9a6a10;">| budget</span>' : ''}</div>`;
-      if(budget){
-        html += `<div class="line" style="margin-top:6px;"><span>Budget <span class="muted" style="font-size:11.5px;">(past ${esc(target.style)} builds kept ${(target.gp * 100).toFixed(1)}%)</span></span><span class="d">${m(budget)}</span></div>`;
-        const usedB = spent / budget;
-        let verdict = '', warn = false;
-        if(spent > budget){ warn = true; verdict = `Over budget by ${m(spent - budget)}. This home is now on track to keep ${pct(left / sold)} instead of ${(target.gp * 100).toFixed(1)}%.`; }
-        else if(built != null){
-          const ahead = usedB - built;
-          if(ahead > 0.15){ warn = true; verdict = `${pct(usedB)} of the budget is spent but the build is only ${pct(built)} done (${doneN} of ${tasks.length} jobs). Worth a look.`; }
-          else verdict = `On track: ${pct(usedB)} of the budget spent, build ${pct(built)} done (${doneN} of ${tasks.length} jobs). ${m(budget - spent)} left to spend.`;
-        } else verdict = `${pct(usedB)} of the budget spent, ${m(budget - spent)} left to spend.`;
-        html += `<div class="cost-verdict${warn ? ' warn' : ''}">${verdict}</div>`;
-      } else if(built != null){
-        html += `<div class="muted" style="font-size:12px; margin-top:4px;">Build ${pct(built)} done (${doneN} of ${tasks.length} jobs).</div>`;
-      }
-    }
-    const flags = codeFlags(c.byCode, target);
-    if(target && target.codes){
-      html += `<div class="label">Cost codes vs past ${esc(target.style)} builds</div>`;
-      html += flags.length ? flags.map(f=>`<div class="flag-line" title="Past ${esc(target.style)} builds averaged ${m(f.avg)} on this code (${f.n} build${f.n === 1 ? '' : 's'})"><span>&#9873; ${esc(f.code + ' · ' + f.name)}: ${m(f.spent)} spent, usually ${m(f.avg)}</span><span class="d">+${m(f.spent - f.avg)} (+${Math.round((f.spent / f.avg - 1) * 100)}%)</span></div>`).join('')
-        : '<div class="muted" style="font-size:12.5px;">No cost code is running over what past builds usually spent on it.</div>';
-      const all = Object.entries(c.byCode || {}).sort((a, b)=>Number(a[0]) - Number(b[0]));
-      html += `<div style="margin-top:6px;"><a href="#" data-codes="1" style="font-size:12.5px;">${showAllCodes ? 'Hide' : 'Show'} every cost code</a></div>`;
-      if(showAllCodes) html += all.map(([code, b])=>{ const u = target.codes[code], over = flags.some(f=>f.code === code);
-        return `<div class="line${over ? ' over' : ''}"><span>${esc(code === '0' ? '' : code + ' · ')}${esc(b.name || '')}</span><span class="d">${m(b.total)}${u ? ' / ' + m(u.avg) : ' / new'}</span></div>`; }).join('')
-        + '<div class="muted" style="font-size:11.5px;">Spent so far / what past builds usually spent.</div>';
-    } else {
-      const top = Object.entries(c.byCode || {}).sort((a, b)=>b[1].total - a[1].total).slice(0, 5);
-      html += `<div class="label">Largest cost codes</div>${top.map(([code, b])=>`<div class="line"><span>${esc(code === '0' ? '' : code + ' · ')}${esc(b.name || '')}</span><span class="d">${m(b.total)}</span></div>`).join('')}
-        <div class="muted" style="font-size:11.5px;">No past builds of this home style in Cost History to compare cost codes against.</div>`;
-    }
-    html += `<div class="muted" style="font-size:11.5px; margin-top:6px;">${(c.lines || []).length} invoice lines · QuickBooks project ${esc(c.project || '')} · imported ${esc(new Date(c.importedAt).toLocaleDateString())}</div>`;
-  }
-  if(sale && !saleEditing) html += `<div class="muted" style="font-size:11.5px; margin-top:4px;">Sale price set by ${esc(sale.setBy || '')} on ${esc(new Date(sale.setAt).toLocaleDateString())} · <a href="#" data-sale="edit">change</a></div>`;
   box.innerHTML = html;
 }
 $('costsBody').addEventListener('click', async e=>{
