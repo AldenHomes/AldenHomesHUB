@@ -768,6 +768,24 @@ async function addClosedHomes(){
   await batch.commit();
   logger.info('Closed homes added from BuilderTrend', { added: added.length, already });
 }
+/* Owner, 2026-10-14: for the 7 homes whose spreadsheet GP was far from BuilderTrend's final price minus cost, use BuilderTrend's
+   final price: gp = (sale - total) / sale. The spreadsheet's figure is kept as gpSheet; gpSource = 'buildertrend'. Once only
+   (marker import-log/bt-gp-2026-10), after the sale prices are on the rows. */
+const BT_GP_HOMES = ['AP 411', 'IM 141', 'OS 121', 'MM 120', 'ET 293', 'OS 256', 'MM 70'];
+async function useBtGp(){
+  const mark = db.collection('import-log').doc('bt-gp-2026-10');
+  if((await mark.get()).exists) return;
+  if(!(await db.collection('import-log').doc('bt-sales-2026-10').get()).exists) return;   // sale prices not on the rows yet
+  const hist = await db.collection('cost-history').get();
+  const batch = db.batch(), done = [];
+  hist.docs.forEach(d=>{ const h = d.data(); const k = String(h.comm || '').toUpperCase() + ' ' + String(h.lot || '').replace(/^0+(?=\d)/, '');
+    if(!BT_GP_HOMES.includes(k) || !(h.sale > 0) || !(h.total > 0)) return;
+    batch.update(d.ref, { gpSheet: typeof h.gp === 'number' ? h.gp : null, gp: Math.round((h.sale - h.total) / h.sale * 10000) / 10000, gpSource: 'buildertrend' });
+    done.push(k); });
+  batch.set(mark, { at: new Date().toISOString(), done });
+  await batch.commit();
+  logger.info('Gross profit from BuilderTrend prices', { done });
+}
 async function historyBuilds(){
   let builds = (await db.collection('cost-history').get()).docs.map(d=>d.data());
   if(!builds.length){ try{ builds = require('./cost-history-seed.json'); } catch(e){ /* no starting list deployed */ } }
@@ -910,7 +928,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         }
         if(seed.length) snap = await col.get();
       }
-      if(BT_SALES){ await applyBtSales(); await addClosedHomes(); snap = await col.get(); }
+      if(BT_SALES){ await applyBtSales(); await addClosedHomes(); await useBtGp(); snap = await col.get(); }
       res.json({ builds: snap.docs.map(d=>({ id: d.id, ...d.data() })) });
       return;
     }
@@ -963,7 +981,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       return;
     }
     if(body.action === 'costsList'){
-      await applyBtSales().then(addClosedHomes).catch(err=>logger.error('BuilderTrend sale prices / closed homes not applied', err));
+      await applyBtSales().then(addClosedHomes).then(useBtGp).catch(err=>logger.error('BuilderTrend sale prices / closed homes not applied', err));
       const [snap, sales, jobsSnap, builds] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get(), db.collection('jobs').get(), historyBuilds()]);
       const sold = {}; sales.docs.forEach(d=>{ sold[d.id] = d.data().price; });
       // the usual cost per code for each home's style, so the list can flag codes running over

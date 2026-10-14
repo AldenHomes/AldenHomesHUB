@@ -323,7 +323,7 @@ function render(){
     ${list.map(b=>`<tr><td>${esc(b.date)} ${ageTag(b.date)}</td><td>${esc(b.comm)} · Lot ${esc(b.lot)}</td><td>${esc(b.model)}</td><td class="num">${b.sqft ? b.sqft.toLocaleString('en-US') : '—'}</td>
       <td class="num"><strong>${norm === 'sqft' ? (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—') : money(b.total)}</strong></td><td class="num">${norm === 'sqft' ? money(b.total) : (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—')}</td>
       <td class="num">${b.sale ? `<a href="#" data-sold="${esc(b.id)}" title="See the selections">${money(b.sale)}</a>` : '—'}</td>
-      <td class="num">${typeof b.gp === 'number' ? (b.gp * 100).toFixed(1) + '%' : '—'}</td>
+      <td class="num"${b.gpSource === 'buildertrend' ? ` title="From BuilderTrend's final price${typeof b.gpSheet === 'number' ? '; the spreadsheet said ' + (b.gpSheet * 100).toFixed(1) + '%' : ''}"` : ''}>${typeof b.gp === 'number' ? (b.gp * 100).toFixed(1) + '%' + (b.gpSource === 'buildertrend' ? '<span class="muted" style="font-size:11px;"> BT</span>' : '') : '—'}</td>
       <td>${b.source === 'quickbooks' ? `<span class="src">from QuickBooks</span> <button type="button" class="linkbtn" data-remove="${esc(b.id)}">Remove</button>` : ''}</td></tr>${openSale === b.id ? saleRow(b) : ''}`).join('')}</tbody></table>`
     : '<p class="muted" style="margin-top:12px;">No builds match.</p>';
   // one style: its recent builds side by side, by cost code, with the average
