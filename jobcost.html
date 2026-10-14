@@ -279,9 +279,18 @@ async function api(body){
   if(!res.ok) throw new Error('hubApi ' + res.status);
   return res.json();
 }
+// a cost code is flagged when it has cost more than 10% (and at least $1,000) over what past builds of this style usually spent on it
+function codeFlags(byCode, target){
+  if(!target || !target.codes) return [];
+  return Object.entries(byCode || {}).map(([code, b])=>{
+    const u = target.codes[code];
+    return u && b.total > u.avg * 1.1 && b.total - u.avg >= 1000 ? { code, name: b.name || u.name, spent: b.total, avg: u.avg, n: u.n } : null;
+  }).filter(Boolean).sort((a, b)=>(b.spent - b.avg) - (a.spent - a.avg));
+}
+let targets = {};   // houseId -> { style, gp, codes } from Cost History
 let sold = {};   // houseId -> sale price (job-sales), set here or on the home's page
 async function loadHomes(){
-  try{ const r = await api({ action:'costsList' }); homes = r.homes || []; sold = r.sold || {}; $('blockedNotice').classList.remove('show'); }
+  try{ const r = await api({ action:'costsList' }); homes = r.homes || []; sold = r.sold || {}; targets = r.targets || {}; $('blockedNotice').classList.remove('show'); }
   catch(err){ console.error(err); $('blockedNotice').classList.add('show'); homes = []; }
   renderHomes();
 }
@@ -388,14 +397,17 @@ function renderHomes(){
   const top = Math.max(1, ...homes.map(h=>h.total || 0));
   $('homesList').innerHTML = list.length ? list.map(h=>{
     const open = openHome === h.houseId, codes = Object.entries(h.byCode || {}).sort((a, b)=>Number(a[0]) - Number(b[0]));
+    const tg = targets[h.houseId], flags = codeFlags(h.byCode, tg);
     return `<div class="home"><button type="button" class="home-h" data-home="${esc(h.houseId)}">
         <div><b>${esc(h.job ? homeLabel(h.job) : h.label || h.project)}</b><div class="sub">QuickBooks: ${esc(h.project)} · ${h.lines} line${h.lines === 1 ? '' : 's'} · imported ${esc(new Date(h.importedAt).toLocaleDateString())}</div>
+          ${flags.length ? `<div class="sub" style="color:var(--danger); font-weight:600;">&#9873; ${flags.length} cost code${flags.length === 1 ? '' : 's'} over the usual: ${flags.slice(0, 3).map(f=>esc(f.name)).join(', ')}${flags.length > 3 ? '…' : ''}</div>` : ''}
           ${sold[h.houseId] ? `<div class="sub">Sold for ${money(sold[h.houseId])} · ${money(sold[h.houseId] - (h.total || 0))} left (${Math.round((sold[h.houseId] - (h.total || 0)) / sold[h.houseId] * 1000) / 10}%)</div>` : ''}</div>
         <div class="bar" style="flex:0 1 160px;"><span style="width:${Math.round((h.total || 0) / top * 100)}%"></span></div>
         <span class="amt">${money(h.total || 0)}</span></button>
-      ${open ? `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th><th class="num">Material</th><th class="num">Labor</th><th class="num">Total</th></tr></thead><tbody>
-          ${codes.map(([c, b])=>`<tr><td class="num" style="text-align:left;">${c === '0' ? '—' : esc(c)}</td><td>${esc(b.name || '')}</td><td class="num">${b.material ? money2(b.material) : ''}</td><td class="num">${b.labor ? money2(b.labor) : ''}</td><td class="num">${money2(b.total)}</td></tr>`).join('')}
-          <tr class="tot"><td colspan="2">Total</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.material, 0))}</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.labor, 0))}</td><td class="num">${money2(h.total || 0)}</td></tr></tbody></table>
+      ${open ? `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th><th class="num">Material</th><th class="num">Labor</th><th class="num">Total</th>${tg ? '<th class="num">Usual</th>' : ''}</tr></thead><tbody>
+          ${codes.map(([c, b])=>`<tr><td class="num" style="text-align:left;">${c === '0' ? '—' : esc(c)}</td><td>${esc(b.name || '')}</td><td class="num">${b.material ? money2(b.material) : ''}</td><td class="num">${b.labor ? money2(b.labor) : ''}</td><td class="num">${money2(b.total)}</td>${tg ? `<td class="num" ${flags.some(f=>f.code === c) ? 'style="color:var(--danger); font-weight:700;" title="Over what past ' + esc(tg.style) + ' builds usually spent"' : ''}>${tg.codes[c] ? (flags.some(f=>f.code === c) ? '&#9873; ' : '') + money(tg.codes[c].avg) : '—'}</td>` : ''}</tr>`).join('')}
+          <tr class="tot"><td colspan="2">Total</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.material, 0))}</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.labor, 0))}</td><td class="num">${money2(h.total || 0)}</td>${tg ? '<td></td>' : ''}</tr></tbody></table>
+        ${tg ? `<div class="muted" style="font-size:12px; margin-top:4px;">"Usual" = what the latest ${tg.n} ${esc(tg.style)} builds in Cost History averaged on each code. &#9873; = more than 10% (and $1,000) over it.</div>` : ''}
         <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><button class="btn" data-lines="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">Show every line</button><a class="btn" href="house.html?id=${encodeURIComponent(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff; text-decoration:none;">Open the home</a>
           <button class="btn" data-sold="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">${sold[h.houseId] ? 'Change sale price' : 'Set sale price'}</button>
           <button class="btn" data-hist="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">${h.job && h.job.settle && h.job.settle < new Date().toISOString().slice(0, 10) ? 'Closed: add to Cost History' : 'Add to Cost History'}</button></div>

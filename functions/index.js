@@ -704,17 +704,29 @@ function staffName(user){
 /* The share of the sale price past builds of the same home style kept as gross profit (average of the latest 8 in Cost History),
    so a home being built can be checked against it: spend no more than sale price x (1 - that). "Stanford B" matches "Stanford";
    the longest matching style wins ("Alden 2.1 B" -> "Alden 2.1", not "Alden"). */
-async function profitTarget(model){
-  const m = String(model || '').trim().toLowerCase();
-  if(!m) return null;
+async function historyBuilds(){
   let builds = (await db.collection('cost-history').get()).docs.map(d=>d.data());
   if(!builds.length){ try{ builds = require('./cost-history-seed.json'); } catch(e){ /* no starting list deployed */ } }
-  builds = builds.filter(b=>typeof b.gp === 'number' && b.base);
+  return builds.filter(b=>typeof b.gp === 'number' && b.base);
+}
+/* Also returns codes = { code: { name, avg, n } }: what each cost code usually costs on that style (average over those same builds
+   that had the code), so a home being built can flag a code running well over it (e.g. plumbing at $27k when it's usually $20k). */
+async function profitTarget(model, preloaded){
+  const m = String(model || '').trim().toLowerCase();
+  if(!m) return null;
+  const builds = preloaded || await historyBuilds();
   const style = builds.map(b=>String(b.base)).filter(b=>m === b.toLowerCase() || m.startsWith(b.toLowerCase() + ' ') || m.startsWith(b.toLowerCase() + '('))
     .sort((a, b)=>b.length - a.length)[0];
   if(!style) return null;
   const same = builds.filter(b=>b.base === style).sort((a, b)=>String(b.date).localeCompare(String(a.date))).slice(0, 8);
-  return { style, n: same.length, gp: Math.round(same.reduce((t, b)=>t + b.gp, 0) / same.length * 10000) / 10000 };
+  const codes = {};
+  same.forEach(b=>Object.entries(b.byCode || {}).forEach(([code, c])=>{
+    if(!c || !(c.total > 0)) return;
+    const x = codes[code] = codes[code] || { name: c.name || '', sum: 0, n: 0 };
+    x.sum += c.total; x.n++;
+  }));
+  Object.values(codes).forEach(x=>{ x.avg = Math.round(x.sum / x.n); delete x.sum; });
+  return { style, n: same.length, gp: Math.round(same.reduce((t, b)=>t + b.gp, 0) / same.length * 10000) / 10000, codes };
 }
 exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (req, res)=>{
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
@@ -860,9 +872,13 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       return;
     }
     if(body.action === 'costsList'){
-      const [snap, sales] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get()]);
+      const [snap, sales, jobsSnap, builds] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get(), db.collection('jobs').get(), historyBuilds()]);
       const sold = {}; sales.docs.forEach(d=>{ sold[d.id] = d.data().price; });
-      res.json({ sold, homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
+      // the usual cost per code for each home's style, so the list can flag codes running over
+      const models = {}; jobsSnap.docs.forEach(d=>{ models[d.id] = d.data().model || ''; });
+      const targets = {};
+      for(const d of snap.docs) targets[d.id] = await profitTarget(models[d.id], builds);
+      res.json({ sold, targets, homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
       return;
     }
     if(body.action === 'costsGet'){

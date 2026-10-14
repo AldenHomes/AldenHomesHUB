@@ -94,6 +94,9 @@
   .cost-verdict.warn{background:#fbefe9; color:var(--danger);}
   .sale-form{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
   .sale-form input{flex:1 1 140px; padding:8px 10px; border:1px solid var(--steel-line); border-radius:8px; font-size:15px;}
+  .flag-line{display:flex; justify-content:space-between; gap:10px; padding:6px 8px; margin-top:4px; border-radius:6px; background:#fbefe9; color:var(--danger); font-size:13px;}
+  .flag-line .d{font-family:"Courier New",monospace; white-space:nowrap;}
+  .line.over span:first-child{color:var(--danger); font-weight:600;}
   .label{font-size:10.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); margin:10px 0 4px;}
   .bar{height:7px; background:#e7e2d5; border-radius:4px; overflow:hidden; margin:8px 0 2px;}
   .bar div{height:100%; background:var(--good); border-radius:4px;}
@@ -969,7 +972,15 @@ function myUid(){ const u = firebase.auth().currentUser; return u ? u.uid : ''; 
    "Sold for" = the sale price (typed here or on Job Costing for now; later the hub's own final sale sheet) plus change orders signed
    in the hub after it was set. Spending is checked against a budget = sold for x (1 - the profit past builds of this style kept,
    from Cost History), and against how far the build is (jobs done on the build schedule). */
-let costInfo = null, costsLoaded = false, saleEditing = false;
+// a cost code is flagged when it has cost more than 10% (and at least $1,000) over what past builds of this style usually spent on it
+function codeFlags(byCode, target){
+  if(!target || !target.codes) return [];
+  return Object.entries(byCode || {}).map(([code, b])=>{
+    const u = target.codes[code];
+    return u && b.total > u.avg * 1.1 && b.total - u.avg >= 1000 ? { code, name: b.name || u.name, spent: b.total, avg: u.avg, n: u.n } : null;
+  }).filter(Boolean).sort((a, b)=>(b.spent - b.avg) - (a.spent - a.avg));
+}
+let costInfo = null, costsLoaded = false, saleEditing = false, showAllCodes = false;
 async function costsApi(body){
   const token = await firebase.auth().currentUser.getIdToken();
   const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify(body) });
@@ -1030,14 +1041,28 @@ function renderCosts(){
         html += `<div class="muted" style="font-size:12px; margin-top:4px;">Build ${pct(built)} done (${doneN} of ${tasks.length} jobs).</div>`;
       }
     }
-    const top = Object.entries(c.byCode || {}).sort((a, b)=>b[1].total - a[1].total).slice(0, 5);
-    html += `<div class="label">Largest cost codes</div>${top.map(([code, b])=>`<div class="line"><span>${esc(code === '0' ? '' : code + ' · ')}${esc(b.name || '')}</span><span class="d">${m(b.total)}</span></div>`).join('')}
-      <div class="muted" style="font-size:11.5px; margin-top:6px;">${(c.lines || []).length} invoice lines · QuickBooks project ${esc(c.project || '')} · imported ${esc(new Date(c.importedAt).toLocaleDateString())}</div>`;
+    const flags = codeFlags(c.byCode, target);
+    if(target && target.codes){
+      html += `<div class="label">Cost codes vs past ${esc(target.style)} builds</div>`;
+      html += flags.length ? flags.map(f=>`<div class="flag-line" title="Past ${esc(target.style)} builds averaged ${m(f.avg)} on this code (${f.n} build${f.n === 1 ? '' : 's'})"><span>&#9873; ${esc(f.code + ' · ' + f.name)}: ${m(f.spent)} spent, usually ${m(f.avg)}</span><span class="d">+${m(f.spent - f.avg)} (+${Math.round((f.spent / f.avg - 1) * 100)}%)</span></div>`).join('')
+        : '<div class="muted" style="font-size:12.5px;">No cost code is running over what past builds usually spent on it.</div>';
+      const all = Object.entries(c.byCode || {}).sort((a, b)=>Number(a[0]) - Number(b[0]));
+      html += `<div style="margin-top:6px;"><a href="#" data-codes="1" style="font-size:12.5px;">${showAllCodes ? 'Hide' : 'Show'} every cost code</a></div>`;
+      if(showAllCodes) html += all.map(([code, b])=>{ const u = target.codes[code], over = flags.some(f=>f.code === code);
+        return `<div class="line${over ? ' over' : ''}"><span>${esc(code === '0' ? '' : code + ' · ')}${esc(b.name || '')}</span><span class="d">${m(b.total)}${u ? ' / ' + m(u.avg) : ' / new'}</span></div>`; }).join('')
+        + '<div class="muted" style="font-size:11.5px;">Spent so far / what past builds usually spent.</div>';
+    } else {
+      const top = Object.entries(c.byCode || {}).sort((a, b)=>b[1].total - a[1].total).slice(0, 5);
+      html += `<div class="label">Largest cost codes</div>${top.map(([code, b])=>`<div class="line"><span>${esc(code === '0' ? '' : code + ' · ')}${esc(b.name || '')}</span><span class="d">${m(b.total)}</span></div>`).join('')}
+        <div class="muted" style="font-size:11.5px;">No past builds of this home style in Cost History to compare cost codes against.</div>`;
+    }
+    html += `<div class="muted" style="font-size:11.5px; margin-top:6px;">${(c.lines || []).length} invoice lines · QuickBooks project ${esc(c.project || '')} · imported ${esc(new Date(c.importedAt).toLocaleDateString())}</div>`;
   }
   if(sale && !saleEditing) html += `<div class="muted" style="font-size:11.5px; margin-top:4px;">Sale price set by ${esc(sale.setBy || '')} on ${esc(new Date(sale.setAt).toLocaleDateString())} · <a href="#" data-sale="edit">change</a></div>`;
   box.innerHTML = html;
 }
 $('costsBody').addEventListener('click', async e=>{
+  if(e.target.closest('[data-codes]')){ e.preventDefault(); showAllCodes = !showAllCodes; renderCosts(); return; }
   const b = e.target.closest('[data-sale]');
   if(!b) return;
   e.preventDefault();
