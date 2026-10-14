@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | Cost History</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  .titlebar{background:var(--paper-2); padding:20px clamp(16px,4vw,40px); border-bottom:4px solid var(--rust);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;}
+  .brand-mark{height:40px; flex:none; display:flex; align-items:center;}
+  .brand-mark img{height:100%; width:auto; display:block;}
+  h1{font-size:clamp(19px,2.4vw,24px); margin:0; font-weight:700; color:var(--navy);}
+  .subtitle{font-size:12px; color:var(--ink-soft); margin-top:3px; letter-spacing:.6px; text-transform:uppercase;}
+  .titlebar-stats{display:flex; gap:22px;}
+  .stat{text-align:center;}
+  .stat .n{font-size:22px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace;}
+  .stat .l{font-size:10px; color:var(--ink-soft); letter-spacing:.6px; text-transform:uppercase; margin-top:3px;}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+  .sync-badge{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-soft); font-family:"Courier New",monospace;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.offline{background:var(--danger);}
+  .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
+  .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
+
+  .wrap{max-width:880px; margin:0 auto; padding:22px clamp(14px,4vw,40px) 60px;}
+  .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
+  .back-link:hover{color:var(--navy);}
+  .btn{padding:11px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-primary:hover{background:var(--navy-2);}
+  .btn:disabled{opacity:.5; cursor:default;}
+  input[type=text], input[type=password], select{padding:11px 11px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; color:var(--ink); background:#fff; font-family:inherit; min-width:0;}
+  input:focus, select:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+
+  /* add an item */
+  .add{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-top:4px solid var(--rust); padding:16px; margin-bottom:16px;}
+  .add-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .add-row #newText{flex:1 1 100%;}
+  .add-row select{flex:1 1 170px;}
+  .add-row .btn{flex:0 0 auto;}
+  .add-extras{display:flex; gap:10px 16px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:14px; color:var(--ink);}
+  .add-extras label{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
+  .add-extras input[type=date]{padding:8px 9px; font-size:14px;}
+  .add-extras input[type=checkbox]{width:18px; height:18px; accent-color:var(--danger);}
+  .pick-photo{border:1px dashed var(--steel-line); border-radius:var(--radius); padding:8px 12px; font-weight:600; color:var(--navy);}
+  /* high priority: red outline so it can't be missed */
+  .item.high{box-shadow:inset 0 0 0 2px var(--danger); background:#fff8f6;}
+  .tag{display:inline-block; border-radius:20px; padding:1px 9px; margin-right:6px; font-weight:700; font-size:11.5px;}
+  .tag.high{background:var(--danger); color:#fff;}
+  .tag.due{background:#ece8dd; color:var(--ink-soft);}
+  .tag.due.soon{background:#fdf0dc; color:#96661a;}
+  .tag.due.late{background:#fbeae4; color:var(--danger);}
+  .item-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .item-photos a{display:block; width:76px; height:76px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--steel-line);}
+  .item-photos img{width:100%; height:100%; object-fit:cover; display:block;}
+  .item-tools{display:flex; gap:14px; flex-wrap:wrap; margin-top:7px;}
+  .item-tools button{background:none; border:none; padding:0; font-size:12.5px; font-weight:700; color:var(--rust-2); cursor:pointer; font-family:inherit;}
+  .item-tools button:hover{text-decoration:underline;}
+  .item-tools button.warn{color:var(--danger);}
+  /* an item being edited: its wording, home and person become boxes */
+  .item-edit textarea{width:100%; min-height:64px; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; line-height:1.45; font-family:inherit; color:var(--ink); resize:vertical;}
+  .item-edit .row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .item-edit select{flex:1 1 180px; min-width:0; padding:8px 9px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; background:#fff; color:var(--ink);}
+  .item-edit .btns{display:flex; gap:8px; margin-top:10px;}
+  .item-edit .btns button{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:8px 16px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:var(--navy);}
+  .item-edit .btns button.save{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .hint{font-size:12.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
+
+  .filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .filters input{flex:1 1 200px;}
+  .filters select{flex:0 1 200px;}
+
+  /* the list: grouped by home, each item one big tap target */
+  .group{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); margin-bottom:14px; overflow:hidden;}
+  .group-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 14px; background:#f3f5ee; border-bottom:1px solid #dfe3d3; font-size:14px; font-weight:700; color:var(--rust-2);}
+  .group-head a{color:inherit; text-decoration:none;}
+  .group-head a:hover{text-decoration:underline;}
+  .group-head .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; color:var(--ink-soft);}
+  .item{display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-top:1px solid #f1ede3;}
+  .item:first-of-type{border-top:none;}
+  .check{flex:none; width:28px; height:28px; margin-top:1px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff; font-size:17px; font-weight:800; line-height:1; padding:0;}
+  .check:hover{border-color:var(--good);}
+  .check.on{background:var(--good); border-color:var(--good);}
+  .item-main{flex:1; min-width:0;}
+  .item-text{font-size:15.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word;}
+  .item.done .item-text{text-decoration:line-through; color:var(--ink-soft);}
+  .item-meta{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+  .who{display:inline-block; background:#eef0e8; color:var(--rust-2); font-weight:700; border-radius:20px; padding:1px 9px; margin-right:6px;}
+  .who.me{background:#fdf0dc; color:#96661a;}
+  .x-btn{flex:none; border:none; background:none; color:#b9b4a5; font-size:20px; line-height:1; cursor:pointer; padding:2px 4px;}
+  .x-btn:hover{color:var(--danger);}
+  .empty{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:36px 20px; text-align:center; color:var(--ink-soft); font-size:14.5px;}
+  .done-toggle{display:flex; align-items:center; gap:8px; width:100%; margin:22px 0 10px; padding:12px 14px; background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit; text-align:left;}
+  .done-toggle .arrow{display:inline-block; transition:transform .15s; font-size:11px;}
+  .done-toggle.open .arrow{transform:rotate(90deg);}
+  .done-toggle .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
+  .notice{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:13.5px; padding:11px 13px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .notice.show{display:block;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-gate.hidden{display:none;}
+  .auth-card{width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;}
+  .auth-card .brand{margin-bottom:22px; pointer-events:none;}
+  .auth-card h2{margin:0; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .auth-field input{width:100%;}
+  .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .auth-error.show{display:block;}
+  .auth-card .btn-primary{width:100%;}
+  .app-shell.locked{display:none;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  @media (max-width:640px){ .titlebar-stats{display:none;} }
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  @media (max-width:640px){
+    /* header buttons wrap instead of running off the side; the signed-in email drops to its own line */
+    .titlebar-account{flex-wrap:wrap; width:100%; gap:8px 10px;}
+    .titlebar-account #currentUserEmail{order:20; flex:1 1 100%; overflow-wrap:anywhere;}
+    /* the green "Synced" light sits up beside the page title, out of the button row */
+    .titlebar{position:relative;}
+    .titlebar .sync-badge{position:absolute; top:16px; right:14px;}
+    .titlebar .brand{padding-right:74px;}
+  }
+  .item-text, .group-head{overflow-wrap:anywhere;}
+  @media (max-width:640px){
+    .add-row select{flex:1 1 100%;}
+    .add-row .btn{flex:1 1 100%;}
+    .filters select{flex:1 1 100%;}
+    .item-tools{gap:6px 14px;}
+  }
+  /* cost history */
+  .card2{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:18px 20px; margin-top:16px;}
+  .card2 h2{font-size:17px; color:var(--navy); margin:0;}
+  .lede{color:var(--ink-soft); font-size:14px; line-height:1.5; margin-top:6px;}
+  .filters2{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px;}
+  .filters2 select{padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; background:#fff;}
+  .seg2{display:inline-flex; border:1px solid var(--steel-line); border-radius:20px; overflow:hidden; background:#fff;}
+  .seg2 button{border:none; background:none; padding:8px 14px; font-size:13px; font-weight:700; color:var(--ink-soft); font-family:inherit; cursor:pointer;}
+  .seg2 button.on{background:var(--navy); color:#fff;}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:14px;}
+  .kpi{background:#faf8f2; border-radius:var(--radius); padding:12px 14px;}
+  .kpi .l{font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft);}
+  .kpi .v{font-family:"Courier New",monospace; font-size:22px; font-weight:700; color:var(--navy); margin-top:4px;}
+  table.jc{width:100%; border-collapse:collapse; font-size:14px; margin-top:12px;}
+  table.jc th{text-align:left; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); padding:7px 8px; border-bottom:2px solid var(--steel-line); white-space:nowrap;}
+  table.jc td{padding:7px 8px; border-bottom:1px solid #f1ede3; vertical-align:middle;}
+  table.jc .num{text-align:right; font-family:"Courier New",monospace; white-space:nowrap;}
+  table.jc th.num{font-family:inherit;}
+  table.jc td.avg, table.jc th.avg{background:#eef0e8; font-weight:700;}
+  .age{display:inline-block; font-size:11px; font-weight:700; border-radius:10px; padding:1px 7px; background:#eaf1ec; color:#27573a;}
+  .age.mid{background:#fdf3e2; color:#8a5d14;} .age.old{background:#fbeae4; color:#a94438;}
+  .src{display:inline-block; font-size:11px; font-weight:700; border-radius:10px; padding:1px 7px; background:#e9eff5; color:#4a6b8a;}
+  .scroll{overflow-x:auto;}
+  .muted{color:var(--ink-soft);}
+  .linkbtn{border:none; background:none; color:var(--rust-2, #6B7355); font-weight:700; cursor:pointer; font-family:inherit; font-size:13px; padding:0;}
+</style>
+</head>
+<body>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div><h2>Cost History</h2></div>
+    </div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="auth-error" id="loginError"></div>
+    <div class="auth-field">
+      <label for="loginEmail">Email</label>
+      <input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+  <div class="titlebar">
+    <a class="brand" href="index.html" title="Back to Alden Homes Hub">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div>
+        <h1>Cost History</h1>
+        <div class="subtitle">What finished homes actually cost</div>
+      </div>
+    </a>
+    <div class="titlebar-stats">
+      <div class="stat"><div class="n" id="statBuilds">0</div><div class="l">Builds</div></div>
+      
+    </div>
+    <div class="titlebar-account">
+      <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+      <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; Back to the hub</a>
+    <div class="notice" id="blockedNotice">The cost history couldn't be loaded. Check your connection and reload the page.</div>
+
+    <div class="card2">
+      <h2>What finished homes actually cost</h2>
+      <p class="lede">Every finished build, by cost code. Pick a home style to line its past builds up side by side. A home is added here from <a href="jobcost.html">Job Costing</a> once it closes.</p>
+      <div class="filters2">
+        <select id="fStyle" aria-label="Home style"></select>
+        <select id="fComm" aria-label="Development"></select>
+        <div class="seg2"><button type="button" data-norm="total" class="on">Total $</button><button type="button" data-norm="sqft">Per sq ft</button></div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+    </div>
+
+    <div class="card2" id="compareCard" style="display:none;">
+      <h2 id="compareTitle">By cost code</h2>
+      <p class="lede">The most recent builds of this style, and their average — a starting point for a new budget.</p>
+      <div class="scroll" id="compare"></div>
+    </div>
+
+    <div class="card2">
+      <h2 id="buildsTitle">Builds</h2>
+      <div class="scroll" id="builds"><p class="muted" style="margin-top:12px;">Loading…</p></div>
+    </div>
+
+    <footer>Alden Homes internal tools — the same history for everyone on the team.</footer>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+
+/* ============================================================
+   COST HISTORY
+   What finished homes actually cost, by cost code: the owner's 136 past builds to start with, then each home added from
+   Job Costing when it closes. Kept on the server (cost-history, through hubApi), like job costs.
+   ============================================================ */
+const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
+let builds = [], norm = 'total', jobs = [];
+const $ = id => document.getElementById(id);
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+const money = n=>(n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+function setSyncStatus(state){ $('syncDot').classList.toggle('offline', state==='offline'); $('syncLabel').textContent = state==='offline' ? 'Offline' : (state==='saving' ? 'Saving…' : 'Synced'); }
+async function api(body){
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(HUB_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify(body) });
+  if(!res.ok) throw new Error('hubApi ' + res.status);
+  return res.json();
+}
+async function loadBuilds(){
+  try{ builds = (await api({ action:'historyList' })).builds || []; $('blockedNotice').classList.remove('show'); }
+  catch(err){ console.error(err); $('blockedNotice').classList.add('show'); builds = []; }
+  fillFilters(); render();
+}
+const ageYears = d=>(Date.now() - new Date(d + 'T12:00:00')) / (365.25 * 864e5);
+const ageTag = d=>{ const y = ageYears(d); return `<span class="age ${y > 3 ? 'old' : y > 1.5 ? 'mid' : ''}">${y < 1 ? Math.max(1, Math.round(y * 12)) + ' mo' : (Math.round(y * 10) / 10) + ' yr'}</span>`; };
+const per = (amt, b)=>norm === 'sqft' ? (b.sqft ? amt / b.sqft : null) : amt;
+const show = v=>v == null ? '—' : norm === 'sqft' ? '$' + v.toFixed(2) : money(v);
+function fillFilters(){
+  const keep = (id, html)=>{ const el = $(id), v = el.value; el.innerHTML = html; if([...el.options].some(o=>o.value === v)) el.value = v; };
+  const styles = [...new Set(builds.map(b=>b.base || b.model).filter(Boolean))].sort((a, b)=>a.localeCompare(b));
+  keep('fStyle', '<option value="">All home styles</option>' + styles.map(s=>`<option>${esc(s)}</option>`).join(''));
+  const comms = [...new Set(builds.map(b=>b.comm).filter(Boolean))].sort();
+  keep('fComm', '<option value="">All developments</option>' + comms.map(c=>`<option>${esc(c)}</option>`).join(''));
+}
+function render(){
+  const style = $('fStyle').value, comm = $('fComm').value;
+  const list = builds.filter(b=>(!style || (b.base || b.model) === style) && (!comm || b.comm === comm)).sort((a, b)=>String(b.date).localeCompare(String(a.date)));
+  const withSf = list.filter(b=>b.sqft), gps = list.filter(b=>typeof b.gp === 'number');
+  const avg = a=>a.length ? a.reduce((t, x)=>t + x, 0) / a.length : 0;
+  $('statBuilds').textContent = builds.length;
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="l">Builds</div><div class="v">${list.length}</div></div>
+    <div class="kpi"><div class="l">Average cost</div><div class="v">${list.length ? money(avg(list.map(b=>b.total))) : '—'}</div></div>
+    <div class="kpi"><div class="l">Average per sq ft</div><div class="v">${withSf.length ? '$' + avg(withSf.map(b=>b.total / b.sqft)).toFixed(2) : '—'}</div></div>
+    <div class="kpi"><div class="l">Average gross profit</div><div class="v">${gps.length ? (avg(gps.map(b=>b.gp)) * 100).toFixed(1) + '%' : '—'}</div></div>`;
+  // the builds themselves
+  $('buildsTitle').textContent = list.length === builds.length ? 'Every build' : list.length + ' build' + (list.length === 1 ? '' : 's');
+  $('builds').innerHTML = list.length ? `<table class="jc"><thead><tr><th>Finished</th><th>Home</th><th>Style</th><th class="num">Sq ft</th><th class="num">${norm === 'sqft' ? 'Per sq ft' : 'Total cost'}</th><th class="num">${norm === 'sqft' ? 'Total cost' : 'Per sq ft'}</th><th class="num">Gross profit</th><th></th></tr></thead><tbody>
+    ${list.map(b=>`<tr><td>${esc(b.date)} ${ageTag(b.date)}</td><td>${esc(b.comm)} · Lot ${esc(b.lot)}</td><td>${esc(b.model)}</td><td class="num">${b.sqft ? b.sqft.toLocaleString('en-US') : '—'}</td>
+      <td class="num"><strong>${norm === 'sqft' ? (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—') : money(b.total)}</strong></td><td class="num">${norm === 'sqft' ? money(b.total) : (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—')}</td>
+      <td class="num">${typeof b.gp === 'number' ? (b.gp * 100).toFixed(1) + '%' : '—'}</td>
+      <td>${b.source === 'quickbooks' ? `<span class="src">from QuickBooks</span> <button type="button" class="linkbtn" data-remove="${esc(b.id)}">Remove</button>` : ''}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="muted" style="margin-top:12px;">No builds match.</p>';
+  // one style: its recent builds side by side, by cost code, with the average
+  const card = $('compareCard');
+  if(!style || !list.length){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  const cols = list.slice(0, 8);
+  $('compareTitle').textContent = style + ' · by cost code';
+  const codes = {};
+  cols.forEach(b=>Object.entries(b.byCode || {}).forEach(([c, x])=>{ codes[c] = codes[c] || x.name; }));
+  const order = Object.keys(codes).sort((a, b)=>Number(a) - Number(b));
+  const cell = (b, c)=>{ const x = (b.byCode || {})[c]; return x ? per(x.total, b) : null; };
+  const rowAvg = c=>{ const v = cols.map(b=>cell(b, c)).filter(x=>x != null); return v.length ? v.reduce((t, x)=>t + x, 0) / cols.length : null; };
+  $('compare').innerHTML = `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th>${cols.map(b=>`<th class="num">${esc(b.comm)} ${esc(b.lot)}<br><span style="font-weight:400; text-transform:none; letter-spacing:0;">${esc(b.date.slice(0, 7))} ${ageTag(b.date)}</span></th>`).join('')}<th class="num avg">Average</th></tr></thead><tbody>
+    ${order.map(c=>`<tr><td>${c === '0' ? '—' : esc(c)}</td><td>${esc(codes[c])}</td>${cols.map(b=>`<td class="num">${show(cell(b, c))}</td>`).join('')}<td class="num avg">${show(rowAvg(c))}</td></tr>`).join('')}
+    <tr><td></td><td><strong>Total</strong></td>${cols.map(b=>`<td class="num"><strong>${show(per(b.total, b))}</strong></td>`).join('')}<td class="num avg">${show(avg(cols.map(b=>per(b.total, b)).filter(x=>x != null)))}</td></tr></tbody></table>
+    <p class="muted" style="font-size:12.5px; margin-top:8px;">Average = the sum across these ${cols.length} build${cols.length === 1 ? '' : 's'} divided by ${cols.length}, so a code a build didn't use counts as $0 for it.${norm === 'sqft' ? ' Per sq ft uses each build\'s own size.' : ''}</p>`;
+}
+$('fStyle').addEventListener('change', render);
+$('fComm').addEventListener('change', render);
+document.querySelector('.seg2').addEventListener('click', e=>{ const b = e.target.closest('[data-norm]'); if(!b) return; norm = b.dataset.norm; document.querySelectorAll('.seg2 button').forEach(x=>x.classList.toggle('on', x === b)); render(); });
+$('builds').addEventListener('click', async e=>{
+  const r = e.target.closest('[data-remove]'); if(!r) return;
+  if(!confirm('Take this home back out of the cost history? Its costs stay in Job Costing.')) return;
+  try{ await api({ action:'historyRemove', id:r.dataset.remove }); await loadBuilds(); } catch(err){ console.error(err); alert('Couldn\'t remove it. Check your connection and try again.'); }
+});
+
+/* ---- sign-in ---- */
+function showLoginGate(){ $('loginGate').classList.remove('hidden'); $('appShell').classList.add('locked'); }
+function showApp(user){
+  $('loginGate').classList.add('hidden');
+  $('appShell').classList.remove('locked');
+  $('currentUserEmail').textContent = user.email || '';
+}
+function doLogin(){
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const errBox = $('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){
+    errBox.textContent = 'Enter both an email and a password.';
+    errBox.classList.add('show');
+    return;
+  }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(err.code)
+      ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show');
+  });
+}
+$('loginSubmitBtn').addEventListener('click', doLogin);
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let started = false;
+firebase.auth().onAuthStateChanged(user=>{
+  // Homeowners using the public request form are signed in anonymously — they are not staff.
+  if(user && !user.isAnonymous){
+    showApp(user);
+    if(started) return;
+    started = true;
+    loadBuilds();
+  } else {
+    showLoginGate();
+  }
+});
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('Service worker registration failed', err));
+  });
+}
+</script>
+<script src="hubsearch.js"></script>
+<script src="assistant.js"></script>
+</body>
+</html>

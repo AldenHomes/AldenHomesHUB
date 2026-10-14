@@ -775,6 +775,54 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       res.json({ done, skipped });
       return;
     }
+    /* ---- Cost History: what finished homes actually cost, to set and check budgets against ----
+       cost-history/{id} = { comm, lot, model, base (home style), date (finished), sqft, gp (gross profit, 0.26 = 26%), total,
+       byCode:{ code:{ name, total, labor? } }, source:'history'|'quickbooks', houseId?, addedAt, addedBy }.
+       It starts from the 136 builds in the owner's spreadsheet (functions/cost-history-seed.json — git-excluded, real figures,
+       loaded the first time the list is asked for); closed homes are added from Job Costing. */
+    if(body.action === 'historyList'){
+      const col = db.collection('cost-history');
+      let snap = await col.get();
+      if(snap.empty){
+        let seed = [];
+        try{ seed = require('./cost-history-seed.json'); } catch(e){ /* not deployed with the starting list */ }
+        for(let i = 0; i < seed.length; i += 400){
+          const batch = db.batch();
+          seed.slice(i, i + 400).forEach(h=>{ const { id, ...rest } = h; batch.set(col.doc(id), { ...rest, addedAt: new Date().toISOString(), addedBy: 'starting history' }); });
+          await batch.commit();
+        }
+        if(seed.length) snap = await col.get();
+      }
+      res.json({ builds: snap.docs.map(d=>({ id: d.id, ...d.data() })) });
+      return;
+    }
+    if(body.action === 'historyAdd'){
+      // a home that's closed: its imported costs become a history row (replacing any earlier row for the same home)
+      const houseId = typeof body.houseId === 'string' ? body.houseId : '';
+      const [costDoc, jobDoc] = await Promise.all([db.collection('job-costs').doc(houseId || '-').get(), db.collection('jobs').doc(houseId || '-').get()]);
+      if(!houseId || !costDoc.exists || !jobDoc.exists){ res.status(404).json({ error: 'house' }); return; }
+      const c = costDoc.data(), j = jobDoc.data();
+      const num = v=>{ const x = Number(v); return isFinite(x) && x > 0 ? x : null; };
+      const byCode = {};
+      Object.entries(c.byCode || {}).forEach(([code, b])=>{ if(b && b.total) byCode[code] = { name: b.name || '', total: b.total, ...(b.labor ? { labor: b.labor } : {}) }; });
+      const model = String(body.model || j.model || '').trim().slice(0, 60);
+      const row = { comm: String(j.community || '').toUpperCase(), lot: String(j.lot || ''), model, base: model.replace(/\s*\(.*\)\s*$/, '').trim(),
+        date: /^\d{4}-\d{2}-\d{2}$/.test(body.date || '') ? body.date : (j.settle || new Date().toISOString().slice(0, 10)),
+        sqft: num(body.sqft) || num(j.sqft), gp: null, total: c.total || 0, byCode, source: 'quickbooks', houseId, project: c.project || '',
+        addedAt: new Date().toISOString(), addedBy: who.email || who.uid };
+      if(typeof body.gp === 'number' && body.gp > -1 && body.gp < 1) row.gp = body.gp;
+      await db.collection('cost-history').doc('qb-' + houseId).set(row);
+      res.json({ ok: true, id: 'qb-' + houseId });
+      return;
+    }
+    if(body.action === 'historyRemove'){
+      const id = typeof body.id === 'string' ? body.id : '';
+      // only rows added from QuickBooks can be taken out here; the starting history stays put
+      if(!/^qb-/.test(id)){ res.status(400).json({ error: 'id' }); return; }
+      await db.collection('cost-history').doc(id).delete();
+      res.json({ ok: true });
+      return;
+    }
     if(body.action === 'costsList'){
       const snap = await db.collection('job-costs').get();
       res.json({ homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
@@ -1158,8 +1206,9 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
 const DEMO_FIELDS = ['name', 'name2', 'phone', 'email', 'dev', 'lot', 'model', 'stage', 'created', 'v1Date', 'updated', 'pricedOn', 'v1Snap', 'custom', 'favs', 'cos', 'signedOn', 'quoteOk', 'line', 'basePrice'];
 // The demo's price list (read from BuilderTrend's master selections template) and its passcode are NOT in the public repo:
 // functions/demo-catalog.json and functions/.env.alden-homes-hub (DEMO_CODE=…) are git-excluded and only travel with a deploy.
-let DEMO_CATALOG = null;
+let DEMO_CATALOG = null, DEMO_COMPS = null;
 try{ DEMO_CATALOG = require('./demo-catalog.json'); } catch(e){ /* not deployed with the list: the demo says so */ }
+try{ DEMO_COMPS = require('./demo-comps.json'); } catch(e){ /* the historic-costs demo's 136 builds (git-excluded too) */ }
 const DEMO_CODE = process.env.DEMO_CODE || '';
 exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (req, res)=>{
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
@@ -1167,9 +1216,10 @@ exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (
   const id = typeof b.id === 'string' && /^L[a-z0-9]{4,12}$/.test(b.id) ? b.id : '';
   // The price list: handed over for the right passcode, or to a customer screen / shared link whose sheet exists.
   // Wrong passcodes are counted, and after 40 in an hour nobody gets in until the next hour (a 4-digit code needs that).
-  if(b.action === 'catalog'){
+  if(b.action === 'catalog' || b.action === 'comps'){
     try{
-      if(!DEMO_CATALOG || !DEMO_CODE){ res.status(503).json({ error: 'not-set-up' }); return; }
+      const wantComps = b.action === 'comps';
+      if(!(wantComps ? DEMO_COMPS : DEMO_CATALOG) || !DEMO_CODE){ res.status(503).json({ error: 'not-set-up' }); return; }
       let ok = false;
       if(typeof b.code === 'string' && b.code){
         const gate = db.collection('demo-config').doc('gate'), hour = new Date().toISOString().slice(0, 13);
@@ -1177,11 +1227,11 @@ exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (
         const fails = g.hour === hour ? (g.fails || 0) : 0;
         if(fails >= 40){ res.status(429).json({ error: 'locked' }); return; }
         if(b.code === DEMO_CODE) ok = true; else await gate.set({ hour, fails: fails + 1 });
-      } else if(id){
+      } else if(id && !wantComps){
         ok = (await db.collection('demo-selections').doc(id).get()).exists;
       }
       if(!ok){ res.status(403).json({ error: 'code' }); return; }
-      res.json({ catalog: DEMO_CATALOG });
+      res.json(wantComps ? { comps: DEMO_COMPS } : { catalog: DEMO_CATALOG });
     } catch(err){ logger.error('demoSync catalog failed', { error: String(err) }); res.status(500).json({ error: 'server' }); }
     return;
   }

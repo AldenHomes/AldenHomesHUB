@@ -394,7 +394,9 @@ function renderHomes(){
       ${open ? `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th><th class="num">Material</th><th class="num">Labor</th><th class="num">Total</th></tr></thead><tbody>
           ${codes.map(([c, b])=>`<tr><td class="num" style="text-align:left;">${c === '0' ? '—' : esc(c)}</td><td>${esc(b.name || '')}</td><td class="num">${b.material ? money2(b.material) : ''}</td><td class="num">${b.labor ? money2(b.labor) : ''}</td><td class="num">${money2(b.total)}</td></tr>`).join('')}
           <tr class="tot"><td colspan="2">Total</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.material, 0))}</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.labor, 0))}</td><td class="num">${money2(h.total || 0)}</td></tr></tbody></table>
-        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><button class="btn" data-lines="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">Show every line</button><a class="btn" href="house.html?id=${encodeURIComponent(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff; text-decoration:none;">Open the home</a></div>
+        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><button class="btn" data-lines="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">Show every line</button><a class="btn" href="house.html?id=${encodeURIComponent(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff; text-decoration:none;">Open the home</a>
+          <button class="btn" data-hist="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">${h.job && h.job.settle && h.job.settle < new Date().toISOString().slice(0, 10) ? 'Closed: add to Cost History' : 'Add to Cost History'}</button></div>
+        <div id="hist-${esc(h.houseId)}"></div>
         <div id="lines-${esc(h.houseId)}"></div>` : ''}</div>`;
   }).join('') : `<p class="muted" style="margin-top:12px;">${homes.length ? 'No homes match.' : 'Nothing imported yet. Choose the QuickBooks report above to bring costs in.'}</p>`;
 }
@@ -402,6 +404,19 @@ $('search').addEventListener('input', renderHomes);
 $('homesList').addEventListener('click', async e=>{
   const h = e.target.closest('[data-home]');
   if(h){ openHome = openHome === h.dataset.home ? '' : h.dataset.home; renderHomes(); return; }
+  const hb = e.target.closest('[data-hist]');
+  if(hb){
+    // a closed home's final costs become a row in Cost History, to compare future builds against
+    const id = hb.dataset.hist, job = jobs.find(j=>j.id === id) || {}, box = document.getElementById('hist-' + id);
+    const sqft = job.sqft || prompt('Square feet of ' + homeLabel(job) + '? (used for cost per square foot; leave blank if you don\'t know)', '') || '';
+    hb.disabled = true; hb.textContent = 'Adding…';
+    try{
+      await api({ action:'historyAdd', houseId:id, sqft: Number(String(sqft).replace(/[^\d.]/g, '')) || null });
+      box.innerHTML = '<p class="muted" style="margin-top:8px;">&#10003; Added to <a href="history.html">Cost History</a>. Adding it again later replaces it with the latest costs.</p>';
+      hb.textContent = 'Added to Cost History';
+    } catch(err){ console.error(err); hb.disabled = false; hb.textContent = 'Add to Cost History'; alert('Couldn\'t add it. Check your connection and try again.'); }
+    return;
+  }
   const lb = e.target.closest('[data-lines]');
   if(lb){
     const id = lb.dataset.lines, box = document.getElementById('lines-' + id);
