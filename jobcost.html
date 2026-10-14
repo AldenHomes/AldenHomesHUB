@@ -221,9 +221,10 @@ html, body{max-width:100%; overflow-x:clip;}
 
     <div class="card2">
       <h2>Import from QuickBooks</h2>
-      <p class="lede">Use the QuickBooks report <strong>Project costs detail</strong>, saved as Excel. Run it for <strong>All Dates</strong>: each import replaces the costs of every home in the file, so nothing is ever counted twice.</p>
+      <p class="lede">Use the QuickBooks report <strong>Project costs detail</strong>, saved as Excel. Run it for <strong>All Dates</strong>: each import replaces the costs of every home in the file, so nothing is ever counted twice.
+        A <strong>Billing Detail Report</strong> PDF from the old accounting system works too.</p>
       <div class="imp-row">
-        <label class="btn btn-primary" style="cursor:pointer;">Choose the report<input type="file" id="qbFile" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+        <label class="btn btn-primary" style="cursor:pointer;">Choose the report<input type="file" id="qbFile" accept=".xlsx,.xls,.csv,.pdf" style="display:none;"></label>
         <span class="muted" id="qbFileName" style="font-size:13.5px;"></span>
       </div>
       <div id="impPreview"></div>
@@ -343,6 +344,66 @@ async function readReport(file){
     noCode: byProject[p].filter(l=>!/^\d{1,3}\s*-|roofing|trim|siding/i.test(String(l.item))).length })) };
 }
 
+/* ---- the old accounting system's "Billing Detail Report" (PDF, one job): read with pdf.js ----
+   Rows: Billing Item | Cost Code "10-030" | Category (Material / Subcontract / Other/Utilts) | Date | Description | Vendor | Invoice | Amount
+   (a trailing "-" = negative; "(Rev)" lines reverse an earlier one). Code "10-030" = cost code 30; Subcontract counts as labor.
+   Columns are found from the heading row's positions on each page. Lines in code 10 from the same vendor + invoice as a code-10 line of
+   $50,000 or more are treated as the LOT PURCHASE and left out unless "Include the lot purchase" is ticked (owner's report for
+   CL 109 had $169,900 + $9,075.49 for the lot under Permits). */
+const CODE_NAMES = { 5:'Engineering', 10:'Permits', 12:'Excavation', 14:'Footers/Found.', 16:'Concrete', 30:'Lumber', 32:'Windows & Doors', 34:'Framing',
+  36:'Shingles', 38:'Insulation', 40:'Siding/Fascia', 41:'Railing', 42:'Brick', 44:'Spouting', 50:'Plumbing', 51:'Sprinklers', 52:'Heating', 54:'Electrical',
+  55:'Energy Star', 56:'Drywall', 57:'Special Stairs', 58:'Trim', 59:'Shelving/Mirrors', 60:'Paint', 70:'Kitchen/Vanities', 71:'Fireplace', 72:'Flooring',
+  74:'Appliances', 76:'Driveway', 78:'Landscape', 80:'Utilities', 90:'Miscellaneous', 91:'Warranty' };
+let pdfjsLib = null;
+async function loadPdfJs(){
+  if(pdfjsLib) return pdfjsLib;
+  pdfjsLib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+  return pdfjsLib;
+}
+async function readOldReport(file){
+  const pdfjs = await loadPdfJs();
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const money = t=>{ const m = String(t).match(/^([\d,]+\.\d\d)(-?)\*?$/); return m ? Number(m[1].replace(/,/g, '')) * (m[2] ? -1 : 1) : null; };
+  let project = '', reportTotal = null; const lines = [];
+  for(let p = 1; p <= doc.numPages; p++){
+    const tc = await (await doc.getPage(p)).getTextContent();
+    const rows = {};
+    tc.items.forEach(it=>{ if(!it.str.trim()) return; const y = Math.round(it.transform[5]); (rows[y] = rows[y] || []).push({ x: it.transform[4], t: it.str.trim() }); });
+    const ordered = Object.keys(rows).map(Number).sort((a, b)=>b - a).map(y=>rows[y].sort((a, b)=>a.x - b.x));
+    const head = ordered.find(r=>r.some(i=>i.t === 'Vendor') && r.some(i=>i.t === 'Invoice'));
+    if(!head) continue;
+    const at = name=>head.find(i=>i.t === name).x;
+    const vendorX = at('Vendor'), invoiceX = at('Invoice'), descX = (head.find(i=>i.t === 'Description') || { x: vendorX - 100 }).x;
+    ordered.forEach(r=>{
+      const text = r.map(i=>i.t).join(' ');
+      if(!project){ const m = text.match(/^([A-Z]{2}-\d+[A-Z]?\s.*?)\s+Project Manager/); if(m) project = m[1].replace(/\s+/g, ' ').trim(); }
+      if(/^Primary Job Totals/.test(text)) reportTotal = money(r[r.length - 1].t);
+      const codeI = r.find(i=>/^\d{2}-\d{3}$/.test(i.t)), dateI = r.find(i=>/^\d\d-\d\d-\d\d$/.test(i.t));
+      const amt = money(r[r.length - 1].t);
+      if(!codeI || !dateI || amt == null) return;
+      const code = Number(codeI.t.split('-')[1]);
+      const category = r.filter(i=>i.x > codeI.x && i.x < dateI.x).map(i=>i.t).join(' ');
+      const memo = r.filter(i=>i.x > dateI.x && i.x < vendorX - 2).map(i=>i.t).join(' ');
+      const vendor = r.filter(i=>i.x >= vendorX - 2 && i.x < invoiceX - 2).map(i=>i.t).join(' ');
+      const num = r.filter(i=>i.x >= invoiceX - 2 && i !== r[r.length - 1]).map(i=>i.t).join(' ');
+      const [mm, dd, yy] = dateI.t.split('-');
+      const labor = /subcontract/i.test(category);
+      lines.push({ date: '20' + yy + '-' + mm + '-' + dd, vendor, type: category, num, account: category, memo,
+        item: code + ' - ' + (CODE_NAMES[code] || 'Code ' + code) + (labor ? ' Labor' : ''), amount: amt });
+    });
+  }
+  if(!project || !lines.length) throw new Error('This PDF doesn\'t look like a Billing Detail Report from the old accounting system.');
+  // the lot purchase: big code-10 lines, plus anything else in code 10 on the same vendor + invoice
+  const big = lines.filter(l=>/^10 - /.test(l.item) && l.amount >= 50000).map(l=>l.vendor + '|' + l.num);
+  lines.forEach(l=>{ if(/^10 - /.test(l.item) && big.includes(l.vendor + '|' + l.num)) l.lot = true; });
+  const total = lines.reduce((t, l)=>t + l.amount, 0);
+  return { range: 'All Dates (old accounting system report)', source: file.name, projects: [{ project, lines, total, houseId: matchHome(project), noCode: 0,
+    lotTotal: lines.filter(l=>l.lot).reduce((t, l)=>t + l.amount, 0), withLot: false, reportTotal }] };
+}
+const projLines = p=>p.withLot ? p.lines : p.lines.filter(l=>!l.lot);
+const projTotal = p=>projLines(p).reduce((t, l)=>t + l.amount, 0);
+
 /* ---- the preview before anything is saved ---- */
 function renderPlan(){
   const box = $('impPreview');
@@ -352,11 +413,14 @@ function renderPlan(){
   const go = plan.projects.filter(p=>p.houseId), unmatched = plan.projects.filter(p=>!p.houseId), replacing = go.filter(p=>homes.some(h=>h.houseId === p.houseId));
   box.innerHTML = `
     ${!/all dates/i.test(plan.range) ? `<div class="imp-warn"><strong>This file covers ${esc(plan.range || 'a limited period')}, not All Dates.</strong> Importing replaces each home's costs with only the lines in this file, so anything earlier would drop off. Re-run the report for All Dates unless that's what you mean to do.</div>` : ''}
+    ${plan.projects.filter(p=>p.reportTotal != null && Math.abs(p.total - p.reportTotal) > 0.5).map(p=>`<div class="imp-warn"><strong>${esc(p.project)}: the lines read add up to ${money2(p.total)} but the report's total is ${money2(p.reportTotal)}.</strong> Something on the PDF wasn't read; don't import until it's checked.</div>`).join('')}
+    ${plan.projects.filter(p=>p.lotTotal).map(p=>`<div class="imp-warn"><strong>${esc(p.project)}: ${money2(p.lotTotal)} under code 10 looks like the lot purchase.</strong> It's left out so the home compares fairly with past builds.
+      <label style="display:block; margin-top:6px; cursor:pointer;"><input type="checkbox" data-lot="${plan.projects.indexOf(p)}" ${p.withLot ? 'checked' : ''}> Include the lot purchase</label></div>`).join('')}
     ${unmatched.length ? `<div class="imp-warn"><strong>${unmatched.length} project${unmatched.length === 1 ? '' : 's'} couldn't be matched to a home.</strong> Pick the home for each one, or leave it on Skip.</div>` : ''}
     <table class="jc"><thead><tr><th>QuickBooks project</th><th>Home in the hub</th><th class="num">Lines</th><th class="num">Total</th></tr></thead><tbody>
       ${plan.projects.map((p, i)=>`<tr><td><strong>${esc(p.project)}</strong>${p.noCode ? `<div class="muted" style="font-size:12px;">${p.noCode} line${p.noCode === 1 ? '' : 's'} without a cost code</div>` : ''}</td>
-        <td><select data-pick="${i}">${opts(p.houseId)}</select></td><td class="num">${p.lines.length}</td><td class="num">${money2(p.total)}</td></tr>`).join('')}
-      <tr class="tot"><td colspan="2">${go.length} home${go.length === 1 ? '' : 's'} will be imported${replacing.length ? ` (${replacing.length} already ha${replacing.length === 1 ? 's' : 've'} costs, which will be replaced)` : ''}</td><td class="num">${go.reduce((t, p)=>t + p.lines.length, 0)}</td><td class="num">${money2(go.reduce((t, p)=>t + p.total, 0))}</td></tr>
+        <td><select data-pick="${i}">${opts(p.houseId)}</select></td><td class="num">${projLines(p).length}</td><td class="num">${money2(projTotal(p))}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="2">${go.length} home${go.length === 1 ? '' : 's'} will be imported${replacing.length ? ` (${replacing.length} already ha${replacing.length === 1 ? 's' : 've'} costs, which will be replaced)` : ''}</td><td class="num">${go.reduce((t, p)=>t + projLines(p).length, 0)}</td><td class="num">${money2(go.reduce((t, p)=>t + projTotal(p), 0))}</td></tr>
     </tbody></table>
     <div class="imp-row"><button class="btn btn-primary" id="impGo" ${go.length ? '' : 'disabled'}>Import ${go.length} home${go.length === 1 ? '' : 's'}</button><button class="btn" id="impCancel" style="border:1px solid var(--steel-line); background:#fff;">Cancel</button></div>`;
 }
@@ -364,11 +428,11 @@ $('qbFile').addEventListener('change', async e=>{
   const f = e.target.files[0]; e.target.value = '';
   if(!f) return;
   $('qbFileName').textContent = 'Reading ' + f.name + '…';
-  try{ plan = await readReport(f); $('qbFileName').textContent = f.name + ' · ' + plan.projects.length + ' project' + (plan.projects.length === 1 ? '' : 's') + (plan.range ? ' · ' + plan.range : ''); }
+  try{ plan = /\.pdf$/i.test(f.name) ? await readOldReport(f) : await readReport(f); $('qbFileName').textContent = f.name + ' · ' + plan.projects.length + ' project' + (plan.projects.length === 1 ? '' : 's') + (plan.range ? ' · ' + plan.range : ''); }
   catch(err){ console.error(err); plan = null; $('qbFileName').textContent = ''; $('impPreview').innerHTML = `<div class="imp-warn">${esc(err.message || 'That file couldn\'t be read.')}</div>`; return; }
   renderPlan();
 });
-$('impPreview').addEventListener('change', e=>{ const s = e.target.closest('[data-pick]'); if(s && plan){ plan.projects[Number(s.dataset.pick)].houseId = s.value; renderPlan(); } });
+$('impPreview').addEventListener('change', e=>{ const lb = e.target.closest('[data-lot]'); if(lb && plan){ plan.projects[Number(lb.dataset.lot)].withLot = lb.checked; renderPlan(); return; } const s = e.target.closest('[data-pick]'); if(s && plan){ plan.projects[Number(s.dataset.pick)].houseId = s.value; renderPlan(); } });
 $('impPreview').addEventListener('click', async e=>{
   if(e.target.closest('#impCancel')){ plan = null; $('qbFileName').textContent = ''; renderPlan(); return; }
   if(!e.target.closest('#impGo') || !plan) return;
@@ -378,7 +442,7 @@ $('impPreview').addEventListener('click', async e=>{
     // a few homes per call, so a large report doesn't make one huge request
     let done = 0;
     for(let i = 0; i < go.length; i += 10){
-      const part = go.slice(i, i + 10).map(p=>({ houseId:p.houseId, project:p.project, label: homeLabel(jobs.find(j=>j.id === p.houseId) || {}), lines:p.lines }));
+      const part = go.slice(i, i + 10).map(p=>({ houseId:p.houseId, project:p.project, label: homeLabel(jobs.find(j=>j.id === p.houseId) || {}), lines: projLines(p).map(({ lot, ...l })=>l) }));
       done += ((await api({ action:'costsImport', source: plan.source, houses: part })).done || []).length;
     }
     $('impPreview').innerHTML = `<div class="imp-ok">Imported ${done} home${done === 1 ? '' : 's'} from ${esc(plan.source)}.</div>`;
