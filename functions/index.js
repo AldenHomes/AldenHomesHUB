@@ -708,6 +708,33 @@ function staffName(user){
      older homes can be years out of date). A code the last home didn't have comes from the most recent home that did. `avg` keeps
      its name so the pages didn't have to change; it is that one home's amount.
    - last: { from, date } = the last home built. The home itself is left out when it's already in Cost History. */
+/* Sale prices of homes closed in the past year, read from BuilderTrend's Job Price Summary (2026-10-14): functions/bt-sales.json,
+   git-excluded like the seed, keyed "AP 103" = { btId, base, selTotal, coTotal, final, lines:[{ bt, title, choice, price }], cos:[{ title, price, date }] }.
+   Written ONCE (marker import-log/bt-sales-2026-10) onto the matching cost-history rows as sale / saleBase / saleLines / saleCOs ...
+   (the spreadsheet's own gp is left alone), and onto job-sales for homes in the hub's list that have no sale price yet. */
+let BT_SALES = null;
+try{ BT_SALES = require('./bt-sales.json'); } catch(e){ /* not deployed with it */ }
+async function applyBtSales(){
+  if(!BT_SALES) return;
+  const mark = db.collection('import-log').doc('bt-sales-2026-10');
+  if((await mark.get()).exists) return;
+  const [hist, jobs, sales] = await Promise.all([db.collection('cost-history').get(), db.collection('jobs').get(), db.collection('job-sales').get()]);
+  if(hist.empty) return;   // the starting history is written first (historyList)
+  const lotKey = l=>String(l == null ? '' : l).toLowerCase().replace(/lot|#|\s/g, '').replace(/^0+(?=\d)/, '');
+  const find = (comm, lot)=>Object.entries(BT_SALES).find(([k])=>{ const [c, n] = k.split(' '); return c === String(comm || '').toUpperCase() && lotKey(n) === lotKey(lot); });
+  const now = new Date().toISOString(), had = new Set(sales.docs.map(d=>d.id));
+  const batch = db.batch(); let rows = 0, homes = 0;
+  hist.docs.forEach(d=>{ const h = d.data(), hit = find(h.comm, h.lot); if(!hit) return; const x = hit[1];
+    batch.update(d.ref, { sale: x.final, saleBase: x.base, saleSelections: x.selTotal, saleChangeOrders: x.coTotal, saleLines: x.lines, saleCOs: x.cos,
+      btJobId: x.btId, saleSource: 'buildertrend', saleAt: now }); rows++; });
+  jobs.docs.forEach(d=>{ const j = d.data(), hit = find(j.community, j.lot); if(!hit || had.has(d.id)) return; const x = hit[1];
+    batch.set(db.collection('job-sales').doc(d.id), { price: x.final, lines: [{ bt: '', title: 'Base price', choice: '', price: x.base }, ...x.lines,
+      ...x.cos.map(c=>({ bt: 'CO', title: 'Change order', choice: c.title, price: c.price }))], source: 'buildertrend',
+      note: 'From the BuilderTrend Job Price Summary', setAt: now, setBy: 'BuilderTrend import' }); homes++; });
+  batch.set(mark, { at: now, rows, homes });
+  await batch.commit();
+  logger.info('BuilderTrend sale prices applied', { rows, homes });
+}
 async function historyBuilds(){
   let builds = (await db.collection('cost-history').get()).docs.map(d=>d.data());
   if(!builds.length){ try{ builds = require('./cost-history-seed.json'); } catch(e){ /* no starting list deployed */ } }
@@ -850,6 +877,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         }
         if(seed.length) snap = await col.get();
       }
+      if(BT_SALES){ await applyBtSales(); snap = await col.get(); }
       res.json({ builds: snap.docs.map(d=>({ id: d.id, ...d.data() })) });
       return;
     }
@@ -902,6 +930,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       return;
     }
     if(body.action === 'costsList'){
+      await applyBtSales().catch(err=>logger.error('BuilderTrend sale prices not applied', err));
       const [snap, sales, jobsSnap, builds] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get(), db.collection('jobs').get(), historyBuilds()]);
       const sold = {}; sales.docs.forEach(d=>{ sold[d.id] = d.data().price; });
       // the usual cost per code for each home's style, so the list can flag codes running over

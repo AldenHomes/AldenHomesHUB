@@ -296,6 +296,16 @@ function fillFilters(){
   const comms = [...new Set(builds.map(b=>b.comm).filter(Boolean))].sort();
   keep('fComm', '<option value="">All developments</option>' + comms.map(c=>`<option>${esc(c)}</option>`).join(''));
 }
+/* what a home sold for, from BuilderTrend's Job Price Summary: base price, each selection, change orders */
+let openSale = '';
+function saleRow(b){
+  const lines = (b.saleLines || []).filter(l=>l.price), free = (b.saleLines || []).length - lines.length;
+  return `<tr><td colspan="9" style="background:#faf8f2;">
+    <div style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin-bottom:6px;"><span>Base price <b>${money(b.saleBase || 0)}</b></span><span>Selections <b>${money(b.saleSelections || 0)}</b></span><span>Change orders <b>${money(b.saleChangeOrders || 0)}</b></span><span>Sold for <b>${money(b.sale)}</b></span>${b.total ? `<span>Sale minus cost <b>${((b.sale - b.total) / b.sale * 100).toFixed(1)}%</b></span>` : ''}</div>
+    <table class="jc" style="margin:0;"><tbody>${lines.map(l=>`<tr><td style="width:46px;">${esc(l.bt)}</td><td>${esc(l.title)}</td><td>${esc(l.choice)}</td><td class="num">${money(l.price)}</td></tr>`).join('')}
+      ${(b.saleCOs || []).map(c=>`<tr><td>CO</td><td>Change order</td><td>${esc(c.title)}</td><td class="num">${money(c.price)}</td></tr>`).join('')}</tbody></table>
+    <div class="muted" style="font-size:12px; margin-top:4px;">From BuilderTrend's Job Price Summary${free ? ` · ${free} no-charge choice${free === 1 ? '' : 's'} not listed` : ''}.</div></td></tr>`;
+}
 function render(){
   const style = $('fStyle').value, comm = $('fComm').value;
   const list = builds.filter(b=>(!style || (b.base || b.model) === style) && (!comm || b.comm === comm)).sort((a, b)=>String(b.date).localeCompare(String(a.date)));
@@ -309,11 +319,12 @@ function render(){
     <div class="kpi"><div class="l">Average gross profit</div><div class="v">${gps.length ? (avg(gps.map(b=>b.gp)) * 100).toFixed(1) + '%' : '—'}</div></div>`;
   // the builds themselves
   $('buildsTitle').textContent = list.length === builds.length ? 'Every build' : list.length + ' build' + (list.length === 1 ? '' : 's');
-  $('builds').innerHTML = list.length ? `<table class="jc"><thead><tr><th>Finished</th><th>Home</th><th>Style</th><th class="num">Sq ft</th><th class="num">${norm === 'sqft' ? 'Per sq ft' : 'Total cost'}</th><th class="num">${norm === 'sqft' ? 'Total cost' : 'Per sq ft'}</th><th class="num">Gross profit</th><th></th></tr></thead><tbody>
+  $('builds').innerHTML = list.length ? `<table class="jc"><thead><tr><th>Finished</th><th>Home</th><th>Style</th><th class="num">Sq ft</th><th class="num">${norm === 'sqft' ? 'Per sq ft' : 'Total cost'}</th><th class="num">${norm === 'sqft' ? 'Total cost' : 'Per sq ft'}</th><th class="num">Sold for</th><th class="num">Gross profit</th><th></th></tr></thead><tbody>
     ${list.map(b=>`<tr><td>${esc(b.date)} ${ageTag(b.date)}</td><td>${esc(b.comm)} · Lot ${esc(b.lot)}</td><td>${esc(b.model)}</td><td class="num">${b.sqft ? b.sqft.toLocaleString('en-US') : '—'}</td>
       <td class="num"><strong>${norm === 'sqft' ? (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—') : money(b.total)}</strong></td><td class="num">${norm === 'sqft' ? money(b.total) : (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—')}</td>
+      <td class="num">${b.sale ? `<a href="#" data-sold="${esc(b.id)}" title="See the selections">${money(b.sale)}</a>` : '—'}</td>
       <td class="num">${typeof b.gp === 'number' ? (b.gp * 100).toFixed(1) + '%' : '—'}</td>
-      <td>${b.source === 'quickbooks' ? `<span class="src">from QuickBooks</span> <button type="button" class="linkbtn" data-remove="${esc(b.id)}">Remove</button>` : ''}</td></tr>`).join('')}</tbody></table>`
+      <td>${b.source === 'quickbooks' ? `<span class="src">from QuickBooks</span> <button type="button" class="linkbtn" data-remove="${esc(b.id)}">Remove</button>` : ''}</td></tr>${openSale === b.id ? saleRow(b) : ''}`).join('')}</tbody></table>`
     : '<p class="muted" style="margin-top:12px;">No builds match.</p>';
   // one style: its recent builds side by side, by cost code, with the average
   const card = $('compareCard');
@@ -335,6 +346,8 @@ $('fStyle').addEventListener('change', render);
 $('fComm').addEventListener('change', render);
 document.querySelector('.seg2').addEventListener('click', e=>{ const b = e.target.closest('[data-norm]'); if(!b) return; norm = b.dataset.norm; document.querySelectorAll('.seg2 button').forEach(x=>x.classList.toggle('on', x === b)); render(); });
 $('builds').addEventListener('click', async e=>{
+  const sd = e.target.closest('[data-sold]');
+  if(sd){ e.preventDefault(); openSale = openSale === sd.dataset.sold ? '' : sd.dataset.sold; render(); return; }
   const r = e.target.closest('[data-remove]'); if(!r) return;
   if(!confirm('Take this home back out of the cost history? Its costs stay in Job Costing.')) return;
   try{ await api({ action:'historyRemove', id:r.dataset.remove }); await loadBuilds(); } catch(err){ console.error(err); alert('Couldn\'t remove it. Check your connection and try again.'); }
