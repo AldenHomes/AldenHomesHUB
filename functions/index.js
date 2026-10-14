@@ -989,7 +989,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       if(typeof body.gp === 'number' && body.gp > -1 && body.gp < 1) row.gp = body.gp;
       row.overhead = await getOverhead();
       if(typeof body.gp === 'number' && body.gp > -1 && body.gp < 1){ /* given */ }
-      else if(saleDoc.exists && saleDoc.data().price > 0){ row.sale = saleDoc.data().price; row.gp = Math.round((row.sale - row.total - row.overhead - (c.lotCost || 0)) / row.sale * 10000) / 10000; }
+      else if(saleDoc.exists && saleDoc.data().price > 0){ row.sale = saleDoc.data().price; row.gp = Math.round((row.sale - (c.lotCost || 0) - row.total - row.overhead) / (row.sale - (c.lotCost || 0)) * 10000) / 10000; }   // the lot comes off the sale before dividing (office's method)
       if(c.lotCost) row.lotCost = c.lotCost;
       await db.collection('cost-history').doc('qb-' + houseId).set(row);
       res.json({ ok: true, id: 'qb-' + houseId });
