@@ -347,8 +347,8 @@ async function readReport(file){
 /* ---- the old accounting system's "Billing Detail Report" (PDF, one job): read with pdf.js ----
    Rows: Billing Item | Cost Code "10-030" | Category (Material / Subcontract / Other/Utilts) | Date | Description | Vendor | Invoice | Amount
    (a trailing "-" = negative; "(Rev)" lines reverse an earlier one). Code "10-030" = cost code 30; Subcontract counts as labor.
-   Columns are found from the heading row's positions on each page. Lines in code 10 from the same vendor + invoice as a code-10 line of
-   $50,000 or more are treated as the LOT PURCHASE, ALWAYS left out of the costs (owner, 2026-10-14) and sent as lotCost (owner's report for
+   Columns are found from the heading row's positions on each page. A code-10 line of $50,000 or more is the LOT PURCHASE (the
+   lot's closing costs on the same bill stay in as ordinary costs — owner, 2026-10-14), ALWAYS left out of the costs (owner, 2026-10-14) and sent as lotCost (owner's report for
    CL 109 had $169,900 + $9,075.49 for the lot under Permits). */
 const CODE_NAMES = { 5:'Engineering', 10:'Permits', 12:'Excavation', 14:'Footers/Found.', 16:'Concrete', 30:'Lumber', 32:'Windows & Doors', 34:'Framing',
   36:'Shingles', 38:'Insulation', 40:'Siding/Fascia', 41:'Railing', 42:'Brick', 44:'Spouting', 50:'Plumbing', 51:'Sprinklers', 52:'Heating', 54:'Electrical',
@@ -394,9 +394,8 @@ async function readOldReport(file){
     });
   }
   if(!project || !lines.length) throw new Error('This PDF doesn\'t look like a Billing Detail Report from the old accounting system.');
-  // the lot purchase: big code-10 lines, plus anything else in code 10 on the same vendor + invoice
-  const big = lines.filter(l=>/^10 - /.test(l.item) && l.amount >= 50000).map(l=>l.vendor + '|' + l.num);
-  lines.forEach(l=>{ if(/^10 - /.test(l.item) && big.includes(l.vendor + '|' + l.num)) l.lot = true; });
+  // the lot purchase: code-10 lines of $50,000 or more. Its closing costs (smaller lines on the same bill) stay in as costs (owner, 2026-10-14)
+  lines.forEach(l=>{ if(/^10 - /.test(l.item) && l.amount >= 50000) l.lot = true; });
   const total = lines.reduce((t, l)=>t + l.amount, 0);
   return { range: 'All Dates (old accounting system report)', source: file.name, projects: [{ project, lines, total, houseId: matchHome(project), noCode: 0,
     lotTotal: lines.filter(l=>l.lot).reduce((t, l)=>t + l.amount, 0), withLot: false, reportTotal }] };
