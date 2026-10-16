@@ -1034,6 +1034,29 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       res.json({ sold, targets, overhead: await getOverhead(), homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, lotCost: c.lotCost || 0, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
       return;
     }
+    /* ---- Alden stats: who the money goes to, from the invoices imported into Job Costing (job-costs lines). Per vendor: total
+       spent, homes, invoices (distinct invoice numbers per home; a line without one counts on its own), lines, and the cost code
+       most of it went to. Also the sale prices on file (job-sales), so the page can total what's contracted. */
+    if(body.action === 'vendorStats'){
+      const [costs, sales] = await Promise.all([db.collection('job-costs').get(), db.collection('job-sales').get()]);
+      const v = {};
+      costs.docs.forEach(d=>{ (d.data().lines || []).forEach((l, i)=>{
+        const name = String(l.vendor || '').trim() || '(no vendor named)';
+        const x = v[name] = v[name] || { name, total:0, homes:{}, invoices:{}, lines:0, codes:{} };
+        const amt = Number(l.amount) || 0;
+        x.total += amt; x.homes[d.id] = 1; x.lines++;
+        x.invoices[d.id + '|' + (String(l.num || '').trim() || '#' + i)] = 1;
+        const code = (String(l.item || '').match(/^(\d{1,3})\s*-\s*([^]*?)(\s+labor)?$/i) || []);
+        const key = code[1] ? code[1] + ' · ' + code[2].trim() : (l.item || 'No code');
+        x.codes[key] = (x.codes[key] || 0) + amt;
+      }); });
+      const vendors = Object.values(v).map(x=>{ const top = Object.entries(x.codes).sort((a, b)=>b[1] - a[1])[0] || ['', 0];
+        return { name: x.name, total: Math.round(x.total * 100) / 100, homes: Object.keys(x.homes).length, invoices: Object.keys(x.invoices).length, lines: x.lines, topCode: top[0] }; })
+        .sort((a, b)=>b.total - a.total);
+      const sold = {}; sales.docs.forEach(d=>{ const p = d.data().price; if(p > 0) sold[d.id] = p; });
+      res.json({ homes: costs.size, vendors: vendors.slice(0, 150), vendorCount: vendors.length, sold });
+      return;
+    }
     if(body.action === 'costSettings'){
       if(body.overhead !== undefined){
         const v = Math.round(Number(body.overhead) * 100) / 100;

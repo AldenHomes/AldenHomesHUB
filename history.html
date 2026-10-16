@@ -172,6 +172,22 @@ html, body{max-width:100%; overflow-x:clip;}
   .src{display:inline-block; font-size:11px; font-weight:700; border-radius:10px; padding:1px 7px; background:#e9eff5; color:#4a6b8a;}
   .scroll{overflow-x:auto;}
   .muted{color:var(--ink-soft);}
+  /* Alden stats */
+  .tabs2{display:inline-flex; border:1px solid var(--steel-line); border-radius:22px; overflow:hidden; background:#fff; margin-top:14px;}
+  .tabs2 button{border:none; background:none; padding:9px 18px; font-size:14px; font-weight:700; color:var(--ink-soft); font-family:inherit; cursor:pointer;}
+  .tabs2 button.on{background:var(--navy); color:#fff;}
+  .kpi .s{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+  .hbars{display:grid; grid-template-columns:minmax(110px, 190px) minmax(0, 1fr) auto; gap:7px 12px; align-items:center; margin-top:12px; font-size:13.5px;}
+  .hbars .n{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .hbars .b{height:14px; border-radius:0 4px 4px 0; background:#eeece6; position:relative;}
+  .hbars .b > span{position:absolute; left:0; top:0; bottom:0; border-radius:0 4px 4px 0; background:var(--navy);}
+  .hbars .a{font-family:"Courier New",monospace; font-size:13px; white-space:nowrap; text-align:right; color:var(--ink);}
+  .grid2{display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:16px;}
+  .grid2 > .card2{margin-top:16px; min-width:0;}   /* lets a wide table scroll inside its box instead of stretching it */
+  .up{color:#a94438; font-weight:700;} .down{color:#27573a; font-weight:700;}
+  .note2{font-size:12.5px; color:var(--ink-soft); margin-top:8px; line-height:1.45;}
+  #tip{position:fixed; z-index:50; pointer-events:none; background:var(--navy-2); color:#fff; font-size:12.5px; line-height:1.4; padding:6px 9px; border-radius:6px; max-width:280px; display:none; box-shadow:0 4px 14px rgba(0,0,0,.18);}
+  @media (max-width:560px){ .grid2{grid-template-columns:1fr;} .hbars{grid-template-columns:minmax(90px, 120px) minmax(0, 1fr) auto;} }
   .linkbtn{border:none; background:none; color:var(--rust-2, #6B7355); font-weight:700; cursor:pointer; font-family:inherit; font-size:13px; padding:0;}
 </style>
 </head>
@@ -220,7 +236,9 @@ html, body{max-width:100%; overflow-x:clip;}
   <div class="wrap">
     <a class="back-link" href="index.html">&larr; Back to the hub</a>
     <div class="notice" id="blockedNotice">The cost history couldn't be loaded. Check your connection and reload the page.</div>
+    <div class="tabs2" id="tabs2"><button type="button" data-tab="history" class="on">Cost history</button><button type="button" data-tab="stats">Alden stats</button></div>
 
+    <div id="tabHistory">
     <div class="card2">
       <h2>What finished homes actually cost</h2>
       <p class="lede">Every finished build, by cost code. Pick a home style to line its past builds up side by side. A home is added here from <a href="jobcost.html">Job Costing</a> once it closes.</p>
@@ -242,6 +260,16 @@ html, body{max-width:100%; overflow-x:clip;}
       <h2 id="buildsTitle">Builds</h2>
       <div class="scroll" id="builds"><p class="muted" style="margin-top:12px;">Loading…</p></div>
     </div>
+    </div>
+    <div id="tabStats" hidden>
+      <div class="card2">
+        <h2>Alden stats</h2>
+        <p class="lede">What the hub's numbers say: finished builds, what buyers pick, vendors, subs, service and what's coming up. It fills in more as homes close and invoices come in. Hover over (or tap) a bar for its numbers.</p>
+        <div class="kpis" id="stHead"></div>
+      </div>
+      <div id="stBody"><p class="muted" style="margin-top:16px;">Loading…</p></div>
+    </div>
+    <div id="tip"></div>
 
     <footer>Alden Homes internal tools — the same history for everyone on the team.</footer>
   </div>
@@ -381,6 +409,165 @@ $('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(
 $('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 $('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
 
+/* ============================================================
+   ALDEN STATS (owner, 2026-10-16: "some useful info based on all the information we will be putting in the hub")
+   Built from what the hub already holds: Cost History (costs, gross profit, sale prices and selections from BuilderTrend),
+   imported invoices (vendors, through hubApi vendorStats), build schedules (subs' answers), service requests and the homes list.
+   Nothing new is stored. Every chart is one colour, bars only, with the numbers beside them and in a tooltip.
+   ============================================================ */
+let statsLoaded = false, statsData = null;
+const pct1 = n=>(n * 100).toFixed(1) + '%';
+const avgOf = a=>a.length ? a.reduce((t, x)=>t + x, 0) / a.length : null;
+const isoDaysAgo = n=>{ const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+function hbars(rows, fmt, tipOf){
+  const top = Math.max(1, ...rows.map(r=>Math.abs(r.v)));
+  return `<div class="hbars">${rows.map(r=>`<div class="n" title="${esc(r.label)}">${esc(r.label)}</div>
+    <div class="b" data-tip="${esc(tipOf ? tipOf(r) : r.label + ': ' + fmt(r.v))}"><span style="width:${Math.max(1, Math.abs(r.v) / top * 100)}%"></span></div>
+    <div class="a">${fmt(r.v)}</div>`).join('')}</div>`;
+}
+function tableOf(head, rows){
+  return `<div class="scroll"><table class="jc"><thead><tr>${head.map(h=>`<th class="${h.num ? 'num' : ''}">${esc(h.t)}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map(r=>`<tr>${r.map((c, i)=>`<td class="${head[i].num ? 'num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+const card = (title, lede, body, wide)=>`<div class="card2"${wide ? ' style="grid-column:1 / -1"' : ''}><h2>${esc(title)}</h2>${lede ? `<p class="lede">${lede}</p>` : ''}${body}</div>`;
+async function loadStats(){
+  if(statsLoaded) return; statsLoaded = true;
+  const safe = p=>p.catch(err=>{ console.error(err); return null; });
+  const [vs, jobSnap, schedSnap, subSnap, svcSnap] = await Promise.all([
+    safe(api({ action:'vendorStats' })), safe(db.collection('jobs').get()), safe(db.collection('build-schedules').get()),
+    safe(db.collection('subs').get()), safe(db.collection('service-requests').get())]);
+  const docs = s=>s ? s.docs.map(d=>({ id:d.id, ...d.data() })) : null;
+  statsData = { vs, jobs: docs(jobSnap), scheds: docs(schedSnap), subs: docs(subSnap), svc: docs(svcSnap) };
+  renderStats();
+}
+function renderStats(){
+  if(!statsData) return;
+  const today = new Date().toISOString().slice(0, 10), y1 = isoDaysAgo(365), y2 = isoDaysAgo(730);
+  const B = builds.filter(b=>b.date && b.total > 0);
+  const last = B.filter(b=>b.date >= y1), prev = B.filter(b=>b.date >= y2 && b.date < y1);
+  const psf = b=>b.sqft ? b.total / b.sqft : null;
+  const gpOf = list=>avgOf(list.filter(b=>typeof b.gp === 'number').map(b=>b.gp));
+  const vs = (now, was, f)=>now == null || was == null ? '' : `<div class="s">${now >= was ? '▲' : '▼'} from ${f(was)} the year before</div>`;
+  const lastPsf = avgOf(last.map(psf).filter(Boolean)), prevPsf = avgOf(prev.map(psf).filter(Boolean));
+  const lastCost = avgOf(last.map(b=>b.total)), prevCost = avgOf(prev.map(b=>b.total));
+  const lastGp = gpOf(last), prevGp = gpOf(prev);
+  const sold = B.filter(b=>b.sale > 0 && b.date >= y1);
+  const withSel = B.filter(b=>Array.isArray(b.saleLines));
+  const jobs = statsData.jobs || [];
+  const active = jobs.filter(j=>!j.settle || j.settle >= today);
+  const soon = active.filter(j=>j.settle && j.settle <= isoDaysAgo(-90));
+  $('stHead').innerHTML = [
+    ['Builds on file', B.length, `${B.length ? B.map(b=>b.date).sort()[0].slice(0, 4) + '–' + B.map(b=>b.date).sort().pop().slice(0, 4) : ''}`],
+    ['Closed in the last year', last.length, prev.length ? prev.length + ' the year before' : ''],
+    ['Average build cost', lastCost == null ? '—' : money(lastCost), lastCost == null ? '' : vs(lastCost, prevCost, money).replace(/<\/?div[^>]*>/g, '')],
+    ['Average cost per sq ft', lastPsf == null ? '—' : '$' + lastPsf.toFixed(2), lastPsf == null ? '' : vs(lastPsf, prevPsf, x=>'$' + x.toFixed(2)).replace(/<\/?div[^>]*>/g, '')],
+    ['Average gross profit', lastGp == null ? '—' : pct1(lastGp), lastGp == null ? '' : vs(lastGp, prevGp, pct1).replace(/<\/?div[^>]*>/g, '')],
+    ['Average sale price', sold.length ? money(avgOf(sold.map(b=>b.sale))) : '—', sold.length ? sold.length + ' homes with a sale price' : 'no sale prices yet'],
+    ['Homes being built', active.length, soon.length + ' settle in the next 90 days'],
+  ].map(([l, v, s])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`).join('');
+  const parts = [];
+
+  // 1. year by year
+  const years = [...new Set(B.map(b=>b.date.slice(0, 4)))].sort();
+  const yr = years.map(y=>{ const l = B.filter(b=>b.date.startsWith(y)); return { y, l, n:l.length, cost:avgOf(l.map(b=>b.total)), psf:avgOf(l.map(psf).filter(Boolean)), gp:gpOf(l), sale:avgOf(l.filter(b=>b.sale > 0).map(b=>b.sale)) }; });
+  parts.push(card('Year by year', 'Finished builds by the year they closed. The bars are the average cost per square foot.',
+    hbars(yr.filter(r=>r.psf).map(r=>({ label:r.y, v:r.psf, r })), v=>'$' + v.toFixed(2), x=>`${x.label}: $${x.v.toFixed(2)} per sq ft · ${x.r.n} build${x.r.n === 1 ? '' : 's'} · avg cost ${money(x.r.cost)}`)
+    + tableOf([{ t:'Year' }, { t:'Builds', num:1 }, { t:'Avg cost', num:1 }, { t:'Per sq ft', num:1 }, { t:'Avg gross profit', num:1 }, { t:'Avg sale', num:1 }],
+      yr.slice().reverse().map(r=>[r.y, r.n, money(r.cost), r.psf ? '$' + r.psf.toFixed(2) : '—', r.gp == null ? '—' : pct1(r.gp), r.sale ? money(r.sale) : '—'])), true));
+
+  // 2. by development and by home style
+  const groupBy = (key, min)=>[...new Set(B.map(key).filter(Boolean))].map(k=>{ const l = B.filter(b=>key(b) === k);
+    return { k, n:l.length, cost:avgOf(l.map(b=>b.total)), psf:avgOf(l.map(psf).filter(Boolean)), gp:gpOf(l), last:l.map(b=>b.date).sort().pop() }; })
+    .filter(g=>g.n >= (min || 1)).sort((a, b)=>b.n - a.n);
+  const gHead = first=>[{ t:first }, { t:'Builds', num:1 }, { t:'Avg cost', num:1 }, { t:'Per sq ft', num:1 }, { t:'Avg gross profit', num:1 }, { t:'Last one', num:1 }];
+  const gRow = g=>[esc(g.k), g.n, money(g.cost), g.psf ? '$' + g.psf.toFixed(2) : '—', g.gp == null ? '—' : pct1(g.gp), esc(g.last)];
+  parts.push(`<div class="grid2">${card('By development', '', tableOf(gHead('Development'), groupBy(b=>b.comm).map(gRow)))}
+    ${card('By home style', 'Styles built at least twice.', tableOf(gHead('Style'), groupBy(b=>b.base || b.model, 2).map(gRow)))}</div>`);
+
+  // 3. where the money goes, and what's moving
+  const recent = B.filter(b=>b.date >= y2), codeSum = {};
+  recent.forEach(b=>Object.entries(b.byCode || {}).forEach(([c, x])=>{ const o = codeSum[c] = codeSum[c] || { name:x.name || 'Code ' + c, t:0 }; o.t += x.total || 0; }));
+  const allT = Object.values(codeSum).reduce((t, o)=>t + o.t, 0) || 1;
+  const shares = Object.entries(codeSum).map(([c, o])=>({ label:c + ' · ' + o.name, v:o.t / allT, avg:o.t / recent.length })).sort((a, b)=>b.v - a.v).slice(0, 12);
+  const perCode = (list, c)=>{ const v = list.map(b=>(b.byCode || {})[c]).filter(x=>x && x.total > 0 && true).map(x=>x.total); return v.length >= 3 ? avgOf(v) : null; };
+  const moves = Object.keys(codeSum).map(c=>{ const a = perCode(last, c), w = perCode(prev, c); return a && w ? { c, name:codeSum[c].name, a, w, ch:(a - w) / w } : null; })
+    .filter(Boolean).sort((x, y)=>Math.abs(y.a - y.w) - Math.abs(x.a - x.w)).slice(0, 10);   // biggest dollar moves, not percentages (small codes swing a lot)
+  parts.push(`<div class="grid2">${card('Where the money goes', `Share of all building costs by cost code, for the ${recent.length} builds closed in the last two years.`,
+      hbars(shares, v=>pct1(v), x=>`${x.label}: ${pct1(x.v)} of costs · about ${money(x.avg)} a home`))}
+    ${card('Costs that moved the most', 'The cost codes whose average per home changed by the most dollars: the last year against the year before (codes on at least three homes in both years). Bigger or smaller homes can move these too.',
+      moves.length ? tableOf([{ t:'Cost code' }, { t:'Year before', num:1 }, { t:'Last year', num:1 }, { t:'Change', num:1 }],
+        moves.map(m=>[esc(m.c + ' · ' + m.name), money(m.w), money(m.a), `<span class="${m.ch > 0 ? 'up' : 'down'}">${m.ch > 0 ? '▲' : '▼'} ${money(Math.abs(m.a - m.w))} (${pct1(Math.abs(m.ch))})</span>`]))
+      : '<p class="note2">Not enough builds in both years yet.</p>')}</div>`);
+
+  // 4. what buyers choose (BuilderTrend price summaries)
+  if(withSel.length){
+    const pick = {};
+    withSel.forEach(b=>{ const seen = {}; (b.saleLines || []).filter(l=>l.price > 0).forEach(l=>{ const k = (l.title || '') + ' — ' + (l.choice || ''); if(seen[k]) return; seen[k] = 1;
+      const o = pick[k] = pick[k] || { label:k, n:0, sum:0 }; o.n++; o.sum += l.price; }); });
+    const popular = Object.values(pick).sort((a, b)=>b.n - a.n || b.sum - a.sum).slice(0, 15);
+    const sel = avgOf(withSel.map(b=>b.saleSelections || 0)), cos = avgOf(withSel.map(b=>b.saleChangeOrders || 0)), base = avgOf(withSel.filter(b=>b.saleBase > 0).map(b=>b.saleBase));
+    parts.push(card('What buyers choose', `From the ${withSel.length} homes with a BuilderTrend price summary. On average: base price ${base ? money(base) : '—'}, selections ${money(sel)}, change orders ${money(cos)}.`,
+      hbars(popular.map(p=>({ label:p.label, v:p.n / withSel.length, p })), v=>pct1(v), x=>`${x.p.label}: picked on ${x.p.n} of ${withSel.length} homes · average ${money(x.p.sum / x.p.n)}`)
+      + '<p class="note2">How many of those homes picked each one (paid choices only).</p>', true));
+  }
+
+  // 5. vendors (imported invoices)
+  const V = statsData.vs;
+  if(V && V.vendors && V.vendors.length){
+    const top = V.vendors.filter(v=>v.total > 0).slice(0, 15);
+    const misc = V.vendors.find(v=>/^misc vendor$/i.test(v.name));
+    parts.push(card('Vendors', `Spending on the invoices imported into Job Costing: ${V.vendorCount} vendors across ${V.homes} home${V.homes === 1 ? '' : 's'}.`,
+      hbars(top.map(v=>({ label:v.name, v:v.total, x:v })), money, r=>`${r.label}: ${money(r.v)} · ${r.x.homes} home${r.x.homes === 1 ? '' : 's'} · ${r.x.invoices} invoice${r.x.invoices === 1 ? '' : 's'} · mostly ${r.x.topCode}`)
+      + tableOf([{ t:'Vendor' }, { t:'Spent', num:1 }, { t:'Homes', num:1 }, { t:'Invoices', num:1 }, { t:'Mostly' }], top.map(v=>[esc(v.name), money(v.total), v.homes, v.invoices, esc(v.topCode)]))
+      + (misc ? `<p class="note2">"Misc Vendor" comes from the QuickBooks sandbox's test data; real reports name each vendor.</p>` : ''), true));
+  } else parts.push(card('Vendors', '', '<p class="note2">No invoices imported yet. Vendor spending shows here once QuickBooks reports come in through Job Costing.</p>', true));
+
+  // 6. subs' answers on sent schedules, and service requests
+  const subs = statsData.subs || [], scheds = (statsData.scheds || []).filter(s=>s.sentAt);
+  const tally = {};
+  scheds.forEach(s=>(s.tasks || []).forEach(t=>(t.subIds || []).forEach(id=>{ const o = tally[id] = tally[id] || { asked:0, yes:0, no:0, wait:0 };
+    const a = (t.confirm || {})[id]; o.asked++; if(a === 'approved') o.yes++; else if(a === 'declined') o.no++; else o.wait++; })));
+  const subRows = Object.entries(tally).map(([id, o])=>({ name:(subs.find(x=>x.id === id) || {}).name || 'Unknown vendor', ...o })).sort((a, b)=>b.asked - a.asked).slice(0, 15);
+  const svc = statsData.svc || [];
+  const done = svc.filter(r=>r.status === 'sent' && r.completedAt && r.submittedAt);
+  const days = done.map(r=>(new Date(r.completedAt) - new Date(r.submittedAt)) / 86400000).filter(d=>d >= 0);
+  const svcYear = svc.filter(r=>(r.submittedAt || '') >= y1);
+  const byVendor = {}; svc.forEach(r=>{ if(r.vendorName){ byVendor[r.vendorName] = (byVendor[r.vendorName] || 0) + 1; } });
+  parts.push(`<div class="grid2">${card('Subcontractor answers', `Jobs on schedules sent to subs (${scheds.length} home${scheds.length === 1 ? '' : 's'} so far).`,
+      subRows.length ? tableOf([{ t:'Vendor' }, { t:'Asked', num:1 }, { t:'Approved', num:1 }, { t:'Declined', num:1 }, { t:'No answer', num:1 }], subRows.map(r=>[esc(r.name), r.asked, r.yes, r.no ? `<span class="up">${r.no}</span>` : 0, r.wait]))
+      : '<p class="note2">No schedules have been sent to subs yet.</p>')}
+    ${card('Service requests', '', `<div class="kpis">
+        <div class="kpi"><div class="l">All requests</div><div class="v">${svc.length}</div><div class="s">${svcYear.length} in the last year</div></div>
+        <div class="kpi"><div class="l">Still open</div><div class="v">${svc.filter(r=>r.status !== 'sent').length}</div></div>
+        <div class="kpi"><div class="l">Days to complete</div><div class="v">${days.length ? Math.round(avgOf(days)) : '—'}</div><div class="s">${days.length ? 'average of ' + days.length : 'none completed yet'}</div></div></div>
+      ${Object.keys(byVendor).length ? hbars(Object.entries(byVendor).sort((a, b)=>b[1] - a[1]).slice(0, 8).map(([k, n])=>({ label:k, v:n })), v=>String(v), r=>`${r.label}: ${r.v} request${r.v === 1 ? '' : 's'} assigned`) + '<p class="note2">Requests assigned to each vendor.</p>' : ''}`)}</div>`);
+
+  // 7. coming up
+  const sold2 = (V && V.sold) || {};
+  const devs = [...new Set(active.map(j=>j.community || '—'))].map(d=>({ label:d, v:active.filter(j=>(j.community || '—') === d).length })).sort((a, b)=>b.v - a.v);
+  const months = []; for(let i = 0; i < 6; i++){ const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + i); const k = d.toISOString().slice(0, 7);
+    months.push({ label:d.toLocaleDateString(undefined, { month:'short', year:'numeric' }), v:active.filter(j=>(j.settle || '').startsWith(k)).length }); }
+  const contracted = active.reduce((t, j)=>t + (sold2[j.id] || 0), 0), priced = active.filter(j=>sold2[j.id]).length;
+  parts.push(`<div class="grid2">${card('Homes being built', `${active.length} homes${priced ? ` · ${money(contracted)} in sale prices on file for ${priced} of them` : ''}.`, hbars(devs, v=>String(v), r=>`${r.label}: ${r.v} home${r.v === 1 ? '' : 's'} being built`))}
+    ${card('Settlements coming up', 'Homes settling each month, from the Job Production Schedule.', hbars(months, v=>String(v), r=>`${r.label}: ${r.v} settlement${r.v === 1 ? '' : 's'}`))}</div>`);
+
+  $('stBody').innerHTML = parts.join('');
+}
+// tabs, and the tooltip on bars
+$('tabs2').addEventListener('click', e=>{ const b = e.target.closest('[data-tab]'); if(!b) return;
+  document.querySelectorAll('#tabs2 button').forEach(x=>x.classList.toggle('on', x === b));
+  const stats = b.dataset.tab === 'stats';
+  $('tabHistory').hidden = stats; $('tabStats').hidden = !stats;
+  try{ localStorage.setItem('historyTab', b.dataset.tab); } catch(err){}
+  if(stats) loadStats();
+});
+function showTip(e){ const t = e.target.closest && e.target.closest('[data-tip]'); const tip = $('tip'); if(!t){ tip.style.display = 'none'; return; }
+  tip.textContent = t.dataset.tip; tip.style.display = 'block';
+  const x = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8), y = e.clientY + 14;
+  tip.style.left = Math.max(8, x) + 'px'; tip.style.top = (y + tip.offsetHeight > window.innerHeight ? e.clientY - tip.offsetHeight - 10 : y) + 'px'; }
+document.addEventListener('mousemove', showTip);
+document.addEventListener('click', e=>{ if(e.target.closest('[data-tip]')) showTip(e); else $('tip').style.display = 'none'; });
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 let started = false;
@@ -390,7 +577,8 @@ firebase.auth().onAuthStateChanged(user=>{
     showApp(user);
     if(started) return;
     started = true;
-    loadBuilds();
+    loadBuilds().then(()=>{ let t = ''; try{ t = localStorage.getItem('historyTab') || ''; } catch(err){}
+      if(t === 'stats') document.querySelector('#tabs2 [data-tab="stats"]').click(); else if(statsData) renderStats(); });
   } else {
     showLoginGate();
   }
