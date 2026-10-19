@@ -534,6 +534,13 @@ function patioChoices(bt, list){
       : [{ t:ft.t, p:0, unit:'sq ft', rate:true, ft:ft.key, lv:0 }]);
   // under-cabinet rope lighting is priced per foot: typed in feet like the other per-foot lines
   if(bt === '514') return list.map(c=>/\(per foot\)/i.test(c.t) ? { ...c, t:c.t.replace(/\(per foot\)/i, '(per linear ft)'), unit:'ft' } : c);
+  /* Owner, 2026-10-19: the laundry tub can go in the laundry room instead of the garage (a no-charge pick that moves the question to the
+     Laundry section, see MOVE_TUB); "Standard vault/cathedral" at no charge on Additional Ceiling Options (nothing preset); the front
+     door is a standard 6' 8" or 8' (no charge, one or the other) and an 8' or 6' 8" allowance typed on the sheet (one or the other). */
+  if(bt === '156') return [...list, { t:'Move the laundry tub to the laundry room', p:0, unit:'', side:true, mv:true }];
+  if(bt === '246') return [{ t:'Standard vault/cathedral ceiling', p:0, unit:'' }, ...list];
+  if(bt === '231') return [{ t:'Standard 6\' 8" front door', p:0, unit:'', grp:'fdoor' }, { t:'Standard 8\' front door', p:0, unit:'', grp:'fdoor' },
+    { t:'8\' front door allowance', p:0, unit:'', grp:'fdallow' }, { t:'6\' 8" front door allowance', p:0, unit:'', grp:'fdallow' }];
   // stair railing (owner, 2026-10-19): both options per linear foot, priced in the back end (BT only had a flat price for one)
   if(bt === '724') return [{ t:'Standard traditional railing (per linear ft)', k:'stair-trad-lf', p:null, unit:'ft' },
     { t:'Square baluster railing (per linear ft)', k:'stair-sq-lf', p:null, unit:'ft' }];
@@ -608,7 +615,7 @@ function buildCatalog(cat){
     const std = STD_FIRST[s.bt] || [];
     sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || ['526', '600', '640', '608', '701', '740', '764', '766', '768'].includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -616,6 +623,8 @@ function buildCatalog(cat){
   { const sec = SECTIONS.find(r=>r.id === 'bsmt');
     if(sec) sec.qs.push({ id:'bstairs', bt:'', num:146, t:'Basement Stairs', cc:57, line:'', room:sec, opt:1, type:'bt', v1:1, nostep:true,
       c:[{ t:'Open stairs to basement', k:'bsmt-open', p:null, unit:'' }, { t:'Basement railing', k:'bsmt-rail', p:null, unit:'', side:true }] }); }
+  { const gar = SECTIONS.find(r=>r.id === 'gar'), lau = SECTIONS.find(r=>r.id === 'lau'), q = gar && gar.qs.find(x=>x.bt === '156');
+    if(q && lau){ q.mvHome = true; lau.qs.unshift({ ...q, room:lau, mvHome:false, mvAway:true }); } }
   // a fixture finish at the top of every bathroom (its number puts it inside the bathroom's own on/off feature)
   [['mbath', 256], ['bath2', 300], ['bath3', 340], ['powder', 379]].forEach(([rid, num])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec || !sec.qs.length) return;
     sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:72, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
@@ -710,8 +719,12 @@ function stdRow(q, L, std, active, lock){
 }
 // a selection that belongs to the other collection isn't asked
 const isLotPrem = q=>!q.num && /lot premium/i.test(q.t);
+// the laundry tub: in the garage unless "Move the laundry tub to the laundry room" is picked, then in the laundry section
+const tubMoved = (q, L)=>{ const i = q.c.findIndex(c=>c.mv); return i >= 0 && !!(L.answers[q.id + '#' + i] || {}).qty; };
 const asked = (q, L)=>{
-  if(!q.num && !isLotPrem(q)) return false;      // BuilderTrend's unnumbered "Contract Price" and "Miscellaneous" lines hold nothing
+  if(!q.num && !isLotPrem(q)) return false;
+  if(q.mvHome && tubMoved(q, L)) return false;
+  if(q.mvAway && !tubMoved(q, L)) return false;      // BuilderTrend's unnumbered "Contract Price" and "Miscellaneous" lines hold nothing
   if(q.line && L.line && q.line !== L.line && LINE_NAMES[q.line]) return false;
   if(isSkip(q, L)) return false;
   const f = featOf(q);
@@ -791,7 +804,7 @@ function prow(q, L, force){
     }
     const ctl = c.unit
       ? `<input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.unit}</span>${n && view !== 'customer' ? `<span class="cp">= ${plus(p * n)}</span>` : ''}`
-      : (n && !(q.one || q.opts || q.ceil || q.nostep) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
+      : (n && !(q.one || q.opts || q.ceil || q.nostep || c.side || c.grp) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
         + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
     return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
   }).join(''));
