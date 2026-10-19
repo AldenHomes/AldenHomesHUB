@@ -942,7 +942,7 @@ function takeRemote(sheet, sent, body){
     const q = qOfKey(theirs), a = sheet.answers[theirs];
     if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + ' — ' + snapVal(a, q, theirs)); }
   }
-  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[id^="jd_"],[data-bt-num],[data-allow],[data-rate],#floorSq,[data-floor-type],[data-floor-level],[data-note],[data-lotprem],[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
+  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('#baseIn,[id^="jd_"],[data-bt-num],[data-allow],[data-rate],#floorSq,[data-floor-type],[data-floor-level],[data-note],[data-lotprem],[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
   if(changed && !typing){ const y = window.scrollY; render(); window.scrollTo(0, y); }
   flashKey = '';
 }
@@ -1083,6 +1083,7 @@ function render(){
 }
 
 /* ---------- Home styles: set up each style's pricing sheet ---------- */
+let baseEdit = false;   // the base price box in a sheet's header is open
 let styleEdit = false, styName = STYLES.ALDEN[0], styState = '', styTimer = null;
 const styColl = name=>Object.keys(STYLES).find(k=>STYLES[k].includes(name)) || 'ALDEN';
 function stylesScreen(){
@@ -1235,7 +1236,9 @@ function leadScreen(L){
     <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
         <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</h1>
-        <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${money(base(L))}</div></div>
+        <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${baseEdit && !PRESENT && !locked(L)
+          ? `<span class="noprint" style="display:inline-flex;gap:6px;align-items:center;vertical-align:middle">$<input type="number" id="baseIn" min="0" step="100" value="${base(L) || ''}" style="width:130px;padding:6px 8px"><button type="button" class="btn sm primary" id="baseSave">Save</button><button type="button" class="btn sm" id="baseCancel">Cancel</button></span>`
+          : money(base(L)) + (!PRESENT && !locked(L) ? ' <button type="button" class="btn sm noprint" id="baseChange" style="padding:2px 9px;margin-left:4px">Change</button>' : '')}</div></div>
       <div style="text-align:right">${PRESENT ? (sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live"><i></i>Live with your Alden Homes rep</span>')
         : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">Pricing meeting ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
           <div class="noprint" style="margin-top:8px;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap">${present[L.id] ? liveBadge() : ''}<button type="button" class="btn sm" id="shareBtn">${shareOpen ? 'Hide' : present[L.id] ? 'Customer screen' : 'Open customer screen'}</button>${staff && !locked(L) ? '<button type="button" class="btn sm" id="delLead">Delete lead</button>' : ''}</div>`}</div>
@@ -1752,7 +1755,7 @@ document.addEventListener('click', async e=>{
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
     leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
-  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
+  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); baseEdit = false; cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
   if(!PRESENT){
     const setFollow = date=>{ L.follow = { date, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(date)); };
@@ -1812,6 +1815,14 @@ document.addEventListener('click', async e=>{
     return;
   }
   if(t.closest('#makeHome')){ makeHome(L); return; }
+  if(t.closest('#baseChange')){ baseEdit = true; render(); const b = $('baseIn'); if(b){ b.focus(); b.select(); } return; }
+  if(t.closest('#baseCancel')){ baseEdit = false; render(); return; }
+  if(t.closest('#baseSave')){
+    if(locked(L)) return;
+    const v = Number($('baseIn').value);
+    if($('baseIn').value === '' || !(v >= 0)){ toast('Type the base price'); return; }
+    L.basePrice = Math.round(v); baseEdit = false; touch(L); render(); toast('Base price is now ' + money(L.basePrice)); return;
+  }
   if(t.closest('#shareCopy')){ navigator.clipboard.writeText(presentUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
   if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); flushId = cur; cur = null; render(); syncTick(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
@@ -1936,7 +1947,8 @@ document.addEventListener('click', async e=>{
     if(!PRESENT) makeHome(L);
   }
 });
-document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); if(e.key === 'Enter' && (e.target.id === 'loginPass' || e.target.id === 'loginEmail')) doLogin(); });
+document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'baseIn') $('baseSave').click(); if(e.key === 'Escape' && e.target.id === 'baseIn') $('baseCancel').click();
+  if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); if(e.key === 'Enter' && (e.target.id === 'loginPass' || e.target.id === 'loginEmail')) doLogin(); });
 document.addEventListener('change', e=>{
   if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); return; }
   if(e.target.dataset && e.target.dataset.allow){
