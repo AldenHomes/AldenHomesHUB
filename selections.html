@@ -1531,7 +1531,7 @@ async function docPdf(btn, name){
       else { const sp = document.createElement('div'); sp.style.height = gap + 'px'; b.parentNode.insertBefore(sp, b); }
     }
     try{
-      await html2pdf().set({ margin:M, filename:name, image:{ type:'jpeg', quality:.95 }, html2canvas:{ scale:S, useCORS:true, backgroundColor:'#ffffff', scrollX:0, scrollY:0, windowWidth:W },
+      await html2pdf().set({ margin:M, filename:name, image:{ type:'jpeg', quality:.95 }, html2canvas:{ scale:S, useCORS:true, backgroundColor:'#ffffff', scrollX:0, scrollY:0 },
         jsPDF:{ unit:'in', format:'letter', orientation:'portrait' }, pagebreak:{ mode:[] } }).from(el).toPdf().get('pdf').then(pdf=>{
           const n = pdf.internal.getNumberOfPages();
           for(let i = 1; i <= n; i++){ pdf.setPage(i); pdf.setFontSize(8); pdf.setTextColor(140); pdf.text('Page ' + i + ' of ' + n, 8.5 - M[3], 11 - 0.25, { align:'right' }); }
