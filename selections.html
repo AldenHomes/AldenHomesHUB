@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alden Homes | Selections</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --line:#d4d2c8; --line-soft:#ece8dd; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --sage:#A3AA83; --sage-2:#6B7355; --sage-soft:#eef0e8; --amber:#c98a2b; --amber-soft:#fdf3e2;
+    --red:#a94438; --red-soft:#fbeae4; --good:#3f7a4e; --good-soft:#eaf1ec; --staff:#4a6b8a; --staff-soft:#e9eff5;
+    --shadow:0 1px 2px rgba(30,32,34,.08),0 4px 14px rgba(30,32,34,.06); --radius:8px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;font-size:16px;padding-bottom:96px}
+  h1,h2,h3,p{margin:0}
+  button,input,select,textarea{font-family:inherit;font-size:inherit}
+  button{cursor:pointer}
+  .mono{font-family:"Courier New",monospace}
+  .muted{color:var(--ink-soft)}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(12px,3vw,28px)}
+
+  .top{background:var(--paper-2);border-bottom:4px solid var(--sage);position:sticky;top:0;z-index:50}
+  .top-in{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 0}
+  .logo{font-weight:800;letter-spacing:.5px;color:var(--navy)}
+  .logo span{color:var(--sage-2)}
+  .top a{color:var(--ink-soft);text-decoration:none;font-size:13px;font-weight:600}
+  .grow{flex:1}
+  .pill{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;background:var(--amber-soft);color:#8a5d14;border-radius:20px;padding:4px 10px}
+  .viewsw{display:flex;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff}
+  .viewsw button{border:none;background:none;padding:7px 14px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .viewsw button.on{background:var(--navy);color:#fff}
+  .viewsw button.on.staff{background:var(--staff)}
+  .titlebar-account{display:flex;align-items:center;gap:10px}
+  /* the same title bar as the hub's other apps: logo (back to the hub), app name */
+  .top .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+  .top .brand img{height:36px;width:auto;display:block}
+  .brand-t{font-size:clamp(18px,2.2vw,22px);font-weight:700;color:var(--navy)}
+  .brand-s{font-size:11px;color:var(--ink-soft);letter-spacing:.6px;text-transform:uppercase;margin-top:2px}
+  body.public .top .brand{pointer-events:none}
+  body.public .brand-s{display:none}
+  body.public .staffonly, body.signedout .staffonly, body.signedout #viewSw{display:none!important}
+  .login{max-width:400px;margin:60px auto 0}
+  .login input{width:100%;padding:11px;border:1px solid var(--line);border-radius:var(--radius);margin-top:6px}
+  .login .err{color:var(--red);font-size:13.5px;min-height:20px;margin-top:8px}
+
+  .btn{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:var(--radius);padding:10px 16px;font-weight:700;font-size:14.5px}
+  .btn:hover{border-color:var(--navy)}
+  .btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+  .btn.good{background:var(--good);border-color:var(--good);color:#fff}
+  .btn.sm{padding:6px 11px;font-size:13px}
+  .btn:disabled{opacity:.45;cursor:default}
+  .card{background:var(--paper-2);box-shadow:var(--shadow);border-radius:var(--radius);padding:18px 20px;margin-top:16px}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--sage-2)}
+  h1{font-size:26px;color:var(--navy);margin-top:4px}
+  h2{font-size:18px;color:var(--navy)}
+  .lede{color:var(--ink-soft);margin-top:6px;line-height:1.5;max-width:760px}
+  label.f{display:block;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px}
+  input[type=text],input[type=tel],input[type=email],input[type=number],select,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:var(--radius);background:#fff;color:var(--ink)}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+  .chip.v1{background:var(--amber-soft);color:#8a5d14}
+  .chip.v2{background:var(--staff-soft);color:var(--staff)}
+  .chip.signed{background:var(--good-soft);color:var(--good)}
+  .chip.red{background:var(--red-soft);color:var(--red)}
+  .chip.plain{background:var(--sage-soft);color:var(--sage-2)}
+
+  /* leads list */
+  .lead{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:14px 0;border-top:1px solid var(--line-soft)}
+  .lead:first-child{border-top:none}
+  .lead .who{flex:1 1 240px;min-width:0}
+  .lead .who strong{font-size:16px;color:var(--navy)}
+  .lead .amt{font-family:"Courier New",monospace;font-weight:700;color:var(--navy);min-width:110px;text-align:right}
+
+  /* tabs */
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-top:16px;border-bottom:2px solid var(--line)}
+  .tab{border:none;background:none;padding:10px 14px;font-weight:700;font-size:14.5px;color:var(--ink-soft);border-bottom:3px solid transparent;margin-bottom:-2px}
+  .tab.on{color:var(--navy);border-bottom-color:var(--sage-2)}
+  .tab.staff{color:var(--staff)}
+  .tab.staff.on{border-bottom-color:var(--staff)}
+  .tab .n{font-size:11px;background:var(--red-soft);color:var(--red);border-radius:10px;padding:1px 7px;margin-left:5px}
+
+  /* rooms layout */
+  .rooms{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;margin-top:16px;align-items:start}
+  @media (max-width:820px){ .rooms{grid-template-columns:1fr} .roomnav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;position:static!important} .roomnav button{flex:none;width:auto;min-width:150px;background:var(--paper-2);border-color:var(--line-soft)} }
+  .roomnav{position:sticky;top:76px}
+  .roomnav button{display:block;width:100%;text-align:left;border:1px solid transparent;background:none;border-radius:var(--radius);padding:9px 11px;margin-bottom:4px;color:var(--ink)}
+  .roomnav button.on{background:var(--paper-2);border-color:var(--line);box-shadow:var(--shadow)}
+  .roomnav .rn{font-weight:700;font-size:14.5px;display:flex;justify-content:space-between;gap:8px}
+  .roomnav .rp{font-size:12px;color:var(--ink-soft);margin-top:2px}
+  .roomnav .done{color:var(--good)}
+  .roomnav .bar{height:4px;background:var(--line-soft);border-radius:2px;margin-top:6px;overflow:hidden}
+  .roomnav .bar span{display:block;height:100%;background:var(--sage-2)}
+  .deadline{font-size:12.5px;background:var(--amber-soft);color:#8a5d14;border-radius:6px;padding:7px 10px;margin-top:10px;display:inline-block}
+
+  /* questions */
+  .q{background:var(--paper-2);box-shadow:var(--shadow);border-radius:var(--radius);padding:16px 18px;margin-top:14px}
+  .q.todo{border-left:4px solid var(--amber)}
+  .q-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .q-head h3{font-size:16.5px;color:var(--navy)}
+  .q-sub{font-size:12.5px;color:var(--ink-soft);margin-top:3px}
+  .opts{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-top:12px}
+  .opt{position:relative;text-align:left;border:2px solid var(--line);background:#fff;border-radius:var(--radius);padding:0;overflow:hidden;color:var(--ink)}
+  .opt:hover{border-color:var(--sage)}
+  .opt.sel{border-color:var(--good);box-shadow:0 0 0 2px var(--good-soft)}
+  .opt:disabled{cursor:default;opacity:.85}
+  .opt .art{height:78px;background:#f7f6f1;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .opt .art svg{width:100%;height:100%}
+  .opt .txt{padding:9px 11px 10px}
+  .opt .nm{font-weight:700;font-size:14px;line-height:1.3}
+  .opt .pr{font-size:13px;margin-top:3px;font-family:"Courier New",monospace;font-weight:700;color:var(--navy)}
+  .opt .pr.inc{color:var(--good);font-family:inherit}
+  .opt .std{position:absolute;top:6px;left:6px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;background:rgba(255,255,255,.92);color:var(--good);border-radius:4px;padding:2px 6px}
+  .opt .tick{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--good);color:#fff;font-size:13px;display:none;align-items:center;justify-content:center}
+  .opt.sel .tick{display:flex}
+  .opt .fav{position:absolute;bottom:6px;right:8px;font-size:17px;color:#c9c4b5;line-height:1}
+  .opt .fav.on{color:var(--red)}
+  .staffline{font-size:11.5px;color:var(--staff);background:var(--staff-soft);border-radius:4px;padding:3px 6px;margin-top:6px;line-height:1.4}
+  .eachrow{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line-soft)}
+  .eachrow:first-of-type{border-top:none;padding-top:0}
+  .eachrow .rm{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-soft)}
+  .qty{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+  .stepper{display:flex;align-items:center;border:2px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#fff}
+  .stepper button{border:none;background:#fff;width:44px;height:44px;font-size:22px;color:var(--navy)}
+  .stepper button:disabled{opacity:.3}
+  .stepper span{min-width:48px;text-align:center;font-weight:700;font-size:18px}
+  .changed{font-size:12.5px;background:var(--amber-soft);color:#8a5d14;border-radius:6px;padding:6px 10px;margin-top:10px;display:inline-block}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  th{text-align:left;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);padding:8px 8px;border-bottom:2px solid var(--line)}
+  td{padding:9px 8px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  .num{text-align:right;font-family:"Courier New",monospace;white-space:nowrap}
+  tr.tot td{font-weight:700;border-top:2px solid var(--line);border-bottom:none}
+  tr.grp td{background:#faf8f2;font-weight:700;color:var(--navy);font-size:13px}
+  td.st, th.st{color:var(--staff)}
+
+  .banner{border-radius:var(--radius);padding:14px 16px;margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .banner.amber{background:var(--amber-soft);border:1px solid #ecd9b0;color:#6e4a10}
+  .banner.good{background:var(--good-soft);border:1px solid #c5dccb;color:#27573a}
+  .banner.staff{background:var(--staff-soft);border:1px solid #c9d8e6;color:#2c4a66}
+  .banner p{flex:1 1 280px;line-height:1.45;font-size:14.5px}
+
+  .totalbar{position:fixed;left:0;right:0;bottom:0;background:var(--paper-2);border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(30,32,34,.08);z-index:40}
+  .totalbar .in{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 0}
+  .totalbar .big{font-family:"Courier New",monospace;font-size:24px;font-weight:700;color:var(--navy)}
+  .totalbar .sub{font-size:12.5px;color:var(--ink-soft)}
+  .toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:var(--navy-2);color:#fff;padding:10px 18px;border-radius:22px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:80}
+  .toast.show{opacity:1}
+  /* the customer's own screen: bigger, nothing but their choices */
+  body.present{font-size:18px}
+  body.present .opts{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  body.present .opt .art{height:130px}
+  body.present .opt .nm{font-size:17px}
+  body.present .opt .pr{font-size:16px}
+  body.present .q-head h3{font-size:21px}
+  body.present .q{padding:20px 22px}
+  body.present #viewSw, body.present .top a:not(.brand), body.present .pill{display:none}
+  .live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--good)}
+  .live i{width:9px;height:9px;border-radius:50%;background:var(--good);animation:livePulse 1.6s ease-in-out infinite}
+  @keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(63,122,78,.5)}50%{box-shadow:0 0 0 7px rgba(63,122,78,0)}}
+  .opt.flash{animation:optFlash 1.6s ease-out}
+  @keyframes optFlash{0%{box-shadow:0 0 0 6px rgba(201,138,43,.75)}100%{box-shadow:0 0 0 2px var(--good-soft)}}
+  .sharebox{background:var(--staff-soft);border:1px solid #c9d8e6;border-radius:var(--radius);padding:14px 16px;margin-top:14px;color:#2c4a66}
+  .sharebox input{font-family:"Courier New",monospace;font-size:13px;margin-top:8px}
+  /* the shareable selection sheet (?show=LEAD): no prices, made to be passed around */
+  body.show{background:#fff;padding-bottom:0}
+  body.show .top, body.show .totalbar{display:none!important}
+  body.show #root{max-width:none;padding:0}
+  .sh, .sh *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sh-hero{background:linear-gradient(155deg,#2b2e31 0%,#4B4F54 55%,#646b4e 100%);color:#fff;padding:40px 0 48px;text-align:center}
+  .sh-logo{display:block;width:fit-content;margin:0 auto;background:#fff;border-radius:10px;padding:12px 22px}
+  .sh-logo img{height:58px;display:block}
+  .sh-kicker{letter-spacing:3.5px;text-transform:uppercase;font-size:12px;font-weight:700;color:#cfd3b8;margin-top:30px}
+  .sh-title{font-family:Georgia,"Times New Roman",serif;font-size:clamp(36px,7vw,62px);font-weight:700;line-height:1.05;margin-top:10px;color:#fff}
+  .sh-sub{color:#e9ebdf;margin-top:14px;font-size:17px}
+  .sh-stats{display:flex;justify-content:center;gap:clamp(22px,6vw,64px);flex-wrap:wrap;margin-top:32px}
+  .sh-stat b{display:block;font-family:Georgia,serif;font-size:38px;line-height:1;color:#fff}
+  .sh-stat span{display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#cfd3b8;margin-top:7px}
+  .sh-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+  .sh-actions button{border:none;border-radius:24px;padding:12px 22px;font-weight:700;font-size:15px;background:#fff;color:var(--navy)}
+  .sh-actions button.alt{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.6)}
+  .sh-sec{padding:40px 0 4px}
+  .sh-sec h2{font-family:Georgia,serif;font-size:29px;color:var(--navy);display:flex;align-items:center;gap:14px}
+  .sh-sec h2:after{content:"";flex:1;height:2px;background:var(--sage)}
+  .sh-lede{color:var(--ink-soft);margin-top:8px;font-size:16px;max-width:680px;line-height:1.5}
+  .sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;margin-top:20px}
+  .sh-grid.big{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .sh-tile{position:relative;border:1px solid var(--line-soft);border-radius:12px;overflow:hidden;background:#fff;box-shadow:var(--shadow);break-inside:avoid;page-break-inside:avoid}
+  .sh-tile .art{height:118px;background:#f7f6f1;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .sh-grid.big .sh-tile .art{height:170px}
+  .sh-tile .art svg{width:100%;height:100%}
+  .sh-tile .art .count{font-family:Georgia,serif;font-size:56px;font-weight:700;color:var(--sage-2)}
+  .sh-tile .txt{padding:12px 14px 14px}
+  .sh-tile .lab{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--sage-2)}
+  .sh-tile .val{font-size:17px;font-weight:700;color:var(--navy);line-height:1.25;margin-top:3px}
+  .sh-grid.big .sh-tile .val{font-family:Georgia,serif;font-size:22px}
+  .sh-tile .up{position:absolute;top:10px;left:10px;background:var(--navy);color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-radius:20px;padding:4px 10px}
+  .sh-made{border-left:5px solid var(--sage);background:#faf8f2;border-radius:0 10px 10px 0;padding:16px 20px;margin-top:14px;font-family:Georgia,serif;font-size:20px;color:var(--navy);break-inside:avoid}
+  .sh-cta{background:var(--sage-soft);border-top:4px solid var(--sage);margin-top:48px;padding:44px 0 50px;text-align:center}
+  .sh-cta h2{font-family:Georgia,serif;font-size:clamp(26px,4.5vw,36px);color:var(--navy)}
+  .sh-cta p{color:var(--ink-soft);margin-top:10px;font-size:17px}
+  .sh-cta .who{margin-top:20px;font-weight:700;color:var(--navy);font-size:18px}
+  .sh-foot{text-align:center;color:var(--ink-soft);font-size:12px;padding:16px 0 26px}
+  .sharelink{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .sharelink input{flex:1 1 280px;font-family:"Courier New",monospace;font-size:13px}
+  body.pdfing .noprint{display:none!important}
+  @page{margin:0}
+  /* office notes + follow-up on a lead (never shown to the customer) */
+  .office{background:var(--staff-soft);border:1px solid #c9d8e6;border-radius:var(--radius);padding:16px 18px;margin-top:16px}
+  .office h2{color:var(--staff);font-size:16px}
+  .office-cols{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:12px}
+  .office textarea{min-height:64px;resize:vertical}
+  .note{background:#fff;border-radius:6px;padding:9px 11px;margin-top:8px;font-size:14.5px;line-height:1.45;white-space:pre-wrap;display:flex;gap:8px}
+  .note .when{font-size:12px;color:var(--ink-soft);margin-top:3px}
+  .note .x{border:none;background:none;color:var(--ink-soft);font-size:18px;line-height:1;padding:0 2px;align-self:flex-start}
+  .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip.due{background:var(--red-soft);color:var(--red)}
+  .chip.soon{background:var(--amber-soft);color:#8a5d14}
+  .chip.later{background:var(--staff-soft);color:var(--staff)}
+  /* the Pricing meeting: the paper pricing sheet, one row per line */
+  .prow{display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line-soft)}
+  .prow:first-child{border-top:none;padding-top:2px}
+  .prow .pl{flex:1 1 220px;min-width:0}
+  .prow .pt{font-weight:700;font-size:15px;color:var(--navy)}
+  .prow .pn{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+  .prow .pc{flex:0 1 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .prow.long .pc{flex:1 1 100%}
+  .segs{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+  .seg{border:2px solid var(--line);background:#fff;border-radius:22px;padding:7px 13px;font-size:14px;font-weight:700;color:var(--ink);line-height:1.2;text-align:center}
+  .seg small{display:block;font-size:11.5px;font-weight:400;color:var(--ink-soft);font-family:"Courier New",monospace}
+  .seg:hover{border-color:var(--sage)}
+  .seg.on{border-color:var(--good);background:var(--good-soft);color:#27573a}
+  .seg.on.dflt{border-color:var(--line);background:#f3f2ec;color:var(--ink-soft)}
+  .seg:disabled{cursor:default;opacity:.8}
+  .prow input[type=number]{width:104px;text-align:right}
+  .prow input[type=text]{width:240px;max-width:100%}
+  .prow textarea{width:100%;min-height:58px;resize:vertical}
+  .prow .tot{font-family:"Courier New",monospace;font-weight:700;color:var(--navy);white-space:nowrap}
+  .prow .stepper button{width:38px;height:38px;font-size:20px}
+  .prow .stepper span{min-width:40px;font-size:16px}
+  body.present .prow .pt{font-size:18px}
+  body.present .seg{font-size:16px;padding:10px 16px}
+  .sh-tile .art .noart{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#eef0e8,#dfe3d0);color:var(--sage-2);font-family:Georgia,serif;font-size:17px;font-weight:700;text-align:center;padding:10px}
+  /* custom items: the + button on every section */
+  .addbtn{display:inline-flex;align-items:center;gap:8px;border:2px dashed var(--line);background:none;border-radius:var(--radius);padding:10px 16px;font-weight:700;font-size:14.5px;color:var(--navy);margin-top:14px}
+  .addbtn:hover{border-color:var(--navy)}
+  .addbtn b{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;align-items:center;justify-content:center;font-size:17px;line-height:1}
+  .custom{background:var(--paper-2);box-shadow:var(--shadow);border-radius:var(--radius);padding:14px 18px;margin-top:14px;border-left:4px solid var(--sage)}
+  .custom.wait{border-left-color:var(--amber)}
+  .custom .row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .custom .row2 input[type=number]{width:120px}
+  .radio2{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .radio2 label{display:flex;align-items:center;gap:7px;border:2px solid var(--line);border-radius:22px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer;background:#fff}
+  .radio2 input{accent-color:var(--navy)}
+  /* the pricing sheet as a document: for review, for printing, for sending */
+  .docbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px}
+  .doc{background:#fff;box-shadow:var(--shadow);border-radius:4px;max-width:860px;margin:16px auto 0;padding:clamp(20px,5vw,48px);color:#222;font-size:14.5px}
+  .doc, .doc *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid var(--sage);padding-bottom:16px}
+  .doc-head img{height:62px;display:block}
+  .doc-head h1{font-family:Georgia,serif;font-size:28px;margin:0;color:var(--navy);text-align:right}
+  .doc-head .sub{font-size:12.5px;color:var(--ink-soft);text-align:right;margin-top:4px}
+  .doc-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 22px;margin-top:18px}
+  .doc-facts div span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-soft)}
+  .doc-facts div b{font-size:15.5px;color:var(--navy)}
+  .doc h3{font-family:Georgia,serif;font-size:17px;color:var(--navy);margin:22px 0 4px;display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:4px;break-after:avoid}
+  .doc h3 span{font-family:"Courier New",monospace;font-size:14px}
+  .doc table{font-size:14px;table-layout:fixed;width:100%}
+  .doc td:first-child{width:46%}
+  .doc td.num{width:122px}
+  .doc td{padding:5px 6px;border-bottom:1px solid #f0ede4}
+  .doc tr{break-inside:avoid}
+  .doc .dn{font-style:italic;color:var(--ink-soft)}
+  .doc .dstd{color:var(--ink-soft)}
+  .doc-total{margin-top:24px;border-top:3px solid var(--navy);padding-top:12px;break-inside:avoid}
+  .doc-total div{display:flex;justify-content:space-between;gap:12px;padding:3px 6px}
+  .doc-total .grand{font-family:Georgia,serif;font-size:24px;font-weight:700;color:var(--navy);margin-top:6px}
+  .doc-fine{font-size:12px;color:var(--ink-soft);margin-top:20px;line-height:1.5}
+  .doc .officecopy{background:var(--staff-soft);color:var(--staff);font-weight:700;font-size:12.5px;text-align:center;padding:6px;border-radius:4px;margin-bottom:14px}
+  body.quote{background:#eceae3;padding-bottom:30px}
+  body.quote .top, body.quote .totalbar{display:none!important}
+  /* a BuilderTrend selection: its choices as rows you tap */
+  .sel{padding:14px 0;border-top:1px solid var(--line-soft)}
+  .sel:first-child{border-top:none;padding-top:4px}
+  .sel-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .sel-h b{font-size:15.5px;color:var(--navy)}
+  /* a selection's heading is a button: closed, it's one line saying what (if anything) was picked */
+  .sel-h{width:100%;border:none;background:none;padding:0;text-align:left;font-family:inherit;cursor:pointer;color:inherit}
+  .sel-h .arrow{margin-left:auto;flex:none;color:var(--ink-soft);transition:transform .12s}
+  .sel.open .sel-h .arrow{transform:rotate(180deg)}
+  .sel-h .picked{font-size:13px;color:#27573a;background:var(--good-soft);border-radius:20px;padding:2px 10px;font-weight:700}
+  .sel-h .cnt{font-size:12.5px;color:var(--ink-soft)}
+  .sel:not(.open){padding:11px 0}
+  .sel-h:hover b{text-decoration:underline}
+  .cho{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;border:2px solid var(--line);border-radius:10px;padding:8px 12px;background:#fff}
+  .cho.on{border-color:var(--good);background:var(--good-soft)}
+  .cho .ct{flex:1 1 200px;min-width:0;font-size:14.5px;font-weight:600}
+  .cho .cp{font-family:"Courier New",monospace;font-weight:700;color:var(--navy);white-space:nowrap}
+  .cho .cp.tbd{font-family:inherit;font-weight:400;color:#8a5d14}
+  .cho button.tog{border:2px solid var(--line);background:#fff;border-radius:20px;padding:6px 14px;font-weight:700;font-size:13.5px;color:var(--navy)}
+  .cho.on button.tog{border-color:var(--good);background:var(--good);color:#fff}
+  .cho input[type=number]{width:92px;text-align:right;padding:7px 8px}
+  .cho .stepper button{width:34px;height:34px;font-size:18px}
+  .cho .stepper span{min-width:34px;font-size:15px}
+  .gate{max-width:380px;margin:12vh auto 0;text-align:center}
+  .gate input{font-family:"Courier New",monospace;font-size:34px;letter-spacing:14px;text-align:center;padding:14px 8px}
+  /* "this home has": what doesn't apply is left off the sheet */
+  .hasbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:16px;font-size:13.5px;color:var(--ink-soft)}
+  .hasbar button{border:2px solid var(--line);background:#fff;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .hasbar button.on{border-color:var(--sage-2);background:var(--sage-soft);color:var(--sage-2)}
+  .hasbar button:disabled{cursor:default;opacity:.7}
+  .sty-row{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line-soft)}
+  .sty-row .t{flex:1 1 260px;font-size:14.5px}
+  .sty-row .t small{display:block;color:var(--ink-soft);font-size:12.5px;margin-top:2px}
+  .sty-row.hide .t{opacity:.5;text-decoration:line-through}
+  .sty-row.incl .t b{color:var(--sage-2)}
+  .tri{display:inline-flex;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff;flex:none}
+  .tri button{border:none;background:none;padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+  .tri button.on{background:var(--navy);color:#fff}
+  .tri button.on.incl{background:var(--sage-2)}
+  .tri button.on.hide{background:#a94438}
+  .cho.std .nochg{font-weight:700;color:var(--good);white-space:nowrap;font-size:14px}
+  .cho .stdmark{border:2px solid var(--good);background:var(--good);color:#fff;border-radius:20px;padding:6px 14px;font-weight:700;font-size:13.5px;white-space:nowrap}
+  .guide .cho .stdmark{padding:9px 20px;font-size:15px}
+  .incl-row{display:flex;gap:10px;align-items:center;padding:10px 12px;margin-top:8px;border-radius:10px;background:var(--sage-soft);color:var(--sage-2);font-weight:700;font-size:14.5px}
+  .modesw{display:inline-flex;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff}
+  .modesw button{border:none;background:none;padding:6px 13px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+  .modesw button.on{background:var(--navy);color:#fff}
+  /* one selection at a time */
+  .g-top{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .g-top .bar{flex:1;height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden}
+  .g-top .bar span{display:block;height:100%;background:var(--sage-2);transition:width .2s}
+  .guide .q{padding:22px 24px 20px;margin-top:12px}
+  .guide .sel{border-top:none;padding:0}
+  .guide .sel-h{cursor:default}
+  .guide .sel-h b{font-size:24px;font-family:Georgia,serif;text-decoration:none!important}
+  .guide .sel-h .arrow{display:none}
+  .guide .cho{padding:14px 16px;margin-top:10px}
+  .guide .cho .ct{font-size:16.5px}
+  .guide .cho .cp{font-size:15.5px}
+  .guide .cho button.tog{padding:9px 20px;font-size:15px}
+  .g-nav{display:flex;gap:10px;align-items:center;margin-top:16px}
+  .g-nav .btn{padding:13px 22px;font-size:16px}
+  .g-std{font-size:13.5px;color:var(--ink-soft);margin-top:12px}
+  body.present .guide .sel-h b{font-size:30px}
+  body.present .guide .cho .ct{font-size:20px}
+  @media print{ body.printdoc #root > :not(.docwrap){display:none!important} body.printdoc .doc, body.quote .doc{box-shadow:none;max-width:none;margin:0;padding:10mm 12mm} body.quote{background:#fff} }
+  @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
+</style>
+</head>
+<body>
+
+<div class="top"><div class="wrap top-in">
+  <a class="brand" href="index.html" title="Back to Alden Homes Hub"><img src="icons/logo.png" alt="Alden Homes">
+    <div><div class="brand-t">Selections</div><div class="brand-s">Leads, pricing &amp; selection sheets</div></div></a>
+  <div class="grow"></div>
+  <div class="viewsw" id="viewSw" title="What the buyer sees on the screen, or what the office sees">
+    <button type="button" data-view="customer">Customer view</button>
+    <button type="button" data-view="staff" class="staff">Office view</button>
+  </div>
+  <div class="titlebar-account staffonly" id="acct"><span id="currentUserEmail" class="muted" style="font-size:12px"></span><button type="button" class="btn sm" id="signOutBtn">Sign out</button></div>
+</div></div>
+
+<div class="wrap" id="root"></div>
+<div class="totalbar" id="totalbar" style="display:none;"><div class="wrap in" id="totalIn"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+/* ============================================================
+   Alden Homes — Selections (the real one, moved over from demo/selections.html on 2026-10-19)
+   Leads and their pricing / selection sheets are kept on the hub's server (Cloud Function selectionsApi, collection
+   selection-sheets — no security rule needed: only the function reads and writes it). Staff sign in; a customer screen
+   (?present=), the customer's pricing sheet (?quote=) and the share page (?show=) open with the sheet's link key (&k=).
+   Signing makes the home: the lot's home in Active Homes (or a new one) gets its sale price from the sheet (job-sales).
+   The demo (demo/selections.html + demoSync) stays up for practice until the owner retires it.
+
+   What this version shows (agreed with the owner, Oct 2026):
+     • Every visit is saved as a LEAD — a buyer who never comes back, or comes back months later, is still on file
+     • Customer view (choices + prices only) vs Office view (cost code, our cost, margin)
+     • The first meeting is PRICING: the Alden Collection Pricing Sheet, section by section (owner, Oct 2026). The second is SELECTIONS.
+     • Pricing answers can be CHANGED later — the change is shown
+     • More than "pick one": counts (extra outlets), per-room picks (each bathroom), colour-only picks, custom items
+     • One room at a time with progress, and a list of what's still to choose before signing
+     • Prices are frozen on the sheet: a later price change is offered, never applied silently; locked for good at signing
+     • After signing, extras are change orders (the hub's own, with the $100 fee)
+     • Office extras: what each vendor needs to see, and upgrades by cost code
+   ============================================================ */
+const ART = {
+  faucet:(metal,arc)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><rect x="18" y="86" width="84" height="5" rx="1.5" fill="#dcd8ce"/><ellipse cx="60" cy="86" rx="26" ry="4" fill="#e8e5dd"/>${arc==='high'?`<path d="M46 86 L46 44 Q46 26 60 26 Q74 26 74 44 L74 56" fill="none" stroke="${metal}" stroke-width="6" stroke-linecap="round"/>`:arc==='pull'?`<path d="M46 86 L46 40 Q46 24 62 24 L70 24 Q78 24 78 34 L78 54" fill="none" stroke="${metal}" stroke-width="6" stroke-linecap="round"/><rect x="73" y="52" width="10" height="14" rx="3" fill="${metal}"/>`:`<path d="M46 86 L46 46 Q46 32 60 32 L72 32" fill="none" stroke="${metal}" stroke-width="6" stroke-linecap="round"/>`}<rect x="40" y="82" width="14" height="7" rx="2" fill="${metal}"/><rect x="30" y="66" width="5" height="18" rx="2" fill="${metal}"/></svg>`,
+  tile:(c1,c2,grout)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="${grout}"/>${[0,1,2,3,4].map(r=>[0,1,2,3].map(c=>{const off=r%2?-14:0;const fill=((r+c)%3===0)?c2:c1;return `<rect x="${c*30+off+1}" y="${r*22+1}" width="28" height="20" rx="1" fill="${fill}"/>`;}).join('')).join('')}</svg>`,
+  floorPlank:(base,grain)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="${base}"/>${[0,1,2,3,4,5].map(i=>`<rect x="0" y="${i*18}" width="120" height="17" fill="${base}" stroke="${grain}" stroke-width="0.6" opacity="0.9"/><path d="M${i%2?10:40} ${i*18+6} q30 3 60 -1 t50 2" stroke="${grain}" stroke-width="0.8" fill="none" opacity="0.5"/>`).join('')}</svg>`,
+  carpet:(base,fleck)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="${base}"/>${Array.from({length:150},(_,i)=>{const x=(i*37)%118,y=(i*53)%108;return `<circle cx="${x}" cy="${y}" r="1.6" fill="${fleck}" opacity="0.5"/>`;}).join('')}</svg>`,
+  showerDoor:(fw,fc)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><rect x="26" y="14" width="68" height="84" fill="#dfeaef" opacity="0.65"/><path d="M34 96 L70 18" stroke="#fff" stroke-width="7" opacity="0.55"/>${fw>0?`<rect x="26" y="14" width="68" height="84" fill="none" stroke="${fc}" stroke-width="${fw}"/>`:''}<rect x="24" y="96" width="72" height="4" rx="1" fill="${fc}"/></svg>`,
+  door:(panels,color)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><rect x="32" y="8" width="56" height="94" rx="2" fill="${color}" stroke="#c9c2b4" stroke-width="1.2"/><circle cx="82" cy="56" r="2.6" fill="#9a9182"/></svg>`,
+  knob:(metal)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><circle cx="60" cy="55" r="26" fill="${metal}"/><circle cx="60" cy="55" r="9" fill="rgba(0,0,0,.10)"/></svg>`,
+  fireplace:()=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><rect x="14" y="20" width="92" height="72" rx="2" fill="#e6e2d8"/><rect x="22" y="44" width="76" height="26" fill="#2f3133"/><rect x="10" y="14" width="100" height="7" rx="2" fill="#8b7355"/></svg>`,
+  yesNo:(yes)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/>${yes?`<circle cx="60" cy="55" r="28" fill="#eef0e8"/><path d="M46 55 l10 11 20 -24" fill="none" stroke="#6B7355" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`:`<circle cx="60" cy="55" r="28" fill="#eeece6"/><path d="M48 43 l24 24 M72 43 l-24 24" stroke="#9a9182" stroke-width="5" stroke-linecap="round"/>`}</svg>`,
+  house:(c)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="#f7f6f1"/><path d="M60 24 L96 52 L96 90 L24 90 L24 52 Z" fill="${c}" stroke="#c9c2b4"/><path d="M18 54 L60 22 L102 54" fill="none" stroke="#8b7355" stroke-width="4" stroke-linecap="round"/><rect x="52" y="66" width="16" height="24" fill="#f7f6f1"/></svg>`,
+  swatch:(c)=>`<svg viewBox="0 0 120 110" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="110" fill="${c}"/></svg>`,
+};
+
+const $ = id=>document.getElementById(id);
+const esc = s=>(s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n=>(n<0?'-$':'$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const iso = d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const daysAgo = n=>{ const d=new Date(); d.setDate(d.getDate()-n); return iso(d); };
+const daysAhead = n=>daysAgo(-n);
+const nice = s=>{ if(!s) return ''; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); };
+const ago = s=>{ if(!s) return 'a while ago'; const [y,m,d]=s.split('-').map(Number); const days=Math.round((new Date().setHours(0,0,0,0)-new Date(y,m-1,d))/86400000);
+  return days<=0?'today':days===1?'yesterday':days<45?days+' days ago':Math.round(days/30)+' months ago'; };
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('show'),2400); }
+
+/* ---------- what's for sale ---------- */
+const DEVS = [{code:'AP',name:'Alden Place'},{code:'CL',name:'Cliffs'},{code:'MM',name:'Mountain Meadows'},{code:'ML',name:'Maple Lane'}];
+let LOTS = [];   // from Available Lots (loadLots)
+// (a home's base price is typed on the lead: BuilderTrend's "Contract Price" line has no figure in it)
+const CODE_NAMES = {2:'Site Improvements',16:'Concrete',36:'Roofing',40:'Siding',55:'Energy Star',57:'Specialty Stairs',59:'Shelves / Mirrors',60:'Painting',14:'Footer / Foundation',32:'Doors / Windows',34:'Framing',41:'Railing',50:'Plumbing',54:'Electrical',56:'Drywall',58:'Trim',70:'Kitchens / Vanities',71:'Fireplace',72:'Floor Covering',90:'Misc.'};
+const CO_FEE = 100;
+
+/* ---------- the item list ----------
+   The REAL list: BuilderTrend's master selections template (268 selections, 583 choices, customer prices), read 2026-10-12.
+   It is NOT in this file. The page gets it from the hub's server after sign-in (or by a sheet's link), so the prices never sit in the public
+   project. A selection has a BT number, a cost code and its choices; any number of choices can be taken, some by the count
+   or by the square foot. There is no builder cost in BuilderTrend's template, so cost and margin don't show yet.
+
+   TWO MEETINGS over the one list: PRICING is the lines that are on the paper pricing sheet (by BT number) — the quick pass.
+   SELECTIONS is everything — the deep dive that really designs the house. Because both read the same answers, whatever is
+   picked at pricing is already there at selections. */
+const SECTION_RANGES = [['lot','Contract & lot',0,121],['bsmt','Foundation & basement',122,149],['gar','Garage',150,169],['ext','Exterior',170,179],
+  ['ent','Front porch & entrance',180,187],['lau','Laundry & mudroom',188,199],['doors','Doors & trim',200,243],['ceil','Ceilings & first floor',244,255],
+  ['mbath','Master bath',256,299],['bath2','Main bath',300,339],['bath3','Third bath',340,378],['powder','Powder bath',379,399],['elec','Electrical',420,459],
+  ['mech','Heating, water & central vac',460,499],['kit','Kitchen',500,549],['fireb','Fireplace & built-ins',550,599],['patio','Patio & deck',600,659],
+  ['porch','Screened porch, sunroom & 3 season',660,699],['win','Windows',700,719],['stairs','Stairs',720,739],['second','Second floor',740,759],
+  ['attic','Attic & storage',760,779],['paint','Paint',780,789],['flr','Flooring',790,999]];
+// the BT numbers that appear on the Alden Collection Pricing Sheet
+const PRICING_BT = new Set([126,128,134,136,138,140,147,150,152,153,154,156,160,161,164,175,180,181,182,184,188,193,194,196,200,206,207,208,224,231,236,244,246,248,
+  256,264,270,272,273,274,278,280,282,300,304,310,312,313,314,318,320,322,340,344,350,352,353,354,358,360,362,379,380,384,388,420,424,426,446,450,500,514,516,518,520,523,526,
+  550,552,553,554,560,600,602,606,608,610,612,616,618,620,622,640,642,644,660,664,672,684,700,701,702,704,720,722,724,726,740,744,760,762,764,768,780,790]);
+// home styles, as they appear on the basement line (126) of each collection
+const STYLES = { ALDEN:['Forge','Percy','Tiffany','Coleman','Sherman','Bradford','Hinderton','Alden 2.1','Coleman 2.1','Grant','Alden','Stanford'],
+                 MCC:['Avonlea','Montgomery','Harbor','Bainbridge','Edward','Winsloe','Carmody','Carmody 2.1'] };
+const LINE_NAMES = { ALDEN:'Alden Collection', MCC:'MCC' };
+let SECTIONS = [], PRICING = [], ROOMS = [], ALL_QS = [], CAT_READY = false;
+/* Home style setup (owner, 2026-10-14): for each style, which lines are left off its sheets (skip) and which come with the house
+   at no charge (incl) — e.g. a Percy's basement is in its base price. Kept on the hub's server (selectionsApi, settings/selections) for every office device,
+   and handed over with the price list so customer screens and links show the same sheet. { 'Percy': { skip:[id], incl:[id] } } */
+let STYLE_CFG = {};
+const cfgOf = L=>(L && STYLE_CFG[L.model]) || {};
+const isSkip = (q, L)=>(cfgOf(L).skip || []).includes(q.id);
+const isIncl = (q, L)=>(cfgOf(L).incl || []).includes(q.id);
+/* Allowances (owner, 2026-10-14): any choice named "…Allowance", plus the laundry countertop (BT 193).
+   On the sheet an allowance is a typed dollar amount, and that amount is what it adds; it's the ONLY price that can be typed there.
+   Its starting amount is set in the back end (Home styles → Allowance amounts, kept on the hub's server as ALLOW_CFG); without one it
+   starts at the selection sheet's price. No amounts are written in this file: it's public, and the prices are real. */
+let ALLOW_CFG = {};
+/* Ceiling height (owner, 2026-10-14): BuilderTrend has two lines (Alden: 8' standard with an upgrade to 9'; MCC: 9' standard
+   with a credit to 8' and an upgrade to 10'). They become ONE question. Each style's standard height is set in the back end
+   (STYLE_CFG[style].ceil = 8 | 9; without one: Alden 8', MCC 9'), and the sheet offers the moves from it. The move prices are set in
+   the back end too (CEIL_CFG, kept on the hub's server; nothing in this file). */
+let CEIL_CFG = {};
+/* Bathroom options (owner, 2026-10-14). BuilderTrend's shower door line is a blank "Shower Door Type:" that gets typed in; it becomes
+   Framed / Frameless / Semi-frameless (that order, one only). Every bathroom also gets a FIXTURE FINISH: chrome is standard at no
+   charge; Brushed nickel / Matte black / Oil-rubbed bronze cost what's set in the back end (it covers the door, faucets and hardware
+   in that bath). Prices live in OPT_PRICES (back end → "Bathroom options", kept on the hub's server); unset = "price to come". */
+let OPT_PRICES = {};
+const OPT_BASE = {};                                    // no prices in this file: they come from the server
+const optPrice = k=>OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k] : null;
+const DOOR_CHOICES = [{ t:'Framed shower door', k:'door-framed' }, { t:'Frameless shower door', k:'door-frameless' }, { t:'Semi-frameless shower door', k:'door-semi' }];
+const FIN_CHOICES = [{ t:'Brushed nickel', k:'fin-bn' }, { t:'Brushed brass', k:'fin-brass' }, { t:'Black', k:'fin-black' }];
+/* Standard choices at no charge (owner, 2026-10-14): every toilet line starts with "Standard toilet" (what the home gets unless
+   another is picked), and every shower options line starts with "Standard shower" and "Standard tub/shower". These lines are one
+   choice per bathroom (q.one). */
+const STD_FIRST = { '273':['Standard toilet'], '313':['Standard toilet'], '353':['Standard toilet'], '379':['Standard toilet'],
+  '256':['Standard shower', 'Standard tub/shower'], '300':['Standard shower', 'Standard tub/shower'], '340':['Standard shower', 'Standard tub/shower'] };
+/* Countertop allowance (owner, 2026-10-19): BuilderTrend's one "Countertop Allowance" on Kitchen/Bath Cabinetry (BT 500) becomes a
+   Granite and a Quartz allowance. Both are typed allowances (named "…allowance", so isAllow picks them up and the back end's
+   Allowance amounts sets their starting amounts); they share grp 'counter', so taking one takes the other off. */
+const SPLIT = { '500': { 'countertop allowance': [{ t:'Granite countertop allowance', grp:'counter' }, { t:'Quartz countertop allowance', grp:'counter' }] } };
+/* Pantry shelves (owner, 2026-10-19): 4 wire shelves are standard at no charge (shown as the standard, and they stay standard when
+   shelves are added); added shelves are charged by the linear foot at the price set in the back end (OPT_PRICES['pantry-lf'], kept on
+   the server). BuilderTrend's blank "Number of Pantry Shelves:" and per-shelf "Add't wire pantry shelves" are replaced by it; its other
+   shelf upgrades stay as they are. */
+const PANTRY_DROP = /^(number of pantry shelves:?|add't wire pantry shelves)$/i;
+// (owner, 2026-10-19: "they all need to be per ft" — every shelf type is priced per linear foot; the appliance shelf stays one item)
+/* Flooring types and levels (owner, 2026-10-19, the office's "FLOORING Master Sheet"): one choice per type + level; the price per
+   sq ft of each is in the back end's flooring table (OPT_PRICES 'floor-' + key + level, on the server — none written here; a minus
+   number is a credit). Tile is priced on the sheet (c.rate). */
+const FLOOR_TYPES = [{ key:'lvp', t:'LVP', levels:[20, 30, 40] }, { key:'vinyl', t:'Vinyl', levels:[10, 30, 40, 50] },
+  { key:'hw', t:'Hardwood', levels:[20, 30, 40, 50, 60] }, { key:'carpet', t:'Carpet', levels:[10, 20, 30] },
+  { key:'io', t:'Indoor/outdoor carpet', levels:[10, 20] }, { key:'tile', t:'Tile', levels:[] }];
+let floorPick = { type:'lvp', level:20 };          // the "add a flooring area" form (not stored)
+/* Patio & deck (owner, 2026-10-19). BuilderTrend has a blank "Patio/Deck" (600) plus extra sq ft prices for each (602), one "Add
+   covered patio/deck" (640) plus extra covered sq ft for each (642), and composite deck flooring per sq ft (608). On the sheet:
+   600 = Patio OR Deck, typed in sq ft at 602's prices (602 itself is folded in, not asked); 640 = Covered patio OR Covered deck, each
+   10x14 at 640's price; 642 = the extra covered sq ft, showing only the one that matches the covered choice; 608 = #1 pressure treated
+   standard (stdOf) or Composite per sq ft. Prices all come from BuilderTrend's list (none are written here). */
+let CAT_RAW = [];
+const rawPrice = (bt, re)=>{ const s = CAT_RAW.find(x=>x.bt === bt); const c = s && s.c.find(x=>re.test(x.t)); return c ? c.p : null; };
+function patioChoices(bt, list){
+  if(bt === '600') return [{ t:'Patio', p:rawPrice('602', /patio/i), unit:'sq ft' }, { t:'Deck', p:rawPrice('602', /deck/i), unit:'sq ft' }];
+  if(bt === '640') return list.flatMap(c=>/add covered/i.test(c.t) ? [{ ...c, t:'Covered patio (10x14)', unit:'' }, { ...c, t:'Covered deck (10x14)', unit:'' }] : [c]);
+  if(bt === '642') return list.map(c=>({ ...c, t: /patio/i.test(c.t) ? 'Additional sq ft - covered patio' : /deck/i.test(c.t) ? 'Additional sq ft - covered deck' : c.t, unit:'sq ft' }));
+  // railing (owner, 2026-10-19): asked by the linear foot, at the price set in the back end (OPT_PRICES['rail-lf']); BT's black spindle stays
+  // black windows (owner, 2026-10-19): "Black Interior Windows" (black inside only) is taken off; exterior, or interior and exterior, stay
+  if(bt === '701') return list.filter(c=>!/^black interior windows$/i.test(String(c.t).trim()));
+  // second floor (owner, 2026-10-19): finishable or finished space, typed in sq ft at BuilderTrend's per-sq-ft prices
+  if(bt === '740') return list.map(c=>({ ...c, t:String(c.t).replace(/^add\s+/i, '').replace(/^2nd floor/i, 'Second floor').replace(/&/g, ' & ').replace(/\s+/g, ' ').trim() + ' (per sq ft)', unit:'sq ft' }));
+  /* Attic room (owner, 2026-10-19): "Enlarge" (BT 768, unfinished or finished extra sq ft) and "Finish" (BT 764: drywall + insulation,
+     or finished = insulation/drywall/trim/HVAC; BT's insulation-only line is left off) are typed in sq ft at BuilderTrend's per-sq-ft
+     prices, one or the other. BT 766 Finish Storage is per sq ft too. */
+  if(bt === '768') return list.map(c=>({ ...c, t: /unfinished/i.test(c.t) ? 'Enlarge - unfinished (per sq ft)' : /finished/i.test(c.t) ? 'Enlarge - finished (per sq ft)' : c.t, unit:'sq ft' }));
+  if(bt === '764') return list.filter(c=>!/^insulate full osb/i.test(String(c.t).trim()))
+    .map(c=>({ ...c, t: /trim|hvac/i.test(c.t) ? 'Finished - insulation, drywall, trim & HVAC (per sq ft)' : /drywall/i.test(c.t) ? 'Drywall + insulation (per sq ft)' : c.t, unit:'sq ft' }));
+  if(bt === '766') return list.map(c=>({ ...c, t:String(c.t).replace(/ceilng/i, 'ceiling') + ' (per sq ft)', unit:'sq ft' }));
+  /* Interior paint (owner, 2026-10-19): flat ceiling / flat walls is the standard at no charge (stdOf); the two paint upgrades are per
+     sq ft (one or the other, grp 'paint'; BT's "wal" spelt out); "Paint color change" stays a flat price and is a side add. */
+  if(bt === '780') return list.map(c=>/color change/i.test(c.t) ? { ...c, side:true }
+    : { ...c, t:String(c.t).replace(/\bwal\b/i, 'walls') + ' (per sq ft)', unit:'sq ft', grp:'paint' });
+  /* Flooring (owner, 2026-10-19, from the office's "FLOORING Master Sheet" calculator): LVP Level 10 on the first floor and all baths
+     is standard at no charge (stdOf, kept while upgrades are added for parts of the house); LVP Levels 20-40 and carpet Levels 10-30
+     are typed in sq ft at per-sq-ft prices set in the back end (OPT_PRICES 'floor-…', kept on the server, worked out
+     from the calculator); tile is typed in sq ft at a price per sq ft typed on the sheet (c.rate). BT's "Estimate 1-3" go. */
+  if(bt === '790') return FLOOR_TYPES.flatMap(ft=>ft.levels.length
+      ? ft.levels.map(n=>({ t:ft.t + ' Level ' + n, k:'floor-' + ft.key + n, p:null, unit:'sq ft', ft:ft.key, lv:n }))
+      : [{ t:ft.t, p:0, unit:'sq ft', rate:true, ft:ft.key, lv:0 }]);
+  // under-cabinet rope lighting is priced per foot: typed in feet like the other per-foot lines
+  if(bt === '514') return list.map(c=>/\(per foot\)/i.test(c.t) ? { ...c, t:c.t.replace(/\(per foot\)/i, '(per linear ft)'), unit:'ft' } : c);
+  // stair railing (owner, 2026-10-19): both options per linear foot, priced in the back end (BT only had a flat price for one)
+  if(bt === '724') return [{ t:'Standard traditional railing (per linear ft)', k:'stair-trad-lf', p:null, unit:'ft' },
+    { t:'Square baluster railing (per linear ft)', k:'stair-sq-lf', p:null, unit:'ft' }];
+  if(bt === '726') return list.map(c=>({ ...c, t:String(c.t).replace(/\s*l\.?f\.?$/i, '').trim() + ' (per linear ft)', unit:'ft' }));
+  if(bt === '610') return [{ t:'Railing (per linear ft)', k:'rail-lf', p:null, unit:'ft' }, ...list];
+  if(bt === '608') return list.map(c=>/composite/i.test(c.t) ? { ...c, t:'Composite deck flooring', unit:'sq ft' } : c);
+  return null;
+}
+/* Garbage disposal (owner, 2026-10-19): standard in every kitchen; BuilderTrend's "Garbage disposal credit" reads as "No garbage disposal". */
+const splitChoices = (bt, list)=>patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
+    ...list.filter(c=>!PANTRY_DROP.test(String(c.t).trim())).map(c=>/appliance/i.test(c.t) ? c : { ...c, t: /\/\s*lf/i.test(c.t) ? c.t : c.t + ' (per linear ft)', unit:'ft' })] :list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }));
+/* The master bath sets the other bathrooms (owner, 2026-10-14: people often make the bathrooms the same). A line in the main, third
+   or powder bath with the same name as a master bath line (`tw`) copies the master's choice, at its own price, marked auto. Touching
+   that line in the other bathroom makes it its own (answers['own:' + id]) and it stops copying. Copies are dropped when a bath is
+   switched off, and don't count as choices that keep a bath on. */
+const BATHS = ['mbath', 'bath2', 'bath3', 'powder'];
+function syncBaths(L){
+  const master = SECTIONS.find(r=>r.id === 'mbath'); if(!master || locked(L)) return;
+  BATHS.slice(1).forEach(rid=>{ const r = SECTIONS.find(x=>x.id === rid); if(!r) return;
+    r.qs.forEach(t=>{ if(!t.tw) return;
+      const keys = t.c.map((c, j)=>t.id + '#' + j);
+      const clearAuto = ()=>keys.forEach(k=>{ if(L.answers[k] && L.answers[k].auto) delete L.answers[k]; });
+      if(!asked(t, L)){ clearAuto(); return; }
+      if(L.answers['own:' + t.id]) return;
+      clearAuto();
+      const m = master.qs.find(x=>x.tw === t.tw); if(!m || !asked(m, L)) return;
+      m.c.forEach((c, i)=>{ const a = L.answers[m.id + '#' + i]; if(!a || !a.qty) return;
+        const j = t.c.findIndex(x=>x.t === c.t); if(j < 0) return;
+        const k = t.id + '#' + j; if(L.answers[k]) return;
+        L.answers[k] = { qty:a.qty, price: isAllow(t, t.c[j]) ? a.price : choicePrice(t, j, L), auto:true }; });
+    });
+  });
+}
+const markOwn = (L, q)=>{ if(q && q.tw && BATHS.slice(1).includes(q.room.id)) L.answers['own:' + q.id] = { qty:1, price:0 }; };
+const CEIL_BASE = {};                                   // no prices in this file: they come from the server
+const ceilStd = L=>{ const c = cfgOf(L).ceil; return c === 8 || c === 9 ? c : (L && (L.line === 'MCC' || STYLES.MCC.includes(L.model)) ? 9 : 8); };
+const ceilPrice = (std, h)=>{ const k = std + '-' + h; return CEIL_CFG[k] != null ? CEIL_CFG[k] : CEIL_BASE[k] != null ? CEIL_BASE[k] : 0; };
+const ceilLabel = (std, h)=>(h < std ? 'Credit to ' : 'Upgrade to ') + h + "' ceilings";
+// what a choice costs when it's first taken: ceiling moves and allowances have their own; everything else is the selection sheet's
+const choicePrice = (q, i, L)=>(q.opts || q.c[i].k) ? (optPrice(q.c[i].k) || 0) : q.ceil ? ceilPrice(ceilStd(L), q.c[i].h) : isAllow(q, q.c[i]) ? allowDefault(q, i) : (q.c[i].p || 0);
+const ALLOW_BASE = { '193': 0 };                         // BT numbers that are allowances though not named so (amount: from the server)
+const isAllow = (q, c)=>!!c && (/allowance/i.test(c.t) || ALLOW_BASE[q.bt] != null);
+const allowDefault = (q, i)=>{ const k = q.id + '#' + i; return ALLOW_CFG[k] != null ? ALLOW_CFG[k] : ALLOW_BASE[q.bt] != null ? ALLOW_BASE[q.bt] : (q.c[i].p || 0); };
+const qById = id=>ALL_QS.find(q=>q.id===id);
+const qOfKey = k=>qById(String(k).split('#')[0]);
+function buildCatalog(cat){
+  CAT_RAW = cat;
+  const skipBt = new Set(['602']);                   // folded into 600's patio / deck choices
+  const twins = {};                                   // a line with an MCC twin is the Alden one, even where it isn't labelled
+  cat.forEach(s=>{ if(s.line === 'MCC') twins[s.bt + '|' + s.t] = true; });
+  const used = {};
+  SECTIONS = SECTION_RANGES.map(([id, name])=>({ id, name, qs:[] }));
+  let ceilDone = false;
+  cat.forEach((s, i)=>{
+    const num = parseInt(s.bt, 10) || 0;
+    const sec = SECTIONS[SECTION_RANGES.findIndex(r=>num >= r[2] && num <= r[3])] || SECTIONS[0];
+    if(skipBt.has(s.bt)) return;
+    if(['264', '304', '344'].includes(s.bt)){        // shower door: types instead of BuilderTrend's blank "Shower Door Type:"
+      sec.qs.push({ id:'door_' + sec.id, bt:s.bt, num, t:s.t.replace(/\s*-\s*(Master|Main|Third) Bath.*$/i, '') + ' - ' + sec.name, cc:s.cc, line:'', room:sec, opt:1, type:'bt', v1:1,
+        opts:true, tw:'Shower Door', c:DOOR_CHOICES.map(x=>({ ...x, p:null, unit:'' })) });
+      return;
+    }
+    if(s.bt === '244'){                                 // ceiling height: one question for both collections (see ceilStd)
+      if(!ceilDone) sec.qs.push({ id:'ceil', bt:'244', num:244, t:'Ceiling Height', cc:s.cc || 34, line:'', room:sec, opt:1, type:'bt', v1:1, ceil:true,
+        c:[{ t:"8' ceilings", h:8, p:null, unit:'' }, { t:"9' ceilings", h:9, p:null, unit:'' }, { t:"10' ceilings", h:10, p:null, unit:'' }] });
+      ceilDone = true; return;
+    }
+    let id = 'b' + (s.bt || 'x') + (s.line ? s.line[0].toLowerCase() : '');
+    if(used[id]) id += '_' + i; used[id] = true;
+    const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
+    const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
+    const std = STD_FIRST[s.bt] || [];
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || ['526', '600', '640', '608', '701', '740', '764', '766', '768'].includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+      // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+  });
+  /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
+     price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
+     doesn't switch the standard off. Number 146 puts it inside the basement's own feature, so it's only asked with a basement. */
+  { const sec = SECTIONS.find(r=>r.id === 'bsmt');
+    if(sec) sec.qs.push({ id:'bstairs', bt:'', num:146, t:'Basement Stairs', cc:57, line:'', room:sec, opt:1, type:'bt', v1:1, nostep:true,
+      c:[{ t:'Open stairs to basement', k:'bsmt-open', p:null, unit:'' }, { t:'Basement railing', k:'bsmt-rail', p:null, unit:'', side:true }] }); }
+  // a fixture finish at the top of every bathroom (its number puts it inside the bathroom's own on/off feature)
+  [['mbath', 256], ['bath2', 300], ['bath3', 340], ['powder', 379]].forEach(([rid, num])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec || !sec.qs.length) return;
+    sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:72, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
+      c:FIN_CHOICES.map(x=>({ ...x, p:null, unit:'' })) }); });
+  SECTIONS = SECTIONS.filter(r=>r.qs.length);
+  ROOMS = SECTIONS;
+  PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
+  ALL_QS = SECTIONS.flatMap(r=>r.qs);
+  CAT_READY = true;
+}
+
+/* ---------- leads (on the hub's server; this browser only remembers Customer / Office view) ---------- */
+const STORE = 'aldenSelections.v1';
+let leads = [], view = 'customer', cur = null, tab = 'v1', roomId = 'lot', newOpen = false;
+
+/* ---------- two screens, one sheet ----------
+   The office opens a sheet on their iPad and presses "Open customer screen". That gives a link (…?present=LEAD) for the
+   customer's iPad: a big, customer-only view of the same sheet. A pick made on either screen shows on the other at once,
+   and the customer's screen follows whichever room the office moves to.
+   The two screens talk through the hub's server (selectionsApi), so they can be any two devices. */
+const PRESENT = new URLSearchParams(location.search).get('present');   // set = this window is the customer's screen
+const LINK_K = new URLSearchParams(location.search).get('k') || '';    // the sheet's link key (customer screen / their copy / share page)
+const NAV = 'aldenSelections.nav1';
+let officeView = 'customer', shareOpen = false, flashKey = '';
+
+// (the customer's screen never changes which view the office is in)
+let echo = false;   // true while redrawing for a change that came FROM the other screen — saving then would send it straight back
+function save(){ if(echo || PRESENT || SHOW || QUOTE) return; try{ localStorage.setItem(STORE, JSON.stringify({ view })); } catch(e){} }
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(STORE) || 'null'); if(s){ officeView = s.view === 'staff' ? 'staff' : 'customer'; view = PRESENT ? 'customer' : officeView; } } catch(e){}
+}
+// a sheet as it comes from the server, with every list / map it needs
+function norm(x){ ['custom','cos','notes'].forEach(f=>{ if(!Array.isArray(x[f])) x[f] = []; }); ['answers','favs'].forEach(f=>{ if(!x[f] || typeof x[f] !== 'object') x[f] = {}; }); return x; }
+let lastNav = '';
+function tellNav(){
+  if(PRESENT || !cur || ['vendors','codes'].includes(tab)) return;
+  const nv = JSON.stringify({ id:cur, tab, roomId: navRoom() });
+  if(nv !== lastNav){ lastNav = nv; try{ localStorage.setItem(NAV, nv); } catch(e){} }
+}
+const pageUrl = ()=>location.href.split('?')[0].split('#')[0];
+const keyOf = L=>KEYS[L.id] || LINK_K;
+const presentUrl = L=>pageUrl() + '?present=' + encodeURIComponent(L.id) + '&k=' + encodeURIComponent(keyOf(L));
+
+/* ---------- reading a lead ---------- */
+const lead = ()=>leads.find(l=>l.id===cur);
+const base = L=>Number(L.basePrice) || 0;
+const locked = L=>L.stage === 'signed';
+const plus = n=>n < 0 ? '− ' + money(-n) + ' credit' : '+ ' + money(n);
+const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2);
+/* Standards shown as a choice (owner, 2026-10-14: "show it like the other options, just preset to it and marked no charge"):
+   the toilet's "Standard toilet", the finish's chrome, the home's standard ceiling height. The standard is "picked" while nothing else
+   is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
+const stdOf = (q, L)=>q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
+  : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
+  : q.bt === '518' ? { label:'4 wire shelves', keep:true }
+  : q.bt === '526' ? { label:'Garbage disposal' }
+  : q.bt === '608' ? { label:'#1 pressure treated' }
+  : q.bt === '701' ? { label:'White windows' }
+  : q.id === 'bstairs' ? { label:'Closed stairs to basement' }
+  : q.bt === '780' ? { label:'Interior paint - flat ceiling/flat walls' }
+  : q.bt === '790' ? { label:'LVP Level 10 - first floor & all baths', keep:true } : null;
+/* Flooring areas (owner, 2026-10-19): like the calculator's rows — each added area is a type + level with its sq ft; the form
+   below adds another (the same type + level again adds to its sq ft). */
+function floorRows(q, L, lock){
+  const cs = choicesOf(q, L), cust = view === 'customer';
+  const have = cs.filter(c=>{ const a = L.answers[q.id + '#' + c.i]; return a && (a.qty || (c.rate && a.price)); });
+  const rows = have.map(c=>{
+    const k = q.id + '#' + c.i, a = L.answers[k], n = a.qty || 0, p = a.price || 0;
+    const each = cust ? '' : c.rate
+      ? `<span class="muted">at $</span><input type="number" min="0" step="0.01" data-rate="${esc(k)}" value="${p || ''}" placeholder="0.00" style="width:90px" aria-label="Price per sq ft" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">/ sq ft</span>`
+      : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'} / sq ft</span>`;
+    return `<div class="cho on ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${each}
+      <input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">sq ft</span>
+      ${!cust && n && p ? `<span class="cp">= ${plus(Math.round(p * n * 100) / 100)}</span>` : ''}
+      <button type="button" class="tog" data-floor-del="${esc(k)}" ${lock ? 'disabled' : ''}>Remove</button></div>`;
+  }).join('');
+  if(lock) return rows;
+  const ft = FLOOR_TYPES.find(x=>x.key === floorPick.type) || FLOOR_TYPES[0];
+  const lv = ft.levels.includes(floorPick.level) ? floorPick.level : ft.levels[0] || 0;
+  const pc = cs.find(c=>c.ft === ft.key && c.lv === lv);
+  const each = cust || !pc ? '' : pc.rate ? '<span class="muted" style="font-size:13px">price typed once added</span>'
+    : pc.p == null ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${pc.p ? (pc.p < 0 ? '− ' + money2(-pc.p) + ' credit' : '+ ' + money2(pc.p)) : 'no charge'} / sq ft</span>`;
+  return rows + `<div class="cho floor-add" style="flex-wrap:wrap;gap:8px"><span class="ct"><b>Add a flooring area</b></span>
+    <select data-floor-type aria-label="Flooring type">${FLOOR_TYPES.map(x=>`<option value="${x.key}" ${x.key === ft.key ? 'selected' : ''}>${esc(x.t)}</option>`).join('')}</select>
+    ${ft.levels.length ? `<select data-floor-level aria-label="Level">${ft.levels.map(n=>`<option value="${n}" ${n === lv ? 'selected' : ''}>Level ${n}</option>`).join('')}</select>` : ''}
+    <input type="number" min="0" step="1" id="floorSq" placeholder="0" style="width:90px" aria-label="Square feet"><span class="muted" style="font-size:13px">sq ft</span>${each}
+    <button type="button" class="tog" data-floor-add="${esc(q.id)}">Add</button></div>`;
+}
+function stdRow(q, L, std, active, lock){
+  return `<div class="cho std ${active ? 'on' : ''}"><span class="ct">${esc(std.label)}</span><span class="nochg">No charge</span>
+    ${active ? '<span class="stdmark">&#10003; Standard</span>' : `<button type="button" class="tog" data-std="${esc(q.id)}" ${lock ? 'disabled' : ''}>Use standard</button>`}</div>`;
+}
+// a selection that belongs to the other collection isn't asked
+const isLotPrem = q=>!q.num && /lot premium/i.test(q.t);
+const asked = (q, L)=>{
+  if(!q.num && !isLotPrem(q)) return false;      // BuilderTrend's unnumbered "Contract Price" and "Miscellaneous" lines hold nothing
+  if(q.line && L.line && q.line !== L.line && LINE_NAMES[q.line]) return false;
+  if(isSkip(q, L)) return false;
+  const f = featOf(q);
+  return !f || hasFeat(L, f);
+};
+// the basement line lists every home style: show only this home's, when there is one
+const choicesOf = (q, L)=>{ if(q.opts) return q.c.map((c, i)=>({ ...c, i, p:optPrice(c.k) }));
+  if(q.ceil){ const std = ceilStd(L); return q.c.map((c, i)=>({ ...c, i, t:ceilLabel(std, c.h), p:ceilPrice(std, c.h) })).filter(c=>c.h !== std); }
+  const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p:optPrice(c.k) } : {}) }));
+  if(q.bt === '642'){ const cov = ALL_QS.find(x=>x.bt === '640'); const got = cov ? cov.c.map((c, i)=>(L.answers[cov.id + '#' + i] || {}).qty ? c.t : '').filter(Boolean).join(' ') : '';
+    if(/patio/i.test(got) || /deck/i.test(got)) return all.filter(c=>/patio/i.test(got) ? /patio/i.test(c.t) : /deck/i.test(c.t)); } if(q.bt !== '126' || !L.model) return all; const mine = all.filter(c=>c.t.toLowerCase().replace(/ basement$/, '') === L.model.toLowerCase()); return mine.length ? mine : all; };
+const missing = ()=>[];                       // nothing on either sheet has to be answered: untouched = standard
+const todo = ()=>[];
+const keysOf = q=>q.c.map((c, i)=>q.id + '#' + i);
+const noteKey = r=>'note:' + r.id;
+// what was chosen on one selection, as a short string (to show "changed since pricing")
+const snapQ = (q, L)=>q.c.map((c, i)=>{ const a = L.answers[q.id + '#' + i]; return a && a.qty ? c.t + (a.qty > 1 ? ' ×' + a.qty : '') : ''; }).filter(Boolean).join(', ');
+const snapAll = L=>Object.fromEntries(ALL_QS.filter(q=>q.v1).map(q=>[q.id, snapQ(q, L)]).filter(x=>x[1]));
+const snapVal = (a, q, k)=>{ const c = q && q.c ? q.c[Number(String(k).split('#')[1])] : null; return (c ? c.t : '') + (a && a.qty > 1 ? ' ×' + a.qty : ''); };
+// one line per choice that was taken, with what it adds
+function lines(L){
+  const out = [];
+  SECTIONS.forEach(r=>{
+    r.qs.forEach(q=>{ if(!asked(q, L)) return; q.c.forEach((c, i)=>{
+      const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
+      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.k ? optPrice(c.k) == null : c.p == null });
+    }); });
+    const n = L.answers[noteKey(r)];
+    if(n && n.label) out.push({ key:noteKey(r), q:{ id:noteKey(r), t:'Notes', room:r, cc:90, bt:'', v1:1, type:'text' }, where:'', label:n.label, price:0, cost:0, std:false, typed:true });
+  });
+  return out;
+}
+const upgrades = L=>lines(L).reduce((s,l)=>s+l.price,0) + L.custom.reduce((s,c)=>s+c.price,0);
+const upgradeCost = ()=>0;
+const coTotal = L=>L.cos.reduce((s,c)=>s+c.price,0) + L.cos.length * CO_FEE;
+const total = L=>base(L) + upgrades(L) + coTotal(L);
+// today's price for an answer, to spot prices that moved since the sheet was priced
+function todayPrice(k, a){ const q = qOfKey(k), c = q ? q.c[Number(k.split('#')[1])] : null; return { price: c && c.p ? c.p : a.price, cost:0 }; }   // a typed amount or a "price to come" keeps what was entered
+function drift(L){
+  if(locked(L)) return [];
+  return Object.entries(L.answers).filter(([k,a])=>k.includes('#') && a.qty).map(([k,a])=>{ const t = todayPrice(k, a); return { k, a, t, diff:(t.price - a.price) * a.qty }; }).filter(x=>x.diff !== 0);
+}
+let openSel = new Set(), openFor = '';
+function openDefault(list){ const key = cur + '|' + tab + '|' + roomId; if(openFor !== key){ openFor = key; openSel = new Set(list.length ? [list[0].id] : []); } }
+// one selection: its choices, each one tap to take (or a count / square feet where that's how it's priced)
+function prow(q, L, force){
+  if(!asked(q, L)) return '';
+  if(isLotPrem(q)){                               // not a choice: an amount for this lot
+    const a = L.answers[q.id + '#0'];
+    return `<div class="sel open" id="q-${q.id}"><div class="sel-h" style="cursor:default"><b>Lot premium</b></div>
+      <div class="cho ${a ? 'on' : ''}"><span class="ct">What this lot adds to the price</span><span class="muted">$</span><input type="number" min="0" step="100" data-lotprem="${esc(q.id)}" value="${a ? a.price : ''}" placeholder="0" style="width:130px" ${locked(L) ? 'disabled' : ''}></div></div>`;
+  }
+  if(isIncl(q, L)){                               // comes with this home style: nothing to choose, nothing to pay
+    return `<div class="sel open" id="q-${q.id}"><div class="sel-h" style="cursor:default"><b>${esc(q.t)}</b>${view === 'staff' ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}</div>
+      <div class="cho std on"><span class="ct">${esc((choicesOf(q, L)[0] || {}).t || q.t)}</span><span class="nochg">No charge</span><span class="stdmark">&#10003; Included</span></div>
+      <div class="q-sub">Comes with the ${esc(L.model)}.</div></div>`;
+  }
+  const staff = view === 'staff', lock = locked(L);
+  const was = L.v1Snap ? (L.v1Snap[q.id] || '') : null, now = snapQ(q, L);
+  const changed = q.v1 && was !== null && was !== now ? `<span class="chip soon">changed since pricing${was ? ' · was ' + esc(was) : ' · added'}</span>` : '';
+  const std = stdOf(q, L);
+  const stdActive = std && (std.keep || !choicesOf(q, L).some(c=>c.i !== std.idx && !c.side && (L.answers[q.id + '#' + c.i] || {}).qty));
+  const rows = (std ? stdRow(q, L, std, stdActive, lock) : '') + (q.bt === '790' ? floorRows(q, L, lock) : choicesOf(q, L).filter(c=>!std || c.i !== std.idx).map(c=>{
+    const k = q.id + '#' + c.i, a = L.answers[k], n = a ? a.qty : 0, p = a ? a.price : c.p;
+    const price = view === 'customer' ? '' : c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
+    if(isAllow(q, c)){
+      const amt = n ? p : allowDefault(q, c.i);
+      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}${/allowance/i.test(c.t) ? '' : ' — allowance'}</span>
+        <span class="muted">$</span><input type="number" min="0" step="1" data-allow="${esc(k)}" value="${amt}" style="width:110px" aria-label="Allowance amount" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">allowance</span>
+        <button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button></div>`;
+    }
+    if(c.rate){
+      const rate = a && a.price ? a.price : '';
+      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>
+        <input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">sq ft</span>
+        ${view === 'customer' ? '' : `<span class="muted">at $</span><input type="number" min="0" step="0.01" data-rate="${esc(k)}" value="${rate}" placeholder="0.00" style="width:90px" aria-label="Price per sq ft" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">/ sq ft</span>${n && rate ? `<span class="cp">= ${plus(Math.round(rate * n * 100) / 100)}</span>` : ''}`}</div>`;
+    }
+    const ctl = c.unit
+      ? `<input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.unit}</span>${n && view !== 'customer' ? `<span class="cp">= ${plus(p * n)}</span>` : ''}`
+      : (n && !(q.one || q.opts || q.ceil || q.nostep) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
+        + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
+    return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
+  }).join(''));
+  const isOpen = force || openSel.has(q.id), shown = choicesOf(q, L);
+  const stdNote = q.fin ? '<div class="q-sub">The finish covers the shower door, faucets and hardware in this bathroom.</div>' : '';
+  const autoNow = q.tw && !L.answers['own:' + q.id] && shown.some(c=>(L.answers[q.id + '#' + c.i] || {}).auto);
+  const got = shown.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty), sum = got.reduce((t, c)=>{ const a = L.answers[q.id + '#' + c.i]; return t + a.price * a.qty; }, 0);
+  const picked = std && stdActive && !got.length ? `<span class="picked">Standard: ${esc(std.label)}</span>` : got.length ? `<span class="picked">${got.length === 1 ? esc(got[0].t.length > 34 ? got[0].t.slice(0, 32) + '…' : got[0].t) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
+  return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" ${force ? '' : `data-sel="${esc(q.id)}"`} aria-expanded="${isOpen}"><b>${esc(q.t)}</b>${autoNow ? '<span class="chip plain">same as master bath</span>' : ''}${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
+      ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}${isOpen || got.length || std ? '' : `<span class="cnt">${shown.length} choice${shown.length === 1 ? '' : 's'}</span>`}
+      <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
+    ${isOpen ? stdNote + (rows || '<div class="q-sub">No choices are set up for this one yet.</div>') : ''}</div>`;
+}
+
+// follow-up: how soon, in words and colour
+function followInfo(L){
+  const f = L.follow; if(!f || !f.date) return null;
+  const [y,m,d] = f.date.split('-').map(Number), days = Math.round((new Date(y,m-1,d) - new Date().setHours(0,0,0,0)) / 86400000);
+  return { days, cls: days < 0 ? 'due' : days === 0 ? 'soon' : 'later',
+    when: days < 0 ? 'Follow-up overdue by ' + (-days) + (days === -1 ? ' day' : ' days') : days === 0 ? 'Follow up today' : days === 1 ? 'Follow up tomorrow' : 'Follow up ' + nice(f.date), what: f.what || '' };
+}
+const noteList = L=>Array.isArray(L.notes) ? L.notes : [];
+function officeCard(L){
+  const f = followInfo(L);
+  return `<div class="office noprint"><h2>Office notes &amp; follow-up <span style="font-weight:400;font-size:12.5px">· only the office sees this</span></h2>
+    <div class="office-cols">
+      <div><label class="f">Follow-up reminder</label>
+        ${f ? `<div><span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? `<div style="margin-top:6px;font-size:14.5px">${esc(f.what)}</div>` : ''}
+            <div class="quick"><button type="button" class="btn sm good" id="followDone">Done</button><button type="button" class="btn sm" id="followClear">Remove</button></div></div>`
+          : '<div class="muted" style="font-size:14px">No follow-up set.</div>'}
+        <div style="margin-top:12px"><input type="text" id="followWhat" placeholder="What to follow up about (optional)" maxlength="200" value="${f ? '' : ''}"></div>
+        <div class="quick">${[['Tomorrow',1],['In 3 days',3],['In a week',7],['In 2 weeks',14],['In a month',30]].map(([l,d])=>`<button type="button" class="btn sm" data-follow-in="${d}">${l}</button>`).join('')}
+          <input type="date" id="followDate" style="width:auto;padding:6px 8px" title="Or pick a date"></div></div>
+      <div><label class="f">Notes</label>
+        <textarea id="noteText" placeholder="e.g. Had a call. They want to move forward." maxlength="1000"></textarea>
+        <div style="margin-top:8px"><button type="button" class="btn sm primary" id="noteAdd">Add note</button></div>
+        ${noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at)).map(nt=>`<div class="note"><div style="flex:1">${esc(nt.text)}<div class="when">${esc(nice(nt.at))} · ${esc(ago(nt.at))}</div></div><button type="button" class="x" data-delnote="${esc(nt.at + '|' + nt.text.slice(0, 20))}" title="Delete this note">&times;</button></div>`).join('')}
+      </div>
+    </div></div>`;
+}
+const stageChip = L=>L.stage === 'signed' ? '<span class="chip signed">Signed &amp; locked</span>'
+  : L.stage === 'v2' ? '<span class="chip v2">Selections in progress</span>' : '<span class="chip v1">Pricing done · not back yet</span>';
+const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name : '', L.lot ? 'Lot ' + L.lot : 'lot not chosen'].filter(Boolean).join(' · ');
+
+/* ---------- saving: the open sheet and the hub's server ----------
+   Every second the open sheet either sends what changed or asks whether anything is new (another office device, or the
+   customer's screen). Only the changes travel, so two people tapping at once don't undo each other. */
+const SEL_URL = 'https://us-central1-alden-homes-hub.cloudfunctions.net/selectionsApi';
+const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn','quoteOk','line','basePrice','notes','follow','address'];
+let KEYS = {}, REMOTE = {}, TEAM = [], present = {}, flushId = '';   // link keys; the server's last copy of each sheet; the team; open customer screens
+async function selApi(body){
+  const u = window.firebase && firebase.apps.length && firebase.auth().currentUser;
+  const headers = { 'Content-Type':'application/json' };
+  if(u && !PRESENT && !SHOW && !QUOTE) headers.Authorization = 'Bearer ' + await u.getIdToken();
+  else body = { ...body, k: LINK_K };
+  const res = await fetch(SEL_URL, { method:'POST', headers, body:JSON.stringify(body) });
+  if(!res.ok){ const e = new Error('selectionsApi ' + res.status); e.status = res.status; throw e; }
+  return res.json();
+}
+const pending = ()=>{ const L = lead(); return !!(L && sync.id === L.id && sync.last && diffSheet(sync.last, L).any); };
+window.addEventListener('beforeunload', e=>{ if(pending() || (flushId && sync.id === flushId)){ e.preventDefault(); e.returnValue = ''; } });
+// send what's left on a sheet before moving on (leaving it, signing)
+async function flush(){ for(let n = 0; n < 12; n++){ if(!sync.busy){ await syncTick(); if(!pending() && !(flushId && sync.id === flushId)) return true; } await new Promise(r=>setTimeout(r, 250)); } return false; }
+let sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 };   // state: off | connecting | live | lost | missing
+const clone = o=>JSON.parse(JSON.stringify(o));
+const same = (a, b)=>JSON.stringify(a) === JSON.stringify(b);
+function diffSheet(from, to){
+  const ans = {}, del = [], top = {};
+  Object.keys(to.answers || {}).forEach(k=>{ if(!from || !same((from.answers || {})[k], to.answers[k])) ans[k] = to.answers[k]; });
+  Object.keys((from && from.answers) || {}).forEach(k=>{ if(!(k in (to.answers || {}))) del.push(k); });
+  SYNC_FIELDS.forEach(f=>{ if(!from || !same(from[f], to[f])) top[f] = to[f] === undefined ? null : to[f]; });
+  return { ans, del, top, any: !!(Object.keys(ans).length || del.length || (from && Object.keys(top).length)) };
+}
+const syncOn = ()=>!SHOW && !QUOTE && !!(PRESENT || cur || flushId) && CAT_READY;
+async function syncTick(){
+  if(!syncOn()){ if(sync.state !== 'off'){ sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 }; } return; }
+  if(sync.busy) return;
+  const sid = PRESENT || cur || flushId;
+  if(sync.id !== sid) sync = { id:sid, rev: REMOTE[sid] ? REMOTE[sid].rev : 0, last: REMOTE[sid] ? clone(REMOTE[sid].sheet) : null, busy:false, nav:'', state:'connecting', fails:0 };
+  const L = leads.find(l=>l.id === sid), sent = L ? clone(L) : null;
+  let body;
+  const navNow = !PRESENT && L && !['vendors','codes'].includes(tab) ? JSON.stringify({ tab, roomId: navRoom() }) : '';
+  if(!PRESENT && L && !sync.last){
+    // a new sheet: this device's copy is the first one
+    body = { action:'patch', id:sid, full:clone(sent), ans:sent.answers, del:[], top:diffSheet(null, sent).top, nav:navNow ? JSON.parse(navNow) : null };
+  } else if(L && sync.last){
+    const d = diffSheet(sync.last, L), navChanged = navNow && navNow !== sync.nav && sid === cur;
+    body = d.any || navChanged ? { action:'patch', id:sid, ans:d.ans, del:d.del, top:d.top, ...(navChanged ? { nav:JSON.parse(navNow) } : {}) } : { action:'get', id:sid, since:sync.rev };
+  } else body = { action:'get', id:sid, since:0 };
+  if(!cur && flushId && body.action === 'get'){ flushId = ''; return; }   // nothing left to send on the sheet just left
+  sync.busy = true;
+  const forId = sid;
+  try{
+    const data = await selApi(body);
+    if(data.key) KEYS[forId] = data.key;
+    if(data.sheet) REMOTE[forId] = { rev: data.rev, sheet: clone(data.sheet) };
+    if(forId !== (PRESENT || cur || flushId)) return;   // they opened a different sheet meanwhile
+    sync.fails = 0;
+    const before = sync.state;
+    if(data.missing){ sync.state = 'missing'; }
+    else {
+      sync.state = 'live';
+      if(navNow && body.nav) sync.nav = navNow;
+      if(data.sheet){ if(forId === (PRESENT || cur)) takeRemote(data.sheet, sent, body); else { const i = leads.findIndex(l=>l.id === forId); if(i >= 0) leads[i] = norm(clone(data.sheet)); sync.last = clone(data.sheet); } sync.rev = data.rev; }
+      if(PRESENT && data.nav){
+        const nv = JSON.stringify(data.nav);
+        if(nv !== sync.nav){ sync.nav = nv; if(data.nav.tab !== tab || data.nav.roomId !== navRoom()){ tab = data.nav.tab || tab; setNavRoom(data.nav.roomId); render(); window.scrollTo(0, 0); } }
+      }
+    }
+    if(before !== sync.state) render();
+  } catch(err){
+    console.warn('selections sync', err);
+    if(PRESENT && err.status === 403 && sync.state !== 'closed'){ sync.state = 'closed'; render(); }
+    else if(PRESENT && err.status === 404 && sync.state !== 'missing'){ sync.state = 'missing'; render(); }
+    else if(++sync.fails >= 3 && sync.state !== 'lost'){ sync.state = 'lost'; render(); }
+  } finally { sync.busy = false; }
+}
+// The server's copy has arrived. Keep anything tapped here while the request was in the air, and point out what the other screen changed.
+function takeRemote(sheet, sent, body){
+  const now = lead();
+  const mine = sent && now ? diffSheet(sent, now) : { ans:{}, del:[], top:{} };
+  const merged = clone(sheet);
+  merged.answers = merged.answers || {};
+  Object.assign(merged.answers, mine.ans);
+  mine.del.forEach(k=>{ delete merged.answers[k]; });
+  Object.assign(merged, mine.top);
+  norm(merged);
+  // what changed that this screen didn't do itself
+  const theirs = sent ? Object.keys(sheet.answers || {}).find(k=>!same((sent.answers || {})[k], sheet.answers[k]) && !(body.ans && k in body.ans)) : '';
+  const i = leads.findIndex(l=>l.id === merged.id);
+  if(i >= 0) leads[i] = merged; else leads.push(merged);
+  sync.last = clone(sheet);
+  const changed = !sent || !same(sent, merged);
+  if(theirs){
+    const q = qOfKey(theirs), a = sheet.answers[theirs];
+    if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + ' — ' + snapVal(a, q, theirs)); }
+  }
+  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[id^="jd_"],[data-bt-num],[data-allow],[data-rate],#floorSq,[data-floor-type],[data-floor-level],[data-note],[data-lotprem],[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
+  if(changed && !typing){ const y = window.scrollY; render(); window.scrollTo(0, y); }
+  flashKey = '';
+}
+setInterval(syncTick, 1000);
+const shareCode = L=>(present[L.id] || {}).code || '······';
+// "Open customer screen": the server opens the sheet to a customer screen for 12 hours and hands back a 6-digit join code
+async function openPresent(L){
+  if(present[L.id] && present[L.id].until > new Date().toISOString()) return;
+  try{ await flush(); const r = await selApi({ action:'present', id:L.id }); KEYS[L.id] = r.k; present[L.id] = { code:r.code, until:r.until }; }
+  catch(err){ console.error(err); toast('Couldn\'t open a customer screen. Check the connection and try again.'); }
+  render();
+}
+const liveBadge = ()=>sync.state === 'live' ? '<span class="live"><i></i>Live</span>' : sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live" style="color:var(--ink-soft)">Connecting…</span>';
+
+/* ---------- the selection sheet they can share ----------
+   Once a sheet is signed, the office makes a link (…?show=LEAD) to a page built to be passed around: the buyer's
+   choices with pictures, room by room, and no prices — it's as much an advertisement for Alden as a keepsake.
+   It can be saved as a PDF. Like the customer screen, it's read from the hub's server, so the link works anywhere. */
+const SHOW = new URLSearchParams(location.search).get('show');
+const CONTACT = { line:'' };   // Alden's website / phone for the bottom of the share page (to come from the owner)
+let showState = 'loading';                                            // loading | ready | missing
+const showUrl = L=>pageUrl() + '?show=' + encodeURIComponent(L.id) + '&k=' + encodeURIComponent(keyOf(L));
+const familyName = L=>{ const w = String(L.name || '').replace(/&.*/, '').trim().split(/\s+/); const last = (String(L.name2 || L.name || '').trim().split(/\s+/).pop()) || w.pop(); return last || 'Our'; };
+function showScreen(){
+  const L = lead();
+  document.title = L ? 'The ' + familyName(L) + ' Home | Alden Homes' : 'Alden Homes';
+  if(!L) return `<div class="wrap"><div class="card" style="margin-top:60px;text-align:center">${showState === 'missing'
+    ? '<h2>This selection sheet isn\'t available.</h2><p class="lede" style="margin:8px auto 0">The link may be mistyped, or it hasn\'t been shared yet.</p>'
+    : '<h2>Opening the selection sheet…</h2>'}</div></div>`;
+  if(L.stage !== 'signed') return `<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>These selections aren't final yet.</h2><p class="lede" style="margin:8px auto 0">The selection sheet appears here once everything has been chosen and signed.</p></div></div>`;
+  // a page to show off: leave out the things they said no to ("Outdoor living: None", "Fan pre-wire: No")
+  // from the pricing sheet, only the things they added (no credits, notes or "No"s); from selections, every pick
+  const ls = lines(L).filter(l=>!l.typed && l.price >= 0 && l.q.num > 126 && !/^misc\b|credit/i.test(l.label));
+  const artOf = l=>{ if(l.q.type === 'qty') return `<span class="count">${L.answers[l.key].qty.toLocaleString('en-US')}</span>`; const o = (l.q.o || []).find(x=>x[0] === l.label); return (o && o[3]) || `<div class="noart">${esc(l.q.room.name)}</div>`; };
+  const tile = (l, big)=>`<div class="sh-tile">${l.price > 0 ? '<span class="up">Upgrade</span>' : ''}<div class="art">${artOf(l)}</div>
+      <div class="txt"><div class="lab">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.room.name : l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</div><div class="val">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.t : l.q.type === 'money' ? l.q.t : l.label)}</div></div></div>`;
+  // the three biggest choices lead the page
+  const sig = ls.filter(l=>l.price > 0 && l.q.type !== 'qty' && l.q.type !== 'money').sort((a,b)=>b.price - a.price).slice(0, 3);
+  const made = [...L.custom.map(c=>c.desc), ...L.cos.map(c=>c.desc)];
+  // the two meetings both have a Kitchen: on this page they are one section
+  const rooms = [...new Set(SECTIONS.map(r=>r.name))].map(name=>({ r:{ name }, mine: ls.filter(l=>l.q.room.name === name && !sig.includes(l)) })).filter(x=>x.mine.length);
+  const ups = ls.filter(l=>l.price > 0).length + made.length;
+  const where = [L.model, (DEVS.find(d=>d.code === L.dev) || {}).name, L.lot ? 'Lot ' + L.lot : ''].filter(Boolean).join(' · ');
+  return `<div class="sh">
+    <div class="sh-hero"><div class="wrap">
+      <div class="sh-logo"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div class="sh-kicker">Designed with Alden Homes</div>
+      <div class="sh-title">The ${esc(familyName(L))} Home</div>
+      <div class="sh-sub">${esc(where)}</div>
+      <div class="sh-stats">
+        <div class="sh-stat"><b>${ls.length + made.length}</b><span>choices made</span></div>
+        <div class="sh-stat"><b>${ups}</b><span>custom upgrades</span></div>
+        <div class="sh-stat"><b>${SECTIONS.filter(r=>ls.some(l=>l.q.room.id === r.id)).length}</b><span>parts of the home</span></div>
+      </div>
+      <div class="sh-actions noprint"><button type="button" id="shPdf">Download as PDF</button><button type="button" class="alt" id="shShare">Share</button></div>
+    </div></div>
+    <div class="wrap">
+      ${sig.length ? `<div class="sh-sec"><h2>Signature choices</h2><p class="sh-lede">The decisions that make this home theirs.</p><div class="sh-grid big">${sig.map(l=>tile(l, true)).join('')}</div></div>` : ''}
+      ${rooms.map(x=>`<div class="sh-sec"><h2>${esc(x.r.name)}</h2><div class="sh-grid">${x.mine.map(l=>tile(l)).join('')}</div></div>`).join('')}
+      ${made.length ? `<div class="sh-sec"><h2>Made just for this home</h2><p class="sh-lede">Not on any list. They asked, and we built it in.</p>${made.map(m=>`<div class="sh-made">${esc(m)}</div>`).join('')}</div>` : ''}
+    </div>
+    <div class="sh-cta"><div class="wrap">
+      <h2>Every Alden home starts like this one.</h2>
+      <p>With your choices, room by room. Handcrafted Homes &amp; Communities.</p>
+      <div class="who">${esc(CONTACT.line)}</div>
+    </div></div>
+    <div class="sh-foot">Selections finalized ${esc(nice(L.signedOn))} · Alden Homes</div>
+  </div>`;
+}
+async function loadShow(){
+  cur = SHOW;
+  if(lead()) showState = 'ready';
+  render();
+  try{
+    const data = await selApi({ action:'get', id:SHOW, since:0 });
+    if(data.sheet){
+      norm(data.sheet);
+      const i = leads.findIndex(l=>l.id === SHOW); if(i >= 0) leads[i] = data.sheet; else leads.push(data.sheet);
+      showState = 'ready';
+    } else if(!lead()) showState = 'missing';
+  } catch(err){ console.warn(err); if(!lead()) showState = 'missing'; }
+  render();
+}
+async function showPdf(btn){
+  const L = lead(); if(!L) return;
+  btn.disabled = true; const was = btn.textContent; btn.textContent = 'Making the PDF…';
+  try{
+    if(typeof html2pdf === 'undefined') await new Promise((res, rej)=>{ const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js'; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+    document.body.classList.add('pdfing');
+    const toPng = (src, w, h)=>new Promise(res=>{ const im = new Image(); im.onload = ()=>{ const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(im, 0, 0, w, h); res(c.toDataURL('image/png')); }; im.onerror = ()=>res(''); im.src = src; });
+    for(const svg of Array.from(document.querySelectorAll('.sh .art svg'))){
+      const box = svg.getBoundingClientRect(), w = Math.max(2, Math.round(box.width * 2)), h = Math.max(2, Math.round(box.height * 2));
+      const copy = svg.cloneNode(true); copy.setAttribute('width', w); copy.setAttribute('height', h); copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const png = await toPng('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copy)), w, h);
+      if(png){ const im = document.createElement('img'); im.src = png; im.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block'; svg.replaceWith(im); }
+    }
+    const logo = document.querySelector('.sh-logo img');
+    if(logo && logo.naturalWidth){ const png = await toPng(logo.src, logo.naturalWidth, logo.naturalHeight); if(png){ logo.src = png; await new Promise(r=>setTimeout(r, 50)); } }
+    await html2pdf().set({ margin:0, filename:'The ' + familyName(L) + ' Home - Alden Homes selections.pdf', image:{ type:'jpeg', quality:.94 },
+      html2canvas:{ scale:2, useCORS:true, backgroundColor:'#ffffff' }, jsPDF:{ unit:'in', format:'letter', orientation:'portrait' }, pagebreak:{ mode:['css','legacy'], avoid:['.sh-tile','.sh-made','.sh-sec h2'] } })
+      .from(document.querySelector('.sh')).save();
+  } catch(err){ console.error(err); window.print(); }   // if the PDF maker can't load, the browser's own "Save as PDF" still works
+  document.body.classList.remove('pdfing');
+  render();   // put the drawings back as they were
+  const again = document.getElementById('shPdf'); if(again){ again.disabled = false; again.textContent = was; }
+}
+// the box on a signed sheet where the office (or the customer's own screen) gets the link
+function shareSheetCard(L){
+  const on = true;
+  return `<div class="card noprint"><h2>Their selection sheet to share</h2>
+    <p class="lede">A good-looking page of everything they chose, with pictures and no prices. They can send the link to friends and family or save it as a PDF. It's a keepsake for them and an advertisement for us.</p>
+    ${on ? `<div class="sharelink"><input type="text" readonly value="${esc(showUrl(L))}" onclick="this.select()"><button type="button" class="btn sm" id="showCopy">Copy link</button><button type="button" class="btn sm primary" id="showOpen">Open it</button></div>`
+         : `<div style="margin-top:12px"><button type="button" class="btn primary" id="showMake">Create the share link</button></div>`}</div>`;
+}
+
+/* ---------- screens ---------- */
+function render(){
+  if(QUOTE){ document.body.classList.add('quote'); cur = QUOTE; view = 'customer'; $('totalbar').style.display = 'none'; $('root').innerHTML = quoteScreen(); return; }
+  document.body.classList.toggle('printdoc', tab === 'quote');
+  if(SHOW){ document.body.classList.add('show'); cur = SHOW; $('totalbar').style.display = 'none'; $('root').innerHTML = showScreen(); return; }
+  document.querySelectorAll('#viewSw button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
+  document.body.classList.toggle('present', !!PRESENT);
+  if(PRESENT){ cur = PRESENT; view = 'customer'; if(['vendors','codes'].includes(tab)) tab = 'summary'; }
+  const L = lead();
+  if(PRESENT && !L){
+    $('totalbar').style.display = 'none';
+    $('root').innerHTML = sync.state === 'missing' || sync.state === 'closed'
+      ? '<div class="card" style="margin-top:40px"><h2>' + (sync.state === 'closed' ? 'This customer screen has been closed.' : 'This screen isn\'t connected to a selection sheet.') + '</h2><p class="lede">Ask your Alden Homes rep to press "Open customer screen" on their device, then try the link or code again.</p><div style="margin-top:14px"><a class="btn" href="selections.html" style="text-decoration:none;display:inline-block">Back</a></div></div>'
+      : '<div class="card" style="margin-top:40px"><h2>Connecting to your selection sheet…</h2><p class="lede">This takes a second or two.</p></div>';
+    return;
+  }
+  if(styleEdit){ $('totalbar').style.display = 'none'; $('root').innerHTML = stylesScreen(); return; }
+  tellNav();
+  $('totalbar').style.display = L ? '' : 'none';
+  $('root').innerHTML = L ? leadScreen(L) : leadsScreen();
+  if(L) $('totalIn').innerHTML = totalBar(L);
+  save();
+}
+
+/* ---------- Home styles: set up each style's pricing sheet ---------- */
+let styleEdit = false, styName = STYLES.ALDEN[0], styState = '', styTimer = null;
+const styColl = name=>Object.keys(STYLES).find(k=>STYLES[k].includes(name)) || 'ALDEN';
+function stylesScreen(){
+  const coll = styColl(styName), fake = { model:styName, line:coll, answers:{} };
+  const cfg = STYLE_CFG[styName] || { skip:[], incl:[] };
+  const stateOf = q=>(cfg.incl || []).includes(q.id) ? 'incl' : (cfg.skip || []).includes(q.id) ? 'hide' : 'show';
+  const fits = q=>(q.num || isLotPrem(q)) && !(q.line && LINE_NAMES[q.line] && q.line !== coll);
+  const priceOf = q=>{ if(isLotPrem(q)) return 'typed per lot'; const c = choicesOf(q, fake); return c.length === 1 ? (c[0].p == null ? 'price to come' : c[0].p ? money(c[0].p) : 'no charge') : c.length + ' choices'; };
+  const opts = Object.keys(STYLES).map(k=>`<optgroup label="${esc(LINE_NAMES[k])}">${STYLES[k].map(m=>`<option ${m === styName ? 'selected' : ''}>${esc(m)}</option>`).join('')}</optgroup>`).join('');
+  const others = Object.keys(STYLES).map(k=>`<optgroup label="${esc(LINE_NAMES[k])}">${STYLES[k].filter(m=>m !== styName).map(m=>`<option value="${esc(m)}">${esc(m)}${STYLE_CFG[m] ? '' : ' (not set up)'}</option>`).join('')}</optgroup>`).join('');
+  const n = { incl:(cfg.incl || []).length, hide:(cfg.skip || []).length };
+  const secs = PRICING.map(r=>{ const qs = r.qs.filter(fits); if(!qs.length) return '';
+    return `<div class="card"><h2 style="font-size:18px">${esc(r.name)}</h2>${qs.map(q=>{ const st = stateOf(q);
+      return `<div class="sty-row ${st}"><div class="t"><b>${esc(q.t)}</b><small>BT ${esc(q.bt || '—')} · ${esc(priceOf(q))}</small></div>
+        <div class="tri"><button type="button" class="${st === 'show' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="show">Show</button><button type="button" class="incl ${st === 'incl' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="incl">Included</button><button type="button" class="hide ${st === 'hide' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="hide">Hide</button></div></div>`; }).join('')}</div>`; }).join('');
+  return `<div style="margin-top:18px"><a href="#" id="styBack" class="muted" style="font-size:13px;text-decoration:none">&larr; All leads</a>
+      <div class="eyebrow" style="margin-top:6px">Office setup</div><h1>Home style pricing sheets</h1>
+      <p class="lede">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
+    <div class="card" style="display:flex;gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
+      <div><label class="f">Home style</label><select id="styPick">${opts}</select></div>
+      <div><label class="f">Standard ceilings</label><select id="styCeil"><option value="8" ${ceilStd(fake) === 8 ? 'selected' : ''}>8'</option><option value="9" ${ceilStd(fake) === 9 ? 'selected' : ''}>9'</option></select></div>
+      <div class="muted" style="font-size:13.5px;padding-bottom:8px">${n.incl} included · ${n.hide} hidden · <span id="styState">${esc(styState)}</span></div>
+      <div class="grow"></div>
+      <div><label class="f">Same as another style?</label><div style="display:flex;gap:8px"><select id="styFrom"><option value="">Copy from…</option>${others}</select><button type="button" class="btn sm" id="styCopy">Copy</button></div></div>
+      ${n.incl || n.hide ? '<button type="button" class="btn sm" id="styClear">Show everything</button>' : ''}
+    </div>
+    ${allowCard()}
+    ${ceilCard()}
+    ${bathCard()}
+    ${secs}`;
+}
+function floorCard(){
+  const lvls = [10, 20, 30, 40, 50, 60];
+  return `<div class="card"><h2 style="font-size:18px">Flooring prices (per sq ft)</h2>
+    <p class="muted" style="font-size:13.5px;margin-top:4px">What each type and level adds per square foot over the standard LVP Level 10. 0 = no charge; a minus number is a credit; empty = "price to come". Tile is priced on the sheet.</p>
+    <div style="overflow-x:auto"><table class="floor-grid" style="border-collapse:collapse;margin-top:10px;font-size:14px">
+      <tr><th style="text-align:left;padding:4px 8px"></th>${lvls.map(n=>`<th style="padding:4px 6px">Level ${n}</th>`).join('')}</tr>
+      ${FLOOR_TYPES.filter(x=>x.levels.length).map(x=>`<tr><td style="padding:4px 8px;white-space:nowrap"><b>${esc(x.t)}</b></td>${lvls.map(n=>{
+        if(x.key === 'lvp' && n === 10) return '<td style="padding:4px 6px;text-align:center" class="muted">standard</td>';
+        if(!x.levels.includes(n)) return '<td></td>';
+        const k = 'floor-' + x.key + n, v = optPrice(k);
+        return `<td style="padding:4px 6px"><input type="number" step="0.01" data-optp="${k}" value="${v == null ? '' : v}" placeholder="—" style="width:80px"></td>`; }).join('')}</tr>`).join('')}
+    </table></div></div>`;
+}
+function bathCard(){
+  const row = (k, name, note)=>`<div class="sty-row"><div class="t"><b>${name}</b><small>${note}</small></div>
+    <span class="muted">$</span><input type="number" step="0.01" data-optp="${k}" value="${optPrice(k) == null ? '' : optPrice(k)}" placeholder="price to come" style="width:130px"></div>`;
+  return `<div class="card"><h2 style="font-size:18px">Other option prices</h2>
+    <p class="muted" style="font-size:13.5px;margin-top:4px">Prices for options BuilderTrend doesn't have (or prices per foot). Shower doors and finishes are the same in every bathroom; chrome is standard at no charge. Leave a box empty and the sheet says "price to come".</p>
+    ${DOOR_CHOICES.map(x=>row(x.k, x.t, 'Not priced in BuilderTrend')).join('')}
+    ${FIN_CHOICES.map(x=>row(x.k, x.t + ' finish', 'Added once per bathroom that picks it (door, faucets and hardware)')).join('')}
+    ${row('pantry-lf', 'Added pantry shelves, per linear ft', '4 wire shelves are standard; this is each extra foot of shelf')}
+    ${row('rail-lf', 'Deck railing, per linear ft', 'Asked on the patio & deck section')}
+    ${row('stair-trad-lf', 'Stair railing, standard traditional, per linear ft', 'Stairs section')}
+    ${row('stair-sq-lf', 'Stair railing, square balusters, per linear ft', 'Stairs section')}
+    ${row('bsmt-open', 'Open stairs to basement', 'Basement section; closed stairs are standard')}
+    ${row('bsmt-rail', 'Basement railing', 'Basement section')}
+</div>${floorCard()}`;
+}
+function ceilCard(){
+  const row = (k, name)=>`<div class="sty-row"><div class="t"><b>${name}</b><small>${k === '9-8' ? 'A credit: type it as a minus number' : k === '8-10' ? 'Not in BuilderTrend' : 'From BuilderTrend'}</small></div>
+    <span class="muted">$</span><input type="number" step="1" data-ceilp="${k}" value="${ceilPrice(k.split('-')[0], k.split('-')[1])}" style="width:120px"></div>`;
+  return `<div class="card"><h2 style="font-size:18px">Ceiling height prices</h2>
+    <p class="muted" style="font-size:13.5px;margin-top:4px">Each style's standard height is set with the style below. The sheet offers the moves from it at these prices.</p>
+    ${row('8-9', "8' standard → upgrade to 9'")}${row('8-10', "8' standard → upgrade to 10'")}${row('9-10', "9' standard → upgrade to 10'")}${row('9-8', "9' standard → credit to 8'")}</div>`;
+}
+function allowCard(){
+  const rows = ALL_QS.flatMap(q=>q.c.map((c, i)=>isAllow(q, c) ? { q, c, i } : null).filter(Boolean));
+  if(!rows.length) return '';
+  return `<div class="card"><h2 style="font-size:18px">Allowance amounts</h2>
+    <p class="muted" style="font-size:13.5px;margin-top:4px">What each allowance starts at on every pricing sheet. The rep can type a different amount for a buyer; these are the only amounts that can be typed on the sheet. Every other price comes from the selection sheet.</p>
+    ${rows.map(({ q, c, i })=>{ const k = q.id + '#' + i;
+      return `<div class="sty-row"><div class="t"><b>${esc(q.t)}</b><small>BT ${esc(q.bt || '—')}${q.line ? ' · ' + esc(LINE_NAMES[q.line] || q.line) : ''} · ${esc(c.t)}</small></div>
+        <span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(k)}" value="${allowDefault(q, i)}" style="width:120px"></div>`; }).join('')}</div>`;
+}
+function styleSave(){
+  styState = 'Saving…'; const el = $('styState'); if(el) el.textContent = styState;
+  clearTimeout(styTimer);
+  styTimer = setTimeout(async ()=>{
+    try{
+      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES }); STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
+    } catch(err){ console.error(err); styState = 'Not saved — check the connection'; }
+    const e2 = $('styState'); if(e2) e2.textContent = styState;
+  }, 500);
+}
+function styleSet(id, st){
+  const c = STYLE_CFG[styName] = STYLE_CFG[styName] || { skip:[], incl:[] };
+  c.skip = (c.skip || []).filter(x=>x !== id); c.incl = (c.incl || []).filter(x=>x !== id);
+  if(st === 'hide') c.skip.push(id); else if(st === 'incl') c.incl.push(id);
+  if(!c.skip.length && !c.incl.length && !c.ceil) delete STYLE_CFG[styName];
+  const y = window.scrollY; render(); window.scrollTo(0, y); styleSave();
+}
+
+function leadsScreen(){
+  const dueRank = L=>{ const f = followInfo(L); return f && f.days <= 0 ? 0 : 1; };
+  const dueCount = leads.filter(L=>dueRank(L) === 0).length;
+  const rows = leads.slice().sort((a,b)=>dueRank(a) - dueRank(b) || (b.updated || '').localeCompare(a.updated || '')).map(L=>`
+    <div class="lead">
+      <div class="who"><strong>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</strong>
+        <div class="muted" style="font-size:13.5px;margin-top:2px">${esc(homeLabel(L))}</div>
+        <div class="muted" style="font-size:12.5px;margin-top:2px">${[L.phone, L.email].filter(Boolean).map(esc).join(' · ')}</div>
+        ${(f=>f ? `<div style="margin-top:6px"><span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? ` <span class="muted" style="font-size:13px">${esc(f.what)}</span>` : ''}</div>` : '')(followInfo(L))}
+        ${noteList(L).length ? `<div class="muted" style="font-size:13px;margin-top:5px;font-style:italic">Last note, ${esc(ago(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].at))}: ${esc(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].text.slice(0, 110))}</div>` : ''}</div>
+      <div>${stageChip(L)}${L.houseId && JOBS[L.houseId] && jobMissing(JOBS[L.houseId]).length ? ` <span class="chip soon">home details to fill in</span>` : ''}${waiting(L).length ? ` <span class="chip soon">${waiting(L).length} to price</span>` : ''}<div class="muted" style="font-size:12.5px;margin-top:4px">Last in ${esc(ago(L.updated))}${drift(L).some(d=>d.diff) ? ' · <span style="color:#8a5d14">prices have changed</span>' : ''}</div></div>
+      <div class="amt">${money(total(L))}<div class="muted" style="font-size:11.5px;font-family:inherit;font-weight:400">${L.stage === 'signed' ? 'contract' : 'so far'}</div></div>
+      <button type="button" class="btn sm" data-open="${L.id}">Open</button>
+    </div>`).join('');
+  const devOpts = DEVS.map(d=>`<option value="${d.code}">${d.code} — ${d.name}</option>`).join('');
+  return `
+    <div style="margin-top:22px"><div class="eyebrow">Selections</div><h1>Leads &amp; selection sheets</h1>
+      <p class="lede">Everyone who sits down for a pricing meeting is saved here, whether or not they come back. Open one to pick up exactly where it was left, even months later.</p></div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2>${leads.length} on file${dueCount ? ` <span class="chip due" style="margin-left:8px;vertical-align:middle">${dueCount} to follow up</span>` : ''}</h2><div class="grow"></div>
+        <button type="button" class="btn primary" id="newLeadBtn">${newOpen ? 'Cancel' : '+ New lead'}</button></div>
+      ${newOpen ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft)">
+        <div class="grid">
+          <div><label class="f">Buyer's name</label><input type="text" id="nName" placeholder="First and last name"></div>
+          <div><label class="f">Second buyer (optional)</label><input type="text" id="nName2"></div>
+          <div><label class="f">Phone</label><input type="tel" id="nPhone"></div>
+          <div><label class="f">Email</label><input type="email" id="nEmail"></div>
+          <div><label class="f">Development</label><select id="nDev"><option value="">Not sure yet</option>${devOpts}</select></div>
+          <div><label class="f">Lot</label><select id="nLot"><option value="">Not chosen yet</option></select></div>
+          <div style="grid-column:1/-1"><label class="f">Street address (optional)</label><input type="text" id="nAddr"></div>
+          <div><label class="f">Collection</label><select id="nLine">${Object.keys(LINE_NAMES).map(k=>`<option value="${k}">${LINE_NAMES[k]}</option>`).join('')}</select></div>
+          <div><label class="f">Home style</label><select id="nModel">${STYLES.ALDEN.map(m=>`<option>${m}</option>`).join('')}</select></div>
+          <div><label class="f">Base price ($)</label><input type="number" id="nBase" min="0" step="100" placeholder="e.g. 389900"></div>
+        </div>
+        <div style="margin-top:12px"><button type="button" class="btn good" id="nStart">Save lead &amp; start pricing</button></div>
+      </div>` : ''}
+      <div style="margin-top:8px">${rows || '<p class="muted" style="padding:14px 0">No leads yet.</p>'}</div>
+    </div>
+    <div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1 1 260px"><h2>Join as customer screen</h2><p class="muted" style="font-size:14px;margin-top:4px">For the TV or the customer's iPad. Type the code shown on the rep's device.</p></div>
+      <input type="tel" inputmode="numeric" id="joinCode" placeholder="000000" maxlength="6" autocomplete="off" style="width:170px;font-family:'Courier New',monospace;font-size:22px;letter-spacing:4px;text-align:center">
+      <button type="button" class="btn primary" id="joinBtn">Join</button></div>
+    <div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1 1 260px"><h2>Home style pricing sheets</h2><p class="muted" style="font-size:14px;margin-top:4px">Office setup: choose which lines each home style's pricing sheet shows, and what comes included at no charge (like a Percy's basement).</p></div>
+      <button type="button" class="btn" id="styleSetup">Set up home styles</button></div>
+`;
+}
+
+function leadScreen(L){
+  const left = todo(L).length, staff = view === 'staff';
+  const d = drift(L).filter(x=>x.diff), dSum = d.reduce((s,x)=>s+x.diff,0);
+  const tabs = [['v1','Pricing'],['quote','Pricing sheet'],['full','Selections'],['summary','Summary'],['sign', locked(L) ? 'Signed copy' : 'Sign']]
+    .map(([id, label])=>`<button type="button" class="tab ${tab===id?'on':''}" data-tab="${id}">${label}${id==='full' && left && !locked(L) ? `<span class="n">${left} to choose</span>` : ''}${id==='quote' && waiting(L).length ? `<span class="n">${waiting(L).length} to price</span>` : ''}</button>`).join('')
+    + (staff ? [['vendors','For vendors'],['codes','By cost code']].map(([id,label])=>`<button type="button" class="tab staff ${tab===id?'on':''}" data-tab="${id}">${label}</button>`).join('') : '');
+  const body = tab === 'v1' ? sheetView(L, 'v1') : tab === 'full' ? sheetView(L, 'full') : tab === 'quote' ? quoteTab(L) : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
+  return `
+    <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
+        <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</h1>
+        <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${money(base(L))}</div></div>
+      <div style="text-align:right">${PRESENT ? (sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live"><i></i>Live with your Alden Homes rep</span>')
+        : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">Pricing meeting ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
+          <div class="noprint" style="margin-top:8px;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap">${present[L.id] ? liveBadge() : ''}<button type="button" class="btn sm" id="shareBtn">${shareOpen ? 'Hide' : present[L.id] ? 'Customer screen' : 'Open customer screen'}</button>${staff && !locked(L) ? '<button type="button" class="btn sm" id="delLead">Delete lead</button>' : ''}</div>`}</div>
+    </div>
+    ${!PRESENT && shareOpen ? `<div class="sharebox noprint"><strong>A second screen for the customer.</strong> ${liveBadge()}
+        <div style="margin-top:6px;line-height:1.5">Put this sheet on the customer's iPad or the TV in a big, customer-only view. Whatever either of you taps shows on both screens about a second later, and their screen follows the room you're on.</div>
+        <div style="margin-top:12px;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
+          <div><label class="f" style="color:inherit">On a TV or another iPad</label>
+            <div style="font-size:14px;line-height:1.5">Open the hub's Selections page there (no sign-in needed), press <strong>Join as customer screen</strong>, and type this code:</div>
+            <div class="mono" style="font-size:30px;font-weight:700;letter-spacing:5px;margin-top:6px;color:var(--navy)">${esc(shareCode(L))}</div></div>
+          <div><label class="f" style="color:inherit">Or send the link</label>
+            <input type="text" readonly value="${esc(presentUrl(L))}" onclick="this.select()">
+            <div style="margin-top:8px"><button type="button" class="btn sm" id="shareCopy">Copy link</button> <button type="button" class="btn sm" id="shareOpenBtn">Open in a new window here</button></div></div>
+        </div>
+        <div style="font-size:12.5px;margin-top:12px">The customer screen stays open for 12 hours. Office notes, follow-ups and our costs never show on it.</div></div>` : ''}
+    ${d.length && !PRESENT ? `<div class="banner amber noprint"><p><strong>${d.length} price${d.length===1?' has':'s have'} changed since this sheet was priced on ${esc(nice(L.pricedOn))}.</strong>
+        At today's prices the same choices come to ${money(Math.abs(dSum))} ${dSum >= 0 ? 'more' : 'less'}. The sheet keeps the prices it was quoted at until someone decides.
+        <span class="muted" style="display:block;font-size:13px;margin-top:4px">${d.map(x=>esc((qOfKey(x.k) || {}).t + ' — ' + snapVal(null, qOfKey(x.k), x.k)) + ': ' + money2(x.a.price) + ' → ' + money2(x.t.price)).join(' · ')}</span></p>
+        <button type="button" class="btn sm" id="repriceBtn">Update to today's prices</button></div>` : ''}
+    ${locked(L) ? `<div class="banner good"><p><strong>Signed on ${esc(nice(L.signedOn))}.</strong> These choices and their prices are locked for good. Anything new is a change order.</p></div>` : ''}
+    ${staff && !PRESENT ? officeCard(L) : (!PRESENT && followInfo(L) && followInfo(L).days <= 0 ? `<div class="banner staff noprint"><p><strong>${esc(followInfo(L).when)}.</strong> ${esc(followInfo(L).what)} <span class="muted">Switch to Office view for notes.</span></p></div>` : '')}
+    <div class="tabs noprint">${tabs}</div>
+    ${body}`;
+}
+
+/* one question, in any of its forms */
+function question(q, L, opts){
+  if(!asked(q, L)) return '';
+  if(q.opt) return prow(q, L);
+  const staff = view === 'staff', lock = locked(L);
+  const snap = L.v1Snap || {};
+  const optCard = (key, o, i)=>{
+    const a = L.answers[key], sel = a && a.label === o[0];
+    const fav = L.favs[key + '|' + o[0]];
+    // a sheet shows the price it was quoted at for the picked option, today's price for the others
+    const price = sel ? a.price : o[1], cost = sel ? a.cost : o[2];
+    return `<button type="button" class="opt ${sel?'sel':''}${sel && flashKey === key ? ' flash' : ''}" data-pick="${esc(key)}" data-opt="${esc(o[0])}" ${lock?'disabled':''}>
+      <div class="art">${o[3] || ''}</div>${i === 0 ? '<span class="std">Standard</span>' : ''}<span class="tick">&#10003;</span>
+      <div class="txt"><div class="nm">${esc(o[0])}</div>
+        <div class="pr ${price === 0 ? 'inc' : ''}">${price === 0 ? (i === 0 ? 'Included' : 'No extra cost') : plus(price)}</div>
+        ${staff && price ? `<div class="staffline">our cost ${money(cost)} · margin ${money(price - cost)}</div>` : ''}</div>
+      ${!lock && !sel ? `<span class="fav ${fav?'on':''}" data-fav="${esc(key + '|' + o[0])}" title="Mark as a favourite">${fav ? '&#9829;' : '&#9825;'}</span>` : ''}
+    </button>`;
+  };
+  const changed = key=>{
+    if(!q.v1 || !L.v1Snap || !L.answers[key] || snap[key] == null || snap[key] === L.answers[key].label) return '';
+    const was = q.o.find(o=>o[0] === snap[key]), diff = L.answers[key].price - (was ? was[1] : 0);
+    return `<div class="changed">Changed since pricing: was <strong>${esc(snap[key])}</strong> · ${diff === 0 ? 'no change in price' : (diff > 0 ? '+ ' : '− ') + money(Math.abs(diff))}</div>`;
+  };
+  const miss = missing(q, L);
+  let inner;
+  if(q.type === 'qty'){
+    const a = L.answers[q.id] || { qty:0, price:q.price, cost:q.cost };
+    inner = `<div class="qty"><div class="stepper"><button type="button" data-qty="${q.id}" data-d="-1" ${lock || !a.qty ? 'disabled' : ''}>&minus;</button><span>${a.qty}</span><button type="button" data-qty="${q.id}" data-d="1" ${lock || a.qty >= q.max ? 'disabled' : ''}>+</button></div>
+      <div><strong>${money(a.price)}</strong> per ${esc(q.unit)}${a.qty ? ` · <span class="mono" style="font-weight:700;color:var(--navy)">+ ${money(a.price * a.qty)}</span>` : ''}
+        ${staff ? `<div class="staffline">our cost ${money(a.cost)} each · margin ${money(a.price - a.cost)} each</div>` : ''}</div></div>`;
+  } else if(q.each){
+    inner = q.each.map(r=>{ const key = q.id + '@' + r; return `<div class="eachrow"><div class="rm">${esc(r)}${!L.answers[key] ? ' <span class="chip red" style="margin-left:6px">to choose</span>' : ''}</div><div class="opts">${q.o.map((o,i)=>optCard(key, o, i)).join('')}</div></div>`; }).join('');
+  } else {
+    inner = `<div class="opts">${q.o.map((o,i)=>optCard(q.id, o, i)).join('')}</div>${changed(q.id)}`;
+  }
+  return `<div class="q ${miss.length && !lock ? 'todo' : ''}" id="q-${q.id}">
+    <div class="q-head"><h3>${esc(q.t)}</h3>
+      ${q.v1 && opts.fullSheet ? '<span class="chip v1">priced at the first meeting</span>' : ''}
+      ${q.type === 'color' ? '<span class="chip plain">colour · no cost</span>' : ''}
+      ${q.each ? '<span class="chip plain">pick for each room</span>' : ''}
+      ${staff ? `<span class="chip" style="background:var(--staff-soft);color:var(--staff)">code ${q.cc} · ${esc(q.vendor || 'Alden')}</span>` : ''}</div>
+    ${q.note ? `<div class="q-sub">${esc(q.note)}</div>` : ''}
+    ${inner}</div>`;
+}
+
+/* ---------- what's in this home ----------
+   Whole groups of selections only matter if the home has the thing: basement extras need a basement, the third-bath lines
+   need a third bath. Most are settled by what was picked at pricing (take a basement there and its detail lines appear here);
+   two have no line of their own to go by, so they're simply switched on or off. A chip at the top of the sheet shows each one
+   and can override it. Switched off = those selections are left off the sheet entirely. */
+const FEATURES = [
+  { id:'bsmt',   name:'Basement',            heads:[126],         from:127, to:149 },
+  { id:'bath3',  name:'Third bath',          heads:[],            from:340, to:378, dflt:false },
+  { id:'powder', name:'Powder bath',         heads:[],            from:379, to:399, dflt:true },
+  { id:'fire',   name:'Fireplace',           heads:[550],         from:551, to:599 },
+  { id:'deck',   name:'Patio or deck',       heads:[600, 640],    from:601, to:659 },
+  { id:'porch',  name:'Porch or sunroom',    heads:[660,672,684], from:660, to:699 },
+  { id:'attic',  name:'Attic room',          heads:[760],         from:761, to:779 },
+  { id:'second', name:'Second-floor space',  heads:[740],         from:741, to:759 },
+];
+const featOf = q=>FEATURES.find(f=>q.num >= f.from && q.num <= f.to && !f.heads.includes(q.num));
+// how many choices on the sheet sit inside a feature (its own line counts: taking a basement is what turns the basement on)
+function featCount(L, f){
+  const lo = Math.min(f.from, ...f.heads), hi = f.to;
+  return Object.keys(L.answers).filter(k=>{ if(!k.includes('#') || !L.answers[k].qty || L.answers[k].auto) return false; const q = qOfKey(k); return q && ((q.num >= lo && q.num <= hi) || f.heads.includes(q.num)); }).length;
+}
+function hasFeat(L, f){
+  const o = L.answers['has:' + f.id];
+  if(o) return o.qty > 0;
+  if(f.heads.some(h=>ALL_QS.some(q=>q.num === h && isIncl(q, L) && asked(q, L)))) return true;
+  return featCount(L, f) > 0 || !!f.dflt;
+}
+// the sections of a meeting that have anything to ask for this home
+const sectionsFor = (L, list)=>list.filter(r=>r.qs.some(q=>asked(q, L)));
+
+/* ---------- one at a time, or the whole section ---------- */
+let gIdx = 0, followGuide = null;
+const modes = { v1:'list', full:'guide' };          // pricing is a quick pass down a list; selections is talked through item by item
+try{ Object.assign(modes, JSON.parse(localStorage.getItem('aldenSelModes') || '{}')); } catch(e){}
+const modeOf = ()=>PRESENT && followGuide !== null ? (followGuide ? 'guide' : 'list') : (modes[tab] || 'list');
+// where the office is, for the customer's screen to follow: the section, and in one-at-a-time view which selection
+const navRoom = ()=>roomId + ((tab === 'v1' || tab === 'full') && modeOf() === 'guide' ? '~' + gIdx : '');
+function setNavRoom(str){ const p = String(str || '').split('~'); if(p[0]) roomId = p[0]; if(p.length > 1){ gIdx = Number(p[1]) || 0; followGuide = true; } else followGuide = false; }
+
+// One meeting's worth of sections, with the list down the side. kind 'v1' = Pricing (the lines on the paper pricing sheet),
+// 'full' = Selections (everything). Same answers either way. Each can be worked one selection at a time or as a whole section.
+function sheetView(L, kind){
+  const pricing = kind === 'v1', list = sectionsFor(L, pricing ? PRICING : ROOMS);
+  if(!list.length) return '<div class="card"><p class="muted">Nothing to choose for this home.</p></div>';
+  const r = list.find(x=>x.id===roomId) || list[0], i = list.indexOf(r), next = list[i+1], prev = list[i-1];
+  if(r.id !== roomId) roomId = r.id;
+  const ls = lines(L), lock = locked(L);
+  const nav = list.map(x=>{ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length + L.custom.filter(c=>c.room === x.id).length;
+    return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? `<span class="done" style="font-size:12px">${n}</span>` : ''}</div></button>`; }).join('');
+  const qs = r.qs.filter(q=>asked(q, L));
+  const nk = noteKey(r), note = L.answers[nk];
+  const guide = modeOf() === 'guide';
+  const hasbar = PRESENT ? '' : `<div class="hasbar noprint"><span>This home has:</span>${FEATURES.map(f=>{ const on = hasFeat(L, f), n = featCount(L, f);
+      return `<button type="button" class="${on ? 'on' : ''}" data-has="${f.id}" ${lock ? 'disabled' : ''} title="${on ? 'Its selections are on the sheet' : 'Its selections are left off the sheet'}">${on ? '&#10003; ' : ''}${esc(f.name)}${n ? ' · ' + n : ''}</button>`; }).join('')}
+      <div class="grow"></div><div class="modesw"><button type="button" class="${guide ? 'on' : ''}" data-mode="guide">One at a time</button><button type="button" class="${guide ? '' : 'on'}" data-mode="list">Whole section</button></div></div>`;
+  const notes = `<div class="sel"><div class="sel-h" style="cursor:default"><b style="font-size:15.5px;font-family:inherit">Notes for ${esc(r.name)}</b></div><textarea data-note="${esc(nk)}" maxlength="600" style="margin-top:8px;min-height:54px;resize:vertical" ${lock ? 'disabled' : ''}>${esc(note ? note.label : '')}</textarea></div>`;
+  const finish = pricing && !next && !lock ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <p style="flex:1 1 260px"><strong>That's the whole pricing sheet.</strong> Anything left untouched stays at standard. It's saved as a lead either way, and everything picked here is already on the selections sheet for the next meeting.</p>
+      ${PRESENT ? '' : '<button type="button" class="btn" id="saveClose">Save &amp; close</button>'}
+      <button type="button" class="btn primary" id="toFull">Carry on to selections</button></div>` : '';
+  let body;
+  if(guide){
+    gIdx = Math.max(0, Math.min(qs.length - 1, gIdx));
+    const q = qs[gIdx], atEnd = gIdx >= qs.length - 1;
+    const picked = q ? choicesOf(q, L).some(c=>(L.answers[q.id + '#' + c.i] || {}).qty) || L.custom.some(c=>c.q === q.id) : false;
+    const fwd = !atEnd ? (picked ? 'Next' : 'Keep standard') : next ? 'On to ' + next.name : pricing ? 'Finish pricing' : 'See the summary';
+    body = `<div class="guide">
+      <div class="g-top"><span>${esc(r.name)} · ${qs.length ? gIdx + 1 : 0} of ${qs.length}</span><div class="bar"><span style="width:${qs.length ? (gIdx + 1) / qs.length * 100 : 0}%"></span></div></div>
+      <div class="q">${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
+        ${q && !picked && !lock && !stdOf(q, L) && !isIncl(q, L) ? '<div class="g-std">Nothing picked means this stays standard.</div>' : ''}
+        ${q ? customBlock(L, r, q) : ''}</div>
+      <div class="g-nav noprint">
+        ${gIdx > 0 || prev ? `<button type="button" class="btn" data-g="-1">&larr; Back</button>` : ''}
+        <div class="grow"></div>
+        <button type="button" class="btn primary" data-g="1">${esc(fwd)} &rarr;</button></div>
+      ${atEnd ? `<div class="q" style="padding:6px 18px 12px;margin-top:16px">${notes}</div>${customBlock(L, r, null, true)}${finish}` : ''}
+    </div>`;
+  } else {
+    openDefault(qs);
+    body = `<div class="q" style="padding:6px 18px 12px">${qs.map(q=>prow(q, L)).join('') || '<p class="muted" style="padding:10px 0">Nothing to choose here for this home.</p>'}${notes}</div>
+      ${customBlock(L, r)}
+      ${finish}
+      <div class="noprint" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+        ${prev ? `<button type="button" class="btn" data-room="${prev.id}">&larr; ${esc(prev.name)}</button>` : ''}
+        <div class="grow"></div>
+        ${next ? `<button type="button" class="btn primary" data-room="${next.id}">Next: ${esc(next.name)} &rarr;</button>` : (pricing ? '' : `<button type="button" class="btn primary" data-tab="summary">See the summary &rarr;</button>`)}
+      </div>`;
+  }
+  return `${hasbar}<div class="rooms">
+    <div class="roomnav noprint">${nav}</div>
+    <div>
+      <div class="eyebrow">${pricing ? 'Pricing · first meeting' : 'Selections · the deep dive'} · section ${i+1} of ${list.length}</div>
+      <h2 style="font-size:22px;margin-top:4px">${esc(r.name)}</h2>
+      ${body}
+    </div></div>`;
+}
+
+/* ---------- custom items: the + on every section ----------
+   Anyone can add something that isn't on the sheet. Either type a price on the spot, or mark it "needs a price" and pick who
+   should price it. Until it has a price it shows as "price to come", stays out of the total, and the sheet can't be confirmed
+   or signed. The person picked gets a notice on their hub bell (and an email) that opens this sheet. TEAM = the hub's logins. */
+let cuOpen = '', cuMode = 'now';   // '' = closed; otherwise the question (or section) whose "add a custom item" form is open
+const waiting = L=>L.custom.filter(c=>c.pending);
+// q given: that question's custom items and its own "add" (One at a time). No q: everything in the section (Whole section).
+// loose: only the section's items that aren't tied to a question, with no add button (end of a section in One at a time).
+function customBlock(L, r, q, loose){
+  const staff = view === 'staff', lock = locked(L), forId = q ? q.id : r.id;
+  const mine = L.custom.map((c, ci)=>({ c, ci })).filter(x=>x.c.room === r.id && (q ? x.c.q === q.id : loose ? !x.c.q : true));
+  const items = mine.map(({ c, ci })=>`<div class="custom ${c.pending ? 'wait' : ''}">
+      <div class="q-head"><h3 style="font-size:16px;color:var(--navy)">${esc(c.desc)}</h3><span class="chip plain">custom item</span>${c.pending ? `<span class="chip soon">price to come${c.ask ? ' · asked ' + esc(c.ask) : ''}</span>` : ''}</div>
+      ${c.pending ? (PRESENT ? '<div class="q-sub">We\'re getting a price on this for you.</div>'
+          : `<div class="row2 noprint"><span class="muted">$</span><input type="number" min="0" step="1" placeholder="Price" data-cuprice="${ci}">${staff ? `<input type="number" min="0" step="1" placeholder="Our cost" data-cucost="${ci}">` : ''}<button type="button" class="btn sm primary" data-cuset="${ci}">Set price</button>${lock ? '' : `<button type="button" class="btn sm" data-delcustom="${ci}">Remove</button>`}</div>`)
+        : `<div class="row2">${view === 'customer' ? '' : `<span class="mono" style="font-weight:700;color:var(--navy)">${plus(c.price)}</span>`}${staff ? `<span class="staffline">our cost ${money(c.cost)} · margin ${money(c.price - c.cost)} · code ${c.cc}</span>` : ''}${!lock && !PRESENT ? `<button type="button" class="btn sm noprint" data-delcustom="${ci}">Remove</button>` : ''}</div>`}
+    </div>`).join('');
+  if(lock || PRESENT || loose) return items;
+  const form = cuOpen === forId ? `<div class="custom" style="border-left-color:var(--navy)"><div class="q-head"><h3 style="font-size:16px;color:var(--navy)">Add a custom item to ${esc(q ? q.t : r.name)}</h3></div>
+      <div style="margin-top:10px"><label class="f">What is it</label><input type="text" id="cuDesc" maxlength="200" placeholder="e.g. Built-in bench with cubbies"></div>
+      <div class="radio2"><label><input type="radio" name="cuMode" value="now" ${cuMode === 'now' ? 'checked' : ''}> I have a price</label><label><input type="radio" name="cuMode" value="ask" ${cuMode === 'ask' ? 'checked' : ''}> It needs a price</label></div>
+      ${cuMode === 'now' ? `<div class="grid" style="margin-top:10px">
+          <div><label class="f">Customer price ($)</label><input type="number" id="cuPrice" min="0" step="1"></div>
+          ${staff ? `<div><label class="f">Our cost ($)</label><input type="number" id="cuCost" min="0" step="1"></div>
+          <div><label class="f">Cost code</label><select id="cuCode">${Object.entries(CODE_NAMES).map(([c,n])=>`<option value="${c}">${c} — ${n}</option>`).join('')}</select></div>` : ''}</div>`
+        : `<div style="margin-top:10px;max-width:320px"><label class="f">Who should price it</label><select id="cuAsk">${TEAM.map(p=>`<option value="${esc(p.uid)}">${esc(p.name)}</option>`).join('')}</select>
+           <div class="q-sub">They get a notice on their hub bell that this item needs a price. The sheet can't be confirmed until it has one.</div></div>`}
+      <div style="margin-top:12px;display:flex;gap:8px"><button type="button" class="btn primary" id="cuAdd">Add it</button><button type="button" class="btn" id="cuCancel">Cancel</button></div></div>`
+    : `<button type="button" class="addbtn noprint" data-cuopen="${esc(forId)}"><b>+</b> Add a custom item${q ? ' for ' + esc(q.t) : ''}</button>`;
+  return items + form;
+}
+
+/* ---------- the pricing sheet as a document ----------
+   Everything that was chosen, section by section, with prices: something to review, print across the table, or send.
+   Office view prints an office copy (BT numbers, cost, margin); Customer view prints the customer's copy.
+   The office CONFIRMS it before it goes out; any change afterwards un-confirms it. The customer's link is …?quote=LEAD. */
+const QUOTE = new URLSearchParams(location.search).get('quote');
+let docAll = false;                                   // also list the lines left at standard
+const quoteUrl = L=>pageUrl() + '?quote=' + encodeURIComponent(L.id) + '&k=' + encodeURIComponent(keyOf(L));
+function quoteDoc(L, forCustomer){
+  const office = !forCustomer && view === 'staff', staff = false;
+  const ls = lines(L);
+  const dname = (DEVS.find(d=>d.code === L.dev) || {}).name || '';
+  const phase = (L.answers.phase || {}).label || '';
+  const stdRow = q=>{                                 // a line nobody touched, for the "every line" version
+    const what = 'Standard';
+    return `<tr class="dstd"><td>${office && q.bt ? `<span class="mono" style="font-size:12px">${esc(q.bt)}</span> ` : ''}${esc(q.t)}</td><td>${esc(what)}</td><td class="num"></td></tr>`;
+  };
+  const secs = SECTIONS.map(r=>{
+    const mine = ls.filter(l=>l.q.room.id === r.id), cu = L.custom.filter(c=>c.room === r.id);
+    const rows = [];
+    r.qs.forEach(q=>{ if(!asked(q, L)) return; const got = mine.filter(l=>l.q.id === q.id);
+      if(got.length) got.forEach(l=>rows.push(l.typed
+        ? `<tr><td colspan="${staff ? 5 : 3}" class="dn">${/_n$/.test(l.q.id) || l.q.id === 'misc' ? 'Note: ' : esc(l.q.t) + ': '}${esc(l.label)}</td></tr>`
+        : `<tr><td>${office && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(l.label)}</td><td class="num">${l.tbd ? '<em>price to come</em>' : l.price ? plus(l.price) : 'no charge'}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
+      else if(docAll && q.v1) rows.push(stdRow(q));
+    });
+    mine.filter(l=>l.typed).forEach(l=>rows.push(`<tr><td colspan="3" class="dn">Note: ${esc(l.label)}</td></tr>`));
+    cu.forEach(c=>rows.push(`<tr><td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`));
+    if(!rows.join('')) return '';
+    const sub = mine.reduce((s,l)=>s+l.price,0) + cu.reduce((s,c)=>s+c.price,0);
+    return `<h3>${esc(r.name)}<span>${sub ? plus(sub) : ''}</span></h3><table><tbody>${rows.join('')}</tbody></table>`;
+  }).join('');
+  const up = upgrades(L), co = coTotal(L), wait = waiting(L).length;
+  return `<div class="doc" id="quoteDoc">
+    ${office ? '<div class="officecopy">OFFICE COPY — shows the BuilderTrend line numbers. Switch to Customer view for the copy that goes to the buyer.</div>' : ''}
+    <div class="doc-head"><img src="icons/logo.png" alt="Alden Homes">
+      <div><h1>Pricing Sheet</h1><div class="sub">${L.quoteOk ? 'Confirmed ' + esc(nice(L.quoteOk)) : 'Draft · not yet confirmed'} · prices as of ${esc(nice(L.pricedOn))}</div></div></div>
+    <div class="doc-facts">
+      <div><span>Prepared for</span><b>${esc([L.name, L.name2].filter(Boolean).join(' & '))}</b></div>
+      <div><span>Community</span><b>${esc(dname || 'To be decided')}</b></div>
+      <div><span>Lot</span><b>${esc(L.lot ? '#' + L.lot : 'To be decided')}${phase ? ' · Phase ' + esc(phase) : ''}</b></div>
+      <div><span>Home style</span><b>${esc(L.model || '')}</b></div>
+      <div><span>Base price</span><b>${money(base(L))}</b></div>
+    </div>
+    ${secs || '<p class="muted" style="margin-top:20px">Nothing has been added to the base home yet.</p>'}
+    ${L.cos.length ? `<h3>Change orders<span>${plus(co)}</span></h3><table><tbody>${L.cos.map(c=>`<tr><td>${esc(nice(c.date))}</td><td>${esc(c.desc)}</td><td class="num">${plus(c.price)}</td>${staff ? `<td class="num st">${money(c.cost)}</td><td class="num st">${money(c.price - c.cost)}</td>` : ''}</tr>`).join('')}<tr><td colspan="2">Change order fees</td><td class="num">${plus(L.cos.length * CO_FEE)}</td>${staff ? '<td></td><td></td>' : ''}</tr></tbody></table>` : ''}
+    <div class="doc-total">
+      <div><span>Base price · ${esc(L.model || '')}</span><span class="mono">${money(base(L))}</span></div>
+      <div><span>Options, upgrades &amp; lot premium</span><span class="mono">${plus(up)}</span></div>
+      ${co ? `<div><span>Change orders</span><span class="mono">${plus(co)}</span></div>` : ''}
+      ${staff ? `<div style="color:var(--staff)"><span>Our cost of the options · margin on them</span><span class="mono">${money(upgradeCost(L))} · ${money(up - upgradeCost(L))}</span></div>` : ''}
+      <div class="grand"><span>Total</span><span>${money(total(L))}</span></div>
+      ${wait ? `<div style="color:#8a5d14"><span>${wait} custom item${wait === 1 ? ' is' : 's are'} still being priced and ${wait === 1 ? 'is' : 'are'} not in this total.</span><span></span></div>` : ''}
+    </div>
+    <div class="doc-fine">This is a pricing summary for discussion, not a contract. Prices are as of ${esc(nice(L.pricedOn))} and can change until selections are signed. Anything not listed here is built to the standard for this home style.<br>Alden Homes · Handcrafted Homes &amp; Communities</div>
+  </div>`;
+}
+function quoteTab(L){
+  const staff = view === 'staff', wait = waiting(L).length;
+  const status = L.quoteOk ? `<span class="chip signed">Confirmed ${esc(nice(L.quoteOk))}</span>` : '<span class="chip v1">Draft · for review</span>';
+  const send = L.quoteOk && !PRESENT ? `<div class="sharebox noprint" style="margin-top:12px"><strong>Send it to the customer.</strong> This link opens their copy of the pricing sheet, with prices and no office figures. They can print it or save it as a PDF.
+      <div class="sharelink"><input type="text" readonly value="${esc(quoteUrl(L))}" onclick="this.select()"><button type="button" class="btn sm" id="quoteCopy">Copy link</button>${L.email ? `<a class="btn sm" style="text-decoration:none" href="mailto:${esc(L.email)}?subject=${encodeURIComponent('Your Alden Homes pricing sheet')}&body=${encodeURIComponent('Here is your pricing sheet from our meeting:\n\n' + quoteUrl(L) + '\n\nLet us know if you have any questions.\n\nAlden Homes')}">Email it</a>` : ''}<button type="button" class="btn sm" id="quoteOpen">Open their copy</button></div></div>` : '';
+  return `<div class="docbar noprint">${status}
+      <label style="display:flex;align-items:center;gap:7px;font-size:14px;cursor:pointer"><input type="checkbox" id="docAll" ${docAll ? 'checked' : ''} style="width:18px;height:18px"> Show every line, including standard</label>
+      <div class="grow"></div>
+      <button type="button" class="btn" id="docPrint">Print</button><button type="button" class="btn" id="docPdf">Download PDF</button>
+      ${PRESENT || locked(L) ? '' : L.quoteOk ? '<button type="button" class="btn" id="quoteUndo">Back to draft</button>' : `<button type="button" class="btn good" id="quoteConfirm" ${wait ? 'disabled' : ''}>Confirm pricing</button>`}</div>
+    ${wait && !L.quoteOk && !PRESENT ? `<div class="banner amber noprint"><p><strong>${wait} custom item${wait === 1 ? ' needs' : 's need'} a price</strong> before this can be confirmed: ${waiting(L).map(c=>esc(c.desc) + (c.ask ? ' (' + esc(c.ask) + ')' : '')).join(', ')}.</p></div>` : ''}
+    ${send}
+    <div class="docwrap">${quoteDoc(L, false)}</div>`;
+}
+async function docPdf(btn, name){
+  btn.disabled = true; const was = btn.textContent; btn.textContent = 'Making the PDF…';
+  try{
+    if(typeof html2pdf === 'undefined') await new Promise((res, rej)=>{ const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js'; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+    const el = document.getElementById('quoteDoc'), keep = el.style.cssText;
+    el.style.boxShadow = 'none'; el.style.maxWidth = 'none'; el.style.margin = '0';
+    await html2pdf().set({ margin:[0.35, 0.1, 0.45, 0.1], filename:name, image:{ type:'jpeg', quality:.95 }, html2canvas:{ scale:2, useCORS:true, backgroundColor:'#ffffff' },
+      jsPDF:{ unit:'in', format:'letter', orientation:'portrait' }, pagebreak:{ mode:['css','legacy'], avoid:['tr','h3','.doc-total'] } }).from(el).save();
+    el.style.cssText = keep;
+  } catch(err){ console.error(err); window.print(); }
+  btn.disabled = false; btn.textContent = was;
+}
+// the customer's own copy, opened from the link they were sent
+let quoteState = 'loading';
+function quoteScreen(){
+  const L = lead();
+  document.title = 'Your pricing sheet | Alden Homes';
+  const card = (h, p)=>`<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>${h}</h2>${p ? `<p class="lede" style="margin:8px auto 0">${p}</p>` : ''}</div></div>`;
+  if(!L) return quoteState === 'missing' ? card('This pricing sheet isn\'t available.', 'The link may be mistyped. Ask your Alden Homes rep to send it again.') : card('Opening your pricing sheet…');
+  if(!L.quoteOk) return card('Your pricing sheet is still being reviewed.', 'We\'re double-checking the numbers. It will show here as soon as it\'s confirmed.');
+  return `<div class="wrap"><div class="docbar noprint" style="justify-content:flex-end"><button type="button" class="btn" id="docPrint">Print</button><button type="button" class="btn primary" id="docPdf">Download PDF</button></div>
+    <div class="docwrap">${quoteDoc(L, true)}</div></div>`;
+}
+async function loadShared(id, done){
+  cur = id; render();
+  try{
+    const data = await selApi({ action:'get', id, since:0 });
+    if(data.sheet){
+      norm(data.sheet);
+      const i = leads.findIndex(l=>l.id === id); if(i >= 0) leads[i] = data.sheet; else leads.push(data.sheet);
+      done('ready');
+    } else if(!lead()) done('missing');
+  } catch(err){ console.warn(err); if(!lead()) done('missing'); }
+  render();
+}
+
+function summary(L){
+  const staff = false, ls = lines(L), left = todo(L);
+  const rows = SECTIONS.map(r=>{
+    const mine = ls.filter(l=>l.q.room.id === r.id), cu = L.custom.filter(c=>c.room === r.id);
+    if(!mine.length && !cu.length) return '';
+    const sub = mine.reduce((s,l)=>s+l.price,0) + cu.reduce((s,c)=>s+c.price,0);
+    return `<tr class="grp"><td colspan="2">${esc(r.name)}</td><td class="num">${sub ? plus(sub) : ''}</td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>`
+      + mine.map(l=>`<tr><td>${esc(l.q.t)}${l.where ? ` <span class="muted">· ${esc(l.where)}</span>` : ''}</td><td>${esc(l.label)}</td>
+          <td class="num">${l.price ? plus(l.price) : '<span class="muted">' + (l.std ? 'included' : l.typed ? '' : 'no cost') + '</span>'}</td>
+          ${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`).join('')
+      + cu.map(c=>`<tr><td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`).join('');
+  }).join('');
+  const up = upgrades(L), upCost = upgradeCost(L);
+  return `
+    ${left.length && !locked(L) ? `<div class="banner amber noprint"><p><strong>${left.length} still to choose</strong> before this can be signed: ${left.slice(0, 8).map(x=>`<a href="#" data-jump="${x.q.room.id}" style="color:inherit">${esc(x.q.t)}${x.key.includes('@') ? ' (' + esc(x.key.split('@')[1]) + ')' : ''}</a>`).join(', ')}${left.length > 8 ? ', and ' + (left.length - 8) + ' more' : ''}.</p></div>` : ''}
+    <div class="card"><h2>Everything on this sheet</h2>
+      <div style="overflow-x:auto;margin-top:10px"><table>
+        <thead><tr><th>Item</th><th>Choice</th><th class="num">Price</th>${staff ? '<th class="num st">Our cost</th><th class="num st">Margin</th>' : ''}</tr></thead>
+        <tbody>
+          <tr><td><strong>${esc(L.model)}</strong> — base price</td><td class="muted">everything marked Standard</td><td class="num"><strong>${money(base(L))}</strong></td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>
+          ${rows}
+          <tr class="tot"><td colspan="2">Upgrades &amp; lot premium</td><td class="num">${plus(up)}</td>${staff ? `<td class="num st">${money(upCost)}</td><td class="num st">${money(up - upCost)} (${up ? Math.round((up - upCost) / up * 100) : 0}%)</td>` : ''}</tr>
+          ${L.cos.map(c=>`<tr><td>Change order · ${esc(nice(c.date))}</td><td>${esc(c.desc)}</td><td class="num">+ ${money(c.price)}</td>${staff ? `<td class="num st">${money(c.cost)}</td><td class="num st">${money(c.price - c.cost)}</td>` : ''}</tr>`).join('')}
+          ${L.cos.length ? `<tr><td colspan="2">Change order fees (${L.cos.length} × ${money(CO_FEE)})</td><td class="num">+ ${money(L.cos.length * CO_FEE)}</td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>` : ''}
+          <tr class="tot"><td colspan="2">Total</td><td class="num">${money(total(L))}</td>${staff ? '<td class="st"></td><td class="st"></td>' : ''}</tr>
+        </tbody></table></div></div>`;
+}
+
+/* ---------- the home's details (owner, 2026-10-19) ----------
+   Once signed, the home needs everything the production schedule's "Edit Job" has. Contact details are asked at signing; the rest
+   (OneDrive folder, draftsman, foundation / settle / walk / move dates) is filled in here, written straight to the home (jobs/{id}),
+   and the sheet shows what's still missing until it's all in. Walk and Move suggest themselves from Settle (−5 / −3 days), as there. */
+const JOB_FIELDS = [['client','Buyer(s)','text'],['address','Address','text'],['phone','Phone','tel'],['email','Email','email'],['filesUrl','OneDrive folder link','url'],
+  ['draftsman','Draftsman','draft'],['fndn','Foundation date','date'],['settle','Settle date','date'],['walk','Walk date','date'],['move','Move date','date']];
+let JOBS = {}, jobWatch = '';
+function watchJob(id){
+  if(!id || jobWatch === id || PRESENT || SHOW || QUOTE || !window.firebase || !firebase.apps.length) return;
+  jobWatch = id;
+  firebase.firestore().collection('jobs').doc(id).onSnapshot(d=>{ JOBS[id] = d.exists ? d.data() : null; const L = lead(); if(L && L.houseId === id && tab === 'sign'){ const y = window.scrollY; render(); window.scrollTo(0, y); } }, err=>console.warn('job', err));
+}
+const jobMissing = j=>j ? JOB_FIELDS.filter(([k])=>!String(j[k] || '').trim()).map(([, n])=>n) : null;
+const addDays = (d, n)=>{ const [y, m, dd] = d.split('-').map(Number); const x = new Date(y, m - 1, dd + n); return iso(x); };
+function homeDetails(L){
+  if(PRESENT || !L.houseId) return '';
+  watchJob(L.houseId);
+  const j = JOBS[L.houseId];
+  if(j === undefined) return '<div class="card noprint"><h2>Home details</h2><p class="muted" style="margin-top:6px">Loading…</p></div>';
+  if(j === null) return '<div class="card noprint"><h2>Home details</h2><p class="muted" style="margin-top:6px">The home this sheet was tied to isn\'t in Active Homes any more.</p></div>';
+  const miss = jobMissing(j), drafts = ['D', 'J'];
+  const field = ([k, n, type])=>{
+    const v = j[k] || '';
+    const box = type === 'draft' ? `<select id="jd_${k}"><option value="">—</option>${[...new Set([...drafts, ...(v ? [v] : [])])].map(x=>`<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">Other…</option></select>`
+      : `<input type="${type === 'url' ? 'text' : type}" id="jd_${k}" value="${esc(v)}" ${type === 'url' ? 'placeholder="Paste the shareable link to this lot\'s OneDrive folder"' : ''}>`;
+    return `<div ${k === 'address' || k === 'filesUrl' || k === 'client' ? 'style="grid-column:1/-1"' : ''}><label class="f">${esc(n)}${v ? '' : ' <span style="color:var(--red)">· needed</span>'}</label>${box}${k === 'settle' ? '<div class="q-sub">Set this first. Walk and Move fill themselves in.</div>' : ''}</div>`;
+  };
+  return `<div class="card noprint" id="homeDetails"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2>Home details</h2>
+      ${miss.length ? `<span class="chip soon">${miss.length} still to fill in</span>` : '<span class="chip signed">All filled in</span>'}<div class="grow"></div>
+      <a class="btn sm" style="text-decoration:none" href="house.html?id=${encodeURIComponent(L.houseId)}">Open the home</a></div>
+    <p class="lede">What the production schedule needs for ${esc([j.community, j.lot ? 'Lot ' + j.lot : ''].filter(Boolean).join(' '))}. Saved straight onto the home.</p>
+    <div class="grid" style="margin-top:12px">${JOB_FIELDS.map(field).join('')}</div>
+    <div class="q-sub" style="margin-top:10px">Saves as you go.</div></div>`;
+}
+async function saveHomeDetails(L){
+  const up = {};
+  JOB_FIELDS.forEach(([k])=>{ const el = $('jd_' + k); if(el) up[k] = el.value === '__other' ? '' : el.value.trim(); });
+  try{ await firebase.firestore().collection('jobs').doc(L.houseId).update(up); toast('Saved on the home'); }
+  catch(err){ console.error(err); toast('Couldn\'t save. Check the connection and try again.'); }
+}
+function sign(L){
+  const left = todo(L);
+  if(locked(L)) return `
+    <div class="card"><h2>Signed selection sheet</h2>
+      <p class="lede">Signed by ${esc([L.name, L.name2].filter(Boolean).join(' and '))} on ${esc(nice(L.signedOn))}. Total at signing ${money(base(L) + upgrades(L))}.</p>
+      ${PRESENT ? '' : L.houseId ? `<div class="noprint" style="margin-top:10px"><a class="btn sm primary" style="text-decoration:none" href="house.html?id=${encodeURIComponent(L.houseId)}">Open the home in the hub</a></div>`
+        : '<div class="banner amber noprint" style="margin-top:10px"><p>This sheet isn\'t tied to a home yet.</p><button type="button" class="btn sm" id="makeHome">Add the home and its sale price</button></div>'}
+      <div class="noprint" style="margin-top:12px"><button type="button" class="btn" id="printBtn">Print or save a copy</button></div></div>
+    ${homeDetails(L)}
+    ${shareSheetCard(L)}
+    ${summary(L)}
+    <div class="card noprint"><h2>Change orders</h2>
+      <p class="lede">Anything added after signing goes through the hub's change orders: the buyer reviews and signs it on their homeowner page, and it carries the ${money(CO_FEE)} fee.</p>
+      ${L.houseId ? `<div style="margin-top:12px"><a class="btn sm" style="text-decoration:none" href="house.html?id=${encodeURIComponent(L.houseId)}#coCard">Write a change order on the home's page</a></div>` : ''}
+      ${false ? `<div class="grid" style="margin-top:12px">
+          <div style="grid-column:1/-1"><label class="f">What's changing</label><input type="text" id="coDesc" placeholder="e.g. Add a floor outlet in the office"></div>
+          <div><label class="f">Customer price ($)</label><input type="number" id="coPrice" min="0" step="1"></div>
+          <div><label class="f">Our cost ($)</label><input type="number" id="coCost" min="0" step="1"></div>
+          <div><label class="f">Cost code</label><select id="coCode">${Object.entries(CODE_NAMES).map(([c,n])=>`<option value="${c}">${c} — ${n}</option>`).join('')}</select></div>
+        </div><div style="margin-top:10px"><button type="button" class="btn sm" id="coAdd">Send change order to the buyer (+ ${money(CO_FEE)} fee)</button></div>`
+        : ''}</div>`;
+  return `
+    <div class="card"><div class="eyebrow">Sign</div><h2 style="font-size:22px;margin-top:4px">Approve these selections</h2>
+      <p class="lede">Signing makes this sheet the record of what's being built, at the prices shown. After that, changes go through a change order, which is reviewed by the office and carries a ${money(CO_FEE)} fee.</p>
+      ${waiting(L).length ? `<div class="banner amber"><p><strong>${waiting(L).length} custom item${waiting(L).length===1?' is':'s are'} still waiting on a price.</strong> The sheet can be signed once ${waiting(L).length===1?'it has':'they have'} one.</p><button type="button" class="btn sm" data-tab="quote">See the pricing sheet</button></div>` : left.length ? `<div class="banner amber"><p><strong>${left.length} item${left.length===1?'':'s'} still to choose.</strong> The sheet can be signed once everything has an answer.</p><button type="button" class="btn sm" data-tab="summary">See what's left</button></div>` : `
+      <div class="grid" style="margin-top:16px">
+        <div><label class="f">Buyer</label><input type="text" id="sg1" value="${esc(L.name)}"></div>
+        <div><label class="f">Second buyer</label><input type="text" id="sg2" value="${esc(L.name2 || '')}" placeholder="If there is one"></div>
+        ${view === 'staff' || !L.dev || !L.lot ? `<div><label class="f">Development</label><select id="sgDev"><option value="">Pick one</option>${DEVS.map(d=>`<option value="${d.code}" ${d.code === L.dev ? 'selected' : ''}>${d.code} — ${esc(d.name)}</option>`).join('')}</select></div>
+        <div><label class="f">Lot</label><input type="text" id="sgLot" value="${esc(L.lot || '')}" placeholder="Lot number"></div>` : ''}
+        ${PRESENT ? '' : `<div><label class="f">Home style</label><input type="text" id="sgModel" value="${esc(L.model || '')}"></div>
+        <div style="grid-column:1/-1"><label class="f">Street address</label><input type="text" id="sgAddr" value="${esc(L.address || '')}"></div>
+        <div><label class="f">Phone</label><input type="tel" id="sgPhone" value="${esc(L.phone || '')}"></div>
+        <div><label class="f">Email</label><input type="email" id="sgEmail" value="${esc(L.email || '')}"></div>`}
+      </div>
+      <p class="muted" style="font-size:13.5px;margin-top:10px">Signing puts this home in Active Homes (or finds it there by development and lot) with this sheet's total as its sale price.</p>
+      <label style="display:flex;gap:10px;align-items:flex-start;margin-top:14px;cursor:pointer"><input type="checkbox" id="sgAgree" style="width:20px;height:20px;margin-top:2px;flex:none">
+        <span>We approve these selections as final for ${esc(homeLabel(L))} at ${money(total(L))}, and understand that later changes are change orders.</span></label>
+      <div style="margin-top:14px"><button type="button" class="btn good" id="signBtn">Sign &amp; lock</button></div>`}
+    </div>`;
+}
+
+function vendors(L){
+  const by = {};
+  lines(L).forEach(l=>{ const v = l.q.vendor || ((CODE_NAMES[l.q.cc] || 'Other') + ' (trade)'); (by[v] = by[v] || []).push(l); });
+  return `<div class="banner staff"><p><strong>What each vendor needs.</strong> Once the sheet is signed, each vendor would see their part on their own link in the hub, with no retyping. Prices are left off.</p></div>
+    ${Object.keys(by).sort().map(v=>`<div class="card"><h2>${esc(v)}</h2><table style="margin-top:8px"><tbody>
+      ${by[v].map(l=>`<tr><td style="width:42%">${esc(l.q.t)}${l.where ? ` <span class="muted">· ${esc(l.where)}</span>` : ''}</td><td><strong>${esc(l.label)}</strong>${l.std ? ' <span class="muted">(standard)</span>' : ''}</td><td class="muted" style="width:90px">code ${l.q.cc}</td></tr>`).join('')}
+    </tbody></table></div>`).join('')}`;
+}
+
+function codes(L){
+  const by = {};
+  const put = (cc, price, cost)=>{ by[cc] = by[cc] || { price:0, cost:0 }; by[cc].price += price; by[cc].cost += cost; };
+  lines(L).forEach(l=>put(l.q.cc, l.price, l.cost));
+  L.custom.forEach(c=>put(c.cc, c.price, c.cost));
+  L.cos.forEach(c=>put(c.cc, c.price, c.cost));
+  if(L.cos.length) put(90, L.cos.length * CO_FEE, 0);
+  const rows = Object.entries(by).filter(([,v])=>v.price || v.cost).sort((a,b)=>a[0]-b[0]);
+  const tp = rows.reduce((s,[,v])=>s+v.price,0), tc = rows.reduce((s,[,v])=>s+v.cost,0);
+  return `<div class="banner staff"><p><strong>Upgrades by cost code.</strong> The "our cost" column is what this sheet adds to the home's budget, on top of the base budget for the model. The price column is what it adds to the settlement.</p></div>
+    <div class="card"><table><thead><tr><th>Code</th><th>Section</th><th class="num">Adds to settlement</th><th class="num">Adds to budget</th><th class="num">Margin</th></tr></thead><tbody>
+      ${rows.map(([cc,v])=>`<tr><td class="mono">${cc}</td><td>${esc(CODE_NAMES[cc] || '')}</td><td class="num">${money(v.price)}</td><td class="num">${money(v.cost)}</td><td class="num">${money(v.price - v.cost)}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="2">Total</td><td class="num">${money(tp)}</td><td class="num">${money(tc)}</td><td class="num">${money(tp - tc)}</td></tr>
+    </tbody></table></div>`;
+}
+
+function totalBar(L){
+  const up = upgrades(L), co = coTotal(L);
+  if(view === 'customer') return `<div class="grow"></div>${locked(L) ? '' : '<span class="sub">Saved automatically</span>'}
+    ${PRESENT ? '' : `<button type="button" class="btn" id="saveClose2">${locked(L) ? 'Close' : 'Save &amp; close'}</button>`}`;
+  return `<div><div class="sub">${locked(L) ? 'Contract total' : L.stage === 'v1' ? 'Ballpark so far' : 'Total so far'}</div><div class="big">${money(total(L))}</div></div>
+    <div class="sub">Base ${money(base(L))}<br>Upgrades ${up < 0 ? '− ' + money(-up) : '+ ' + money(up)}${co ? ' · change orders + ' + money(co) : ''}</div>
+    <div class="grow"></div>
+    ${locked(L) ? '' : '<span class="sub">Saved automatically</span>'}
+    ${PRESENT ? '' : `<button type="button" class="btn" id="saveClose2">${locked(L) ? 'Close' : 'Save &amp; close'}</button>`}`;
+}
+
+/* ---------- doing things ---------- */
+function touch(L){ syncBaths(L); L.updated = iso(new Date()); if(L.quoteOk && !locked(L)) L.quoteOk = null; }
+document.addEventListener('click', async e=>{
+  const t = e.target, L = lead();
+  const sw = t.closest('#viewSw button'); if(sw){ view = sw.dataset.view; if(view !== 'staff' && ['vendors','codes'].includes(tab)) tab = 'summary'; render(); return; }
+  if(QUOTE){ if(t.closest('#docPrint')) window.print(); else if(t.closest('#docPdf') && L) docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + '.pdf'); return; }
+  if(t.closest('#shPdf')){ showPdf(t.closest('#shPdf')); return; }
+  if(t.closest('#shShare')){
+    const url = location.href, title = document.title;
+    if(navigator.share) navigator.share({ title, text:'Take a look at what we chose for our Alden home.', url }).catch(()=>{});
+    else navigator.clipboard.writeText(url).then(()=>toast('Link copied — paste it anywhere'), ()=>toast('Copy the address from the bar above'));
+    return;
+  }
+  if(t.closest('#joinBtn')){
+    const code = ($('joinCode').value || '').replace(/\D/g, '');
+    if(code.length !== 6){ toast('Type the 6-digit code from the rep\'s screen'); return; }
+    try{ const r = await fetch(SEL_URL, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action:'join', code }) });
+      if(r.status === 429){ toast('Too many wrong codes. Wait an hour and try again.'); return; }
+      if(!r.ok){ toast('That code isn\'t open. Check it on the rep\'s screen.'); return; }
+      const j = await r.json(); location.href = pageUrl() + '?present=' + encodeURIComponent(j.id) + '&k=' + encodeURIComponent(j.k); }
+    catch(err){ toast('Couldn\'t reach the hub. Check the connection.'); }
+    return;
+  }
+  if(t.closest('#styleSetup')){ styleEdit = true; cur = null; render(); window.scrollTo(0, 0); return; }
+  if(t.closest('#styBack')){ e.preventDefault(); styleEdit = false; render(); window.scrollTo(0, 0); return; }
+  const sb = t.closest('[data-sty]'); if(sb){ styleSet(sb.dataset.sty, sb.dataset.st); return; }
+  if(t.closest('#styCopy')){
+    const from = $('styFrom').value; if(!from){ toast('Pick the style to copy from'); return; }
+    if(STYLE_CFG[styName] && !confirm('Replace ' + styName + '\'s setup with ' + from + '\'s?')) return;
+    if(STYLE_CFG[from]) STYLE_CFG[styName] = JSON.parse(JSON.stringify(STYLE_CFG[from])); else delete STYLE_CFG[styName];
+    render(); styleSave(); toast(styName + ' now matches ' + from); return;
+  }
+  if(t.closest('#styClear')){ if(!confirm('Show every line on ' + styName + '\'s sheet again?')) return; const keepCeil = (STYLE_CFG[styName] || {}).ceil; if(keepCeil) STYLE_CFG[styName] = { skip:[], incl:[], ceil:keepCeil }; else delete STYLE_CFG[styName]; render(); styleSave(); return; }
+  if(t.closest('#signOutBtn')){ if(pending() && !confirm('Changes are still saving. Sign out anyway?')) return; firebase.auth().signOut().then(()=>location.reload()); return; }
+  if(t.closest('#loginGo')){ doLogin(); return; }
+  if(t.closest('#newLeadBtn')){ newOpen = !newOpen; render(); if(newOpen) $('nName').focus(); return; }
+  if(t.closest('#nStart')){
+    const name = $('nName').value.trim(); if(!name){ toast('Add the buyer\'s name first'); return; }
+    const n = { id:'L'+Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), address:$('nAddr').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value, line:$('nLine').value, basePrice:Number($('nBase').value) || 0,
+      stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
+    leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
+  }
+  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
+  if(!L) return;
+  if(!PRESENT){
+    const setFollow = date=>{ L.follow = { date, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(date)); };
+    const fin = t.closest('[data-follow-in]'); if(fin){ setFollow(daysAhead(Number(fin.dataset.followIn))); return; }
+    if(t.closest('#followDone')){ L.notes = noteList(L); L.notes.push({ text:'Followed up' + (L.follow.what ? ': ' + L.follow.what : '.'), at:iso(new Date()) }); L.follow = null; render(); toast('Marked done and noted'); return; }
+    if(t.closest('#followClear')){ L.follow = null; render(); return; }
+    if(t.closest('#noteAdd')){
+      const text = ($('noteText').value || '').trim(); if(!text){ toast('Type the note first'); return; }
+      L.notes = noteList(L); L.notes.push({ text, at:iso(new Date()) }); render(); toast('Note saved'); return;
+    }
+    const dn = t.closest('[data-delnote]'); if(dn){ L.notes = noteList(L).filter(nt=>(nt.at + '|' + nt.text.slice(0, 20)) !== dn.dataset.delnote); render(); return; }
+  }
+  const md = t.closest('[data-mode]');
+  if(md && (tab === 'v1' || tab === 'full')){
+    const list = sectionsFor(L, tab === 'v1' ? PRICING : ROOMS), r = list.find(x=>x.id === roomId) || list[0], qs = r ? r.qs.filter(q=>asked(q, L)) : [];
+    // switching views keeps your place: the selection you were on is the one that's open
+    if(md.dataset.mode === 'list'){ const q = qs[gIdx]; openFor = cur + '|' + tab + '|' + roomId; openSel = new Set(q ? [q.id] : []); }
+    else { const first = qs.findIndex(q=>openSel.has(q.id)); gIdx = first >= 0 ? first : 0; }
+    modes[tab] = md.dataset.mode; followGuide = null;
+    try{ localStorage.setItem('aldenSelModes', JSON.stringify(modes)); } catch(err){}
+    render(); return;
+  }
+  const gb = t.closest('[data-g]');
+  if(gb && (tab === 'v1' || tab === 'full')){
+    const list = sectionsFor(L, tab === 'v1' ? PRICING : ROOMS), i = Math.max(0, list.findIndex(x=>x.id === roomId)), qs = list[i] ? list[i].qs.filter(q=>asked(q, L)) : [];
+    const d = Number(gb.dataset.g);
+    if(d > 0){
+      if(gIdx < qs.length - 1) gIdx++;
+      else if(list[i + 1]){ roomId = list[i + 1].id; gIdx = 0; }
+      else if(tab === 'full'){ tab = 'summary'; }
+      else { const fin = document.getElementById('toFull'); if(fin){ fin.scrollIntoView({ block:'center' }); return; } }
+    } else {
+      if(gIdx > 0) gIdx--;
+      else if(list[i - 1]){ roomId = list[i - 1].id; gIdx = list[i - 1].qs.filter(q=>asked(q, L)).length - 1; }
+    }
+    const y = window.scrollY; render(); window.scrollTo(0, y); return;   // stay where they're scrolled (owner, 2026-10-19)
+  }
+  const hb = t.closest('[data-has]');
+  if(hb && !locked(L)){
+    const f = FEATURES.find(x=>x.id === hb.dataset.has), on = hasFeat(L, f), count = featCount(L, f);
+    // switching something off would silently drop what's been chosen in it, so that has to be cleared first
+    if(on && count){ toast(f.name + ' has ' + count + ' choice' + (count === 1 ? '' : 's') + ' on this sheet. Take ' + (count === 1 ? 'it' : 'them') + ' off first.'); return; }
+    L.answers['has:' + f.id] = { qty: on ? -1 : 1, price:0 };
+    gIdx = 0; touch(L); render(); toast(f.name + (on ? ' left off the sheet' : ' added to the sheet')); return;
+  }
+  const sh = t.closest('[data-sel]');
+  if(sh){ const id = sh.dataset.sel; if(openSel.has(id)) openSel.delete(id); else openSel.add(id); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  if(t.closest('#shareBtn')){
+    shareOpen = !shareOpen; render();
+    if(shareOpen) openPresent(L);
+    return;
+  }
+  if(t.closest('#delLead')){
+    if(!confirm('Delete ' + L.name + '\'s lead and selection sheet? This can\'t be undone.')) return;
+    try{ await selApi({ action:'remove', id:L.id }); leads = leads.filter(x=>x.id !== L.id); delete REMOTE[L.id]; cur = null; sync = { id:'', rev:0, last:null, busy:false, nav:'', state:'off', fails:0 }; render(); toast('Lead deleted'); }
+    catch(err){ toast(err.status === 409 ? 'A signed sheet can\'t be deleted.' : 'Couldn\'t delete it. Check the connection.'); }
+    return;
+  }
+  if(t.closest('#makeHome')){ makeHome(L); return; }
+  if(t.closest('#shareCopy')){ navigator.clipboard.writeText(presentUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
+  if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
+  if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); flushId = cur; cur = null; render(); syncTick(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
+  const tb = t.closest('[data-tab]'); if(tb){ tab = tb.dataset.tab; if(tab === 'v1' && !PRICING.some(x=>x.id === roomId)) roomId = PRICING[0].id; if(tab === 'full' && !ROOMS.some(x=>x.id === roomId)) roomId = ROOMS[0].id; render(); window.scrollTo(0, 0); return; }
+  const rm = t.closest('[data-room]'); if(rm){ gIdx = 0; roomId = rm.dataset.room; if(tab !== 'v1' && tab !== 'full') tab = 'full'; render(); window.scrollTo(0, 0); return; }
+  const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
+  if(t.closest('#printBtn')){ window.print(); return; }
+  if(t.closest('#docPrint')){ window.print(); return; }
+  if(t.closest('#docPdf')){ docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + '.pdf'); return; }
+  if(t.closest('#quoteConfirm')){
+    // confirming also puts the sheet on the hub's server, so the customer's link works
+    L.quoteOk = iso(new Date());
+    syncTick(); render(); toast('Pricing confirmed. It can go to the customer now.'); return;
+  }
+  if(t.closest('#quoteUndo')){ L.quoteOk = null; render(); return; }
+  if(t.closest('#quoteCopy')){ navigator.clipboard.writeText(quoteUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
+  if(t.closest('#quoteOpen')){ window.open(quoteUrl(L), '_blank'); return; }
+  if(t.closest('#showMake')){
+    // the sheet has to be on the hub's server for the link to work on someone else's phone
+    syncTick(); render(); toast('Share link ready'); return;
+  }
+  if(t.closest('#showCopy')){ navigator.clipboard.writeText(showUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
+  if(t.closest('#showOpen')){ window.open(showUrl(L), '_blank'); return; }
+  if(t.closest('#repriceBtn')){
+    drift(L).forEach(x=>{ x.a.price = x.t.price; x.a.cost = x.t.cost; });
+    L.pricedOn = iso(new Date()); touch(L); render(); toast('Updated to today\'s prices'); return;
+  }
+  if(locked(L)){
+    if(t.closest('#coAdd')){
+      const desc = $('coDesc').value.trim(), price = Number($('coPrice').value);
+      if(!desc || !(price >= 0) || $('coPrice').value === ''){ toast('Say what\'s changing and the price'); return; }
+      L.cos.push({ desc, price, cost:Number($('coCost').value) || 0, cc:Number($('coCode').value), date:iso(new Date()) }); touch(L); render(); toast('Change order sent to the buyer to sign');
+    }
+    return;
+  }
+  const sd = t.closest('[data-std]');
+  if(sd && !locked(L)){ const q = qById(sd.dataset.std); if(q){ q.c.forEach((c, j)=>{ if(!c.side) delete L.answers[q.id + '#' + j]; }); markOwn(L, q); touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); } return; }
+  const fa = t.closest('[data-floor-add]'), fd = t.closest('[data-floor-del]');
+  if((fa || fd) && !locked(L)){
+    const q = fa ? qById(fa.dataset.floorAdd) : qOfKey(fd.dataset.floorDel); if(!q) return;
+    if(fd){ delete L.answers[fd.dataset.floorDel]; markOwn(L, q); touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+    const ft = FLOOR_TYPES.find(x=>x.key === floorPick.type) || FLOOR_TYPES[0];
+    const lv = ft.levels.includes(floorPick.level) ? floorPick.level : ft.levels[0] || 0;
+    const i = q.c.findIndex(c=>c.ft === ft.key && c.lv === lv), box = $('floorSq'), sq = Math.max(0, Math.min(99999, Math.round(Number(box && box.value) || 0)));
+    if(i < 0) return;
+    if(!sq){ toast('Type the square feet first'); if(box) box.focus(); return; }
+    const k = q.id + '#' + i, a = L.answers[k] || { qty:0, price:choicePrice(q, i, L) };
+    a.qty = (a.qty || 0) + sq; L.answers[k] = a; markOwn(L, q); flashKey = k; touch(L);
+    const y = window.scrollY; render(); window.scrollTo(0, y); flashKey = ''; return;
+  }
+  const tg = t.closest('[data-bt-tog]'), stp = t.closest('[data-bt-step]');
+  if(tg || stp){
+    const k = tg ? tg.dataset.btTog : stp.dataset.btStep, q = qOfKey(k), c = q && q.c[Number(k.split('#')[1])];
+    if(!c) return;
+    const box = isAllow(q, c) ? document.querySelector('[data-allow="' + k + '"]') : null;
+    const a = L.answers[k] || { qty:0, price: box ? Math.max(0, Math.round(Number(box.value) || 0)) : choicePrice(q, Number(k.split('#')[1]), L) };     // the price is fixed the moment it's first picked
+    markOwn(L, q); delete a.auto;
+    if((q.ceil || q.opts || q.one) && tg && !a.qty) q.c.forEach((x, j)=>{ if(q.id + '#' + j !== k) delete L.answers[q.id + '#' + j]; });
+    if(c.grp && tg && !a.qty) q.c.forEach((x, j)=>{ if(x.grp === c.grp && q.id + '#' + j !== k) delete L.answers[q.id + '#' + j]; });
+    a.qty = tg ? (a.qty ? 0 : 1) : Math.max(0, Math.min(99, a.qty + Number(stp.dataset.d)));
+    if(a.qty) L.answers[k] = a; else delete L.answers[k];
+    touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  const fav = t.closest('[data-fav]'); if(fav){ e.stopPropagation(); L.favs[fav.dataset.fav] = !L.favs[fav.dataset.fav]; if(!L.favs[fav.dataset.fav]) delete L.favs[fav.dataset.fav]; render(); return; }
+  const pick = t.closest('[data-pick]');
+  if(pick){
+    const key = pick.dataset.pick, q = qById(key.split('@')[0]), o = q.o.find(x=>x[0] === pick.dataset.opt);
+    L.answers[key] = { label:o[0], price:o[1], cost:o[2] };
+    // an answer can make another question irrelevant (no fireplace -> no mantel); drop those answers
+    ALL_QS.forEach(x=>{ if(!asked(x, L)) keysOf(x).forEach(k=>{ delete L.answers[k]; }); });
+    touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  const qb = t.closest('[data-qty]');
+  if(qb){
+    const q = qById(qb.dataset.qty), a = L.answers[q.id] || { qty:0, price:q.price, cost:q.cost };
+    a.qty = Math.max(0, Math.min(q.max, a.qty + Number(qb.dataset.d))); L.answers[q.id] = a;
+    touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if(t.closest('#toFull')){
+    // the first time they move on, remember what was priced, so later changes can be shown
+    if(!L.v1Snap) L.v1Snap = snapAll(L);
+    L.stage = 'v2'; tab = 'full'; roomId = ROOMS[0].id; touch(L); render(); window.scrollTo(0, 0); return;
+  }
+  const cuo = t.closest('[data-cuopen]'); if(cuo){ cuOpen = cuo.dataset.cuopen; cuMode = 'now'; const y = window.scrollY; render(); window.scrollTo(0, y); const d = $('cuDesc'); if(d) d.focus({ preventScroll:true }); return; }
+  if(t.closest('#cuCancel')){ cuOpen = ''; render(); return; }
+  if(t.closest('#cuAdd')){
+    const desc = $('cuDesc').value.trim();
+    if(!desc){ toast('Say what the item is'); return; }
+    if(cuMode === 'ask'){
+      const uid = $('cuAsk').value, who = (TEAM.find(p=>p.uid === uid) || {}).name || 'They';
+      L.custom.push({ desc, price:0, cost:0, cc:90, room:roomId, ...(qById(cuOpen) ? { q:cuOpen } : {}), pending:true, ask:who, askUid:uid, at:iso(new Date()) });
+      cuOpen = ''; touch(L); render(); toast(who + ' will get a notice that this needs a price'); return;
+    }
+    const price = Number($('cuPrice').value);
+    if($('cuPrice').value === '' || !(price >= 0)){ toast('Type the price, or choose "It needs a price"'); return; }
+    const costEl = $('cuCost'), codeEl = $('cuCode');
+    L.custom.push({ desc, price, cost: costEl && costEl.value !== '' ? Number(costEl.value) || 0 : Math.round(price * 0.72), cc: codeEl ? Number(codeEl.value) : 90, room:roomId, ...(qById(cuOpen) ? { q:cuOpen } : {}) });
+    cuOpen = ''; touch(L); render(); toast('Added to the sheet'); return;
+  }
+  const cs = t.closest('[data-cuset]');
+  if(cs){
+    const i = Number(cs.dataset.cuset), c = L.custom[i], pe = document.querySelector('[data-cuprice="' + i + '"]'), ce = document.querySelector('[data-cucost="' + i + '"]');
+    const price = Number(pe.value);
+    if(!c || pe.value === '' || !(price >= 0)){ toast('Type the price first'); return; }
+    c.price = price; c.cost = ce && ce.value !== '' ? Number(ce.value) || 0 : Math.round(price * 0.72); delete c.pending;
+    touch(L); render(); toast('Price set'); return;
+  }
+  const dc = t.closest('[data-delcustom]'); if(dc){ L.custom.splice(Number(dc.dataset.delcustom), 1); touch(L); render(); return; }
+  if(t.closest('#signBtn')){
+    if(!$('sg1').value.trim()){ toast('Add the buyer\'s name'); return; }
+    if($('sgDev')){ L.dev = $('sgDev').value; L.lot = $('sgLot').value.trim(); }
+    if(!L.dev || !L.lot){ toast('Pick the development and type the lot first'); return; }
+    if($('sgAddr')){
+      const v = { model:$('sgModel').value.trim(), address:$('sgAddr').value.trim(), phone:$('sgPhone').value.trim(), email:$('sgEmail').value.trim() };
+      const miss = [['model','home style'],['address','street address'],['phone','phone'],['email','email']].filter(([k])=>!v[k]).map(([, n])=>n);
+      if(miss.length){ toast('Fill in the ' + miss.join(', ') + ' first'); return; }
+      Object.assign(L, v);
+    }
+    if(!$('sgAgree').checked){ toast('Tick the box to approve first'); return; }
+    L.name = $('sg1').value.trim(); L.name2 = $('sg2').value.trim();
+    L.stage = 'signed'; L.signedOn = iso(new Date()); L.pricedOn = L.signedOn; touch(L); tab = 'sign'; render(); window.scrollTo(0, 0); toast('Signed and locked');
+    if(!PRESENT) makeHome(L);
+  }
+});
+document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); if(e.key === 'Enter' && (e.target.id === 'loginPass' || e.target.id === 'loginEmail')) doLogin(); });
+document.addEventListener('change', e=>{
+  if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); return; }
+  if(e.target.dataset && e.target.dataset.allow){
+    const L3 = lead(); if(!L3 || locked(L3)) return;
+    const k = e.target.dataset.allow, v = Math.max(0, Math.round(Number(e.target.value) || 0)); markOwn(L3, qOfKey(k));
+    const q3 = qOfKey(k), c3 = q3 && q3.c[Number(k.split('#')[1])];
+    if(c3 && c3.grp && e.target.value !== '') q3.c.forEach((x, j)=>{ if(x.grp === c3.grp && q3.id + '#' + j !== k) delete L3.answers[q3.id + '#' + j]; });
+    if(e.target.value === '') delete L3.answers[k]; else L3.answers[k] = { ...(L3.answers[k] || {}), qty:1, price:v };
+    touch(L3); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if(e.target.matches && e.target.matches('[data-floor-type],[data-floor-level]')){
+    const keep = ($('floorSq') || {}).value || '';
+    if(e.target.matches('[data-floor-type]')){ floorPick.type = e.target.value; const ft = FLOOR_TYPES.find(x=>x.key === floorPick.type); floorPick.level = ft && ft.levels[0] || 0; }
+    else floorPick.level = Number(e.target.value);
+    const y = window.scrollY; render(); window.scrollTo(0, y); if($('floorSq')) $('floorSq').value = keep; return;
+  }
+  if(e.target.dataset && e.target.dataset.rate){             // tile: the price per sq ft typed on the sheet
+    const L4 = lead(); if(!L4 || locked(L4)) return;
+    const k = e.target.dataset.rate, v = Math.max(0, Math.round((Number(e.target.value) || 0) * 100) / 100); markOwn(L4, qOfKey(k));
+    L4.answers[k] = { ...(L4.answers[k] || { qty:0 }), price:v };
+    if(!L4.answers[k].qty && !v) delete L4.answers[k];
+    touch(L4); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if(e.target.dataset && e.target.dataset.allowdef){
+    const v = Math.round(Number(e.target.value));
+    if(!Number.isFinite(v) || v < 0){ toast('Type a dollar amount'); render(); return; }
+    ALLOW_CFG[e.target.dataset.allowdef] = v; styleSave(); toast('Default allowance saved'); return;
+  }
+  if(e.target.dataset && e.target.dataset.lotprem){
+    const L2 = lead(); if(!L2 || locked(L2)) return;
+    const k = e.target.dataset.lotprem + '#0', v = Math.max(0, Math.round(Number(e.target.value) || 0));
+    if(v) L2.answers[k] = { qty:1, price:v }; else delete L2.answers[k];
+    touch(L2); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if(e.target.dataset && (e.target.dataset.btNum || e.target.dataset.note)){
+    const L1 = lead(); if(!L1 || locked(L1)) return;
+    if(e.target.dataset.note){ const v = e.target.value.trim(); if(v) L1.answers[e.target.dataset.note] = { label:v, qty:0, price:0 }; else delete L1.answers[e.target.dataset.note]; }
+    else { const k = e.target.dataset.btNum, q = qOfKey(k), c = q && q.c[Number(k.split('#')[1])]; if(!c) return; markOwn(L1, q);
+      if(q.one && Number(e.target.value) > 0) q.c.forEach((x, j)=>{ if(q.id + '#' + j !== k) delete L1.answers[q.id + '#' + j]; });
+      if(c.grp && Number(e.target.value) > 0) q.c.forEach((x, j)=>{ if(x.grp === c.grp && q.id + '#' + j !== k) delete L1.answers[q.id + '#' + j]; });
+      const v = Math.max(0, Math.min(99999, Math.round(Number(e.target.value) || 0)));
+      if(!v){ if(c.rate && L1.answers[k] && L1.answers[k].price) L1.answers[k].qty = 0; else delete L1.answers[k]; }
+      else { const a = L1.answers[k] || { price:choicePrice(q, Number(k.split('#')[1]), L1) }; a.qty = v; L1.answers[k] = a; } }
+    touch(L1); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if(e.target.name === 'cuMode'){ const keep = ($('cuDesc') || {}).value || ''; cuMode = e.target.value; render(); if($('cuDesc')) $('cuDesc').value = keep; return; }
+  if(e.target.id === 'docAll'){ docAll = e.target.checked; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  const el = e.target, L0 = lead();
+  if(L0 && !locked(L0) && el.dataset && (el.dataset.num || el.dataset.money || el.dataset.text)){
+    const id = el.dataset.num || el.dataset.money || el.dataset.text, q = qById(id);
+    if(!q) return;
+    if(el.dataset.num){ const v = Math.max(0, Math.min(q.max, Math.round(Number(el.value) || 0))); if(!v) delete L0.answers[id]; else { const a = L0.answers[id] || { price:q.price, cost:q.cost }; a.qty = v; L0.answers[id] = a; } }
+    else if(el.dataset.money){ const v = Math.max(0, Math.round(Number(el.value) || 0)); if(!v) delete L0.answers[id]; else L0.answers[id] = moneyAns(q, v); }
+    else { const v = el.value.trim(); if(!v) delete L0.answers[id]; else L0.answers[id] = { label:v, price:0, cost:0 }; }
+    ALL_QS.forEach(x=>{ if(!asked(x, L0)) keysOf(x).forEach(k=>{ delete L0.answers[k]; }); });
+    touch(L0); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if(e.target.id === 'followDate' && e.target.value && lead()){ const L = lead(); L.follow = { date:e.target.value, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(L.follow.date)); return; }
+  if(e.target.id === 'styCeil'){ const c = STYLE_CFG[styName] = STYLE_CFG[styName] || { skip:[], incl:[] }; c.ceil = Number(e.target.value); render(); styleSave(); toast(styName + ': standard ceilings ' + c.ceil + "'"); return; }
+  if(e.target.dataset && e.target.dataset.optp){
+    const k = e.target.dataset.optp, v = Math.round(Number(e.target.value) * 100) / 100;
+    if(e.target.value === ''){ delete OPT_PRICES[k]; if(OPT_BASE[k] != null) OPT_PRICES[k] = null; }
+    else if(!Number.isFinite(v)){ toast('Type a dollar amount'); render(); return; }
+    else OPT_PRICES[k] = v;
+    styleSave(); toast('Price saved'); return;
+  }
+  if(e.target.dataset && e.target.dataset.ceilp){
+    const v = Math.round(Number(e.target.value));
+    if(e.target.value === '' || !Number.isFinite(v)){ toast('Type a dollar amount'); render(); return; }
+    CEIL_CFG[e.target.dataset.ceilp] = v; styleSave(); toast('Ceiling price saved'); return;
+  }
+  if(e.target.id === 'styPick'){ styName = e.target.value; styState = ''; render(); return; }
+  if(e.target.id === 'jd_settle' && e.target.value){ ['walk', 'move'].forEach((k, i)=>{ const el = $('jd_' + k); if(el && !el.value) el.value = addDays(e.target.value, i ? -3 : -5); }); }
+  if(e.target.id === 'jd_draftsman' && e.target.value === '__other'){ const v = (prompt('Draftsman initials') || '').trim(); if(v){ const o = document.createElement('option'); o.textContent = v; e.target.insertBefore(o, e.target.lastChild); e.target.value = v; } else e.target.value = ''; }
+  if(e.target.id && e.target.id.startsWith('jd_')){ const L5 = lead(); if(L5 && L5.houseId) saveHomeDetails(L5); }
+  if(e.target.id === 'nDev'){ const d = e.target.value; $('nLot').innerHTML = '<option value="">Not chosen yet</option>' + LOTS.filter(l=>l.dev === d).map(l=>`<option value="${esc(l.lot)}" data-addr="${esc(l.addr)}">Lot ${esc(l.lot)}${l.addr ? ' — ' + esc(l.addr) : ''}</option>`).join('') + '<option value="__type">Another lot (type it)</option>'; }
+  if(e.target.id === 'nLot'){
+    if(e.target.value === '__type'){ const v = (prompt('Lot number') || '').trim(); if(v){ const o = document.createElement('option'); o.value = v; o.textContent = 'Lot ' + v; e.target.insertBefore(o, e.target.lastChild); e.target.value = v; } else e.target.value = ''; }
+    const op = e.target.selectedOptions[0]; if(op && op.dataset.addr && $('nAddr') && !$('nAddr').value) $('nAddr').value = op.dataset.addr;
+  }
+});
+
+/* ---------- start ----------
+   The office signs in with their hub login; the price list, every lead and the team come from the server in one go.
+   A customer screen / their pricing sheet / the share page opens with the sheet's link key instead (no sign-in). */
+let DEVS_SEEN = false;
+function applySetup(data){
+  buildCatalog(data.catalog || []);
+  STYLE_CFG = data.styles || {}; ALLOW_CFG = data.allow || {}; CEIL_CFG = data.ceil || {}; OPT_PRICES = data.prices || {};
+}
+function loginScreen(msg){
+  document.body.classList.add('signedout');
+  $('totalbar').style.display = 'none';
+  $('root').innerHTML = `<div class="card login"><img src="icons/logo.png" alt="Alden Homes" style="height:56px">
+    <h2 style="margin-top:12px">Selections</h2><p class="lede" style="margin-top:4px">Sign in with your hub login.</p>
+    <label class="f" style="margin-top:14px">Email</label><input type="text" id="loginEmail" autocomplete="username">
+    <label class="f" style="margin-top:10px">Password</label><input type="password" id="loginPass" autocomplete="current-password">
+    <div class="err" id="loginErr">${esc(msg || '')}</div>
+    <button type="button" class="btn primary" id="loginGo" style="width:100%;margin-top:4px">Sign in</button>
+    <p class="muted" style="font-size:13px;margin-top:16px">Customer screen? <a href="#" id="showJoin">Join with a code</a></p></div>
+    <div class="card noprint" id="joinCard" style="max-width:400px;margin:14px auto 0;display:none"><h2>Join as customer screen</h2><p class="muted" style="font-size:14px;margin-top:4px">Type the code shown on the rep's device.</p>
+      <div style="display:flex;gap:10px;margin-top:10px"><input type="tel" inputmode="numeric" id="joinCode" placeholder="000000" maxlength="6" autocomplete="off" style="flex:1;font-family:'Courier New',monospace;font-size:22px;letter-spacing:4px;text-align:center"><button type="button" class="btn primary" id="joinBtn">Join</button></div></div>`;
+}
+document.addEventListener('click', e=>{ if(e.target.closest('#showJoin')){ e.preventDefault(); const c = $('joinCard'); if(c){ c.style.display = ''; $('joinCode').focus(); } } });
+function doLogin(){
+  const email = ($('loginEmail').value || '').trim(), pass = $('loginPass').value || '';
+  if(!email || !pass){ $('loginErr').textContent = 'Enter your email and password.'; return; }
+  firebase.auth().signInWithEmailAndPassword(email, pass).catch(err=>{
+    $('loginErr').textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-email'].includes(err.code) ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message; });
+}
+// the lots the office has listed (Available Lots on the schedule page) and the developments they're in
+async function loadLots(){
+  try{
+    const snap = await firebase.firestore().collection('available-lots').get();
+    LOTS = snap.docs.map(d=>d.data()).filter(l=>l.lot).map(l=>({ dev:String(l.community || '').toUpperCase(), lot:String(l.lot), addr:l.address || '' }))
+      .sort((a, b)=>a.dev.localeCompare(b.dev) || String(a.lot).localeCompare(String(b.lot), undefined, { numeric:true }));
+    LOTS.forEach(l=>{ if(l.dev && !DEVS.some(d=>d.code === l.dev)) DEVS.push({ code:l.dev, name:l.dev }); });
+  } catch(err){ console.warn('lots', err); }
+}
+async function bootOffice(){
+  $('root').innerHTML = '<div class="card" style="margin-top:60px;text-align:center"><h2>Opening…</h2></div>';
+  let data;
+  try{ data = await selApi({ action:'boot' }); }
+  catch(err){ console.error(err); $('root').innerHTML = '<div class="card" style="margin-top:60px;text-align:center"><h2>The selections couldn\'t be loaded.</h2><p class="lede" style="margin:8px auto 0">Check the connection and reload the page.</p></div>'; return; }
+  applySetup(data);
+  TEAM = data.team || [];
+  (data.sheets || []).forEach(x=>{ KEYS[x.id] = x.key; REMOTE[x.id] = { rev:x.rev, sheet:clone(x.sheet) }; });
+  leads = (data.sheets || []).map(x=>norm(clone(x.sheet)));
+  try{ const homes = leads.filter(l=>l.houseId).map(l=>l.houseId);
+    for(let i = 0; i < homes.length; i += 10){ const snap = await firebase.firestore().collection('jobs').where(firebase.firestore.FieldPath.documentId(), 'in', homes.slice(i, i + 10)).get(); snap.docs.forEach(d=>{ JOBS[d.id] = d.data(); }); } }
+  catch(err){ console.warn('homes', err); }
+  await loadLots();
+  const want = new URLSearchParams(location.search).get('open');
+  if(want && leads.some(l=>l.id === want)){ cur = want; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; }
+  start();
+  // the hub's search button and voice assistant, as on every staff page
+  ['hubsearch.js', 'assistant.js'].forEach(f=>{ const sc = document.createElement('script'); sc.src = f; document.body.appendChild(sc); });
+}
+async function boot(){
+  const linkId = PRESENT || SHOW || QUOTE;
+  if(linkId){
+    document.body.classList.add('public');
+    $('root').innerHTML = '<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>Opening…</h2></div></div>';
+    try{ applySetup(await selApi({ action:'catalog', id:linkId })); }
+    catch(e){ $('totalbar').style.display = 'none'; $('root').innerHTML = `<div class="wrap"><div class="card" style="margin-top:60px;text-align:center"><h2>This link isn't active.</h2><p class="lede" style="margin:8px auto 0">Ask your Alden Homes rep to share it again.</p></div></div>`; return; }
+    start();
+    return;
+  }
+  firebase.initializeApp(firebaseConfig);
+  let started = false;
+  firebase.auth().onAuthStateChanged(user=>{
+    if(user && !user.isAnonymous){
+      document.body.classList.remove('signedout');
+      $('currentUserEmail').textContent = user.email || '';
+      if(!started){ started = true; bootOffice(); }
+    } else { started = false; loginScreen(); }
+  });
+}
+function start(){
+  load();
+  if(SHOW){ loadShow(); return; }
+  if(QUOTE){ loadShared(QUOTE, st=>{ quoteState = st; }); return; }
+  render();
+}
+/* Signed: the home is made (or found by development + lot) in Active Homes, and its sale price set from this sheet. */
+async function makeHome(L){
+  if(!(await flush())){ toast('Still saving. Try "Add the home" again in a moment.'); render(); return; }
+  const saleLines = [{ bt:'', title:'Base price', choice:L.model || '', price:base(L) },
+    ...lines(L).filter(l=>!l.typed).map(l=>({ bt:l.q.bt || '', title:l.q.t, choice:l.label, price:l.price })),
+    ...L.custom.filter(c=>!c.pending).map(c=>({ bt:'', title:'Custom item', choice:c.desc, price:c.price }))];
+  try{
+    const r = await selApi({ action:'sign', id:L.id, sale:{ price: base(L) + upgrades(L), lines: saleLines } });
+    L.houseId = r.houseId; if(REMOTE[L.id]) REMOTE[L.id].sheet.houseId = r.houseId; if(sync.last) sync.last.houseId = r.houseId;
+    toast(r.created ? 'The home is in Active Homes now, with its sale price' : 'The sale price is on the home in Active Homes');
+  } catch(err){ console.error(err); toast('The sheet is signed, but the home couldn\'t be added yet. Press "Add the home" to try again.'); }
+  render();
+}
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+boot();
+
+</script>
+</body>
+</html>

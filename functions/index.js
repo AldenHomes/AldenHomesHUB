@@ -1558,6 +1558,254 @@ exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (
 });
 
 /* ============================================================
+   selectionsApi — the REAL selections & pricing sheets (selections.html), moved over from the demo (owner, 2026-10-19).
+   Sheets live in `selection-sheets/{id}` = { sheet (JSON text), rev, nav, key, join, presentUntil, houseId, at, by } and the
+   style setup / allowance / option prices in `settings/selections` — both written and read ONLY here, so no security rule is
+   needed (clients can't touch them directly).
+   - Staff (Firebase ID token): boot (price list + setup + every sheet + the team), get / patch (only what changed, in a
+     transaction, like the demo), stylesSet, present (opens a customer screen for 12 hours: returns a 6-digit join code),
+     remove, sign (makes the home: links the lot's home in `jobs` or adds one, and sets its sale price in `job-sales`).
+   - Anyone holding a sheet's link (id + key): get (no office notes, follow-ups or our costs), catalog; patch (picks only)
+     only while a customer screen is open; join (6-digit code -> the link).
+   A custom item that "needs a price" from a teammate puts a bell notice (notes, kind 'selPrice') on that person.
+   The price list itself is functions/demo-catalog.json (git-excluded; travels with a deploy).
+   ============================================================ */
+const SEL_FIELDS = [...DEMO_FIELDS, 'notes', 'follow', 'address'];
+const SEL_OFFICE_ONLY = ['notes', 'follow'];
+const selRef = id=>db.collection('selection-sheets').doc(id);
+const selKey = ()=>require('crypto').randomBytes(12).toString('hex');
+// what a link-holder sees: no office notes / follow-up, no "our cost" on custom items or change orders
+function selPublic(sheet){
+  const s = JSON.parse(JSON.stringify(sheet || {}));
+  SEL_OFFICE_ONLY.forEach(f=>{ delete s[f]; });
+  ['custom', 'cos'].forEach(f=>{ if(Array.isArray(s[f])) s[f].forEach(c=>{ if(c && typeof c === 'object') delete c.cost; }); });
+  return s;
+}
+async function selSetup(){
+  const ref = db.collection('settings').doc('selections');
+  const d = await ref.get();
+  if(d.exists) return d.data();
+  // first time: start from the demo's setup (styles, allowance amounts, ceiling and option prices the owner already set)
+  const demo = (await db.collection('demo-config').doc('styles').get()).data() || {};
+  const setup = { styles: demo.styles || {}, allow: demo.allow || {}, ceil: demo.ceil || {}, prices: demo.prices || {}, updatedAt: new Date().toISOString(), from: 'demo' };
+  await ref.set(setup);
+  return setup;
+}
+// a "needs a price" custom item asked of a teammate -> one bell notice for them (once per item)
+async function selPriceAsks(id, before, after, who){
+  const was = new Set((Array.isArray(before && before.custom) ? before.custom : []).filter(c=>c && c.pending && c.askUid).map(c=>c.askUid + '|' + c.desc));
+  const fresh = (Array.isArray(after && after.custom) ? after.custom : []).filter(c=>c && c.pending && typeof c.askUid === 'string' && c.askUid && !was.has(c.askUid + '|' + c.desc));
+  const label = [after.name, [after.dev, after.lot ? 'Lot ' + after.lot : ''].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+  for(const c of fresh.slice(0, 10)){
+    await db.collection('notes').add({ houseId: after.houseId || '', houseLabel: String(label || 'a selection sheet').slice(0, 120), sheetId: id,
+      text: 'Needs a price on the selection sheet: ' + String(c.desc || '').slice(0, 300), by: { uid: who.uid, name: staffName(who) },
+      mentions: [c.askUid], kind: 'selPrice', at: new Date().toISOString(), readBy: {} });
+  }
+}
+exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (req, res)=>{
+  if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
+  const b = req.body || {};
+  const id = typeof b.id === 'string' && /^L[a-z0-9]{4,16}$/.test(b.id) ? b.id : '';
+  try{
+    const who = await staffFromRequest(req);
+    const now = new Date();
+
+    /* ---------- anyone with a link ---------- */
+    if(!who){
+      if(b.action === 'join'){
+        const code = String(b.code || '').replace(/\D/g, '');
+        const gate = db.collection('settings').doc('selections-gate'), hour = now.toISOString().slice(0, 13);
+        const g = (await gate.get()).data() || {};
+        const fails = g.hour === hour ? (g.fails || 0) : 0;
+        if(fails >= 40){ res.status(429).json({ error: 'locked' }); return; }
+        const hit = code.length === 6 ? (await db.collection('selection-sheets').where('join', '==', code).limit(1).get()).docs[0] : null;
+        if(!hit || !(hit.data().presentUntil > now.toISOString())){ await gate.set({ hour, fails: fails + 1 }); res.status(404).json({ error: 'code' }); return; }
+        res.json({ id: hit.id, k: hit.data().key });
+        return;
+      }
+      if(!id || typeof b.k !== 'string' || !b.k){ res.status(401).json({ error: 'sign-in' }); return; }
+      const doc = await selRef(id).get();
+      if(!doc.exists || doc.data().key !== b.k){ res.status(404).json({ error: 'missing' }); return; }
+      const d = doc.data();
+      if(b.action === 'catalog'){
+        if(!DEMO_CATALOG){ res.status(503).json({ error: 'not-set-up' }); return; }
+        const setup = await selSetup();
+        res.json({ catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {} });
+        return;
+      }
+      if(b.action === 'get'){
+        res.json(d.rev > (Number(b.since) || 0) ? { rev: d.rev, sheet: selPublic(JSON.parse(d.sheet)), nav: d.nav || null, presenting: d.presentUntil > now.toISOString() }
+          : { rev: d.rev, nav: d.nav || null, presenting: d.presentUntil > now.toISOString() });
+        return;
+      }
+      if(b.action === 'patch'){
+        // the customer's screen: picks only, and only while the office has it open
+        const out = await db.runTransaction(async tx=>{
+          const x = await tx.get(selRef(id)); const xd = x.data();
+          if(!(xd.presentUntil > new Date().toISOString())) return { closed: true };
+          const sheet = JSON.parse(xd.sheet);
+          if(sheet.stage === 'signed') return { rev: xd.rev, sheet: selPublic(sheet), nav: xd.nav || null };
+          sheet.answers = sheet.answers && typeof sheet.answers === 'object' ? sheet.answers : {};
+          const ans = b.ans && typeof b.ans === 'object' ? b.ans : {};
+          Object.keys(ans).slice(0, 300).forEach(k=>{ if(/^[A-Za-z0-9_:@~.-]{1,60}(#\d{1,3})?$/.test(k)) sheet.answers[k] = ans[k]; });
+          (Array.isArray(b.del) ? b.del : []).slice(0, 300).forEach(k=>{ delete sheet.answers[k]; });
+          if(b.top && b.top.favs && typeof b.top.favs === 'object') sheet.favs = b.top.favs;
+          const text = JSON.stringify(sheet);
+          if(text.length > 200000) return { tooBig: true };
+          tx.update(selRef(id), { sheet: text, rev: (xd.rev || 0) + 1, at: new Date().toISOString() });
+          return { rev: (xd.rev || 0) + 1, sheet: selPublic(sheet), nav: xd.nav || null };
+        });
+        if(out.closed){ res.status(403).json({ error: 'closed' }); return; }
+        if(out.tooBig){ res.status(413).json({ error: 'size' }); return; }
+        res.json(out);
+        return;
+      }
+      res.status(400).json({ error: 'action' });
+      return;
+    }
+
+    /* ---------- staff ---------- */
+    if(b.action === 'boot'){
+      if(!DEMO_CATALOG){ res.status(503).json({ error: 'not-set-up' }); return; }
+      const [setup, snap, users] = await Promise.all([selSetup(), db.collection('selection-sheets').get(), admin.auth().listUsers(1000)]);
+      const team = users.users.filter(u=>u.email && !u.disabled).map(u=>({ uid: u.uid, name: staffName(u) })).sort((x, y)=>x.name.localeCompare(y.name));
+      const sheets = snap.docs.map(d=>({ id: d.id, key: d.data().key, rev: d.data().rev || 0, houseId: d.data().houseId || '', sheet: JSON.parse(d.data().sheet) }));
+      res.json({ catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {}, sheets, team });
+      return;
+    }
+    if(b.action === 'stylesSet'){
+      const src = b.styles && typeof b.styles === 'object' ? b.styles : null;
+      if(!src){ res.status(400).json({ error: 'styles' }); return; }
+      const ids = a=>(Array.isArray(a) ? a : []).filter(x=>typeof x === 'string' && /^[A-Za-z0-9_]{1,30}$/.test(x)).slice(0, 600);
+      const styles = {};
+      Object.entries(src).slice(0, 80).forEach(([name, v])=>{
+        if(typeof name !== 'string' || !name.trim() || name.length > 40 || !v || typeof v !== 'object') return;
+        const skip = ids(v.skip), incl = ids(v.incl).filter(x=>!skip.includes(x));
+        const ceil = v.ceil === 8 || v.ceil === 9 ? v.ceil : null;
+        if(skip.length || incl.length || ceil) styles[name.trim()] = { skip, incl, ...(ceil ? { ceil } : {}) };
+      });
+      const allow = {};
+      Object.entries(b.allow && typeof b.allow === 'object' ? b.allow : {}).slice(0, 200).forEach(([k, v])=>{
+        const n = Math.round(Number(v) * 100) / 100;
+        if(/^[A-Za-z0-9_]{1,30}#\d{1,3}$/.test(k) && isFinite(n) && n >= 0 && n <= 1000000) allow[k] = n;
+      });
+      const ceil = {};
+      ['8-9', '8-10', '9-10', '9-8'].forEach(k=>{ const n = Math.round(Number((b.ceil || {})[k]) * 100) / 100; if(b.ceil && b.ceil[k] !== undefined && b.ceil[k] !== '' && isFinite(n) && Math.abs(n) <= 1000000) ceil[k] = n; });
+      const prices = {};
+      Object.entries(b.prices && typeof b.prices === 'object' ? b.prices : {}).slice(0, 200).forEach(([k, v])=>{
+        const n = Math.round(Number(v) * 100) / 100;
+        if(/^[a-z0-9_-]{1,30}$/.test(k) && v !== null && v !== '' && isFinite(n) && Math.abs(n) <= 1000000) prices[k] = n;
+      });
+      await db.collection('settings').doc('selections').set({ styles, allow, ceil, prices, updatedAt: now.toISOString(), updatedBy: who.email || who.uid });
+      res.json({ ok: true, styles, allow, ceil, prices });
+      return;
+    }
+    if(!id){ res.status(400).json({ error: 'id' }); return; }
+    if(b.action === 'get'){
+      const doc = await selRef(id).get();
+      if(!doc.exists){ res.json({ missing: true }); return; }
+      const d = doc.data();
+      res.json(d.rev > (Number(b.since) || 0) ? { rev: d.rev, sheet: JSON.parse(d.sheet), nav: d.nav || null, key: d.key, houseId: d.houseId || '' } : { rev: d.rev, nav: d.nav || null });
+      return;
+    }
+    if(b.action === 'patch'){
+      let before = null;
+      const out = await db.runTransaction(async tx=>{
+        const doc = await tx.get(selRef(id));
+        let sheet, rev = 0, nav = null, key = '', houseId = '';
+        if(doc.exists){ const d = doc.data(); sheet = JSON.parse(d.sheet); rev = d.rev || 0; nav = d.nav || null; key = d.key; houseId = d.houseId || ''; }
+        else if(b.full && typeof b.full === 'object' && !Array.isArray(b.full)){ sheet = b.full; key = selKey(); }
+        else return { missing: true };
+        before = JSON.parse(JSON.stringify(sheet));
+        if(!sheet.answers || typeof sheet.answers !== 'object') sheet.answers = {};
+        const ans = b.ans && typeof b.ans === 'object' ? b.ans : {};
+        Object.keys(ans).slice(0, 600).forEach(k=>{ sheet.answers[k] = ans[k]; });
+        (Array.isArray(b.del) ? b.del : []).slice(0, 600).forEach(k=>{ delete sheet.answers[k]; });
+        const top = b.top && typeof b.top === 'object' ? b.top : {};
+        SEL_FIELDS.forEach(f=>{ if(f in top) sheet[f] = top[f]; });
+        sheet.id = id; sheet.houseId = houseId;
+        if(b.nav && typeof b.nav === 'object') nav = { tab: String(b.nav.tab || '').slice(0, 20), roomId: String(b.nav.roomId || '').slice(0, 30) };
+        const text = JSON.stringify(sheet);
+        if(text.length > 200000) return { tooBig: true };
+        rev++;
+        const data = { sheet: text, rev, nav, key, at: now.toISOString(), by: who.email || who.uid, name: String(sheet.name || '').slice(0, 120), stage: String(sheet.stage || '') };
+        if(doc.exists) tx.update(selRef(id), data); else tx.set(selRef(id), { ...data, houseId: '', created: now.toISOString() });
+        return { rev, sheet, nav, key, houseId };
+      });
+      if(out.tooBig){ res.status(413).json({ error: 'size' }); return; }
+      if(!out.missing) await selPriceAsks(id, before, out.sheet, who).catch(err=>logger.error('selPrice notice failed', { error: String(err) }));
+      res.json(out);
+      return;
+    }
+    if(b.action === 'present'){
+      // a customer screen for 12 hours; the 6-digit code lets another device join it
+      const code = String(require('crypto').randomInt(0, 1000000)).padStart(6, '0');
+      const until = new Date(now.getTime() + 12 * 3600 * 1000).toISOString();
+      const doc = await selRef(id).get();
+      if(!doc.exists){ res.status(404).json({ error: 'missing' }); return; }
+      await selRef(id).update({ join: code, presentUntil: until });
+      res.json({ code, k: doc.data().key, until });
+      return;
+    }
+    if(b.action === 'remove'){
+      const doc = await selRef(id).get();
+      if(doc.exists && JSON.parse(doc.data().sheet).stage === 'signed'){ res.status(409).json({ error: 'signed' }); return; }
+      await selRef(id).delete();
+      res.json({ ok: true });
+      return;
+    }
+    if(b.action === 'sign'){
+      // the sheet is signed: its home is the lot's home in the hub (same development + lot) or a new one, and its sale price is set
+      const doc = await selRef(id).get();
+      if(!doc.exists){ res.status(404).json({ error: 'missing' }); return; }
+      const d = doc.data(), sheet = JSON.parse(d.sheet);
+      if(sheet.stage !== 'signed'){ res.status(409).json({ error: 'not-signed' }); return; }
+      const sale = b.sale && typeof b.sale === 'object' ? b.sale : {};
+      const price = Math.round(Number(sale.price) * 100) / 100;
+      if(!isFinite(price) || price <= 0){ res.status(400).json({ error: 'price' }); return; }
+      const cut = (s, n)=>String(s == null ? '' : s).slice(0, n);
+      const lines = (Array.isArray(sale.lines) ? sale.lines : []).slice(0, 800).map(l=>({ bt: cut(l.bt, 12), title: cut(l.title, 160), choice: cut(l.choice, 240), price: Math.round(Number(l.price) * 100) / 100 || 0 }));
+      const lotKey = l=>String(l == null ? '' : l).toLowerCase().replace(/lot|#|\s/g, '').replace(/^0+(?=\d)/, '');
+      let houseId = d.houseId || '', created = false;
+      if(!houseId && sheet.dev && sheet.lot){
+        const jobs = await db.collection('jobs').get();
+        const hit = jobs.docs.find(j=>String(j.data().community || '').toUpperCase() === String(sheet.dev).toUpperCase() && lotKey(j.data().lot) === lotKey(sheet.lot));
+        if(hit) houseId = hit.id;
+      }
+      const client = [sheet.name, sheet.name2].filter(Boolean).join(' & ');
+      if(!houseId){
+        const ref = db.collection('jobs').doc();
+        await ref.set({ community: cut(String(sheet.dev || '').toUpperCase(), 10), lot: cut(sheet.lot, 20), model: cut(sheet.model, 60), client: cut(client, 120), address: cut(sheet.address, 160),
+          phone: cut(sheet.phone, 40), email: cut(sheet.email, 120), filesUrl: '', plan: '', draftsman: '', fndn: '', walk: '', move: '', settle: '',
+          addedFrom: 'selections', selectionSheet: id, addedAt: now.toISOString() });
+        houseId = ref.id; created = true;
+      } else {
+        // fill in what the home doesn't have yet (never overwrite what the office typed)
+        const ref = db.collection('jobs').doc(houseId), j = (await ref.get()).data() || {};
+        const fill = {};
+        if(!j.client && client) fill.client = cut(client, 120);
+        if(!j.model && sheet.model) fill.model = cut(sheet.model, 60);
+        if(!j.phone && sheet.phone) fill.phone = cut(sheet.phone, 40);
+        if(!j.email && sheet.email) fill.email = cut(sheet.email, 120);
+        if(!j.address && sheet.address) fill.address = cut(sheet.address, 160);
+        fill.selectionSheet = id;
+        await ref.update(fill);
+      }
+      await db.collection('job-sales').doc(houseId).set({ price, lines, source: 'hub', sheetId: id, note: 'From the signed selection sheet', setAt: now.toISOString(), setBy: staffName(who) });
+      sheet.houseId = houseId;
+      await selRef(id).update({ houseId, sheet: JSON.stringify(sheet), rev: (d.rev || 0) + 1 });
+      logger.info('Selection sheet signed', { id, houseId, created, price, by: who.email });
+      res.json({ houseId, created });
+      return;
+    }
+    res.status(400).json({ error: 'action' });
+  } catch(err){
+    logger.error('selectionsApi failed', { action: b.action, error: String(err) });
+    res.status(500).json({ error: 'server' });
+  }
+});
+
+/* ============================================================
    onNoteCreated — someone was @mentioned in a note on a home.
    Email each person mentioned, at the address they sign in to the hub with.
    (The "emails to subs" switch on Admin Settings doesn't affect this — these go to staff.)
@@ -1579,7 +1827,8 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   // which is where another vendor can be picked.
   const fromSub = ['subDeclined', 'subNote', 'subWaiting'].includes(note.kind);
   // a punch list item (a note with todo: true) given to someone opens the punch list
-  const link = note.todo ? `${site}punch.html`
+  const link = note.kind === 'selPrice' ? `${site}selections.html?open=${encodeURIComponent(note.sheetId || '')}`
+    : note.todo ? `${site}punch.html`
     : fromSub ? `${site}construction.html?house=${encodeURIComponent(note.houseId || '')}&task=${encodeURIComponent(note.taskId || '')}`
     : `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
   const where = note.houseId ? ` for <strong>${esc(house)}</strong>` : '';
@@ -1589,6 +1838,7 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   const wording = note.todo ? { heading: urgent ? 'High priority punch list item' : 'Punch list item for you', subject: `${urgent ? 'HIGH PRIORITY — ' : ''}Punch list: ${String(note.text || '').slice(0, 60)}`, lead: `<strong>${esc(who)}</strong> added a ${urgent ? '<strong style="color:#b3452f;">high priority</strong> ' : ''}punch list item for you${where}${esc(dueBy)}:`, plain: `${who} added a ${urgent ? 'HIGH PRIORITY ' : ''}punch list item for you${note.houseId ? ' for ' + house : ''}${dueBy}:`, button: 'Open the punch list' } : {
     subDeclined: { heading: 'A sub declined a job', subject: `Declined: ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> declined a job on <strong>${esc(house)}</strong>:`, plain: `${who} declined a job on ${house}:`, button: 'Open this job' },
     subNote: { heading: 'Note from a sub', subject: `Note from ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> sent a note about <strong>${esc(house)}</strong>:`, plain: `${who} sent a note about ${house}:`, button: 'Open this job' },
+    selPrice: { heading: 'A price is needed', subject: `Price needed: ${house}`, lead: `<strong>${esc(who)}</strong> needs a price from you on a selection sheet (<strong>${esc(house)}</strong>):`, plain: `${who} needs a price from you on a selection sheet (${house}):`, button: 'Open the selection sheet' },
     subWaiting: { heading: 'Still waiting on a sub', subject: `Still waiting on an answer — ${house}`, lead: `A job on <strong>${esc(house)}</strong> has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, plain: `A job on ${house} has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, button: 'Open this job' },
   }[note.kind] || { heading: 'New note for you', subject: `New note for you on ${house}`, lead: `<strong>${esc(who)}</strong> mentioned you in a note on <strong>${esc(house)}</strong>:`, plain: `${who} mentioned you in a note on ${house}:`, button: 'Open this home' };
   const optOut = fromSub ? `You can switch these off in the hub: ${site}admin.html` : '';

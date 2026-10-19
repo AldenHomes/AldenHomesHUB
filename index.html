@@ -84,6 +84,7 @@
   .bell-item .kind.subDeclined{background:#fbeae4; color:var(--danger);}
   .bell-item .kind.subNote{background:#eef0e8; color:var(--rust-2);}
   .bell-item .kind.costOver{background:#fbeae4; color:var(--danger);}
+  .bell-item .kind.selPrice{background:#fdf3e2; color:#8a5d14;}
   .bell-item .kind.subWaiting{background:#fbeee0; color:#96661a;}
   .bell-foot{display:block; padding:10px 14px; border-top:1px solid #ece8dd; text-align:center; font-size:12px; color:var(--ink-soft);}
 
@@ -464,6 +465,15 @@ html, body{max-width:100%; overflow-x:clip;}
           <div class="tile-stat"><div class="n" id="tileStatPunchMine">—</div><div class="l">Mine</div></div>
         </div>
       </a>
+      <a class="tile" id="selectionsTile" href="selections.html">
+        <div class="tile-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        </div>
+        <div>
+          <h3 class="tile-title">Selections</h3>
+          <p class="tile-desc">Leads, pricing meetings and selection sheets. Signing one puts the home in Active Homes with its sale price.</p>
+        </div>
+      </a>
       <a class="tile" id="jobcostTile" href="jobcost.html">
         <div class="tile-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
@@ -657,8 +667,9 @@ function renderBell(){
   document.getElementById('bellClear').style.display = unread ? '' : 'none';
   // Something from a sub (declined, sent a note, hasn't answered) opens that job on the schedule,
   // where another vendor can be picked. A staff note opens the home's notes.
-  const BELL_KINDS = { subDeclined:'Declined', subNote:'Sub note', subWaiting:'No answer', costOver:'Over usual' };
+  const BELL_KINDS = { subDeclined:'Declined', subNote:'Sub note', subWaiting:'No answer', costOver:'Over usual', selPrice:'Price needed' };
   const bellLink = n=>n.todo && !(n.houseId && (n.replies || []).length) ? 'punch.html'   // a comment on a punch item is read on the home's page
+    : n.kind === 'selPrice' ? `selections.html?open=${encodeURIComponent(n.sheetId || '')}`
     : n.kind === 'costOver' ? `house.html?id=${encodeURIComponent(n.houseId || '')}#costs`
     : BELL_KINDS[n.kind] ? `construction.html?house=${encodeURIComponent(n.houseId || '')}&task=${encodeURIComponent(n.taskId || '')}`
     : `house.html?id=${encodeURIComponent(n.houseId || '')}#notes`;
@@ -1055,7 +1066,8 @@ function renderMyWork(){
   };
   const punchRow = t=>`<div class="mw-row"><button type="button" class="mw-check" data-mw-check="${escHtml(t.id)}" aria-label="Mark as done" title="Done"></button>
       <div class="mw-main"><div class="mw-t">${escHtml(t.text || '')}</div><div class="mw-m">${t.priority === 'high' ? '<span class="mw-chip red">High priority</span> ' : ''}${dueTag(t)}${escHtml(where(t))}</div>${punchPics(t)}</div></div>`;
-  const noteHref = x=>['subDeclined', 'subNote', 'subWaiting'].includes(x.kind)
+  const noteHref = x=>x.kind === 'selPrice' ? `selections.html?open=${encodeURIComponent(x.sheetId || '')}`
+    : ['subDeclined', 'subNote', 'subWaiting'].includes(x.kind)
     ? `construction.html?house=${encodeURIComponent(x.houseId || '')}&task=${encodeURIComponent(x.taskId || '')}`
     : (x.houseId ? `house.html?id=${encodeURIComponent(x.houseId)}#notes` : 'punch.html');
   const urgent = [...g.late, ...g.dueToday];
