@@ -1210,7 +1210,7 @@ function bathCard(){
     ${row('hosebib', 'Additional hose bib, each', 'Exterior section; 2 are standard')}
     ${row('walk-sf', 'Additional walkway, per sq ft', 'Front porch & entrance section')}
     ${FIN_CHOICES.map(x=>row(x.k + '-k', 'Kitchen faucet: ' + x.t + ' finish', 'Kitchen section; chrome is standard')).join('')}
-    ${row('ff-less-sf', 'Smaller first floor, credit per sq ft', 'Type it as a minus number, e.g. -60')}
+    ${row('ff-less-sf', 'Smaller first floor, credit per sq ft', 'A credit: type it as a minus number')}
 </div>${floorCard()}`;
 }
 function ceilCard(){
