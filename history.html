@@ -39,7 +39,7 @@
   .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
   .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
 
-  .wrap{max-width:880px; margin:0 auto; padding:22px clamp(14px,4vw,40px) 60px;}
+  .wrap{max-width:1400px; margin:0 auto; padding:22px clamp(14px,4vw,40px) 60px;}
   .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
   .back-link:hover{color:var(--navy);}
   .btn{padding:11px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
@@ -170,7 +170,16 @@ html, body{max-width:100%; overflow-x:clip;}
   .age{display:inline-block; font-size:11px; font-weight:700; border-radius:10px; padding:1px 7px; background:#eaf1ec; color:#27573a;}
   .age.mid{background:#fdf3e2; color:#8a5d14;} .age.old{background:#fbeae4; color:#a94438;}
   .src{display:inline-block; font-size:11px; font-weight:700; border-radius:10px; padding:1px 7px; background:#e9eff5; color:#4a6b8a;}
-  .scroll{overflow-x:auto;}
+  /* a long or wide table scrolls inside its own box, and its headings stay in view (owner, 2026-10-21): the column headings stick to
+     the top and the row names (first column; also the second on the side-by-side table, .stick2) stick to the left */
+  .scroll{overflow:auto; max-height:75vh; margin-top:12px;}
+  .scroll table.jc{border-collapse:separate; border-spacing:0; margin-top:0;}
+  .scroll table.jc thead th{position:sticky; top:0; z-index:2; background:#fff;}
+  .scroll table.jc td:first-child, .scroll table.jc th:first-child, .scroll table.jc .stick2{position:sticky; left:0; z-index:1; background:#fff;}
+  .scroll table.jc thead th:first-child, .scroll table.jc thead th.stick2{z-index:3;}
+  .scroll table.jc td:first-child:not(:has(+ .stick2)), .scroll table.jc .stick2{min-width:130px;}
+  .scroll table.jc .stick2{box-shadow:inset -1px 0 0 var(--steel-line);}
+  .scroll table.jc td:first-child:not(:has(+ .stick2)), .scroll table.jc th:first-child:not(:has(+ .stick2)){box-shadow:inset -1px 0 0 var(--steel-line);}
   .muted{color:var(--ink-soft);}
   /* Alden stats */
   .tabs2{display:inline-flex; border:1px solid var(--steel-line); border-radius:22px; overflow:hidden; background:#fff; margin-top:14px;}
@@ -365,10 +374,12 @@ function render(){
   const order = Object.keys(codes).sort((a, b)=>Number(a) - Number(b));
   const cell = (b, c)=>{ const x = (b.byCode || {})[c]; return x ? per(x.total, b) : null; };
   const rowAvg = c=>{ const v = cols.map(b=>cell(b, c)).filter(x=>x != null); return v.length ? v.reduce((t, x)=>t + x, 0) / cols.length : null; };
-  $('compare').innerHTML = `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th>${cols.map(b=>`<th class="num">${esc(b.comm)} ${esc(b.lot)}<br><span style="font-weight:400; text-transform:none; letter-spacing:0;">${esc(b.date.slice(0, 7))} ${ageTag(b.date)}</span></th>`).join('')}<th class="num avg">Average</th></tr></thead><tbody>
-    ${order.map(c=>`<tr><td>${c === '0' ? '—' : esc(c)}</td><td>${esc(codes[c])}</td>${cols.map(b=>`<td class="num">${show(cell(b, c))}</td>`).join('')}<td class="num avg">${show(rowAvg(c))}</td></tr>`).join('')}
-    <tr><td></td><td><strong>Total</strong></td>${cols.map(b=>`<td class="num"><strong>${show(per(b.total, b))}</strong></td>`).join('')}<td class="num avg">${show(avg(cols.map(b=>per(b.total, b)).filter(x=>x != null)))}</td></tr></tbody></table>
+  $('compare').innerHTML = `<table class="jc"><thead><tr><th>Code</th><th class="stick2">Cost code</th>${cols.map(b=>`<th class="num">${esc(b.comm)} ${esc(b.lot)}<br><span style="font-weight:400; text-transform:none; letter-spacing:0;">${esc(b.date.slice(0, 7))} ${ageTag(b.date)}</span></th>`).join('')}<th class="num avg">Average</th></tr></thead><tbody>
+    ${order.map(c=>`<tr><td>${c === '0' ? '—' : esc(c)}</td><td class="stick2">${esc(codes[c])}</td>${cols.map(b=>`<td class="num">${show(cell(b, c))}</td>`).join('')}<td class="num avg">${show(rowAvg(c))}</td></tr>`).join('')}
+    <tr><td></td><td class="stick2"><strong>Total</strong></td>${cols.map(b=>`<td class="num"><strong>${show(per(b.total, b))}</strong></td>`).join('')}<td class="num avg">${show(avg(cols.map(b=>per(b.total, b)).filter(x=>x != null)))}</td></tr></tbody></table>
     <p class="muted" style="font-size:12.5px; margin-top:8px;">Average = the sum across these ${cols.length} build${cols.length === 1 ? '' : 's'} divided by ${cols.length}, so a code a build didn't use counts as $0 for it.${norm === 'sqft' ? ' Per sq ft uses each build\'s own size.' : ''}</p>`;
+  // the cost code name sticks just right of the code column
+  const w = ($('compare').querySelector('th') || {}).offsetWidth || 0; $('compare').querySelectorAll('.stick2').forEach(x=>{ x.style.left = w + 'px'; });
 }
 $('fStyle').addEventListener('change', render);
 $('fComm').addEventListener('change', render);
