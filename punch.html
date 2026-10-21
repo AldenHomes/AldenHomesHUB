@@ -464,7 +464,7 @@ function itemHtml(t){
     </div>`;
   return `<div class="item${t.done ? ' done' : ''}${high && !t.done ? ' high' : ''}">
     <button type="button" class="check${t.done ? ' on' : ''}" data-check="${esc(t.id)}" aria-label="${t.done ? 'Mark as not done' : 'Mark as done'}" title="${t.done ? 'Not done after all' : 'Done'}">${t.done ? '&#10003;' : ''}</button>
-    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${high && !t.done ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${names}${meta}</div>${photos ? `<div class="item-photos">${photos}</div>` : ''}${tools}</div>
+    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${high && !t.done ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${names}${meta}${t.requestId ? ` · <a href="service.html?open=${encodeURIComponent(t.requestId)}" style="color:inherit">from ${esc(t.requestFrom ? t.requestFrom + '\'s' : 'a')} service request</a>` : ''}</div>${photos ? `<div class="item-photos">${photos}</div>` : ''}${tools}</div>
     <button type="button" class="x-btn" data-delete="${esc(t.id)}" title="Delete this item">&times;</button>
   </div>`;
 }

@@ -163,6 +163,27 @@ html, body{max-width:100%; overflow-x:clip;}
     .modal-foot .btn{flex:1 1 auto;}
     .head-actions{gap:6px;}
   }
+  /* a request split into items (owner, 2026-10-21) */
+  .items-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .items-head .prog{font-size:12.5px; font-weight:700; color:var(--rust-2, #6B7355); background:#eef0e8; border-radius:20px; padding:2px 10px;}
+  .it{border:1px solid var(--steel-line); border-radius:var(--radius); padding:10px 12px; margin-top:8px; background:#fff;}
+  .it.done{background:#f3f7f2; border-color:#c5dccb;}
+  .it-top{display:flex; gap:8px; align-items:flex-start;}
+  .it-n{font-family:"Courier New",monospace; font-weight:700; color:var(--ink-soft); min-width:22px;}
+  .it-text{flex:1; font-size:14px; line-height:1.45; white-space:pre-wrap;}
+  .it.done .it-text{color:var(--ink-soft);}
+  .it-x, .it-ed{background:none; border:none; color:#b9b4a5; cursor:pointer; font-size:12.5px; font-weight:700; padding:0 2px;}
+  .it-x{font-size:18px; line-height:1;} .it-x:hover{color:#a8451a;} .it-ed:hover{color:var(--navy);}
+  .it-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; padding-left:30px;}
+  .it-row select, .it-row input[type=date], .it-row input[type=text]{padding:6px 8px; font-size:13.5px; border:1px solid var(--steel-line); border-radius:var(--radius); font-family:inherit;}
+  .it-row textarea{flex:1 1 100%; min-height:44px; padding:7px 9px; font-size:13.5px; border:1px solid var(--steel-line); border-radius:var(--radius); font-family:inherit; resize:vertical;}
+  .seg{display:inline-flex; border:1px solid var(--steel-line); border-radius:20px; overflow:hidden; background:#fff;}
+  .seg button{border:none; background:none; padding:5px 11px; font-size:12.5px; font-weight:700; color:var(--ink-soft); cursor:pointer; font-family:inherit;}
+  .seg button.on{background:var(--navy); color:#fff;}
+  .seg button.on.ok{background:#3f7a4e;}
+  .it-tag{font-size:12px; font-weight:700; border-radius:20px; padding:2px 9px; background:#eef0e8; color:#4f5a3a;}
+  .it-tag.ok{background:#eaf1ec; color:#27573a;}
+  .alldone{background:#eaf1ec; border:1px solid #c5dccb; color:#27573a; border-radius:var(--radius); padding:10px 12px; margin-top:10px; font-size:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -311,6 +332,13 @@ html, body{max-width:100%; overflow-x:clip;}
           </div>
           <div class="muted" id="descNote" style="font-size:12px; margin-top:6px;"></div>
         </div>
+        <div class="detail-item detail-full">
+          <div class="items-head"><label style="margin:0">Items</label><span class="prog" id="itemsProg" style="display:none"></span><div style="flex:1"></div>
+            <button type="button" class="btn btn-ghost btn-small" id="splitBtn">Split the description into items</button>
+            <button type="button" class="btn btn-ghost btn-small" id="addItemBtn">+ Add an item</button></div>
+          <div class="muted" id="itemsHelp" style="font-size:12.5px; margin-top:6px;">For a list of things (like an end-of-year walk-through): split it into items, then send each one to a vendor, the punch list, or just answer it.</div>
+          <div id="itemsList"></div>
+        </div>
         <div class="detail-item detail-full" id="d_photosWrap" style="display:none;">
           <label>Photos</label>
           <div class="photo-gallery" id="d_photos"></div>
@@ -427,7 +455,19 @@ let sortDir = 'desc';
 // Photos are kept for good — they're the service history for the home. To keep storage in
 // check they are shrunk on the phone or computer before they're uploaded (see shrinkPhoto).
 let jobs = [];      // every home in the hub, so a request can be tied to the home it's about
-let vendors = [];   // the Vendors list from Construction Schedules
+let vendors = [];
+/* ---- a request split into items (owner, 2026-10-21: a 1-year walk-through lists a dozen things; some the office calls a vendor
+   about — they call and arrange it, nothing is sent through the hub — some go on the punch list, some are questions to answer).
+   r.items = [{ id, text, route: '' | 'vendor' | 'punch' | 'answer',
+                vendorId, vendorName, vstatus: 'todo' | 'called' | 'setup' | 'done', when ('YYYY-MM-DD', set up for),
+                punchId (the notes doc made for it), punchFor (name), answer, doneAt }]
+   A punch item is an ordinary punch list item (notes, todo:true) for the home, with requestId / requestItem pointing back here;
+   whether it's done is read from it (punchState). The request isn't completed by itself: once every item is done it offers to. */
+let staffList = [];      // hub logins, for who a punch item is for
+let punchState = {};     // punch item id -> { done }
+const itemDone = it=>it.route === 'vendor' ? it.vstatus === 'done' : it.route === 'punch' ? !!(punchState[it.punchId] || {}).done : it.route === 'answer' ? !!String(it.answer || '').trim() : false;
+const itemsOf = r=>Array.isArray(r && r.items) ? r.items : [];
+const newItemId = ()=>'i' + Math.random().toString(36).slice(2, 9);   // the Vendors list from Construction Schedules
 let doneOpen = false;
 // arriving from a home's page (service.html?open=ID) opens that request's card
 let pendingOpenId = new URLSearchParams(location.search).get('open');
@@ -534,6 +574,12 @@ function attachListener(){
   listening = true;
   db.collection('jobs').onSnapshot(s=>{ jobs = s.docs.map(d=>({ id: d.id, ...d.data() })); render(); refreshCard(); },
     err=>console.error('jobs listener error', err));
+  db.collection('notes').where('requestId', '>', '').onSnapshot(s=>{
+    punchState = {}; s.docs.forEach(d=>{ punchState[d.id] = { done: !!d.data().done }; });
+    render(); refreshCard();
+  }, err=>console.error('punch items listener error', err));
+  firebase.auth().currentUser.getIdToken().then(token=>fetch('https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi', { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ action:'staff' }) }))
+    .then(res=>res.ok ? res.json() : { staff: [] }).then(d=>{ staffList = d.staff || []; refreshCard(); }).catch(err=>console.error('team list', err));
   db.collection('subs').onSnapshot(s=>{
     vendors = s.docs.map(d=>({ id: d.id, ...d.data() })).sort((a,b)=>(a.name||'').localeCompare(b.name||'', 'en', { sensitivity:'base' }));
     render(); refreshCard();
@@ -571,7 +617,7 @@ function requestRow(r, done){
     <td data-label="${done ? 'Completed' : 'Status'}">${done
       ? `<span class="mono muted">${esc(fmtDateTime(r.completedAt).split(' ')[0] || '—')}</span>`
       : `<span class="status-badge ${statusClass(status)}">${statusLabel(status)}</span>`}</td>
-    <td data-label="Name">${esc(r.name||'')}${vendor && vendor.name ? `<div class="sub-line">Assigned: ${esc(vendor.name)}</div>` : ''}</td>
+    <td data-label="Name">${esc(r.name||'')}${vendor && vendor.name ? `<div class="sub-line">Assigned: ${esc(vendor.name)}</div>` : ''}${itemsOf(r).length ? `<div class="sub-line">${itemsOf(r).filter(itemDone).length} of ${itemsOf(r).length} items done</div>` : ''}</td>
     <td data-label="Address / Lot">${esc(r.address||'')}${r.lot ? ` <span class="muted">(Lot ${esc(r.lot)})</span>` : ''}${home ? `<div class="sub-line">${esc(homeLabel(home))}</div>` : ''}</td>
     <td data-label="Phone" class="mono">${esc(r.phone||'')}</td>
     <td data-label="Photos">${photoCount ? `<span class="photo-count">${PHOTO_ICON} ${photoCount}</span>` : r.photosCleared ? '<span class="muted" title="Removed by the old automatic clean-up">Cleared</span>' : '<span class="muted">—</span>'}</td>
@@ -804,6 +850,7 @@ function openModal(id){
     photosWrap.style.display = 'none';
   }
 
+  renderItems(r);
   const status = r.status || 'new';
   document.querySelectorAll('.status-btn').forEach(btn=>{
     btn.classList.toggle('active-'+btn.dataset.status, btn.dataset.status===status);
@@ -817,6 +864,7 @@ function refreshCard(){
   if(!editingId || !overlay.classList.contains('show')) return;
   if(document.activeElement && document.activeElement.tagName === 'SELECT' && overlay.contains(document.activeElement)) return;
   if(document.getElementById('descEdit').style.display !== 'none') return; // someone is in the middle of editing the description
+  if(document.activeElement && document.activeElement.closest && document.activeElement.closest('#itemsList') && /TEXTAREA|INPUT/.test(document.activeElement.tagName)) return;
   if(requests.some(r=>r.id===editingId)) openModal(editingId); else closeModal();
 }
 document.getElementById('closeModal').addEventListener('click', closeModal);
@@ -839,6 +887,114 @@ document.querySelectorAll('.status-btn').forEach(btn=>{
     }
     catch(e){ console.error(e); alert('Could not update status — check your connection.'); }
   });
+});
+
+/* ---- items ---- */
+function renderItems(r){
+  const items = itemsOf(r), done = items.filter(itemDone).length, home = homeFor(r);
+  const prog = document.getElementById('itemsProg');
+  prog.style.display = items.length ? '' : 'none'; prog.textContent = done + ' of ' + items.length + ' done';
+  document.getElementById('splitBtn').style.display = items.length ? 'none' : '';
+  document.getElementById('itemsHelp').style.display = items.length ? 'none' : '';
+  const vOpts = v=>'<option value="">Which vendor?</option>' + vendors.map(x=>`<option value="${esc(x.id)}" ${x.id === v ? 'selected' : ''}>${esc(x.name || 'Unnamed')}</option>`).join('');
+  const html = items.map((it, i)=>{
+    const ok = itemDone(it), id = esc(it.id);
+    let row = '';
+    if(it.route === 'vendor'){
+      const st = it.vstatus || 'todo';
+      row = `<select data-it-vendor="${id}">${vOpts(it.vendorId)}</select>
+        <span class="seg">${[['todo','Not called yet'],['called','Called'],['setup','Set up'],['done','Done']].map(([k, l])=>`<button type="button" data-it-vst="${id}" data-v="${k}" class="${st === k ? 'on' + (k === 'done' ? ' ok' : '') : ''}">${l}</button>`).join('')}</span>
+        ${st === 'setup' || it.when ? `<label class="muted" style="font-size:12.5px">for <input type="date" data-it-when="${id}" value="${esc(it.when || '')}"></label>` : ''}`;
+    } else if(it.route === 'punch'){
+      row = it.punchId
+        ? `<span class="it-tag ${ok ? 'ok' : ''}">${ok ? '&#10003; Done on the punch list' : 'On the punch list'}${it.punchFor ? ' · for ' + esc(it.punchFor) : ''}</span> <a href="punch.html" style="font-size:12.5px">Open the punch list &rarr;</a>`
+        : `<select data-it-who="${id}"><option value="">For anyone</option>${staffList.map(s=>`<option value="${esc(s.uid)}">${esc(s.name)}</option>`).join('')}</select>
+           <input type="date" data-it-due="${id}" title="Needed by (optional)">
+           <button type="button" class="btn btn-primary btn-small" data-it-punch="${id}">Add to the punch list</button>${home ? '' : ' <span class="muted" style="font-size:12px">(no home linked — it goes on as a general item)</span>'}`;
+    } else if(it.route === 'answer'){
+      row = `<textarea data-it-answer="${id}" placeholder="The answer (saves when you click away)">${esc(it.answer || '')}</textarea>`;
+    }
+    return `<div class="it ${ok ? 'done' : ''}"><div class="it-top"><span class="it-n">${i + 1}.</span><div class="it-text">${esc(it.text)}</div>
+        <button type="button" class="it-ed" data-it-edit="${id}" title="Change the wording">Edit</button><button type="button" class="it-x" data-it-del="${id}" title="Remove this item">&times;</button></div>
+      <div class="it-row"><select data-it-route="${id}" ${it.route === 'punch' && it.punchId ? 'disabled' : ''}><option value="">What happens with it?</option>
+        <option value="vendor" ${it.route === 'vendor' ? 'selected' : ''}>Call a vendor</option><option value="punch" ${it.route === 'punch' ? 'selected' : ''}>Punch list (our crew)</option><option value="answer" ${it.route === 'answer' ? 'selected' : ''}>Just answer it</option></select>
+        ${ok ? '<span class="it-tag ok">&#10003; Done</span>' : ''}</div>
+      ${row ? `<div class="it-row">${row}</div>` : ''}</div>`;
+  }).join('');
+  const all = items.length && done === items.length && r.status !== 'sent'
+    ? '<div class="alldone">&#10003; Every item is done. <button type="button" class="btn btn-primary btn-small" id="itemsComplete">Mark the request Complete</button></div>' : '';
+  document.getElementById('itemsList').innerHTML = html + all;
+}
+async function saveItems(items){
+  if(!editingId) return;
+  setSyncStatus('saving');
+  try{ await requestsCol.doc(editingId).update({ items }); }
+  catch(err){ console.error(err); alert('Could not save the items — check your connection.'); }
+}
+const curItems = ()=>JSON.parse(JSON.stringify(itemsOf(requests.find(x=>x.id === editingId))));
+// split a description: numbered lines ("1.", "2)") start items, the lines under them carry on; a "Questions" heading makes the items
+// after it questions (they start as "Just answer it"). No numbers at all: one item per non-empty line.
+function splitDescription(text){
+  const lines = String(text || '').split(/\r?\n/), out = [];
+  let cur = null, question = false;
+  const numbered = lines.some(l=>/^\s*\d{1,2}[.)]\s+/.test(l));
+  lines.forEach(l=>{
+    const t = l.trim();
+    if(!t){ cur = null; return; }
+    if(numbered){
+      const m = t.match(/^(\d{1,2})[.)]\s+(.*)$/);
+      if(m){ cur = { id:newItemId(), text:m[2].trim(), route: question ? 'answer' : '' }; out.push(cur); return; }
+      if(/question/i.test(t) && t.length < 60){ question = true; cur = null; return; }
+      if(cur) cur.text += ' ' + t;
+    } else out.push({ id:newItemId(), text:t.replace(/^[-*•]\s*/, ''), route:'' });
+  });
+  return out.filter(x=>x.text);
+}
+document.getElementById('splitBtn').addEventListener('click', ()=>{
+  const r = requests.find(x=>x.id === editingId); if(!r) return;
+  const items = splitDescription(r.description);
+  if(!items.length){ alert('There\'s nothing in the description to split. Use "+ Add an item" instead.'); return; }
+  saveItems(items);
+});
+document.getElementById('addItemBtn').addEventListener('click', ()=>{
+  const t = (prompt('What\'s the item?') || '').trim(); if(!t) return;
+  saveItems(curItems().concat([{ id:newItemId(), text:t, route:'' }]));
+});
+document.getElementById('itemsList').addEventListener('click', async e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  const items = curItems();
+  if(b.id === 'itemsComplete'){ document.querySelector('.status-btn[data-status="sent"]').click(); return; }
+  if(b.dataset.itDel){ const it = items.find(x=>x.id === b.dataset.itDel); if(it && it.punchId && !confirm('This item is on the punch list. Remove it from this request? (The punch list item stays.)')) return;
+    if(it && !it.punchId && !confirm('Remove this item?')) return; saveItems(items.filter(x=>x.id !== b.dataset.itDel)); return; }
+  if(b.dataset.itEdit){ const it = items.find(x=>x.id === b.dataset.itEdit); if(!it) return; const t = prompt('The item', it.text); if(t == null || !t.trim()) return; it.text = t.trim(); saveItems(items); return; }
+  if(b.dataset.itVst){ const it = items.find(x=>x.id === b.dataset.itVst); if(!it) return; it.vstatus = b.dataset.v; it.doneAt = b.dataset.v === 'done' ? new Date().toISOString() : ''; saveItems(items); return; }
+  if(b.dataset.itPunch){
+    const it = items.find(x=>x.id === b.dataset.itPunch), r = requests.find(x=>x.id === editingId); if(!it || !r) return;
+    const uid = (document.querySelector('[data-it-who="' + it.id + '"]') || {}).value || '', who = staffList.find(s=>s.uid === uid);
+    const due = (document.querySelector('[data-it-due="' + it.id + '"]') || {}).value || '';
+    const home = homeFor(r), user = firebase.auth().currentUser;
+    b.disabled = true; setSyncStatus('saving');
+    try{
+      const ref = db.collection('notes').doc();
+      await ref.set({ todo:true, done:false, due, priority:'', photos:[], photoPaths:[], text: it.text,
+        houseId: home ? home.id : '', houseLabel: home ? homeLabel(home) : 'General',
+        mentions: who ? [who.uid] : [], mentionNames: who ? [who.name] : [],
+        by: { uid:user.uid, name: user.displayName || String(user.email || '').split('@')[0], email: user.email || '' },
+        at: new Date().toISOString(), readBy: who && who.uid === user.uid ? { [user.uid]: true } : {},
+        requestId: r.id, requestItem: it.id, requestFrom: r.name || '' });
+      it.punchId = ref.id; it.punchFor = who ? who.name : '';
+      await saveItems(items);
+    } catch(err){ console.error(err); alert('Could not add it to the punch list — check your connection.'); b.disabled = false; }
+    return;
+  }
+});
+document.getElementById('itemsList').addEventListener('change', e=>{
+  const el = e.target, items = curItems();
+  const find = id=>items.find(x=>x.id === id);
+  if(el.dataset.itRoute){ const it = find(el.dataset.itRoute); if(!it) return; it.route = el.value; if(it.route === 'vendor' && !it.vstatus) it.vstatus = 'todo'; el.blur(); saveItems(items); return; }
+  if(el.dataset.itVendor){ const it = find(el.dataset.itVendor), v = vendors.find(x=>x.id === el.value); if(!it) return; it.vendorId = v ? v.id : ''; it.vendorName = v ? (v.name || '') : ''; el.blur(); saveItems(items); return; }
+  if(el.dataset.itWhen){ const it = find(el.dataset.itWhen); if(!it) return; it.when = el.value; if(el.value && (it.vstatus || 'todo') === 'todo') it.vstatus = 'setup'; el.blur(); saveItems(items); return; }
+  if(el.dataset.itAnswer){ const it = find(el.dataset.itAnswer); if(!it) return; it.answer = el.value.trim(); it.doneAt = it.answer ? new Date().toISOString() : ''; el.blur(); saveItems(items); return; }
 });
 
 /* ---- edit the description (e.g. to tidy it up before sending it to a vendor) ---- */
