@@ -172,6 +172,8 @@ html, body{max-width:100%; overflow-x:clip;}
   .src{display:inline-block; font-size:11px; font-weight:700; border-radius:10px; padding:1px 7px; background:#e9eff5; color:#4a6b8a;}
   /* a long or wide table scrolls inside its own box, and its headings stay in view (owner, 2026-10-21): the column headings stick to
      the top and the row names (first column; also the second on the side-by-side table, .stick2) stick to the left */
+  select.bsmt{padding:4px 6px; font-size:12.5px; border:1px solid var(--steel-line); border-radius:var(--radius); background:#fff; max-width:230px;}
+  select.bsmt.on{background:#fdf3e2; border-color:#ecd9b0; color:#6e4a10; font-weight:700;}
   .scroll{overflow:auto; max-height:75vh; margin-top:12px;}
   .scroll table.jc{border-collapse:separate; border-spacing:0; margin-top:0;}
   .scroll table.jc thead th{position:sticky; top:0; z-index:2; background:#fff;}
@@ -254,6 +256,7 @@ html, body{max-width:100%; overflow-x:clip;}
       <div class="filters2">
         <select id="fStyle" aria-label="Home style"></select>
         <select id="fComm" aria-label="Development"></select>
+        <select id="fBsmt" aria-label="Basement"><option value="">With or without a basement</option><option value="yes">With a basement</option><option value="no">Without a basement</option></select>
         <div class="seg2"><button type="button" data-norm="total" class="on">Total $</button><button type="button" data-norm="sqft">Per sq ft</button></div>
       </div>
       <div class="kpis" id="kpis"></div>
@@ -337,15 +340,27 @@ function fillFilters(){
 let openSale = '';
 function saleRow(b){
   const lines = (b.saleLines || []).filter(l=>l.price), free = (b.saleLines || []).length - lines.length;
-  return `<tr><td colspan="9" style="background:#faf8f2;">
+  return `<tr><td colspan="10" style="background:#faf8f2;">
     <div style="display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin-bottom:6px;"><span>Base price <b>${money(b.saleBase || 0)}</b></span><span>Selections <b>${money(b.saleSelections || 0)}</b></span><span>Change orders <b>${money(b.saleChangeOrders || 0)}</b></span><span>Sold for <b>${money(b.sale)}</b></span>${b.total ? `<span>Sale minus cost <b>${((b.sale - b.total) / b.sale * 100).toFixed(2)}%</b></span>` : ''}</div>
     <table class="jc" style="margin:0;"><tbody>${lines.map(l=>`<tr><td style="width:46px;">${esc(l.bt)}</td><td>${esc(l.title)}</td><td>${esc(l.choice)}</td><td class="num">${money(l.price)}</td></tr>`).join('')}
       ${(b.saleCOs || []).map(c=>`<tr><td>CO</td><td>Change order</td><td>${esc(c.title)}</td><td class="num">${money(c.price)}</td></tr>`).join('')}</tbody></table>
     <div class="muted" style="font-size:12px; margin-top:4px;">From BuilderTrend's Job Price Summary${free ? ` · ${free} no-charge choice${free === 1 ? '' : 's'} not listed` : ''}.</div></td></tr>`;
 }
+/* Basements (owner, 2026-10-21): a build has one when it's marked "(B)", when its foundation (code 14) cost $20,000 or more, or when
+   someone set it here. The server works it out (bsmt, bsmtWhy: marked | foundation | set); this box shows it and lets it be corrected.
+   A home's usual costs (Job Costing, the home's Job Costs card) come from past builds of its style with the same answer. */
+const fnd = b=>((b.byCode || {})['14'] || {}).total || 0;
+function bsmtCell(b){
+  const auto = b.bsmtWhy === 'set' ? 'Go by the mark and foundation' : (b.bsmt ? 'Yes' : 'No') + (b.bsmtWhy === 'marked' ? ' · marked (B)' : b.bsmtWhy === 'foundation' ? ' · foundation ' + money(fnd(b)) : '');
+  const v = b.bsmtWhy === 'set' ? (b.bsmt ? 'yes' : 'no') : 'auto';
+  return `<select class="bsmt${b.bsmt ? ' on' : ''}" data-bsmt="${esc(b.id)}" title="Foundation (code 14): ${money(fnd(b))}">
+    <option value="auto" ${v === 'auto' ? 'selected' : ''}>${esc(auto)}</option>
+    <option value="yes" ${v === 'yes' ? 'selected' : ''}>Yes${b.bsmtWhy === 'set' ? ' · set by hand' : ''}</option>
+    <option value="no" ${v === 'no' ? 'selected' : ''}>No${b.bsmtWhy === 'set' ? ' · set by hand' : ''}</option></select>`;
+}
 function render(){
-  const style = $('fStyle').value, comm = $('fComm').value;
-  const list = builds.filter(b=>(!style || (b.base || b.model) === style) && (!comm || b.comm === comm)).sort((a, b)=>String(b.date).localeCompare(String(a.date)));
+  const style = $('fStyle').value, comm = $('fComm').value, bf = $('fBsmt').value;
+  const list = builds.filter(b=>(!style || (b.base || b.model) === style) && (!comm || b.comm === comm) && (!bf || (bf === 'yes') === !!b.bsmt)).sort((a, b)=>String(b.date).localeCompare(String(a.date)));
   const withSf = list.filter(b=>b.sqft), gps = list.filter(b=>typeof b.gp === 'number');
   const avg = a=>a.length ? a.reduce((t, x)=>t + x, 0) / a.length : 0;
   $('statBuilds').textContent = builds.length;
@@ -356,8 +371,8 @@ function render(){
     <div class="kpi"><div class="l">Average gross profit</div><div class="v">${gps.length ? (avg(gps.map(b=>b.gp)) * 100).toFixed(2) + '%' : '—'}</div></div>`;
   // the builds themselves
   $('buildsTitle').textContent = list.length === builds.length ? 'Every build' : list.length + ' build' + (list.length === 1 ? '' : 's');
-  $('builds').innerHTML = list.length ? `<table class="jc"><thead><tr><th>Finished</th><th>Home</th><th>Style</th><th class="num">Sq ft</th><th class="num">${norm === 'sqft' ? 'Per sq ft' : 'Total cost'}</th><th class="num">${norm === 'sqft' ? 'Total cost' : 'Per sq ft'}</th><th class="num">Sold for</th><th class="num">Gross profit</th><th></th></tr></thead><tbody>
-    ${list.map(b=>`<tr><td>${esc(b.date)} ${ageTag(b.date)}</td><td>${esc(b.comm)} · Lot ${esc(b.lot)}</td><td>${esc(b.model)}</td><td class="num">${b.sqft ? b.sqft.toLocaleString('en-US') : '—'}</td>
+  $('builds').innerHTML = list.length ? `<table class="jc"><thead><tr><th>Finished</th><th>Home</th><th>Style</th><th>Basement</th><th class="num">Sq ft</th><th class="num">${norm === 'sqft' ? 'Per sq ft' : 'Total cost'}</th><th class="num">${norm === 'sqft' ? 'Total cost' : 'Per sq ft'}</th><th class="num">Sold for</th><th class="num">Gross profit</th><th></th></tr></thead><tbody>
+    ${list.map(b=>`<tr><td>${esc(b.date)} ${ageTag(b.date)}</td><td>${esc(b.comm)} · Lot ${esc(b.lot)}</td><td>${esc(b.model)}</td><td>${bsmtCell(b)}</td><td class="num">${b.sqft ? b.sqft.toLocaleString('en-US') : '—'}</td>
       <td class="num"><strong>${norm === 'sqft' ? (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—') : money(b.total)}</strong></td><td class="num">${norm === 'sqft' ? money(b.total) : (b.sqft ? '$' + (b.total / b.sqft).toFixed(2) : '—')}</td>
       <td class="num">${b.sale ? `<a href="#" data-sold="${esc(b.id)}" title="See the selections">${money(b.sale)}</a>` : '—'}</td>
       <td class="num"${b.gpSource === 'buildertrend' ? ` title="From BuilderTrend's final price${typeof b.gpSheet === 'number' ? '; the spreadsheet said ' + (b.gpSheet * 100).toFixed(2) + '%' : ''}"` : ''}>${typeof b.gp === 'number' ? (b.gp * 100).toFixed(2) + '%' + (b.gpSource === 'buildertrend' ? '<span class="muted" style="font-size:11px;"> BT</span>' : '') : '—'}</td>
@@ -374,7 +389,7 @@ function render(){
   const order = Object.keys(codes).sort((a, b)=>Number(a) - Number(b));
   const cell = (b, c)=>{ const x = (b.byCode || {})[c]; return x ? per(x.total, b) : null; };
   const rowAvg = c=>{ const v = cols.map(b=>cell(b, c)).filter(x=>x != null); return v.length ? v.reduce((t, x)=>t + x, 0) / cols.length : null; };
-  $('compare').innerHTML = `<table class="jc"><thead><tr><th>Code</th><th class="stick2">Cost code</th>${cols.map(b=>`<th class="num">${esc(b.comm)} ${esc(b.lot)}<br><span style="font-weight:400; text-transform:none; letter-spacing:0;">${esc(b.date.slice(0, 7))} ${ageTag(b.date)}</span></th>`).join('')}<th class="num avg">Average</th></tr></thead><tbody>
+  $('compare').innerHTML = `<table class="jc"><thead><tr><th>Code</th><th class="stick2">Cost code</th>${cols.map(b=>`<th class="num">${b.bsmt ? '<span class="age mid" title="Has a basement">B</span> ' : ''}${esc(b.comm)} ${esc(b.lot)}<br><span style="font-weight:400; text-transform:none; letter-spacing:0;">${esc(b.date.slice(0, 7))} ${ageTag(b.date)}</span></th>`).join('')}<th class="num avg">Average</th></tr></thead><tbody>
     ${order.map(c=>`<tr><td>${c === '0' ? '—' : esc(c)}</td><td class="stick2">${esc(codes[c])}</td>${cols.map(b=>`<td class="num">${show(cell(b, c))}</td>`).join('')}<td class="num avg">${show(rowAvg(c))}</td></tr>`).join('')}
     <tr><td></td><td class="stick2"><strong>Total</strong></td>${cols.map(b=>`<td class="num"><strong>${show(per(b.total, b))}</strong></td>`).join('')}<td class="num avg">${show(avg(cols.map(b=>per(b.total, b)).filter(x=>x != null)))}</td></tr></tbody></table>
     <p class="muted" style="font-size:12.5px; margin-top:8px;">Average = the sum across these ${cols.length} build${cols.length === 1 ? '' : 's'} divided by ${cols.length}, so a code a build didn't use counts as $0 for it.${norm === 'sqft' ? ' Per sq ft uses each build\'s own size.' : ''}</p>`;
@@ -383,6 +398,15 @@ function render(){
 }
 $('fStyle').addEventListener('change', render);
 $('fComm').addEventListener('change', render);
+$('fBsmt').addEventListener('change', render);
+$('builds').addEventListener('change', async e=>{
+  const sel = e.target.closest('[data-bsmt]'); if(!sel) return;
+  const b = builds.find(x=>x.id === sel.dataset.bsmt); if(!b) return;
+  sel.disabled = true;
+  try{ const r = await api({ action:'historyBasement', id:b.id, value: sel.value === 'auto' ? null : sel.value === 'yes' }); b.bsmt = r.bsmt; b.bsmtWhy = r.bsmtWhy; }
+  catch(err){ console.error(err); alert('Couldn\'t save that. Check your connection and try again.'); }
+  render();
+});
 document.querySelector('.seg2').addEventListener('click', e=>{ const b = e.target.closest('[data-norm]'); if(!b) return; norm = b.dataset.norm; document.querySelectorAll('.seg2 button').forEach(x=>x.classList.toggle('on', x === b)); render(); });
 $('builds').addEventListener('click', async e=>{
   const sd = e.target.closest('[data-sold]');

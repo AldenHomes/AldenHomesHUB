@@ -2120,7 +2120,8 @@ async function makeHome(L){
     ...lines(L).filter(l=>!l.typed).map(l=>({ bt:l.q.bt || '', title:l.q.t, choice:l.label, price:l.price })),
     ...L.custom.filter(c=>!c.pending).map(c=>({ bt:'', title:'Custom item', choice:c.desc, price:c.price }))];
   try{
-    const r = await selApi({ action:'sign', id:L.id, sale:{ price: base(L) + upgrades(L), lines: saleLines } });
+    // whether the home has a basement goes onto the home too: its budget is compared with past builds that match (Cost History)
+    const r = await selApi({ action:'sign', id:L.id, basement: !!hasFeat(L, FEATURES.find(f=>f.id === 'bsmt')), sale:{ price: base(L) + upgrades(L), lines: saleLines } });
     L.houseId = r.houseId; if(REMOTE[L.id]) REMOTE[L.id].sheet.houseId = r.houseId; if(sync.last) sync.last.houseId = r.houseId;
     toast(r.created ? 'The home is in Active Homes now, with its sale price' : 'The sale price is on the home in Active Homes');
   } catch(err){ console.error(err); toast('The sheet is signed, but the home couldn\'t be added yet. Press "Add the home" to try again.'); }

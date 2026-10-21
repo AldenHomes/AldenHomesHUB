@@ -829,6 +829,21 @@ async function historyBuilds(){
   return builds.filter(b=>b.base);
 }
 // self = { id, community, lot } of the home being checked
+/* Basements (owner, 2026-10-21: "models with basements always cost more. They didn't always mark it — the clear tell is if the
+   foundation is way higher, or sometimes they marked it with a B"). A past build has a basement when someone set it by hand
+   (bsmtSet true/false, from Cost History), else when its model is marked "(B)", else when its foundation (code 14, Footers/Found.)
+   cost $20,000 or more — in the 136 builds, marked basements mostly ran $20k–43k there and the rest $6k–17k. A home being built
+   uses jobs.basement (set when its selection sheet is signed), else "(B)" in its model, else its own code-14 cost so far. */
+const BSMT_FOUNDATION = 20000;
+const bsmtMarked = model=>/\(B\)|\bB\b/.test(String(model || ''));
+function bsmtOf(b){
+  if(typeof b.bsmtSet === 'boolean') return { on: b.bsmtSet, why: 'set' };
+  if(bsmtMarked(b.model)) return { on: true, why: 'marked' };
+  const fnd = ((b.byCode || {})['14'] || {}).total || 0;
+  return fnd >= BSMT_FOUNDATION ? { on: true, why: 'foundation' } : { on: false, why: '' };
+}
+const homeBsmt = (job, byCode)=>job && typeof job.basement === 'boolean' ? job.basement
+  : bsmtMarked(job && job.model) || (((byCode || {})['14'] || {}).total || 0) >= BSMT_FOUNDATION;
 async function profitTarget(model, preloaded, self){
   const m = String(model || '').trim().toLowerCase();
   if(!m) return null;
@@ -839,7 +854,12 @@ async function profitTarget(model, preloaded, self){
   const style = builds.map(b=>String(b.base)).filter(b=>m === b.toLowerCase() || m.startsWith(b.toLowerCase() + ' ') || m.startsWith(b.toLowerCase() + '('))
     .sort((a, b)=>b.length - a.length)[0];
   if(!style) return null;
-  const same = builds.filter(b=>b.base === style).sort((a, b)=>String(b.date).localeCompare(String(a.date)));
+  let same = builds.filter(b=>b.base === style).sort((a, b)=>String(b.date).localeCompare(String(a.date)));
+  let bsmtLabel = '';
+  if(self && typeof self.bsmt === 'boolean'){
+    const match = same.filter(b=>bsmtOf(b).on === self.bsmt);
+    if(match.length){ same = match; bsmtLabel = self.bsmt ? ' with a basement' : ' without a basement'; }
+  }
   const label = b=>[b.comm, b.lot].filter(Boolean).join(' ') || b.model || style;
   const codes = {};
   same.forEach(b=>Object.entries(b.byCode || {}).forEach(([code, c])=>{
@@ -851,7 +871,7 @@ async function profitTarget(model, preloaded, self){
   recent.forEach(b=>Object.entries(b.byCode || {}).forEach(([code, c])=>{ if(c && c.total > 0){ const x = sums[code] = sums[code] || { t: 0, n: 0 }; x.t += c.total; x.n++; } }));
   Object.entries(sums).forEach(([code, x])=>{ if(codes[code]){ codes[code].mean = Math.round(x.t / x.n); codes[code].meanN = x.n; } });
   const withGp = same.filter(b=>typeof b.gp === 'number').slice(0, 8);
-  return { style, n: withGp.length, gp: withGp.length ? Math.round(withGp.reduce((t, b)=>t + b.gp, 0) / withGp.length * 10000) / 10000 : null,
+  return { style, bsmtLabel, n: withGp.length, gp: withGp.length ? Math.round(withGp.reduce((t, b)=>t + b.gp, 0) / withGp.length * 10000) / 10000 : null,
     recentN: recent.length, codes, last: same.length ? { from: label(same[0]), date: String(same[0].date || '').slice(0, 10) } : null };
 }
 exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (req, res)=>{
@@ -930,7 +950,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
         const ref = db.collection('job-costs').doc(houseId);
         const prev = await ref.get();
         const before = new Set(prev.exists && Array.isArray(prev.data().flagged) ? prev.data().flagged : []);
-        const target = await profitTarget(jobData[houseId].model, builds, { id: houseId, community: jobData[houseId].community, lot: jobData[houseId].lot });
+        const target = await profitTarget(jobData[houseId].model, builds, { id: houseId, community: jobData[houseId].community, lot: jobData[houseId].lot, bsmt: homeBsmt(jobData[houseId], byCode) });
         const over = target ? Object.entries(byCode).filter(([code, b])=>{ const u = target.codes[code]; return u && b.total > u.avg * 1.1 && b.total - u.avg >= 1000; }) : [];
         const lotCost = Math.round((Number(h.lotCost) || 0) * 100) / 100;
         await ref.set({ houseId, project: cut(h.project, 80), label: cut(h.label, 120), lines, total, byCode, flagged: over.map(([code])=>code), lotCost,
@@ -968,7 +988,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       }
       if(BT_SALES){ await applyBtSales(); await addClosedHomes(); await useBtGp(); snap = await col.get(); }
       await addManualHomes().catch(err=>logger.error('Homes from contracts not added', err));
-      res.json({ builds: snap.docs.map(d=>({ id: d.id, ...d.data() })) });
+      res.json({ builds: snap.docs.map(d=>{ const b = { id: d.id, ...d.data() }, x = bsmtOf(b); return { ...b, bsmt: x.on, bsmtWhy: x.why }; }) });
       return;
     }
     if(body.action === 'historyAdd'){
@@ -991,8 +1011,18 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       if(typeof body.gp === 'number' && body.gp > -1 && body.gp < 1){ /* given */ }
       else if(saleDoc.exists && saleDoc.data().price > 0){ row.sale = saleDoc.data().price; row.gp = Math.round((row.sale - (c.lotCost || 0) - row.total - row.overhead) / (row.sale - (c.lotCost || 0)) * 10000) / 10000; }   // the lot comes off the sale before dividing (office's method)
       if(c.lotCost) row.lotCost = c.lotCost;
+      if(typeof j.basement === 'boolean') row.bsmtSet = j.basement;
       await db.collection('cost-history').doc('qb-' + houseId).set(row);
       res.json({ ok: true, id: 'qb-' + houseId });
+      return;
+    }
+    if(body.action === 'historyBasement'){
+      const id = typeof body.id === 'string' ? body.id : '';
+      const ref = db.collection('cost-history').doc(id || '-');
+      if(!id || !(await ref.get()).exists){ res.status(404).json({ error: 'build' }); return; }
+      await ref.update({ bsmtSet: typeof body.value === 'boolean' ? body.value : admin.firestore.FieldValue.delete(), bsmtBy: who.email || who.uid });
+      const b = (await ref.get()).data(), x = bsmtOf(b);
+      res.json({ bsmt: x.on, bsmtWhy: x.why });
       return;
     }
     if(body.action === 'historyRemove'){
@@ -1030,7 +1060,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       // the usual cost per code for each home's style, so the list can flag codes running over
       const jobData = {}; jobsSnap.docs.forEach(d=>{ jobData[d.id] = d.data(); });
       const targets = {};
-      for(const d of snap.docs) targets[d.id] = await profitTarget((jobData[d.id] || {}).model, builds, { id: d.id, ...(jobData[d.id] || {}) });
+      for(const d of snap.docs) targets[d.id] = await profitTarget((jobData[d.id] || {}).model, builds, { id: d.id, ...(jobData[d.id] || {}), bsmt: homeBsmt(jobData[d.id], d.data().byCode) });
       res.json({ sold, targets, overhead: await getOverhead(), homes: snap.docs.map(d=>{ const c = d.data(); return { houseId: d.id, project: c.project, label: c.label, total: c.total, lines: (c.lines || []).length, byCode: c.byCode, lotCost: c.lotCost || 0, importedAt: c.importedAt, importedBy: c.importedBy, source: c.source }; }) });
       return;
     }
@@ -1071,7 +1101,7 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       if(!id){ res.status(400).json({ error: 'house' }); return; }
       const [doc, saleDoc, jobDoc] = await Promise.all([db.collection('job-costs').doc(id).get(), db.collection('job-sales').doc(id).get(), db.collection('jobs').doc(id).get()]);
       res.json({ costs: doc.exists ? doc.data() : null, sale: saleDoc.exists ? saleDoc.data() : null, overhead: await getOverhead(),
-        target: await profitTarget(jobDoc.exists ? jobDoc.data().model : '', null, { id, ...(jobDoc.exists ? jobDoc.data() : {}) }) });
+        target: await profitTarget(jobDoc.exists ? jobDoc.data().model : '', null, { id, ...(jobDoc.exists ? jobDoc.data() : {}), bsmt: homeBsmt(jobDoc.exists ? jobDoc.data() : null, doc.exists ? doc.data().byCode : null) }) });
       return;
     }
     res.status(400).json({ error: 'action' });
@@ -1791,6 +1821,7 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
         fill.selectionSheet = id;
         await ref.update(fill);
       }
+      if(typeof b.basement === 'boolean') await db.collection('jobs').doc(houseId).update({ basement: b.basement });
       await db.collection('job-sales').doc(houseId).set({ price, lines, source: 'hub', sheetId: id, note: 'From the signed selection sheet', setAt: now.toISOString(), setBy: staffName(who) });
       sheet.houseId = houseId;
       await selRef(id).update({ houseId, sheet: JSON.stringify(sheet), rev: (d.rev || 0) + 1 });
