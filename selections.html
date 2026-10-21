@@ -36,6 +36,9 @@
   .viewsw button.on{background:var(--navy);color:#fff}
   .viewsw button.on.staff{background:var(--staff)}
   .titlebar-account{display:flex;align-items:center;gap:10px}
+  .qnote{margin-top:14px} .qnote textarea{width:100%;min-height:54px;resize:vertical;margin-top:4px}
+  .verlist{margin-top:10px} .verrow{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line-soft);font-size:14px}
+  .verrow:first-child{border-top:none} .verrow .grow{flex:1}
   .pq{padding:10px 0;border-top:1px solid var(--line-soft)} .pq:first-of-type{border-top:none}
   .pq-h{margin-bottom:4px}
   .pr{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;padding:4px 0 4px 12px}
@@ -483,7 +486,12 @@ let OPT_PRICES = {};
    kept on the server (settings/selections.over). buildCatalog keeps BuilderTrend's own price as c.p0 and uses this one when set.
    Sheets keep the price they were quoted at; a sheet whose prices moved shows the usual "prices have changed" offer. */
 let PRICE_OVER = {};
-let BASE_CFG = {};   // base price per home style, set in the back end (settings/selections.bases); a new lead starts with it
+/* HOUSE price per home style (owner, 2026-10-21; kept in settings/selections.bases): a new lead starts with its style's house price, the
+   rep types the lot price, and house + lot = the lead's base price (L.basePrice). L.housePrice / L.lotPrice are office only: the buyer
+   only ever sees the base price. */
+let BASE_CFG = {};
+const houseOf = L=>L.housePrice != null ? Number(L.housePrice) || 0 : (Number(L.basePrice) || 0) - (Number(L.lotPrice) || 0);
+const setBase = (L, house, lot)=>{ L.housePrice = Math.round(house); L.lotPrice = Math.round(lot); L.basePrice = L.housePrice + L.lotPrice; };
 const overKey = (q, c)=>q.id + '|' + c.t;
 const overOn = c=>!c.k && !c.rate && !c.h;              // choices priced elsewhere: back-end option prices, typed tile, ceiling moves
 const OPT_BASE = {};                                    // no prices in this file: they come from the server
@@ -496,7 +504,8 @@ const FIN_CHOICES = [{ t:'Brushed nickel', k:'fin-bn' }, { t:'Brushed brass', k:
    choice per bathroom (q.one). */
 const STD_FIRST = { '273':['Standard toilet'], '313':['Standard toilet'], '353':['Standard toilet'], '379':['Standard toilet'],
   '256':['Standard shower', 'Standard tub/shower'], '300':['Standard shower', 'Standard tub/shower'], '340':['Standard shower', 'Standard tub/shower'],
-  '270':['Standard shower faucet'], '310':['Standard shower faucet'], '350':['Standard shower faucet'] };   // shower faucets (owner, 2026-10-21): standard preset, no charge
+  '270':['Standard shower faucet'], '310':['Standard shower faucet'], '350':['Standard shower faucet'],
+  '720':['Standard carpet stairs'] };   // stair material (owner, 2026-10-21): carpet is standard, no charge   // shower faucets (owner, 2026-10-21): standard preset, no charge
 /* Countertop allowance (owner, 2026-10-19): BuilderTrend's one "Countertop Allowance" on Kitchen/Bath Cabinetry (BT 500) becomes a
    Granite and a Quartz allowance. Both are typed allowances (named "…allowance", so isAllow picks them up and the back end's
    Allowance amounts sets their starting amounts); they share grp 'counter', so taking one takes the other off. */
@@ -510,10 +519,12 @@ const PANTRY_DROP = /^(number of pantry shelves:?|add't wire pantry shelves)$/i;
 /* Flooring types and levels (owner, 2026-10-19, the office's "FLOORING Master Sheet"): one choice per type + level; the price per
    sq ft of each is in the back end's flooring table (OPT_PRICES 'floor-' + key + level, on the server — none written here; a minus
    number is a credit). Tile is priced on the sheet (c.rate). */
-const FLOOR_TYPES = [{ key:'lvp', t:'LVP', levels:[20, 30, 40] }, { key:'vinyl', t:'Vinyl', levels:[10, 30, 40, 50] },
+/* Owner, 2026-10-21: for now the standard is the company's basic flooring (vinyl / carpet) and LVP Level 10 is an upgrade again
+   (they're moving to LVP Level 10 as standard, but not yet). Prices come from the sheet's main table, priced over that basic level. */
+const FLOOR_TYPES = [{ key:'lvp', t:'LVP', levels:[10, 20, 30, 40] }, { key:'vinyl', t:'Vinyl', levels:[10, 30, 40, 50] },
   { key:'hw', t:'Hardwood', levels:[20, 30, 40, 50, 60] }, { key:'carpet', t:'Carpet', levels:[10, 20, 30] },
   { key:'io', t:'Indoor/outdoor carpet', levels:[10, 20] }, { key:'tile', t:'Tile', levels:[] }];
-let floorPick = { type:'lvp', level:20 };          // the "add a flooring area" form (not stored)
+let floorPick = { type:'lvp', level:10 };          // the "add a flooring area" form (not stored)
 /* Patio & deck (owner, 2026-10-19). BuilderTrend has a blank "Patio/Deck" (600) plus extra sq ft prices for each (602), one "Add
    covered patio/deck" (640) plus extra covered sq ft for each (642), and composite deck flooring per sq ft (608). On the sheet:
    600 = Patio OR Deck, typed in sq ft at 602's prices (602 itself is folded in, not asked); 640 = Covered patio OR Covered deck, each
@@ -573,8 +584,8 @@ function patioChoices(bt, list){
   if(bt === '231') return [{ t:'Standard 6\' 8" front door', p:0, unit:'', grp:'fdoor' }, { t:'Standard 8\' front door', p:0, unit:'', grp:'fdoor' },
     { t:'8\' front door allowance', p:0, unit:'', grp:'fdallow' }, { t:'6\' 8" front door allowance', p:0, unit:'', grp:'fdallow' }];
   // stair railing (owner, 2026-10-19): both options per linear foot, priced in the back end (BT only had a flat price for one)
-  if(bt === '724') return [{ t:'Standard traditional railing (per linear ft)', k:'stair-trad-lf', p:null, unit:'ft' },
-    { t:'Square baluster railing (per linear ft)', k:'stair-sq-lf', p:null, unit:'ft' }];
+  // (owner, 2026-10-21) both are no charge: it's only a question of which style; one or the other
+  if(bt === '724') return [{ t:'Standard traditional railing', p:0, unit:'' }, { t:'Square baluster railing', p:0, unit:'' }];
   if(bt === '726') return list.map(c=>({ ...c, t:String(c.t).replace(/\s*l\.?f\.?$/i, '').trim() + ' (per linear ft)', unit:'ft' }));
   if(bt === '610') return [{ t:'Railing (per linear ft)', k:'rail-lf', p:null, unit:'ft' }, ...list];
   if(bt === '608') return list.map(c=>/composite/i.test(c.t) ? { ...c, t:'Composite deck flooring', unit:'sq ft' } : c);
@@ -645,7 +656,7 @@ function buildCatalog(cat){
     const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
     const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
     const std = STD_FIRST[s.bt] || [];
-    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248'].includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
       c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
@@ -719,13 +730,14 @@ const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.a
 const stdOf = (q, L)=>q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
   : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
   : q.one && /^shower faucet/i.test(q.t) ? { label:'Standard shower faucet', idx: q.c.findIndex(c=>c.t === 'Standard shower faucet') }
+  : q.bt === '720' ? { label:'Standard carpet stairs', idx: q.c.findIndex(c=>c.t === 'Standard carpet stairs') }
   : q.bt === '518' ? { label:'4 wire shelves', keep:true }
   : q.bt === '526' ? { label:'Garbage disposal' }
   : q.bt === '608' ? { label:'#1 pressure treated' }
   : q.bt === '701' ? { label:'White windows' }
   : q.id === 'bstairs' ? { label:'Closed stairs to basement' }
   : q.bt === '780' ? { label:'Interior paint - flat ceiling/flat walls' }
-  : q.bt === '790' ? { label:'LVP Level 10 - first floor & all baths', keep:true }
+  : q.bt === '790' ? { label:'Standard flooring (vinyl / carpet)', keep:true }
   : q.bt === '175' ? { label:'2 standard hose bibs', keep:true } : null;
 /* Flooring areas (owner, 2026-10-19): like the calculator's rows — each added area is a type + level with its sq ft; the form
    below adds another (the same type + level again adds to its sq ft). */
@@ -781,6 +793,7 @@ const missing = ()=>[];                       // nothing on either sheet has to 
 const todo = ()=>[];
 const keysOf = q=>q.c.map((c, i)=>q.id + '#' + i);
 const noteKey = r=>'note:' + r.id;
+const qNoteKey = q=>'qnote:' + q.id;   // a note on one question (owner, 2026-10-21: "the note at the bottom of each question")
 // what was chosen on one selection, as a short string (to show "changed since pricing")
 const snapQ = (q, L)=>q.c.map((c, i)=>{ const a = L.answers[q.id + '#' + i]; return a && a.qty ? c.t + (a.qty > 1 ? ' ×' + a.qty : '') : ''; }).filter(Boolean).join(', ');
 const snapAll = L=>Object.fromEntries(ALL_QS.filter(q=>q.v1).map(q=>[q.id, snapQ(q, L)]).filter(x=>x[1]));
@@ -789,10 +802,14 @@ const snapVal = (a, q, k)=>{ const c = q && q.c ? q.c[Number(String(k).split('#'
 function lines(L){
   const out = [];
   SECTIONS.forEach(r=>{
-    r.qs.forEach(q=>{ if(!asked(q, L)) return; q.c.forEach((c, i)=>{
+    r.qs.forEach(q=>{ if(!asked(q, L)) return;
+      q.c.forEach((c, i)=>{
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
       out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.k ? optPrice(c.k) == null : c.p == null });
-    }); });
+      });
+      const qn = L.answers[qNoteKey(q)];   // the question's own note, after its picks
+      if(qn && qn.label) out.push({ key:qNoteKey(q), q, where:'', label:qn.label, price:0, cost:0, std:false, typed:true });
+    });
     const n = L.answers[noteKey(r)];
     if(n && n.label) out.push({ key:noteKey(r), q:{ id:noteKey(r), t:'Notes', room:r, cc:90, bt:'', v1:1, type:'text' }, where:'', label:n.label, price:0, cost:0, std:false, typed:true });
   });
@@ -894,7 +911,32 @@ const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name :
    Every second the open sheet either sends what changed or asks whether anything is new (another office device, or the
    customer's screen). Only the changes travel, so two people tapping at once don't undo each other. */
 const SEL_URL = 'https://us-central1-alden-homes-hub.cloudfunctions.net/selectionsApi';
-const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn','quoteOk','line','basePrice','notes','follow','address'];
+const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn','quoteOk','line','basePrice','notes','follow','address','versions','housePrice','lotPrice'];
+/* Earlier versions of the pricing sheet (owner, 2026-10-21: buyers come back to bring the price down or up, and the office wants the
+   old version and the new one on record). A copy is kept each time pricing is confirmed, and whenever someone presses "Keep a copy of
+   this version". L.versions = [{ at, why, by, total, sheet:{ answers, custom, basePrice, model, line, dev, lot, name, name2, pricedOn } }],
+   newest last, at most 30; office only (never sent to the customer's screen or links). */
+const VER_KEEP = ['answers', 'custom', 'basePrice', 'housePrice', 'lotPrice', 'model', 'line', 'dev', 'lot', 'name', 'name2', 'pricedOn', 'quoteOk'];
+let viewVer = -1;   // the version being looked at on the Pricing sheet tab (-1 = the current sheet)
+function keepVersion(L, why){
+  const sheet = {}; VER_KEEP.forEach(f=>{ sheet[f] = clone(L[f] === undefined ? null : L[f]); });
+  const who = window.firebase && firebase.apps.length && firebase.auth().currentUser;
+  L.versions = (Array.isArray(L.versions) ? L.versions : []).concat([{ at:new Date().toISOString(), why, by: who ? (who.displayName || String(who.email || '').split('@')[0]) : '', total: base(L) + upgrades(L), sheet }]).slice(-30);
+}
+const verLead = (L, v)=>norm({ ...clone(L), ...clone(v.sheet), cos:[], versions:[], stage:'v1' });
+const whenAt = s=>{ const d = new Date(s); return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) + ', ' + d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' }); };
+function versionsCard(L){
+  const vs = Array.isArray(L.versions) ? L.versions : [], now = base(L) + upgrades(L);
+  const diff = d=>d === 0 ? 'same as now' : (d > 0 ? money(d) + ' more than now' : money(-d) + ' less than now');
+  return `<div class="card noprint"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="font-size:18px">Earlier versions</h2><div class="grow"></div>
+      ${locked(L) ? '' : '<button type="button" class="btn sm" id="verKeep">Keep a copy of this version</button>'}</div>
+    <p class="muted" style="font-size:13.5px;margin-top:4px">A copy is kept each time pricing is confirmed. Only the office sees these.</p>
+    ${vs.length ? `<div class="verlist">${vs.map((v, i)=>({ v, i })).reverse().map(({ v, i })=>`<div class="verrow"><b>${esc(whenAt(v.at))}</b>
+        <span class="muted">${v.why === 'confirmed' ? 'Pricing confirmed' : 'Copy kept'}${v.by ? ' by ' + esc(v.by) : ''}</span><div class="grow"></div>
+        <span class="mono">${money(v.total)}</span><span class="muted" style="font-size:13px">${esc(diff(v.total - now))}</span>
+        <button type="button" class="btn sm" data-ver="${i}">${viewVer === i ? 'Looking at it' : 'View'}</button></div>`).join('')}</div>`
+      : '<p class="muted" style="margin-top:10px;font-size:14px">None yet.</p>'}</div>`;
+}
 let KEYS = {}, REMOTE = {}, TEAM = [], present = {}, flushId = '';   // link keys; the server's last copy of each sheet; the team; open customer screens
 async function selApi(body){
   const u = window.firebase && firebase.apps.length && firebase.auth().currentUser;
@@ -983,7 +1025,7 @@ function takeRemote(sheet, sent, body){
     const q = qOfKey(theirs), a = sheet.answers[theirs];
     if(q){ flashKey = theirs; toast((PRESENT ? 'Updated: ' : 'The customer picked: ') + q.t + ' — ' + snapVal(a, q, theirs)); }
   }
-  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('#baseIn,[id^="jd_"],[data-bt-num],[data-allow],[data-rate],#floorSq,[data-floor-type],[data-floor-level],[data-note],[data-lotprem],[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
+  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('#baseIn,#lotIn,[id^="jd_"],[data-bt-num],[data-allow],[data-rate],#floorSq,[data-floor-type],[data-floor-level],[data-note],[data-lotprem],[data-num],[data-money],[data-text],#noteText,#followWhat,#cuDesc,#cuPrice,#cuCost');
   if(changed && !typing){ const y = window.scrollY; render(); window.scrollTo(0, y); }
   flashKey = '';
 }
@@ -1139,8 +1181,8 @@ function pricesScreen(){
       <span class="pnote">${on ? `<b class="chg">changed</b> · BuilderTrend ${c.p0 == null ? 'had none' : money2(c.p0)} <button type="button" class="linkbtn" data-overclear="${esc(k)}">Use BuilderTrend's</button>` : 'BuilderTrend\'s price'}${c.unit ? ' · per ' + esc(c.unit) : ''}</span>`;
   };
   const n = Object.keys(PRICE_OVER).length;
-  return `<div class="card"><h2 style="font-size:18px">Base price per home style</h2>
-      <p class="muted" style="font-size:13.5px;margin-top:4px">What a new lead's sheet starts at for each home style. A sheet already started keeps its own base price (it can be changed on the sheet).</p>
+  return `<div class="card"><h2 style="font-size:18px">House price per home style</h2>
+      <p class="muted" style="font-size:13.5px;margin-top:4px">A new lead starts with its style's house price; the rep types the lot price, and house + lot is the base price the customer sees. A sheet already started keeps its own prices (they can be changed on the sheet).</p>
       ${Object.keys(STYLES).map(k=>`<div class="eyebrow" style="margin-top:12px">${esc(LINE_NAMES[k])}</div>${STYLES[k].map(m=>`<div class="pr"><span class="pt"><b>${esc(m)}</b></span><span class="pv"><span class="muted">$</span><input type="number" min="0" step="100" data-basep="${esc(m)}" value="${BASE_CFG[m] || ''}" placeholder="not set" style="width:130px"></span></div>`).join('')}`).join('')}</div>
     <div class="card"><h2 style="font-size:18px">Every price</h2>
       <p class="muted" style="font-size:13.5px;margin-top:4px">Every choice on the pricing and selection sheets. Type a new price to change it; leave the box empty to use BuilderTrend's (shown greyed in the box). A credit is a minus number. Prices on sheets already quoted don't change by themselves: those sheets get the usual "prices have changed" offer.</p>
@@ -1170,7 +1212,7 @@ function stylesScreen(){
       <p class="lede">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
     <div class="card" style="display:${styView === 'prices' ? 'none' : 'flex'};gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
       <div><label class="f">Home style</label><select id="styPick">${opts}</select></div>
-      <div><label class="f">Base price</label><span class="muted">$</span> <input type="number" min="0" step="100" data-basep="${esc(styName)}" value="${BASE_CFG[styName] || ''}" placeholder="not set" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:var(--radius)"></div>
+      <div><label class="f">House price</label><span class="muted">$</span> <input type="number" min="0" step="100" data-basep="${esc(styName)}" value="${BASE_CFG[styName] || ''}" placeholder="not set" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:var(--radius)"></div>
       <div><label class="f">Standard ceilings</label><select id="styCeil"><option value="8" ${ceilStd(fake) === 8 ? 'selected' : ''}>8'</option><option value="9" ${ceilStd(fake) === 9 ? 'selected' : ''}>9'</option></select></div>
       <div class="muted" style="font-size:13.5px;padding-bottom:8px">${n.incl} included · ${n.hide} hidden · <span id="styState">${esc(styState)}</span></div>
       <div class="grow"></div>
@@ -1182,11 +1224,10 @@ function stylesScreen(){
 function floorCard(){
   const lvls = [10, 20, 30, 40, 50, 60];
   return `<div class="card"><h2 style="font-size:18px">Flooring prices (per sq ft)</h2>
-    <p class="muted" style="font-size:13.5px;margin-top:4px">What each type and level adds per square foot over the standard LVP Level 10. 0 = no charge; a minus number is a credit; empty = "price to come". Tile is priced on the sheet.</p>
+    <p class="muted" style="font-size:13.5px;margin-top:4px">What each type and level adds per square foot over the standard flooring (vinyl / carpet). 0 = no charge; a minus number is a credit; empty = "price to come". Tile is priced on the sheet.</p>
     <div style="overflow-x:auto"><table class="floor-grid" style="border-collapse:collapse;margin-top:10px;font-size:14px">
       <tr><th style="text-align:left;padding:4px 8px"></th>${lvls.map(n=>`<th style="padding:4px 6px">Level ${n}</th>`).join('')}</tr>
       ${FLOOR_TYPES.filter(x=>x.levels.length).map(x=>`<tr><td style="padding:4px 8px;white-space:nowrap"><b>${esc(x.t)}</b></td>${lvls.map(n=>{
-        if(x.key === 'lvp' && n === 10) return '<td style="padding:4px 6px;text-align:center" class="muted">standard</td>';
         if(!x.levels.includes(n)) return '<td></td>';
         const k = 'floor-' + x.key + n, v = optPrice(k);
         return `<td style="padding:4px 6px"><input type="number" step="0.01" data-optp="${k}" value="${v == null ? '' : v}" placeholder="—" style="width:80px"></td>`; }).join('')}</tr>`).join('')}
@@ -1203,8 +1244,6 @@ function bathCard(){
       <span class="muted">$</span><input type="number" step="0.01" data-optp="${x.k}-m" value="${OPT_PRICES[x.k + '-m'] == null ? '' : OPT_PRICES[x.k + '-m']}" placeholder="same as other baths" style="width:130px"></div>`).join('')}
     ${row('pantry-lf', 'Added pantry shelves, per linear ft', '4 wire shelves are standard; this is each extra foot of shelf')}
     ${row('rail-lf', 'Deck railing, per linear ft', 'Asked on the patio & deck section')}
-    ${row('stair-trad-lf', 'Stair railing, standard traditional, per linear ft', 'Stairs section')}
-    ${row('stair-sq-lf', 'Stair railing, square balusters, per linear ft', 'Stairs section')}
     ${row('bsmt-open', 'Open stairs to basement', 'Basement section; closed stairs are standard')}
     ${row('bsmt-rail', 'Basement railing', 'Basement section')}
     ${row('hosebib', 'Additional hose bib, each', 'Exterior section; 2 are standard')}
@@ -1279,7 +1318,9 @@ function leadsScreen(){
           <div style="grid-column:1/-1"><label class="f">Street address (optional)</label><input type="text" id="nAddr"></div>
           <div><label class="f">Collection</label><select id="nLine">${Object.keys(LINE_NAMES).map(k=>`<option value="${k}">${LINE_NAMES[k]}</option>`).join('')}</select></div>
           <div><label class="f">Home style</label><select id="nModel">${STYLES.ALDEN.map(m=>`<option>${m}</option>`).join('')}</select></div>
-          <div><label class="f">Base price ($)</label><input type="number" id="nBase" min="0" step="100" placeholder="e.g. 389900"></div>
+          <div><label class="f">House price ($)</label><input type="number" id="nBase" min="0" step="100" placeholder="from the home style"></div>
+          <div><label class="f">Lot price ($)</label><input type="number" id="nLotPrice" min="0" step="100" placeholder="type the lot price"></div>
+          <div class="muted" id="nBaseSum" style="grid-column:1/-1;font-size:13.5px"></div>
         </div>
         <div style="margin-top:12px"><button type="button" class="btn good" id="nStart">Save lead &amp; start pricing</button></div>
       </div>` : ''}
@@ -1306,9 +1347,9 @@ function leadScreen(L){
     <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
         <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</h1>
-        <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${baseEdit && !PRESENT && !locked(L)
-          ? `<span class="noprint" style="display:inline-flex;gap:6px;align-items:center;vertical-align:middle">$<input type="number" id="baseIn" min="0" step="100" value="${base(L) || ''}" style="width:130px;padding:6px 8px"><button type="button" class="btn sm primary" id="baseSave">Save</button><button type="button" class="btn sm" id="baseCancel">Cancel</button></span>`
-          : money(base(L)) + (!PRESENT && !locked(L) ? ' <button type="button" class="btn sm noprint" id="baseChange" style="padding:2px 9px;margin-left:4px">Change</button>' : '')}</div></div>
+        <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${baseEdit && staff && !PRESENT && !locked(L)
+          ? `<span class="noprint" style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;vertical-align:middle">house $<input type="number" id="baseIn" min="0" step="100" value="${houseOf(L) || ''}" style="width:120px;padding:6px 8px"> + lot $<input type="number" id="lotIn" min="0" step="100" value="${Number(L.lotPrice) || ''}" style="width:110px;padding:6px 8px"><button type="button" class="btn sm primary" id="baseSave">Save</button><button type="button" class="btn sm" id="baseCancel">Cancel</button></span>`
+          : money(base(L)) + (staff && !PRESENT ? ` <span class="staffline" style="display:inline">(house ${money(houseOf(L))} + lot ${money(Number(L.lotPrice) || 0)})</span>` : '') + (staff && !PRESENT && !locked(L) ? ' <button type="button" class="btn sm noprint" id="baseChange" style="padding:2px 9px;margin-left:4px">Change</button>' : '')}</div></div>
       <div style="text-align:right">${PRESENT ? (sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live"><i></i>Live with your Alden Homes rep</span>')
         : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">Pricing meeting ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
           <div class="noprint" style="margin-top:8px;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap">${present[L.id] ? liveBadge() : ''}<button type="button" class="btn sm" id="shareBtn">${shareOpen ? 'Hide' : present[L.id] ? 'Customer screen' : 'Open customer screen'}</button>${staff && !locked(L) ? '<button type="button" class="btn sm" id="delLead">Delete lead</button>' : ''}</div>`}</div>
@@ -1450,7 +1491,8 @@ function sheetView(L, kind){
       <div class="g-top"><span>${esc(r.name)} · ${qs.length ? gIdx + 1 : 0} of ${qs.length}</span><div class="bar"><span style="width:${qs.length ? (gIdx + 1) / qs.length * 100 : 0}%"></span></div></div>
       <div class="q">${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
         ${q && !picked && !lock && !stdOf(q, L) && !isIncl(q, L) ? '<div class="g-std">Nothing picked means this stays standard.</div>' : ''}
-        ${q ? customBlock(L, r, q) : ''}</div>
+        ${q ? customBlock(L, r, q) : ''}
+        ${q && !PRESENT ? (n=>`<div class="qnote noprint"><label class="f">Note for this question</label><textarea data-note="${esc(qNoteKey(q))}" maxlength="600" placeholder="Anything to remember about ${esc(q.t)}" ${lock ? 'disabled' : ''}>${esc(n ? n.label : '')}</textarea></div>`)(L.answers[qNoteKey(q)]) : ''}</div>
       <div class="g-nav noprint">
         ${gIdx > 0 || prev ? `<button type="button" class="btn" data-g="-1">&larr; Back</button>` : ''}
         <div class="grow"></div>
@@ -1534,7 +1576,7 @@ function quoteDoc(L, forCustomer){
         : `<tr><td>${office && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(l.label)}</td><td class="num">${l.tbd ? '<em>price to come</em>' : l.price ? plus(l.price) : 'no charge'}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
       else if(docAll && q.v1) rows.push(stdRow(q));
     });
-    mine.filter(l=>l.typed).forEach(l=>rows.push(`<tr><td colspan="3" class="dn">Note: ${esc(l.label)}</td></tr>`));
+    mine.filter(l=>l.typed && !r.qs.includes(l.q)).forEach(l=>rows.push(`<tr><td colspan="3" class="dn">Note: ${esc(l.label)}</td></tr>`));
     cu.forEach(c=>rows.push(`<tr><td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`));
     if(!rows.join('')) return '';
     const sub = mine.reduce((s,l)=>s+l.price,0) + cu.reduce((s,c)=>s+c.price,0);
@@ -1556,6 +1598,7 @@ function quoteDoc(L, forCustomer){
     ${L.cos.length ? `<h3>Change orders<span>${plus(co)}</span></h3><table><tbody>${L.cos.map(c=>`<tr><td>${esc(nice(c.date))}</td><td>${esc(c.desc)}</td><td class="num">${plus(c.price)}</td>${staff ? `<td class="num st">${money(c.cost)}</td><td class="num st">${money(c.price - c.cost)}</td>` : ''}</tr>`).join('')}<tr><td colspan="2">Change order fees</td><td class="num">${plus(L.cos.length * CO_FEE)}</td>${staff ? '<td></td><td></td>' : ''}</tr></tbody></table>` : ''}
     <div class="doc-total">
       <div><span>Base price · ${esc(L.model || '')}</span><span class="mono">${money(base(L))}</span></div>
+      ${office && Number(L.lotPrice) ? `<div style="color:var(--staff);font-size:13px"><span>Office only: house ${money(houseOf(L))} + lot ${money(Number(L.lotPrice))}</span><span></span></div>` : ''}
       <div><span>Options, upgrades &amp; lot premium</span><span class="mono">${plus(up)}</span></div>
       ${co ? `<div><span>Change orders</span><span class="mono">${plus(co)}</span></div>` : ''}
       ${staff ? `<div style="color:var(--staff)"><span>Our cost of the options · margin on them</span><span class="mono">${money(upgradeCost(L))} · ${money(up - upgradeCost(L))}</span></div>` : ''}
@@ -1566,6 +1609,15 @@ function quoteDoc(L, forCustomer){
   </div>`;
 }
 function quoteTab(L){
+  const vs = Array.isArray(L.versions) ? L.versions : [];
+  if(viewVer >= vs.length || PRESENT) viewVer = -1;
+  if(viewVer >= 0){
+    const v = vs[viewVer];
+    return `<div class="banner staff noprint"><p><strong>An earlier version: ${esc(whenAt(v.at))}</strong> (${v.why === 'confirmed' ? 'pricing confirmed' : 'copy kept'}). Total then ${money(v.total)}; now ${money(base(L) + upgrades(L))}.</p>
+        <button type="button" class="btn sm primary" data-ver="-1">Back to the current sheet</button></div>
+      <div class="docbar noprint"><div class="grow"></div><button type="button" class="btn" id="docPrint">Print</button><button type="button" class="btn" id="docPdf">Download PDF</button></div>
+      <div class="docwrap">${quoteDoc(verLead(L, v), false)}</div>${versionsCard(L)}`;
+  }
   const staff = view === 'staff', wait = waiting(L).length;
   const status = L.quoteOk ? `<span class="chip signed">Confirmed ${esc(nice(L.quoteOk))}</span>` : '<span class="chip v1">Draft · for review</span>';
   const send = L.quoteOk && !PRESENT ? `<div class="sharebox noprint" style="margin-top:12px"><strong>Send it to the customer.</strong> This link opens their copy of the pricing sheet, with prices and no office figures. They can print it or save it as a PDF.
@@ -1577,7 +1629,8 @@ function quoteTab(L){
       ${PRESENT || locked(L) ? '' : L.quoteOk ? '<button type="button" class="btn" id="quoteUndo">Back to draft</button>' : `<button type="button" class="btn good" id="quoteConfirm" ${wait ? 'disabled' : ''}>Confirm pricing</button>`}</div>
     ${wait && !L.quoteOk && !PRESENT ? `<div class="banner amber noprint"><p><strong>${wait} custom item${wait === 1 ? ' needs' : 's need'} a price</strong> before this can be confirmed: ${waiting(L).map(c=>esc(c.desc) + (c.ask ? ' (' + esc(c.ask) + ')' : '')).join(', ')}.</p></div>` : ''}
     ${send}
-    <div class="docwrap">${quoteDoc(L, false)}</div>`;
+    <div class="docwrap">${quoteDoc(L, false)}</div>
+    ${PRESENT ? '' : versionsCard(L)}`;
 }
 async function docPdf(btn, name){
   btn.disabled = true; const was = btn.textContent; btn.textContent = 'Making the PDF…';
@@ -1820,14 +1873,14 @@ document.addEventListener('click', async e=>{
   if(t.closest('#styClear')){ if(!confirm('Show every line on ' + styName + '\'s sheet again?')) return; const keepCeil = (STYLE_CFG[styName] || {}).ceil; if(keepCeil) STYLE_CFG[styName] = { skip:[], incl:[], ceil:keepCeil }; else delete STYLE_CFG[styName]; render(); styleSave(); return; }
   if(t.closest('#signOutBtn')){ if(pending() && !confirm('Changes are still saving. Sign out anyway?')) return; firebase.auth().signOut().then(()=>location.reload()); return; }
   if(t.closest('#loginGo')){ doLogin(); return; }
-  if(t.closest('#newLeadBtn')){ newOpen = !newOpen; render(); if(newOpen){ $('nBase').value = BASE_CFG[$('nModel').value] || ''; $('nName').focus(); } return; }
+  if(t.closest('#newLeadBtn')){ newOpen = !newOpen; render(); if(newOpen){ $('nBase').value = BASE_CFG[$('nModel').value] || ''; baseSum(); $('nName').focus(); } return; }
   if(t.closest('#nStart')){
     const name = $('nName').value.trim(); if(!name){ toast('Add the buyer\'s name first'); return; }
-    const n = { id:'L'+Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), address:$('nAddr').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value, line:$('nLine').value, basePrice:Number($('nBase').value) || 0,
+    const n = { id:'L'+Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), address:$('nAddr').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value, line:$('nLine').value, housePrice:Math.round(Number($('nBase').value) || 0), lotPrice:Math.round(Number($('nLotPrice').value) || 0), basePrice:Math.round(Number($('nBase').value) || 0) + Math.round(Number($('nLotPrice').value) || 0),
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
     leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
-  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); baseEdit = false; cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
+  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); baseEdit = false; viewVer = -1; cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
   if(!PRESENT){
     const setFollow = date=>{ L.follow = { date, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(date)); };
@@ -1891,25 +1944,27 @@ document.addEventListener('click', async e=>{
   if(t.closest('#baseCancel')){ baseEdit = false; render(); return; }
   if(t.closest('#baseSave')){
     if(locked(L)) return;
-    const v = Number($('baseIn').value);
-    if($('baseIn').value === '' || !(v >= 0)){ toast('Type the base price'); return; }
-    L.basePrice = Math.round(v); baseEdit = false; touch(L); render(); toast('Base price is now ' + money(L.basePrice)); return;
+    const v = Number($('baseIn').value), lp = Number($('lotIn').value) || 0;
+    if($('baseIn').value === '' || !(v >= 0) || lp < 0){ toast('Type the house price'); return; }
+    setBase(L, v, lp); baseEdit = false; touch(L); render(); toast('Base price is now ' + money(L.basePrice)); return;
   }
   if(t.closest('#shareCopy')){ navigator.clipboard.writeText(presentUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
   if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); flushId = cur; cur = null; render(); syncTick(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
-  const tb = t.closest('[data-tab]'); if(tb){ tab = tb.dataset.tab; if(tab === 'v1' && !PRICING.some(x=>x.id === roomId)) roomId = PRICING[0].id; if(tab === 'full' && !ROOMS.some(x=>x.id === roomId)) roomId = ROOMS[0].id; render(); window.scrollTo(0, 0); return; }
+  const tb = t.closest('[data-tab]'); if(tb){ viewVer = -1; tab = tb.dataset.tab; if(tab === 'v1' && !PRICING.some(x=>x.id === roomId)) roomId = PRICING[0].id; if(tab === 'full' && !ROOMS.some(x=>x.id === roomId)) roomId = ROOMS[0].id; render(); window.scrollTo(0, 0); return; }
   const rm = t.closest('[data-room]'); if(rm){ gIdx = 0; roomId = rm.dataset.room; if(tab !== 'v1' && tab !== 'full') tab = 'full'; render(); window.scrollTo(0, 0); return; }
   const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#printBtn')){ window.print(); return; }
   if(t.closest('#docPrint')){ window.print(); return; }
-  if(t.closest('#docPdf')){ docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + '.pdf'); return; }
+  if(t.closest('#docPdf')){ const v = viewVer >= 0 && (L.versions || [])[viewVer]; docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + (v ? ' - ' + v.at.slice(0, 10) : '') + '.pdf'); return; }
   if(t.closest('#quoteConfirm')){
     // confirming also puts the sheet on the hub's server, so the customer's link works
-    L.quoteOk = iso(new Date());
+    L.quoteOk = iso(new Date()); keepVersion(L, 'confirmed');
     syncTick(); render(); toast('Pricing confirmed. It can go to the customer now.'); return;
   }
   if(t.closest('#quoteUndo')){ L.quoteOk = null; render(); return; }
+  if(t.closest('#verKeep')){ keepVersion(L, 'saved'); render(); toast('A copy of this version is kept'); return; }
+  const vb = t.closest('[data-ver]'); if(vb){ viewVer = Number(vb.dataset.ver); render(); window.scrollTo(0, 0); return; }
   if(t.closest('#quoteCopy')){ navigator.clipboard.writeText(quoteUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
   if(t.closest('#quoteOpen')){ window.open(quoteUrl(L), '_blank'); return; }
   if(t.closest('#showMake')){
@@ -2019,8 +2074,12 @@ document.addEventListener('click', async e=>{
     if(!PRESENT) makeHome(L);
   }
 });
-document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'baseIn') $('baseSave').click(); if(e.key === 'Escape' && e.target.id === 'baseIn') $('baseCancel').click();
+document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && (e.target.id === 'baseIn' || e.target.id === 'lotIn')) $('baseSave').click(); if(e.key === 'Escape' && (e.target.id === 'baseIn' || e.target.id === 'lotIn')) $('baseCancel').click();
   if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); if(e.key === 'Enter' && (e.target.id === 'loginPass' || e.target.id === 'loginEmail')) doLogin(); });
+// the new lead form says what the base price will be
+function baseSum(){ const el = $('nBaseSum'); if(!el) return; const h = Number($('nBase').value) || 0, l = Number($('nLotPrice').value) || 0;
+  el.textContent = h || l ? 'Base price the customer sees: ' + money(h + l) + ' (house ' + money(h) + ' + lot ' + money(l) + ')' : ''; }
+document.addEventListener('input', e=>{ if(e.target.id === 'nBase' || e.target.id === 'nLotPrice') baseSum(); });
 document.addEventListener('input', e=>{
   if(e.target.id !== 'priceFind') return;
   const w = e.target.value.trim().toLowerCase();
@@ -2028,7 +2087,7 @@ document.addEventListener('input', e=>{
   document.querySelectorAll('.psec').forEach(x=>{ x.style.display = [...x.querySelectorAll('.pq')].some(p=>p.style.display !== 'none') ? '' : 'none'; });
 });
 document.addEventListener('change', e=>{
-  if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); if($('nBase')) $('nBase').value = BASE_CFG[$('nModel').value] || ''; return; }
+  if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); if($('nBase')) $('nBase').value = BASE_CFG[$('nModel').value] || ''; baseSum(); return; }
   if(e.target.dataset && e.target.dataset.allow){
     const L3 = lead(); if(!L3 || locked(L3)) return;
     const k = e.target.dataset.allow, v = Math.max(0, Math.round(Number(e.target.value) || 0)); markOwn(L3, qOfKey(k));
@@ -2091,9 +2150,9 @@ document.addEventListener('change', e=>{
     if(e.target.value === '') delete BASE_CFG[m];
     else if(!Number.isFinite(v) || v <= 0){ toast('Type the base price'); render(); return; }
     else BASE_CFG[m] = v;
-    styleSave(); toast(e.target.value === '' ? m + ' has no base price set' : m + ' base price saved'); return;
+    styleSave(); toast(e.target.value === '' ? m + ' has no house price set' : m + ' house price saved'); return;
   }
-  if(e.target.id === 'nModel'){ const b = $('nBase'); if(b) b.value = BASE_CFG[e.target.value] || ''; return; }
+  if(e.target.id === 'nModel'){ const b = $('nBase'); if(b) b.value = BASE_CFG[e.target.value] || ''; baseSum(); return; }
   if(e.target.dataset && e.target.dataset.over){
     const k = e.target.dataset.over, v = Math.round(Number(e.target.value) * 100) / 100;
     if(e.target.value === '') delete PRICE_OVER[k];
@@ -2210,7 +2269,8 @@ function start(){
 /* Signed: the home is made (or found by development + lot) in Active Homes, and its sale price set from this sheet. */
 async function makeHome(L){
   if(!(await flush())){ toast('Still saving. Try "Add the home" again in a moment.'); render(); return; }
-  const saleLines = [{ bt:'', title:'Base price', choice:L.model || '', price:base(L) },
+  const saleLines = [...(Number(L.lotPrice) ? [{ bt:'', title:'House price', choice:L.model || '', price:houseOf(L) }, { bt:'', title:'Lot price', choice:L.lot ? 'Lot ' + L.lot : '', price:Number(L.lotPrice) }]
+      : [{ bt:'', title:'Base price', choice:L.model || '', price:base(L) }]),
     ...lines(L).filter(l=>!l.typed).map(l=>({ bt:l.q.bt || '', title:l.q.t, choice:l.label, price:l.price })),
     ...L.custom.filter(c=>!c.pending).map(c=>({ bt:'', title:'Custom item', choice:c.desc, price:c.price }))];
   try{

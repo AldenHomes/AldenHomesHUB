@@ -1600,8 +1600,9 @@ exports.demoSync = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3 }, async (
    A custom item that "needs a price" from a teammate puts a bell notice (notes, kind 'selPrice') on that person.
    The price list itself is functions/demo-catalog.json (git-excluded; travels with a deploy).
    ============================================================ */
-const SEL_FIELDS = [...DEMO_FIELDS, 'notes', 'follow', 'address'];
-const SEL_OFFICE_ONLY = ['notes', 'follow'];
+const SEL_FIELDS = [...DEMO_FIELDS, 'notes', 'follow', 'address', 'versions', 'housePrice', 'lotPrice'];
+// office only: notes, follow-ups, earlier versions, and how the base price splits into house + lot (the buyer only sees the base price)
+const SEL_OFFICE_ONLY = ['notes', 'follow', 'versions', 'housePrice', 'lotPrice'];   // versions = earlier copies of the pricing sheet, for the office only
 const selRef = id=>db.collection('selection-sheets').doc(id);
 const selKey = ()=>require('crypto').randomBytes(12).toString('hex');
 // what a link-holder sees: no office notes / follow-up, no "our cost" on custom items or change orders
