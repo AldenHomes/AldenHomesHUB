@@ -487,14 +487,16 @@ let BASE_CFG = {};   // base price per home style, set in the back end (settings
 const overKey = (q, c)=>q.id + '|' + c.t;
 const overOn = c=>!c.k && !c.rate && !c.h;              // choices priced elsewhere: back-end option prices, typed tile, ceiling moves
 const OPT_BASE = {};                                    // no prices in this file: they come from the server
-const optPrice = k=>OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k] : null;
+const optPrice = k=>OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k]
+  : /-m$/.test(k) ? optPrice(k.slice(0, -2)) : null;   // a master bath finish price not set yet = the other baths' price
 const DOOR_CHOICES = [{ t:'Framed shower door', k:'door-framed' }, { t:'Frameless shower door', k:'door-frameless' }, { t:'Semi-frameless shower door', k:'door-semi' }];
 const FIN_CHOICES = [{ t:'Brushed nickel', k:'fin-bn' }, { t:'Brushed brass', k:'fin-brass' }, { t:'Black', k:'fin-black' }];
 /* Standard choices at no charge (owner, 2026-10-14): every toilet line starts with "Standard toilet" (what the home gets unless
    another is picked), and every shower options line starts with "Standard shower" and "Standard tub/shower". These lines are one
    choice per bathroom (q.one). */
 const STD_FIRST = { '273':['Standard toilet'], '313':['Standard toilet'], '353':['Standard toilet'], '379':['Standard toilet'],
-  '256':['Standard shower', 'Standard tub/shower'], '300':['Standard shower', 'Standard tub/shower'], '340':['Standard shower', 'Standard tub/shower'] };
+  '256':['Standard shower', 'Standard tub/shower'], '300':['Standard shower', 'Standard tub/shower'], '340':['Standard shower', 'Standard tub/shower'],
+  '270':['Standard shower faucet'], '310':['Standard shower faucet'], '350':['Standard shower faucet'] };   // shower faucets (owner, 2026-10-21): standard preset, no charge
 /* Countertop allowance (owner, 2026-10-19): BuilderTrend's one "Countertop Allowance" on Kitchen/Bath Cabinetry (BT 500) becomes a
    Granite and a Quartz allowance. Both are typed allowances (named "…allowance", so isAllow picks them up and the back end's
    Allowance amounts sets their starting amounts); they share grp 'counter', so taking one takes the other off. */
@@ -549,6 +551,18 @@ function patioChoices(bt, list){
   /* Hose bibs (owner, 2026-10-21): 2 are standard at no charge (stdOf, kept); each one more is a set price (OPT_PRICES 'hosebib', on the
      server), counted with + / -. BuilderTrend's two lines (custom placement of the 2nd, a 3rd at a bundled price) give way to it. */
   if(bt === '175') return [{ t:'Additional hose bib (each)', k:'hosebib', p:null, unit:'' }];
+  // first floor footprint (owner, 2026-10-21): bigger by the sq ft at BuilderTrend's price, or SMALLER for a credit per sq ft (OPT_PRICES
+  // 'ff-less-sf', a minus number on the server) — one or the other
+  if(bt === '248') return [...list.map(c=>/expand/i.test(c.t) ? { ...c, t:'Expand the first floor footprint (per sq ft)', unit:'sq ft' } : c),
+    { t:'Make the first floor smaller (credit per sq ft)', k:'ff-less-sf', p:null, unit:'sq ft' }];
+  // pet space (owner, 2026-10-21): just an allowance the rep types (named "…allowance", so isAllow treats it as one)
+  if(bt === '196') return [{ t:'Pet space allowance', p:0, unit:'' }];
+  // fireplaces (owner, 2026-10-21): the 50" linear electric fireplace is a count, not feet ("linear" in its name read as per foot)
+  if(bt === '550') return list.map(c=>({ ...c, unit:'' }));
+  // front porch composite (owner, 2026-10-21): BuilderTrend's upgrade prices are per sq ft — typed in sq ft, one or the other
+  if(bt === '182') return list.map(c=>({ ...c, t:String(c.t).replace(/^Upg(rade)?\.? to /i, 'Upgrade to ') + ' (per sq ft)', unit:'sq ft' }));
+  // walkway (owner, 2026-10-21): additional walkway by the sq ft, priced in the back end (OPT_PRICES 'walk-sf'); stamped / colored stay
+  if(bt === '181') return [{ t:'Additional walkway (per sq ft)', k:'walk-sf', p:null, unit:'sq ft' }, ...list];
   // under-cabinet rope lighting is priced per foot: typed in feet like the other per-foot lines
   if(bt === '514') return list.map(c=>/\(per foot\)/i.test(c.t) ? { ...c, t:c.t.replace(/\(per foot\)/i, '(per linear ft)'), unit:'ft' } : c);
   /* Owner, 2026-10-19: the laundry tub can go in the laundry room instead of the garage (a no-charge pick that moves the question to the
@@ -631,7 +645,7 @@ function buildCatalog(cat){
     const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
     const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
     const std = STD_FIRST[s.bt] || [];
-    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || ['526', '600', '640', '608', '701', '740', '764', '766', '768'].includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248'].includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
       c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
@@ -644,9 +658,15 @@ function buildCatalog(cat){
   { const gar = SECTIONS.find(r=>r.id === 'gar'), lau = SECTIONS.find(r=>r.id === 'lau'), q = gar && gar.qs.find(x=>x.bt === '156');
     if(q && lau){ q.mvHome = true; lau.qs.unshift({ ...q, room:lau, mvHome:false, mvAway:true }); } }
   // a fixture finish at the top of every bathroom (its number puts it inside the bathroom's own on/off feature)
+  /* Kitchen faucet finish (owner, 2026-10-21: the same colours as the bathrooms, chrome preset): its own question just before the
+     kitchen faucet, priced separately from the baths (keys 'fin-bn-k' etc., set in the back end; unset = price to come). */
+  { const kit = SECTIONS.find(r=>r.id === 'kit'), at = kit ? kit.qs.findIndex(q=>q.bt === '520') : -1;
+    if(at >= 0) kit.qs.splice(at, 0, { id:'fin_kit', bt:'', num:520, t:'Kitchen Faucet Finish', cc:50, line:'', room:kit, opt:1, type:'bt', v1:1, opts:true, fin:true,
+      c:FIN_CHOICES.map(x=>({ ...x, k:x.k + '-k', p:null, unit:'' })) }); }
   [['mbath', 256], ['bath2', 300], ['bath3', 340], ['powder', 379]].forEach(([rid, num])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec || !sec.qs.length) return;
     sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:72, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
-      c:FIN_CHOICES.map(x=>({ ...x, p:null, unit:'' })) }); });
+      // the master bath's finishes have their own prices (owner, 2026-10-21: the master often has double fixtures): keys 'fin-bn-m' etc.
+      c:FIN_CHOICES.map(x=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) }); });
   SECTIONS = SECTIONS.filter(r=>r.qs.length);
   ROOMS = SECTIONS;
   PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
@@ -698,6 +718,7 @@ const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.a
    is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
 const stdOf = (q, L)=>q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
   : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
+  : q.one && /^shower faucet/i.test(q.t) ? { label:'Standard shower faucet', idx: q.c.findIndex(c=>c.t === 'Standard shower faucet') }
   : q.bt === '518' ? { label:'4 wire shelves', keep:true }
   : q.bt === '526' ? { label:'Garbage disposal' }
   : q.bt === '608' ? { label:'#1 pressure treated' }
@@ -829,7 +850,7 @@ function prow(q, L, force){
     return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
   }).join(''));
   const isOpen = force || openSel.has(q.id), shown = choicesOf(q, L);
-  const stdNote = q.fin ? '<div class="q-sub">The finish covers the shower door, faucets and hardware in this bathroom.</div>' : '';
+  const stdNote = q.fin && q.id !== 'fin_kit' ? '<div class="q-sub">The finish covers the shower door, faucets and hardware in this bathroom.</div>' : '';
   const autoNow = q.tw && !L.answers['own:' + q.id] && shown.some(c=>(L.answers[q.id + '#' + c.i] || {}).auto);
   const got = shown.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty), sum = got.reduce((t, c)=>{ const a = L.answers[q.id + '#' + c.i]; return t + a.price * a.qty; }, 0);
   const picked = std && stdActive && !got.length ? `<span class="picked">Standard: ${esc(std.label)}</span>` : got.length ? `<span class="picked">${got.length === 1 ? esc(got[0].t.length > 34 ? got[0].t.slice(0, 32) + '…' : got[0].t) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
@@ -1177,7 +1198,9 @@ function bathCard(){
   return `<div class="card"><h2 style="font-size:18px">Other option prices</h2>
     <p class="muted" style="font-size:13.5px;margin-top:4px">Prices for options BuilderTrend doesn't have (or prices per foot). Shower doors and finishes are the same in every bathroom; chrome is standard at no charge. Leave a box empty and the sheet says "price to come".</p>
     ${DOOR_CHOICES.map(x=>row(x.k, x.t, 'Not priced in BuilderTrend')).join('')}
-    ${FIN_CHOICES.map(x=>row(x.k, x.t + ' finish', 'Added once per bathroom that picks it (door, faucets and hardware)')).join('')}
+    ${FIN_CHOICES.map(x=>row(x.k, x.t + ' finish', 'Every bath except the master: added once per bathroom that picks it (door, faucets and hardware)')).join('')}
+    ${FIN_CHOICES.map(x=>`<div class="sty-row"><div class="t"><b>Master bath: ${esc(x.t)} finish</b><small>The master often has double fixtures. Empty = the same as the other baths${optPrice(x.k) != null ? ' (' + money2(optPrice(x.k)) + ')' : ''}</small></div>
+      <span class="muted">$</span><input type="number" step="0.01" data-optp="${x.k}-m" value="${OPT_PRICES[x.k + '-m'] == null ? '' : OPT_PRICES[x.k + '-m']}" placeholder="same as other baths" style="width:130px"></div>`).join('')}
     ${row('pantry-lf', 'Added pantry shelves, per linear ft', '4 wire shelves are standard; this is each extra foot of shelf')}
     ${row('rail-lf', 'Deck railing, per linear ft', 'Asked on the patio & deck section')}
     ${row('stair-trad-lf', 'Stair railing, standard traditional, per linear ft', 'Stairs section')}
@@ -1185,6 +1208,9 @@ function bathCard(){
     ${row('bsmt-open', 'Open stairs to basement', 'Basement section; closed stairs are standard')}
     ${row('bsmt-rail', 'Basement railing', 'Basement section')}
     ${row('hosebib', 'Additional hose bib, each', 'Exterior section; 2 are standard')}
+    ${row('walk-sf', 'Additional walkway, per sq ft', 'Front porch & entrance section')}
+    ${FIN_CHOICES.map(x=>row(x.k + '-k', 'Kitchen faucet: ' + x.t + ' finish', 'Kitchen section; chrome is standard')).join('')}
+    ${row('ff-less-sf', 'Smaller first floor, credit per sq ft', 'Type it as a minus number, e.g. -60')}
 </div>${floorCard()}`;
 }
 function ceilCard(){
