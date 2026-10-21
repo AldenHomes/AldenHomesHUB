@@ -483,6 +483,7 @@ let OPT_PRICES = {};
    kept on the server (settings/selections.over). buildCatalog keeps BuilderTrend's own price as c.p0 and uses this one when set.
    Sheets keep the price they were quoted at; a sheet whose prices moved shows the usual "prices have changed" offer. */
 let PRICE_OVER = {};
+let BASE_CFG = {};   // base price per home style, set in the back end (settings/selections.bases); a new lead starts with it
 const overKey = (q, c)=>q.id + '|' + c.t;
 const overOn = c=>!c.k && !c.rate && !c.h;              // choices priced elsewhere: back-end option prices, typed tile, ceiling moves
 const OPT_BASE = {};                                    // no prices in this file: they come from the server
@@ -545,6 +546,9 @@ function patioChoices(bt, list){
   if(bt === '790') return FLOOR_TYPES.flatMap(ft=>ft.levels.length
       ? ft.levels.map(n=>({ t:ft.t + ' Level ' + n, k:'floor-' + ft.key + n, p:null, unit:'sq ft', ft:ft.key, lv:n }))
       : [{ t:ft.t, p:0, unit:'sq ft', rate:true, ft:ft.key, lv:0 }]);
+  /* Hose bibs (owner, 2026-10-21): 2 are standard at no charge (stdOf, kept); each one more is a set price (OPT_PRICES 'hosebib', on the
+     server), counted with + / -. BuilderTrend's two lines (custom placement of the 2nd, a 3rd at a bundled price) give way to it. */
+  if(bt === '175') return [{ t:'Additional hose bib (each)', k:'hosebib', p:null, unit:'' }];
   // under-cabinet rope lighting is priced per foot: typed in feet like the other per-foot lines
   if(bt === '514') return list.map(c=>/\(per foot\)/i.test(c.t) ? { ...c, t:c.t.replace(/\(per foot\)/i, '(per linear ft)'), unit:'ft' } : c);
   /* Owner, 2026-10-19: the laundry tub can go in the laundry room instead of the garage (a no-charge pick that moves the question to the
@@ -700,7 +704,8 @@ const stdOf = (q, L)=>q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { 
   : q.bt === '701' ? { label:'White windows' }
   : q.id === 'bstairs' ? { label:'Closed stairs to basement' }
   : q.bt === '780' ? { label:'Interior paint - flat ceiling/flat walls' }
-  : q.bt === '790' ? { label:'LVP Level 10 - first floor & all baths', keep:true } : null;
+  : q.bt === '790' ? { label:'LVP Level 10 - first floor & all baths', keep:true }
+  : q.bt === '175' ? { label:'2 standard hose bibs', keep:true } : null;
 /* Flooring areas (owner, 2026-10-19): like the calculator's rows — each added area is a type + level with its sq ft; the form
    below adds another (the same type + level again adds to its sq ft). */
 function floorRows(q, L, lock){
@@ -1113,7 +1118,10 @@ function pricesScreen(){
       <span class="pnote">${on ? `<b class="chg">changed</b> · BuilderTrend ${c.p0 == null ? 'had none' : money2(c.p0)} <button type="button" class="linkbtn" data-overclear="${esc(k)}">Use BuilderTrend's</button>` : 'BuilderTrend\'s price'}${c.unit ? ' · per ' + esc(c.unit) : ''}</span>`;
   };
   const n = Object.keys(PRICE_OVER).length;
-  return `<div class="card"><h2 style="font-size:18px">Every price</h2>
+  return `<div class="card"><h2 style="font-size:18px">Base price per home style</h2>
+      <p class="muted" style="font-size:13.5px;margin-top:4px">What a new lead's sheet starts at for each home style. A sheet already started keeps its own base price (it can be changed on the sheet).</p>
+      ${Object.keys(STYLES).map(k=>`<div class="eyebrow" style="margin-top:12px">${esc(LINE_NAMES[k])}</div>${STYLES[k].map(m=>`<div class="pr"><span class="pt"><b>${esc(m)}</b></span><span class="pv"><span class="muted">$</span><input type="number" min="0" step="100" data-basep="${esc(m)}" value="${BASE_CFG[m] || ''}" placeholder="not set" style="width:130px"></span></div>`).join('')}`).join('')}</div>
+    <div class="card"><h2 style="font-size:18px">Every price</h2>
       <p class="muted" style="font-size:13.5px;margin-top:4px">Every choice on the pricing and selection sheets. Type a new price to change it; leave the box empty to use BuilderTrend's (shown greyed in the box). A credit is a minus number. Prices on sheets already quoted don't change by themselves: those sheets get the usual "prices have changed" offer.</p>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px"><input type="search" id="priceFind" placeholder="Find a question or choice…" style="flex:1 1 260px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius)">
         <span class="muted" style="font-size:13.5px">${n} price${n === 1 ? '' : 's'} changed · <span id="styState">${esc(styState)}</span></span></div></div>
@@ -1141,6 +1149,7 @@ function stylesScreen(){
       <p class="lede">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
     <div class="card" style="display:${styView === 'prices' ? 'none' : 'flex'};gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
       <div><label class="f">Home style</label><select id="styPick">${opts}</select></div>
+      <div><label class="f">Base price</label><span class="muted">$</span> <input type="number" min="0" step="100" data-basep="${esc(styName)}" value="${BASE_CFG[styName] || ''}" placeholder="not set" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:var(--radius)"></div>
       <div><label class="f">Standard ceilings</label><select id="styCeil"><option value="8" ${ceilStd(fake) === 8 ? 'selected' : ''}>8'</option><option value="9" ${ceilStd(fake) === 9 ? 'selected' : ''}>9'</option></select></div>
       <div class="muted" style="font-size:13.5px;padding-bottom:8px">${n.incl} included · ${n.hide} hidden · <span id="styState">${esc(styState)}</span></div>
       <div class="grow"></div>
@@ -1175,6 +1184,7 @@ function bathCard(){
     ${row('stair-sq-lf', 'Stair railing, square balusters, per linear ft', 'Stairs section')}
     ${row('bsmt-open', 'Open stairs to basement', 'Basement section; closed stairs are standard')}
     ${row('bsmt-rail', 'Basement railing', 'Basement section')}
+    ${row('hosebib', 'Additional hose bib, each', 'Exterior section; 2 are standard')}
 </div>${floorCard()}`;
 }
 function ceilCard(){
@@ -1198,7 +1208,7 @@ function styleSave(){
   clearTimeout(styTimer);
   styTimer = setTimeout(async ()=>{
     try{
-      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER }); PRICE_OVER = saved.over || PRICE_OVER; STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
+      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER, bases:BASE_CFG }); PRICE_OVER = saved.over || PRICE_OVER; BASE_CFG = saved.bases || BASE_CFG; STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
     } catch(err){ console.error(err); styState = 'Not saved — check the connection'; }
     const e2 = $('styState'); if(e2) e2.textContent = styState;
   }, 500);
@@ -1784,7 +1794,7 @@ document.addEventListener('click', async e=>{
   if(t.closest('#styClear')){ if(!confirm('Show every line on ' + styName + '\'s sheet again?')) return; const keepCeil = (STYLE_CFG[styName] || {}).ceil; if(keepCeil) STYLE_CFG[styName] = { skip:[], incl:[], ceil:keepCeil }; else delete STYLE_CFG[styName]; render(); styleSave(); return; }
   if(t.closest('#signOutBtn')){ if(pending() && !confirm('Changes are still saving. Sign out anyway?')) return; firebase.auth().signOut().then(()=>location.reload()); return; }
   if(t.closest('#loginGo')){ doLogin(); return; }
-  if(t.closest('#newLeadBtn')){ newOpen = !newOpen; render(); if(newOpen) $('nName').focus(); return; }
+  if(t.closest('#newLeadBtn')){ newOpen = !newOpen; render(); if(newOpen){ $('nBase').value = BASE_CFG[$('nModel').value] || ''; $('nName').focus(); } return; }
   if(t.closest('#nStart')){
     const name = $('nName').value.trim(); if(!name){ toast('Add the buyer\'s name first'); return; }
     const n = { id:'L'+Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), address:$('nAddr').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value, line:$('nLine').value, basePrice:Number($('nBase').value) || 0,
@@ -1992,7 +2002,7 @@ document.addEventListener('input', e=>{
   document.querySelectorAll('.psec').forEach(x=>{ x.style.display = [...x.querySelectorAll('.pq')].some(p=>p.style.display !== 'none') ? '' : 'none'; });
 });
 document.addEventListener('change', e=>{
-  if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); return; }
+  if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); if($('nBase')) $('nBase').value = BASE_CFG[$('nModel').value] || ''; return; }
   if(e.target.dataset && e.target.dataset.allow){
     const L3 = lead(); if(!L3 || locked(L3)) return;
     const k = e.target.dataset.allow, v = Math.max(0, Math.round(Number(e.target.value) || 0)); markOwn(L3, qOfKey(k));
@@ -2050,6 +2060,14 @@ document.addEventListener('change', e=>{
   }
   if(e.target.id === 'followDate' && e.target.value && lead()){ const L = lead(); L.follow = { date:e.target.value, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(L.follow.date)); return; }
   if(e.target.id === 'styCeil'){ const c = STYLE_CFG[styName] = STYLE_CFG[styName] || { skip:[], incl:[] }; c.ceil = Number(e.target.value); render(); styleSave(); toast(styName + ': standard ceilings ' + c.ceil + "'"); return; }
+  if(e.target.dataset && e.target.dataset.basep){
+    const m = e.target.dataset.basep, v = Math.round(Number(e.target.value));
+    if(e.target.value === '') delete BASE_CFG[m];
+    else if(!Number.isFinite(v) || v <= 0){ toast('Type the base price'); render(); return; }
+    else BASE_CFG[m] = v;
+    styleSave(); toast(e.target.value === '' ? m + ' has no base price set' : m + ' base price saved'); return;
+  }
+  if(e.target.id === 'nModel'){ const b = $('nBase'); if(b) b.value = BASE_CFG[e.target.value] || ''; return; }
   if(e.target.dataset && e.target.dataset.over){
     const k = e.target.dataset.over, v = Math.round(Number(e.target.value) * 100) / 100;
     if(e.target.value === '') delete PRICE_OVER[k];
@@ -2085,7 +2103,7 @@ document.addEventListener('change', e=>{
    A customer screen / their pricing sheet / the share page opens with the sheet's link key instead (no sign-in). */
 let DEVS_SEEN = false;
 function applySetup(data){
-  PRICE_OVER = data.over || {};
+  PRICE_OVER = data.over || {}; BASE_CFG = data.bases || {};
   buildCatalog(data.catalog || []);
   STYLE_CFG = data.styles || {}; ALLOW_CFG = data.allow || {}; CEIL_CFG = data.ceil || {}; OPT_PRICES = data.prices || {};
 }

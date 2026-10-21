@@ -1660,7 +1660,7 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
       if(b.action === 'catalog'){
         if(!DEMO_CATALOG){ res.status(503).json({ error: 'not-set-up' }); return; }
         const setup = await selSetup();
-        res.json({ catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {}, over: setup.over || {} });
+        res.json({ catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {}, over: setup.over || {}, bases: setup.bases || {} });
         return;
       }
       if(b.action === 'get'){
@@ -1700,7 +1700,7 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
       const [setup, snap, users] = await Promise.all([selSetup(), db.collection('selection-sheets').get(), admin.auth().listUsers(1000)]);
       const team = users.users.filter(u=>u.email && !u.disabled).map(u=>({ uid: u.uid, name: staffName(u) })).sort((x, y)=>x.name.localeCompare(y.name));
       const sheets = snap.docs.map(d=>({ id: d.id, key: d.data().key, rev: d.data().rev || 0, houseId: d.data().houseId || '', sheet: JSON.parse(d.data().sheet) }));
-      res.json({ catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {}, over: setup.over || {}, sheets, team });
+      res.json({ catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {}, over: setup.over || {}, bases: setup.bases || {}, sheets, team });
       return;
     }
     if(b.action === 'stylesSet'){
@@ -1732,8 +1732,14 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
         const n = Math.round(Number(v) * 100) / 100;
         if(typeof k === 'string' && k.length <= 200 && k.includes('|') && v !== null && v !== '' && isFinite(n) && Math.abs(n) <= 5000000) over[k] = n;
       });
-      await db.collection('settings').doc('selections').set({ styles, allow, ceil, prices, over, updatedAt: now.toISOString(), updatedBy: who.email || who.uid });
-      res.json({ ok: true, styles, allow, ceil, prices, over });
+      // base price per home style (owner, 2026-10-21): { 'Percy': 297900 } — a new lead starts with it
+      const bases = {};
+      Object.entries(b.bases && typeof b.bases === 'object' ? b.bases : {}).slice(0, 120).forEach(([k, v])=>{
+        const n = Math.round(Number(v));
+        if(typeof k === 'string' && k.trim() && k.length <= 40 && v !== null && v !== '' && isFinite(n) && n > 0 && n <= 20000000) bases[k.trim()] = n;
+      });
+      await db.collection('settings').doc('selections').set({ styles, allow, ceil, prices, over, bases, updatedAt: now.toISOString(), updatedBy: who.email || who.uid });
+      res.json({ ok: true, styles, allow, ceil, prices, over, bases });
       return;
     }
     if(!id){ res.status(400).json({ error: 'id' }); return; }
