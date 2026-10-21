@@ -36,6 +36,13 @@
   .viewsw button.on{background:var(--navy);color:#fff}
   .viewsw button.on.staff{background:var(--staff)}
   .titlebar-account{display:flex;align-items:center;gap:10px}
+  .pq{padding:10px 0;border-top:1px solid var(--line-soft)} .pq:first-of-type{border-top:none}
+  .pq-h{margin-bottom:4px}
+  .pr{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;padding:4px 0 4px 12px}
+  .pr .pt{flex:1 1 260px;font-size:14.5px} .pr .pv{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .pr input{padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius)}
+  .pnote{font-size:12.5px;color:var(--ink-soft)} .pnote .chg{color:#8a5d14}
+  .linkbtn{background:none;border:none;padding:0;color:var(--sage-2);font-weight:700;font-size:12.5px;text-decoration:underline;cursor:pointer}
   /* the same title bar as the hub's other apps: logo (back to the hub), app name */
   .top .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
   .top .brand img{height:36px;width:auto;display:block}
@@ -472,6 +479,12 @@ let CEIL_CFG = {};
    charge; Brushed nickel / Matte black / Oil-rubbed bronze cost what's set in the back end (it covers the door, faucets and hardware
    in that bath). Prices live in OPT_PRICES (back end → "Bathroom options", kept on the hub's server); unset = "price to come". */
 let OPT_PRICES = {};
+/* Any choice's price, changed in the back end (owner, 2026-10-21: "adjust all cost on all questions"): { 'questionId|choice name': price },
+   kept on the server (settings/selections.over). buildCatalog keeps BuilderTrend's own price as c.p0 and uses this one when set.
+   Sheets keep the price they were quoted at; a sheet whose prices moved shows the usual "prices have changed" offer. */
+let PRICE_OVER = {};
+const overKey = (q, c)=>q.id + '|' + c.t;
+const overOn = c=>!c.k && !c.rate && !c.h;              // choices priced elsewhere: back-end option prices, typed tile, ceiling moves
 const OPT_BASE = {};                                    // no prices in this file: they come from the server
 const optPrice = k=>OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k] : null;
 const DOOR_CHOICES = [{ t:'Framed shower door', k:'door-framed' }, { t:'Frameless shower door', k:'door-frameless' }, { t:'Semi-frameless shower door', k:'door-semi' }];
@@ -586,6 +599,7 @@ const isAllow = (q, c)=>!!c && (/allowance/i.test(c.t) || ALLOW_BASE[q.bt] != nu
 const allowDefault = (q, i)=>{ const k = q.id + '#' + i; return ALLOW_CFG[k] != null ? ALLOW_CFG[k] : ALLOW_BASE[q.bt] != null ? ALLOW_BASE[q.bt] : (q.c[i].p || 0); };
 const qById = id=>ALL_QS.find(q=>q.id===id);
 const qOfKey = k=>qById(String(k).split('#')[0]);
+function applyOver(){ ALL_QS.forEach(q=>q.c.forEach(c=>{ if(!('p0' in c) || !overOn(c)) return; const v = PRICE_OVER[overKey(q, c)]; c.p = v != null ? v : c.p0; })); }
 function buildCatalog(cat){
   CAT_RAW = cat;
   const skipBt = new Set(['602']);                   // folded into 600's patio / deck choices
@@ -615,7 +629,7 @@ function buildCatalog(cat){
     const std = STD_FIRST[s.bt] || [];
     sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || ['526', '600', '640', '608', '701', '740', '764', '766', '768'].includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -633,6 +647,7 @@ function buildCatalog(cat){
   ROOMS = SECTIONS;
   PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
   ALL_QS = SECTIONS.flatMap(r=>r.qs);
+  applyOver();
   CAT_READY = true;
 }
 
@@ -1086,6 +1101,27 @@ function render(){
 let baseEdit = false;   // the base price box in a sheet's header is open
 let styleEdit = false, styName = STYLES.ALDEN[0], styState = '', styTimer = null;
 const styColl = name=>Object.keys(STYLES).find(k=>STYLES[k].includes(name)) || 'ALDEN';
+let styView = 'show';   // back end: 'show' = what each style's sheet shows; 'prices' = every price
+function pricesScreen(){
+  const cell = (q, c, i)=>{
+    if(isAllow(q, c)) return `<span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(q.id + '#' + i)}" value="${allowDefault(q, i)}" style="width:110px"><span class="pnote">allowance (typed on the sheet)</span>`;
+    if(c.rate) return '<span class="pnote">price typed on the sheet</span>';
+    if(c.h) return '<span class="pnote">ceiling moves are priced in the card at the top</span>';
+    if(c.k) return `<span class="muted">$</span><input type="number" step="0.01" data-optp="${esc(c.k)}" value="${optPrice(c.k) == null ? '' : optPrice(c.k)}" placeholder="price to come" style="width:110px">`;
+    const k = overKey(q, c), on = PRICE_OVER[k] != null;
+    return `<span class="muted">$</span><input type="number" step="0.01" data-over="${esc(k)}" value="${on ? PRICE_OVER[k] : ''}" placeholder="${c.p0 == null ? 'price to come' : c.p0}" style="width:110px">
+      <span class="pnote">${on ? `<b class="chg">changed</b> · BuilderTrend ${c.p0 == null ? 'had none' : money2(c.p0)} <button type="button" class="linkbtn" data-overclear="${esc(k)}">Use BuilderTrend's</button>` : 'BuilderTrend\'s price'}${c.unit ? ' · per ' + esc(c.unit) : ''}</span>`;
+  };
+  const n = Object.keys(PRICE_OVER).length;
+  return `<div class="card"><h2 style="font-size:18px">Every price</h2>
+      <p class="muted" style="font-size:13.5px;margin-top:4px">Every choice on the pricing and selection sheets. Type a new price to change it; leave the box empty to use BuilderTrend's (shown greyed in the box). A credit is a minus number. Prices on sheets already quoted don't change by themselves: those sheets get the usual "prices have changed" offer.</p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px"><input type="search" id="priceFind" placeholder="Find a question or choice…" style="flex:1 1 260px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius)">
+        <span class="muted" style="font-size:13.5px">${n} price${n === 1 ? '' : 's'} changed · <span id="styState">${esc(styState)}</span></span></div></div>
+    ${SECTIONS.map(r=>{ const qs = r.qs.filter(q=>!q.mvAway && q.c.length && !isLotPrem(q)); if(!qs.length) return '';
+      return `<div class="card psec"><h2 style="font-size:18px">${esc(r.name)}</h2>${qs.map(q=>`<div class="pq" data-find="${esc((q.t + ' ' + q.bt + ' ' + q.c.map(c=>c.t).join(' ')).toLowerCase())}">
+        <div class="pq-h"><b>${esc(q.t)}</b> <small class="muted">BT ${esc(q.bt || '—')}${q.line && LINE_NAMES[q.line] ? ' · ' + esc(LINE_NAMES[q.line]) : ''}${q.v1 ? ' · on the pricing sheet' : ''}</small></div>
+        ${q.c.map((c, i)=>`<div class="pr"><span class="pt">${esc(c.t)}</span><span class="pv">${cell(q, c, i)}</span></div>`).join('')}</div>`).join('')}</div>`; }).join('')}`;
+}
 function stylesScreen(){
   const coll = styColl(styName), fake = { model:styName, line:coll, answers:{} };
   const cfg = STYLE_CFG[styName] || { skip:[], incl:[] };
@@ -1101,8 +1137,9 @@ function stylesScreen(){
         <div class="tri"><button type="button" class="${st === 'show' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="show">Show</button><button type="button" class="incl ${st === 'incl' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="incl">Included</button><button type="button" class="hide ${st === 'hide' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="hide">Hide</button></div></div>`; }).join('')}</div>`; }).join('');
   return `<div style="margin-top:18px"><a href="#" id="styBack" class="muted" style="font-size:13px;text-decoration:none">&larr; All leads</a>
       <div class="eyebrow" style="margin-top:6px">Office setup</div><h1>Home style pricing sheets</h1>
+      <div class="viewsw noprint" style="display:inline-flex;margin-top:10px"><button type="button" data-styview="show" class="${styView === 'show' ? 'on' : ''}">What each style shows</button><button type="button" data-styview="prices" class="${styView === 'prices' ? 'on' : ''}">Every price</button></div>
       <p class="lede">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
-    <div class="card" style="display:flex;gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
+    <div class="card" style="display:${styView === 'prices' ? 'none' : 'flex'};gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
       <div><label class="f">Home style</label><select id="styPick">${opts}</select></div>
       <div><label class="f">Standard ceilings</label><select id="styCeil"><option value="8" ${ceilStd(fake) === 8 ? 'selected' : ''}>8'</option><option value="9" ${ceilStd(fake) === 9 ? 'selected' : ''}>9'</option></select></div>
       <div class="muted" style="font-size:13.5px;padding-bottom:8px">${n.incl} included · ${n.hide} hidden · <span id="styState">${esc(styState)}</span></div>
@@ -1110,10 +1147,7 @@ function stylesScreen(){
       <div><label class="f">Same as another style?</label><div style="display:flex;gap:8px"><select id="styFrom"><option value="">Copy from…</option>${others}</select><button type="button" class="btn sm" id="styCopy">Copy</button></div></div>
       ${n.incl || n.hide ? '<button type="button" class="btn sm" id="styClear">Show everything</button>' : ''}
     </div>
-    ${allowCard()}
-    ${ceilCard()}
-    ${bathCard()}
-    ${secs}`;
+    ${styView === 'prices' ? ceilCard() + pricesScreen() : allowCard() + ceilCard() + bathCard() + secs}`;
 }
 function floorCard(){
   const lvls = [10, 20, 30, 40, 50, 60];
@@ -1164,7 +1198,7 @@ function styleSave(){
   clearTimeout(styTimer);
   styTimer = setTimeout(async ()=>{
     try{
-      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES }); STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
+      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER }); PRICE_OVER = saved.over || PRICE_OVER; STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
     } catch(err){ console.error(err); styState = 'Not saved — check the connection'; }
     const e2 = $('styState'); if(e2) e2.textContent = styState;
   }, 500);
@@ -1736,6 +1770,8 @@ document.addEventListener('click', async e=>{
     catch(err){ toast('Couldn\'t reach the hub. Check the connection.'); }
     return;
   }
+  const sv = t.closest('[data-styview]'); if(sv){ styView = sv.dataset.styview; render(); return; }
+  const oc = t.closest('[data-overclear]'); if(oc){ delete PRICE_OVER[oc.dataset.overclear]; applyOver(); styleSave(); const y = window.scrollY; render(); window.scrollTo(0, y); toast('Back to BuilderTrend\'s price'); return; }
   if(t.closest('#styleSetup')){ styleEdit = true; cur = null; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#styBack')){ e.preventDefault(); styleEdit = false; render(); window.scrollTo(0, 0); return; }
   const sb = t.closest('[data-sty]'); if(sb){ styleSet(sb.dataset.sty, sb.dataset.st); return; }
@@ -1949,6 +1985,12 @@ document.addEventListener('click', async e=>{
 });
 document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && e.target.id === 'baseIn') $('baseSave').click(); if(e.key === 'Escape' && e.target.id === 'baseIn') $('baseCancel').click();
   if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); if(e.key === 'Enter' && (e.target.id === 'loginPass' || e.target.id === 'loginEmail')) doLogin(); });
+document.addEventListener('input', e=>{
+  if(e.target.id !== 'priceFind') return;
+  const w = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('.pq').forEach(x=>{ x.style.display = !w || x.dataset.find.includes(w) ? '' : 'none'; });
+  document.querySelectorAll('.psec').forEach(x=>{ x.style.display = [...x.querySelectorAll('.pq')].some(p=>p.style.display !== 'none') ? '' : 'none'; });
+});
 document.addEventListener('change', e=>{
   if(e.target.id === 'nLine'){ $('nModel').innerHTML = (STYLES[e.target.value] || []).map(m=>`<option>${m}</option>`).join(''); return; }
   if(e.target.dataset && e.target.dataset.allow){
@@ -2008,6 +2050,13 @@ document.addEventListener('change', e=>{
   }
   if(e.target.id === 'followDate' && e.target.value && lead()){ const L = lead(); L.follow = { date:e.target.value, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(L.follow.date)); return; }
   if(e.target.id === 'styCeil'){ const c = STYLE_CFG[styName] = STYLE_CFG[styName] || { skip:[], incl:[] }; c.ceil = Number(e.target.value); render(); styleSave(); toast(styName + ': standard ceilings ' + c.ceil + "'"); return; }
+  if(e.target.dataset && e.target.dataset.over){
+    const k = e.target.dataset.over, v = Math.round(Number(e.target.value) * 100) / 100;
+    if(e.target.value === '') delete PRICE_OVER[k];
+    else if(!Number.isFinite(v)){ toast('Type a dollar amount'); render(); return; }
+    else PRICE_OVER[k] = v;
+    applyOver(); styleSave(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(e.target.value === '' ? 'Back to BuilderTrend\'s price' : 'Price saved'); return;
+  }
   if(e.target.dataset && e.target.dataset.optp){
     const k = e.target.dataset.optp, v = Math.round(Number(e.target.value) * 100) / 100;
     if(e.target.value === ''){ delete OPT_PRICES[k]; if(OPT_BASE[k] != null) OPT_PRICES[k] = null; }
@@ -2036,6 +2085,7 @@ document.addEventListener('change', e=>{
    A customer screen / their pricing sheet / the share page opens with the sheet's link key instead (no sign-in). */
 let DEVS_SEEN = false;
 function applySetup(data){
+  PRICE_OVER = data.over || {};
   buildCatalog(data.catalog || []);
   STYLE_CFG = data.styles || {}; ALLOW_CFG = data.allow || {}; CEIL_CFG = data.ceil || {}; OPT_PRICES = data.prices || {};
 }
