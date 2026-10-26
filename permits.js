@@ -140,6 +140,7 @@
     let b = $('permitsBanner');
     const home = $('home');
     if(!b && home){ b = document.createElement('a'); b.id = 'permitsBanner'; b.href = '#permitsCard';
+      b.addEventListener('click', ()=>{ if(!pOpen) setOpen(true); });
       b.style.cssText = 'display:none; margin:0 0 14px; padding:12px 16px; border-radius:10px; background:#b3261e; color:#fff; font-weight:700; font-size:15px; text-decoration:none; box-shadow:0 2px 8px rgba(179,38,30,.25);';
       home.insertBefore(b, home.firstChild); }
     if(!b) return;
@@ -159,6 +160,7 @@
     .pm-row label{display:flex; flex-direction:column; gap:3px; font-size:11px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; color:#777;}
     .pm-row input{padding:7px 8px; border:1px solid #d6d2c4; border-radius:6px; font-size:14px; font-family:inherit; text-transform:none; letter-spacing:0; font-weight:400; color:#222;}
     .pm-next{background:#f3f5ee; border:1px solid #dfe3d3; border-radius:8px; padding:9px 12px; font-size:14px; margin-bottom:6px;}
+    #permitsCard.open .tl-arrow{transform:rotate(90deg);}
     .pm-btn{border:1px solid #d6d2c4; background:#fff; border-radius:8px; padding:8px 13px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:#1f3550;}
     .pm-btn.primary{background:#1f3550; border-color:#1f3550; color:#fff;} .pm-btn:disabled{opacity:.55; cursor:default;}
     /* the form screen */
@@ -202,15 +204,23 @@
     .pf-sigbox{position:absolute; border:1px dashed rgba(31,53,80,.35); background:rgba(255,228,120,.2); cursor:pointer; padding:0; margin:0; display:flex; align-items:flex-end; overflow:hidden;}
     .pf-sigbox span{font-size:1.5cqw; color:#8a6d1a; padding:0 0 2px 4px;} .pf-sigbox img{height:100%; display:block;} .pf-sigbox.on{border-color:transparent; background:none;}`;
 
+  /* On the house page (owner, 2026-10-26) the card is the LAST one and starts CLOSED, like the Timeline: its bar shows where the
+     permits stand; the red banner, a bell link (#permitsCard) or a click opens it. In the Permits app it's always open. */
+  let pOpen = location.hash === '#permitsCard';
+  function setOpen(v){ pOpen = v; if(hasJob()) renderPermits(); }
   function card(){
     let c = $('permitsCard');
     if(c) return c;
-    const mount = $('permitsMount'), before = $('costs'); if(!mount && !before) return null;
+    const mount = $('permitsMount'), last = $('timelineCard'), before = $('costs'); if(!mount && !last && !before) return null;
     c = document.createElement('div'); c.className = mount ? 'card2' : 'card wide'; c.id = 'permitsCard';
-    c.innerHTML = `<div class="card-head"><div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg></div><h3>Permits</h3></div>
+    if(!mount) c.innerHTML = `<button type="button" class="tl-toggle" id="permitsToggle" aria-expanded="false">
+        <span class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg></span>
+        <span class="tl-title">Permits</span><span class="tl-hint" id="permitsHint"></span><span class="tl-arrow">&#9654;</span></button>
+      <div class="card-body" id="permitsBody" style="display:none;"></div>`;
+    else c.innerHTML = `<div class="card-head"><div class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg></div><h3>Permits</h3></div>
       <div class="card-body" id="permitsBody"></div>`;
     if(!$('pfCss')){ const st = document.createElement('style'); st.id = 'pfCss'; st.textContent = CSS; document.head.appendChild(st); }
-    if(mount) mount.appendChild(c); else before.parentNode.insertBefore(c, before);
+    if(mount) mount.appendChild(c); else if(last) last.parentNode.insertBefore(c, last.nextSibling); else before.parentNode.insertBefore(c, before);
     c.addEventListener('click', onCardClick);
     c.addEventListener('change', onCardChange);
     return c;
@@ -233,6 +243,14 @@
     const doneIdx = STEPS.filter(s=>(p[s.id] || {}).ok).length;
     const nowIdx = STEPS.findIndex(s=>!(p[s.id] || {}).ok);
     const next = nowIdx < 0 ? 'All permits approved.' : (p[STEPS[nowIdx].id] || {}).sent ? `Waiting on: ${STEPS[nowIdx].t.toLowerCase()} (submitted ${nice(p[STEPS[nowIdx].id].sent)}).` : `Next: ${STEPS[nowIdx].form ? 'fill out and submit' : 'apply for'} the ${STEPS[nowIdx].t.toLowerCase()}.`;
+    const tg = $('permitsToggle');
+    if(tg){
+      c.classList.toggle('open', pOpen); tg.setAttribute('aria-expanded', String(pOpen));
+      $('permitsHint').innerHTML = pOpen ? 'Hide' : `<span style="color:${nowIdx >= 0 && !(p[STEPS[nowIdx].id] || {}).sent && job.selectionSheet ? '#b3261e' : 'inherit'}">${esc(next)}</span>`;
+      $('permitsBody').style.display = pOpen ? 'block' : 'none';
+      // opened from a bell link: the card is drawn after the page loads, so scroll to it once
+      if(pOpen && location.hash === '#permitsCard' && !card.scrolled){ card.scrolled = true; setTimeout(()=>c.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400); }
+    }
     $('permitsBody').innerHTML = `<div class="pm-next"><b>${esc(next)}</b> <span style="color:#777">${doneIdx} of ${STEPS.length} approved${dev ? ' · ' + esc(dev.borough) : ''}</span></div>
       ${STEPS.map((s, i)=>{ const st = p[s.id] || {};
         return `<div class="pm-step ${st.ok ? 'ok' : i === nowIdx ? 'now' : ''}"><div class="pm-n">${st.ok ? '&#10003;' : i + 1}</div>
@@ -254,6 +272,7 @@
     save({ [step]: { [f]: f === 'no' ? el.value.trim().slice(0, 40) : el.value } });
   }
   function onCardClick(e){
+    if(e.target.closest('#permitsToggle')){ setOpen(!pOpen); return; }
     const b = e.target.closest('[data-fill]'); if(!b) return;
     const dev = PERMIT_DEVS[J().community];
     ed = { step: b.dataset.fill, form: dev.forms[b.dataset.fill] };
