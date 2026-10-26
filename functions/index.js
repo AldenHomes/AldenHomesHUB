@@ -1869,7 +1869,7 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
    `invoice-batches` and `settings/invoices` are server-only, and PDFs live in Storage under invoices/ with a download-token url.
    ============================================================ */
 const INV_MODEL = 'claude-opus-5-5';
-const INV_PAGES_PER_CALL = 20;      // pages per Claude request; an invoice running across two requests is joined back together
+const INV_PAGES_PER_CALL = 10;      // pages per Claude request (10 since item lines are read too); an invoice running across two requests is joined back together
 // the cost codes the office uses (from Cost History); "labor" marks a subcontractor's work rather than material
 const INV_CODES = { 5: 'Engineering', 10: 'Permits', 12: 'Excavation', 14: 'Footers/Found.', 16: 'Concrete', 30: 'Lumber', 32: 'Windows & Doors',
   34: 'Framing', 36: 'Shingles', 38: 'Insulation', 40: 'Siding/Fascia', 41: 'Railing', 42: 'Brick', 44: 'Spouting', 50: 'Plumbing', 51: 'Sprinklers',
@@ -1877,6 +1877,47 @@ const INV_CODES = { 5: 'Engineering', 10: 'Permits', 12: 'Excavation', 14: 'Foot
   70: 'Kitchen/Vanities', 71: 'Fireplace', 72: 'Flooring', 74: 'Appliances', 76: 'Driveway', 78: 'Landscape', 80: 'Utilities', 90: 'Miscellaneous', 91: 'Warranty' };
 const invKey = v=>String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\b(inc|llc|co|company|corp|the)\b/g, '').trim();
 const invHomeLabel = j=>[j.community, j.lot ? 'Lot ' + j.lot : '', j.client].filter(Boolean).join(' · ') || 'A home';
+/* RED STAMP (owner, 2026-10-26: "lot number and cost code written in red pretty big across the top of the invoice"): once an invoice
+   is ready, a copy of its PDF is saved with "CL 98 - 40 Siding/Fascia" (one line per part, with the amount when split) in big red
+   letters across the top of page 1 — that copy (stampUrl) is what the page shows and what gets printed / attached. The original stays. */
+const invShortHome = j=>j ? [j.community, j.lot].filter(Boolean).join(' ') || invHomeLabel(j) : '?';
+function invStampLines(inv, jobsById){
+  const sp = inv.splits || [];
+  return sp.map(s=>{
+    const t = `${invShortHome(jobsById[s.houseId])} - ${s.code || '?'} ${INV_CODES[s.code] || ''}${s.labor ? ' LABOR' : ''}`;
+    return (sp.length > 1 ? t + '  $' + Number(s.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : t)
+      .replace(/[^\x20-\x7e]/g, ' ').replace(/\s+/g, ' ').trim();
+  });
+}
+async function invStamp(id, inv, jobsById){
+  const { PDFDocument, StandardFonts, rgb, degrees } = require('pdf-lib');
+  const bucket = admin.storage().bucket();
+  const [bytes] = await bucket.file(inv.path).download();
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const font = await doc.embedFont(StandardFonts.HelveticaBold);
+  const page = doc.getPage(0);
+  const { width, height } = page.getSize(), rot = ((page.getRotation().angle % 360) + 360) % 360;
+  // a page turned by the scanner: work in the page's upright frame, then map back
+  const W = rot === 90 || rot === 270 ? height : width, H = rot === 90 || rot === 270 ? width : height;
+  const lines = invStampLines(inv, jobsById);
+  let size = 26;
+  const widest = ()=>Math.max(...lines.map(t=>font.widthOfTextAtSize(t, size)));
+  while(size > 10 && widest() > W - 40) size -= 1;
+  const lh = size * 1.2, boxH = lines.length * lh + 14, top = H - 12;
+  const map = (x, y)=>rot === 90 ? { x: width - y, y: x } : rot === 180 ? { x: width - x, y: height - y } : rot === 270 ? { x: y, y: height - x } : { x, y };
+  const boxW = widest() + 24, bx = (W - boxW) / 2;
+  const corner = map(bx, top - boxH);
+  // the box is drawn in the upright frame: rotate it with the page
+  page.drawRectangle({ x: corner.x, y: corner.y, width: boxW, height: boxH, rotate: degrees(rot), color: rgb(1, 1, 1), opacity: 0.85,
+    borderColor: rgb(0.8, 0.07, 0.07), borderWidth: 2 });
+  lines.forEach((t, i)=>{
+    const tw = font.widthOfTextAtSize(t, size), p = map((W - tw) / 2, top - 7 - (i + 1) * lh + size * 0.25);
+    page.drawText(t, { x: p.x, y: p.y, size, font, color: rgb(0.8, 0.07, 0.07), rotate: degrees(rot) });
+  });
+  const stampPath = `invoices/${id}-stamped.pdf`, token = crypto.randomUUID();
+  await bucket.file(stampPath).save(Buffer.from(await doc.save()), { resumable: false, metadata: { contentType: 'application/pdf', metadata: { firebaseStorageDownloadTokens: token } } });
+  return { stampPath, stampUrl: fileUrl(stampPath, token), stampText: lines.join(' / ') };
+}
 async function invSettings(){ const d = await db.collection('settings').doc('invoices').get(); return d.exists ? d.data() : {}; }
 // is an invoice complete enough to go straight to the accountant?
 function invCheck(inv, jobsById){
@@ -1888,11 +1929,18 @@ function invCheck(inv, jobsById){
   if(splits.length && Math.abs(sum - (Number(inv.total) || 0)) > 0.99) why.push('The split amounts don\'t add up to the total');
   return [...new Set(why)];
 }
+// item lines (owner, 2026-10-26: track what recurring items cost, e.g. a jump in an exterior door model's price)
+const INV_LINES_SCHEMA = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['item', 'sku', 'qty', 'unit', 'unitPrice', 'amount'],
+  properties: { item: { type: 'string' }, sku: { type: 'string' }, qty: { type: 'number' }, unit: { type: 'string' }, unitPrice: { type: 'number' }, amount: { type: 'number' } } } };
+const INV_LINES_RULE = `- lines: every product or service line as printed, in order (NOT tax, freight/delivery/fuel, subtotal or total lines, and not
+  deposits/payments). item = the description as printed (fix obvious scan errors only); sku = the item / model / part number column
+  ('' if none); qty; unit (EA, LF, PC, SQ, BF, HR… as printed, '' if none); unitPrice = price per unit before tax; amount = the line's
+  extended amount. A subcontractor bill with one lump sum is one line. A handwritten bill: read what you can.`;
 const INV_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['invoices'],
   properties: { invoices: { type: 'array', items: {
     type: 'object', additionalProperties: false,
-    required: ['firstPage', 'lastPage', 'continuesPrevious', 'isInvoice', 'vendor', 'invoiceNumber', 'invoiceDate', 'total', 'poJob', 'shipTo', 'splits', 'sure', 'questions'],
+    required: ['firstPage', 'lastPage', 'continuesPrevious', 'isInvoice', 'vendor', 'invoiceNumber', 'invoiceDate', 'total', 'poJob', 'shipTo', 'splits', 'lines', 'sure', 'questions'],
     properties: {
       firstPage: { type: 'integer' }, lastPage: { type: 'integer' },
       continuesPrevious: { type: 'boolean' }, isInvoice: { type: 'boolean' },
@@ -1900,6 +1948,7 @@ const INV_SCHEMA = {
       poJob: { type: 'string' }, shipTo: { type: 'string' },
       splits: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['homeId', 'code', 'labor', 'amount', 'why'],
         properties: { homeId: { type: 'string' }, code: { type: 'integer' }, labor: { type: 'boolean' }, amount: { type: 'number' }, why: { type: 'string' } } } },
+      lines: INV_LINES_SCHEMA,
       sure: { type: 'boolean' }, questions: { type: 'array', items: { type: 'string' } },
     } } } },
 };
@@ -1919,7 +1968,28 @@ const INV_RULES = `You read scanned invoices for Alden Homes, a home builder in 
   the main item). why = a few words on how you decided.
 - sure: true only when you are confident about every home and cost code. Otherwise false, and questions = short plain questions for
   the office ("Which lot is this for? No lot or address on it.", "Lumber or Trim?").
+${INV_LINES_RULE}
 Use the vendor habits list when it applies, but the invoice itself wins.`;
+// keep a line list tidy for storing
+const invLines = ls=>(Array.isArray(ls) ? ls : []).slice(0, 200).map(l=>{ const n = v=>Math.round((Number(v) || 0) * 10000) / 10000;
+  return { item: String(l.item || '').slice(0, 200), sku: String(l.sku || '').slice(0, 60), qty: n(l.qty), unit: String(l.unit || '').slice(0, 12),
+    unitPrice: n(l.unitPrice), amount: Math.round((Number(l.amount) || 0) * 100) / 100 }; }).filter(l=>l.item || l.sku);
+// an older invoice read before lines were kept: read just its lines from its own PDF
+async function invReadLines(inv){
+  const sdk = require('@anthropic-ai/sdk');
+  const Anthropic = sdk.Anthropic || sdk.default || sdk;
+  const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value().trim() });
+  const [bytes] = await admin.storage().bucket().file(inv.path).download();
+  const request = { model: INV_MODEL, max_tokens: 16000,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object', additionalProperties: false, required: ['lines'], properties: { lines: INV_LINES_SCHEMA } } } },
+    system: 'You read one scanned invoice for Alden Homes, a home builder, and list its item lines.\n' + INV_LINES_RULE,
+    messages: [{ role: 'user', content: [
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: Buffer.from(bytes).toString('base64') } },
+      { type: 'text', text: "List this invoice's item lines." } ] }] };
+  const msg = await client.messages.stream(request).finalMessage();
+  if(msg.stop_reason === 'refusal' || msg.stop_reason === 'max_tokens') throw new Error('lines: ' + msg.stop_reason);
+  return invLines(JSON.parse(msg.content.filter(b=>b.type === 'text').map(b=>b.text).join('')).lines);
+}
 async function invReadChunk(client, Anthropic, pdfBytes, facts){
   const request = {
     model: INV_MODEL, max_tokens: 32000,
@@ -1974,7 +2044,7 @@ async function invProcessBatch(batchId){
         const a = Math.max(1, Math.min(end - start, x.firstPage | 0)), b = Math.max(a, Math.min(end - start, x.lastPage | 0));
         const e = { ...x, firstPage: start + a, lastPage: start + b };
         const prev = found[found.length - 1];
-        if(x.continuesPrevious && prev && prev.isInvoice){ prev.lastPage = Math.max(prev.lastPage, e.lastPage); if(!prev.total && e.total) prev.total = e.total; return; }
+        if(x.continuesPrevious && prev && prev.isInvoice){ prev.lastPage = Math.max(prev.lastPage, e.lastPage); if(!prev.total && e.total) prev.total = e.total; prev.lines = [...(prev.lines || []), ...(x.lines || [])]; return; }
         found.push(e);
       });
       await ref.update({ progress: end, pages: pageCount });
@@ -1995,12 +2065,13 @@ async function invProcessBatch(batchId){
       const inv = { batchId, pages: [x.firstPage, x.lastPage], path, url: fileUrl(path, token),
         vendor: String(x.vendor || '').slice(0, 120), number: String(x.invoiceNumber || '').slice(0, 60),
         date: /^\d{4}-\d{2}-\d{2}$/.test(x.invoiceDate || '') ? x.invoiceDate : '', total: Math.round((Number(x.total) || 0) * 100) / 100,
-        poJob: String(x.poJob || '').slice(0, 200), shipTo: String(x.shipTo || '').slice(0, 200), splits,
+        poJob: String(x.poJob || '').slice(0, 200), shipTo: String(x.shipTo || '').slice(0, 200), splits, lines: invLines(x.lines),
         questions: (x.questions || []).map(q=>String(q).slice(0, 200)).slice(0, 6), aiSure: !!x.sure, createdAt: now };
       const why = invCheck(inv, jobs);
       inv.status = x.sure && !why.length ? 'ready' : 'review';
       inv.reasons = inv.status === 'review' ? [...new Set([...why, ...inv.questions])] : [];
       inv.reviewers = inv.status === 'review' ? settingsReviewers : [];
+      if(inv.status === 'ready') Object.assign(inv, await invStamp(docRef.id, inv, jobs).catch(err=>{ logger.warn('Invoice stamp failed', { error: String(err) }); return {}; }));
       await docRef.set(inv);
       made++; if(inv.status === 'review') review++;
     }
@@ -2019,7 +2090,7 @@ async function invProcessBatch(batchId){
 }
 if(ASSISTANT_ON) exports.onInvoiceBatch = onDocumentCreated({ document: 'invoice-batches/{batchId}', timeoutSeconds: 540, memory: '1GiB', secrets: [ANTHROPIC_API_KEY] },
   async event=>{ await invProcessBatch(event.params.batchId); });
-exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeoutSeconds: 120, memory: '1GiB' }, async (req, res)=>{
+exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeoutSeconds: 120, memory: '1GiB', secrets: [ANTHROPIC_API_KEY] }, async (req, res)=>{
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
   try{
     const who = await staffFromRequest(req);
@@ -2082,6 +2153,12 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       } else if(b.status === 'review'){ up.status = 'review'; up.reasons = [cut(b.reason || 'Sent back for a look', 200)]; }
       else if(b.status === 'entered'){ if(old.status !== 'ready'){ res.status(409).json({ error: 'not-ready' }); return; } up.status = 'entered'; up.enteredBy = by; up.enteredAt = now; }
       else if(b.status === 'unentered'){ up.status = 'ready'; up.enteredBy = ''; up.enteredAt = ''; }
+      // ready (or changed while ready / entered): put the red lot + cost code on a fresh copy of the PDF
+      const after = { ...merged, ...up };
+      if(after.status === 'ready' || after.status === 'entered'){
+        const text = invStampLines(after, jobs).join(' / ');
+        if(text !== old.stampText || !old.stampUrl) Object.assign(up, await invStamp(ref.id, after, jobs).catch(err=>{ logger.warn('Invoice stamp failed', { error: String(err) }); return {}; }));
+      }
       await ref.update(up);
       // a reviewer added by hand hears about it
       const added = (up.reviewers || []).filter(x=>!(old.reviewers || []).includes(x) && x !== who.uid);
@@ -2091,12 +2168,32 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       res.json({ invoice: { id: ref.id, ...(await ref.get()).data() } });
       return;
     }
+    if(b.action === 'stamp'){
+      const ref = db.collection('invoices').doc(String(b.id || '-')), d = await ref.get();
+      if(!d.exists){ res.status(404).json({ error: 'invoice' }); return; }
+      const jobsSnap = await db.collection('jobs').get(); const jobs = {}; jobsSnap.docs.forEach(x=>{ jobs[x.id] = x.data(); });
+      const up = await invStamp(ref.id, d.data(), jobs);
+      await ref.update(up);
+      res.json(up);
+      return;
+    }
+    if(b.action === 'readLines'){
+      // item lines for an invoice read before they were kept (the page asks for these one by one)
+      if(!ASSISTANT_ON){ res.status(503).json({ error: 'reader-off' }); return; }
+      const ref = db.collection('invoices').doc(String(b.id || '-')), d = await ref.get();
+      if(!d.exists){ res.status(404).json({ error: 'invoice' }); return; }
+      const lines = await invReadLines(d.data());
+      await ref.update({ lines });
+      res.json({ lines });
+      return;
+    }
     if(b.action === 'remove'){
       // a page read as an invoice by mistake, or a duplicate
       const ref = db.collection('invoices').doc(String(b.id || '-')), d = await ref.get();
       if(!d.exists){ res.json({ ok: true }); return; }
       if(d.data().status === 'entered'){ res.status(409).json({ error: 'entered' }); return; }
       await admin.storage().bucket().file(d.data().path).delete().catch(()=>{});
+      if(d.data().stampPath) await admin.storage().bucket().file(d.data().stampPath).delete().catch(()=>{});
       await ref.delete();
       res.json({ ok: true });
       return;

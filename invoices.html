@@ -202,7 +202,15 @@ html, body{max-width:100%; overflow-x:clip;}
   /* one invoice */
   .ov{position:fixed; inset:0; background:rgba(30,32,34,.45); z-index:150; display:none;} .ov.show{display:block;}
   .ovbox{position:absolute; inset:16px; background:#fff; border-radius:var(--radius); display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,1fr); overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,.25);}
-  .ovbox iframe{width:100%; height:100%; border:none; background:#eee;}
+  .ovbox iframe{width:100%; height:100%; border:none; background:#eee; display:block;}
+  .pdfwrap{position:relative; min-height:0;}
+  /* the lot + cost code in big red over the invoice while it's being reviewed (the saved copy gets the same stamp once ready) */
+  .stampv{position:absolute; top:52px; left:50%; transform:translateX(-50%); max-width:92%; pointer-events:none; text-align:center;
+    color:#c41212; font-weight:800; font-size:clamp(17px,2.2vw,28px); line-height:1.2; background:rgba(255,255,255,.88); border:2px solid #c41212;
+    border-radius:6px; padding:6px 14px; box-shadow:0 2px 8px rgba(0,0,0,.15);}
+  .stampv.none{color:#8a8f94; border-color:#c9ccd0; font-size:15px; font-weight:700;}
+  .navbtns{display:flex; gap:6px; align-items:center; font-size:13px; color:var(--ink-soft); white-space:nowrap;}
+  .ovside input.bad{border-color:var(--danger); background:#fdf3f0;}
   .ovside{overflow:auto; padding:16px 18px;}
   .ovside h2{margin:0; font-size:18px; color:var(--navy);}
   .f2{display:block; font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft); margin:12px 0 4px;}
@@ -215,6 +223,12 @@ html, body{max-width:100%; overflow-x:clip;}
   .sumline{font-size:13px; margin-top:8px;} .sumline.bad{color:var(--danger); font-weight:700;}
   .who-chips{display:flex; gap:6px; flex-wrap:wrap;} .who-chips label{display:inline-flex; gap:5px; align-items:center; border:1px solid var(--steel-line); border-radius:20px; padding:4px 10px; font-size:13px; cursor:pointer;}
   .acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; padding-top:12px; border-top:1px solid var(--steel-line);}
+  #list{overflow-x:auto;}
+  /* item prices */
+  .up{color:var(--danger); font-weight:700;} .down{color:var(--good); font-weight:700;}
+  tr.hist td{background:#faf8f2; font-size:13px;}
+  table.lines{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px;} table.lines td, table.lines th{padding:4px 6px; border-bottom:1px solid #f1ede3; text-align:left;}
+  table.lines th{font-size:10.5px; text-transform:uppercase; color:var(--ink-soft);} table.lines .num{text-align:right; white-space:nowrap;}
   @media (max-width:860px){ .ovbox{grid-template-columns:1fr; grid-template-rows:38vh minmax(0,1fr); inset:6px;} }
 </style>
 </head>
@@ -278,7 +292,8 @@ html, body{max-width:100%; overflow-x:clip;}
   </div>
 </div>
 
-<div class="ov" id="ov"><div class="ovbox"><iframe id="pdf" title="The invoice"></iframe><div class="ovside" id="side"></div></div></div>
+<div class="ov" id="ov"><div class="ovbox"><div class="pdfwrap"><iframe id="pdf" title="The invoice"></iframe><div class="stampv" id="stampv"></div></div><div class="ovside" id="side"></div></div></div>
+<datalist id="homeDL"></datalist><datalist id="codeDL"></datalist>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -318,7 +333,54 @@ async function api(body, url){
   return res.json();
 }
 let invoices = [], batches = [], codes = {}, reviewers = [], staff = [], jobs = [], tab = 'review', openId = '', draft = null;
-const STATUS = { review:'To review', ready:'Ready for QuickBooks', entered:'Entered in QuickBooks', all:'All' };
+const STATUS = { review:'To review', ready:'Ready for QuickBooks', entered:'Entered in QuickBooks', all:'All', items:'Item prices' };
+/* ITEM PRICES (owner, 2026-10-26: "see if there would be a big increase on an exterior door model or something").
+   Nothing extra is stored: every invoice keeps its item lines (item, sku, qty, unit, unitPrice), and this tab groups them by vendor +
+   model/SKU (or the wording when there's no number), oldest to newest, and compares the latest price with the one before it. */
+const UP_FLAG = 0.10;   // a rise of 10% or more is shown in red
+let openItem = '', showOnce = false;
+const normKey = s=>String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const vendKey = v=>normKey(v).replace(/\b(inc|llc|co|company|corp|the)\b/g, '').replace(/\s+/g, ' ').trim();
+function itemGroups(){
+  const g = {};
+  invoices.forEach(x=>(x.lines || []).forEach(l=>{
+    const unit = Number(l.unitPrice) || (Number(l.qty) ? (Number(l.amount) || 0) / Number(l.qty) : 0);
+    if(!(unit > 0)) return;
+    const key = vendKey(x.vendor) + '|' + (l.sku ? 'sku ' + normKey(l.sku) : normKey(l.item));
+    const e = g[key] || (g[key] = { key, item: l.item, sku: l.sku, vendor: x.vendor, unit: l.unit, buys: [] });
+    e.buys.push({ date: x.date || String(x.createdAt || '').slice(0, 10), inv: x.id, number: x.number, home: (x.splits || []).map(s=>s.houseLabel).filter(Boolean).join(', '), qty: l.qty, price: unit, item: l.item });
+  }));
+  return Object.values(g).map(e=>{
+    e.buys.sort((a, b)=>a.date.localeCompare(b.date));
+    const last = e.buys[e.buys.length - 1];
+    // "before" = the most recent purchase at a different price (or the one before if the price never changed)
+    let prev = null; for(let i = e.buys.length - 2; i >= 0; i--){ prev = e.buys[i]; if(Math.abs(prev.price - last.price) > 0.004) break; }
+    e.last = last; e.prev = prev; e.item = last.item || e.item;
+    e.change = prev && prev.price ? (last.price - prev.price) / prev.price : null;
+    return e;
+  });
+}
+const price = n=>'$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: n < 10 ? 4 : 2 });
+function itemsView(q){
+  const missing = invoices.filter(x=>!Array.isArray(x.lines)).length;
+  const all = itemGroups();
+  const many = all.filter(e=>e.buys.length > 1).length;
+  const rows = all.filter(e=>(showOnce || e.buys.length > 1) && (!q || [e.item, e.sku, e.vendor].join(' ').toLowerCase().includes(q)));
+  rows.sort((a, b)=>(b.change || 0) - (a.change || 0) || b.buys.length - a.buys.length || String(a.item).localeCompare(String(b.item)));
+  const ups = all.filter(e=>e.change != null && e.change >= UP_FLAG).length;
+  const pct = Math.round(UP_FLAG * 100);
+  return (missing ? `<div class="batch" style="margin-top:8px;"><span>${missing} invoice${missing === 1 ? " from before item tracking hasn't" : "s from before item tracking haven't"} had their items read yet.</span><button type="button" class="btn2 primary" id="readOld">Read them now</button><span class="muted" id="readOldNote"></span></div>` : '')
+    + `<p class="lede" style="margin-top:10px;">Items bought more than once, grouped by vendor and model / item number. The newest price is compared with the one before it; a rise of ${pct}% or more is in red. Click an item to see every time it was bought. ${ups ? `<b class="up">${ups} item${ups === 1 ? ' has' : 's have'} gone up ${pct}% or more.</b>` : ''}</p>
+    <label style="font-size:13.5px; display:inline-flex; gap:6px; align-items:center; margin-top:6px;"><input type="checkbox" id="showOnce" ${showOnce ? 'checked' : ''}> Also show items bought only once (${all.length - many})</label>`
+    + (rows.length ? `<table class="iv"><thead><tr><th>Item</th><th>Model / #</th><th>Vendor</th><th class="num">Times</th><th class="num">Latest</th><th class="num">Before</th><th class="num">Change</th><th>Last bought</th></tr></thead><tbody>`
+      + rows.map(e=>{ const ch = e.change == null ? '' : `<span class="${e.change >= UP_FLAG ? 'up' : e.change < 0 ? 'down' : ''}">${e.change > 0 ? '+' : ''}${(e.change * 100).toFixed(1)}%</span>`;
+        return `<tr class="row" data-item="${esc(e.key)}"><td>${esc(e.item)}</td><td>${esc(e.sku || '')}</td><td>${esc(e.vendor)}</td><td class="num">${e.buys.length}</td>
+          <td class="num">${price(e.last.price)}${e.unit ? ' <span class="muted">/' + esc(e.unit) + '</span>' : ''}</td><td class="num">${e.prev ? price(e.prev.price) : ''}</td><td class="num">${ch}</td><td>${esc(niceDate(e.last.date))}</td></tr>`
+          + (openItem === e.key ? `<tr class="hist"><td colspan="8"><table class="lines" data-nosort><thead><tr><th>Date</th><th>Invoice #</th><th>Home</th><th class="num">Qty</th><th class="num">Price each</th><th></th></tr></thead><tbody>`
+            + e.buys.slice().reverse().map(b=>`<tr><td>${esc(niceDate(b.date))}</td><td>${esc(b.number || '')}</td><td>${esc(b.home || '')}</td><td class="num">${b.qty || ''}</td><td class="num">${price(b.price)}</td><td><a href="#" data-open="${esc(b.inv)}">Open invoice</a></td></tr>`).join('')
+            + '</tbody></table></td></tr>' : ''); }).join('') + '</tbody></table>'
+      : `<p class="muted" style="margin-top:12px;">${all.length ? 'No items bought more than once yet. Prices show up here as the same items come in again.' : 'No item lines yet.'}</p>`);
+}
 const codeName = c=>c && codes[c] ? c + ' ' + codes[c] : '';
 async function load(){
   try{
@@ -337,7 +399,7 @@ async function load(){
 function render(){
   const n = s=>invoices.filter(x=>x.status === s).length;
   $('statReview').textContent = n('review'); $('statReady').textContent = n('ready');
-  $('tabs').innerHTML = ['review', 'ready', 'entered', 'all'].map(k=>`<button type="button" data-tab="${k}" class="${tab === k ? 'on' : ''}">${STATUS[k]}<span class="n">${k === 'all' ? invoices.length : n(k)}</span></button>`).join('');
+  $('tabs').innerHTML = ['review', 'ready', 'entered', 'all', 'items'].map(k=>`<button type="button" data-tab="${k}" class="${tab === k ? 'on' : ''}">${STATUS[k]}${k === 'items' ? '' : `<span class="n">${k === 'all' ? invoices.length : n(k)}</span>`}</button>`).join('');
   // the scans: being read, done, or failed
   $('batches').innerHTML = batches.filter(b=>b.status !== 'retried').slice(0, 6).map(b=>{
     const pct = b.pages ? Math.round((b.progress || 0) / b.pages * 100) : 0;
@@ -347,6 +409,8 @@ function render(){
       : `<span class="muted">${b.status === 'waiting' ? 'Waiting to start…' : 'Reading' + (b.pages ? ' page ' + (b.progress || 0) + ' of ' + b.pages : '…')}</span><div class="bar"><span style="width:${pct}%"></span></div>`}</div>`; }).join('');
   // the list
   const q = ($('search').value || '').trim().toLowerCase();
+  if(tab === 'items'){ $('bulk').innerHTML = ''; $('list').innerHTML = itemsView(q); }
+  else {
   const rows = invoices.filter(x=>(tab === 'all' || x.status === tab) && (!q || [x.vendor, x.number, x.poJob, x.shipTo, ...(x.splits || []).map(s=>s.houseLabel)].join(' ').toLowerCase().includes(q)))
     .sort((a, b)=>String(b.date || b.createdAt).localeCompare(String(a.date || a.createdAt)));
   $('bulk').innerHTML = tab === 'ready' && rows.length ? `<button type="button" class="btn2 good" id="bulkEntered" disabled>Mark ticked as entered</button>` : '';
@@ -357,6 +421,7 @@ function render(){
         <td class="num">${money2(x.total)}</td>
         <td>${x.status === 'review' ? (x.reasons || []).slice(0, 3).map(r=>`<span class="chipq">${esc(r)}</span>`).join('') : x.status === 'entered' ? `<span class="chipok">Entered${x.enteredBy ? ' by ' + esc(x.enteredBy) : ''}</span>` : '<span class="chipok">Ready</span>'}</td></tr>`; }).join('')}</tbody></table>`
     : `<p class="muted" style="margin-top:12px;">${invoices.length ? 'Nothing here.' : 'No invoices yet. Upload a scan above.'}</p>`;
+  }
   $('reviewers').innerHTML = staff.length ? staff.map(s=>`<label><input type="checkbox" data-rev="${esc(s.uid)}" ${reviewers.includes(s.uid) ? 'checked' : ''}> ${esc(s.name)}</label>`).join('') : '<span class="muted">Loading the team…</span>';
 }
 
@@ -367,21 +432,60 @@ function openInvoice(id){
   draft = { vendor:x.vendor || '', number:x.number || '', date:x.date || '', total:x.total || 0, note:x.note || '',
     splits:(x.splits || []).map(s=>({ ...s })), reviewers:[...(x.reviewers || [])] };
   if(!draft.splits.length) draft.splits.push({ houseId:'', code:0, labor:false, amount:x.total || 0, why:'' });
-  $('pdf').src = x.url;
+  // Prev / Next follow the list as it's shown (its tab, search and sort)
+  const shown = [...document.querySelectorAll('#list tr[data-open]')].map(r=>r.dataset.open);
+  if(shown.includes(id)) navIds = shown; else if(!navIds.includes(id)) navIds = [id];
+  showPdf(x);
   $('ov').classList.add('show');
   renderSide();
 }
+let navIds = [];
+const pdfOf = x=>x.stampUrl && x.status !== 'review' ? x.stampUrl : x.url;
+function showPdf(x){ const u = pdfOf(x); if($('pdf').dataset.u !== u){ $('pdf').src = u; $('pdf').dataset.u = u; } }
+// "CL 98 - 40 Siding/Fascia", one per part (same wording as the stamp the server puts on the PDF)
+function stampText(s, many){
+  const j = jobs.find(h=>h.id === s.houseId);
+  const home = j ? [j.community, j.lot].filter(Boolean).join(' ') || homeLabel(j) : '?';
+  return home + ' - ' + (s.code ? s.code + ' ' + (codes[s.code] || '') : '?') + (s.labor ? ' LABOR' : '') + (many ? '  ' + money2(s.amount) : '');
+}
+function renderStamp(x){
+  const el = $('stampv');
+  if(pdfOf(x) === x.stampUrl){ el.style.display = 'none'; return; }   // the PDF itself carries it
+  const known = draft.splits.some(s=>s.houseId || s.code);
+  el.style.display = '';
+  el.className = 'stampv' + (known ? '' : ' none');
+  el.innerHTML = known ? draft.splits.map(s=>'<div style="white-space:nowrap">' + esc(stampText(s, draft.splits.length > 1)) + '</div>').join('') : 'No lot or cost code yet';
+}
+// go to the next invoice in the list (after one is done, or with the Next button)
+function step(dir, leaving){
+  const i = navIds.indexOf(openId);
+  const next = navIds[i + dir] || (leaving ? navIds[i - 1] : null);
+  if(leaving) navIds = navIds.filter(id=>id !== openId);
+  render();
+  if(next && invoices.some(x=>x.id === next)) openInvoice(next);
+  else { closeInvoice(); render(); if(leaving) toast('That was the last one in this list.'); }
+}
+function toast(msg){
+  const t = document.createElement('div'); t.textContent = msg;
+  t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#33363a;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:300;box-shadow:0 4px 14px rgba(0,0,0,.2)';
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 2600);
+}
+const homeText = j=>homeLabel(j) + (j.address ? ' — ' + j.address : '');
+const codeText = c=>c && codes[c] ? c + ' ' + codes[c] : '';
 function renderSide(){
   const x = invoices.find(i=>i.id === openId); if(!x){ closeInvoice(); return; }
+  showPdf(x); renderStamp(x);
   const active = jobs.filter(j=>!j.settle || j.settle >= new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)).sort((a, b)=>homeLabel(a).localeCompare(homeLabel(b), undefined, { numeric:true }));
-  const homeOpts = h=>'<option value="">Which home?</option>' + active.map(j=>`<option value="${esc(j.id)}" ${j.id === h ? 'selected' : ''}>${esc(homeLabel(j))}${j.address ? ' — ' + esc(j.address) : ''}</option>`).join('')
-    + (h && !active.some(j=>j.id === h) ? `<option value="${esc(h)}" selected>${esc((jobs.find(j=>j.id === h) && homeLabel(jobs.find(j=>j.id === h))) || 'A home')}</option>` : '');
-  const codeOpts = c=>'<option value="0">Which cost code?</option>' + Object.entries(codes).map(([k, n])=>`<option value="${k}" ${Number(k) === Number(c) ? 'selected' : ''}>${k} ${esc(n)}</option>`).join('');
+  $('homeDL').innerHTML = active.map(j=>`<option value="${esc(homeText(j))}"></option>`).join('');
+  $('codeDL').innerHTML = Object.keys(codes).map(k=>`<option value="${esc(codeText(k))}"></option>`).join('');
+  const homeVal = h=>{ const j = jobs.find(z=>z.id === h); return j ? homeText(j) : ''; };
+  const idx = navIds.indexOf(openId);
   const sum = draft.splits.reduce((t, s)=>t + (Number(s.amount) || 0), 0), off = Math.abs(sum - (Number(draft.total) || 0)) > 0.99;
   const ro = x.status === 'entered';
   $('side').innerHTML = `<div style="display:flex; gap:10px; align-items:flex-start;"><div style="flex:1"><h2>${esc(x.vendor || 'Invoice')}</h2>
       <div class="muted" style="font-size:13px; margin-top:3px;">${esc(STATUS[x.status] || '')}${x.checkedBy ? ' · checked by ' + esc(x.checkedBy) : ''}${x.enteredBy ? ' · entered by ' + esc(x.enteredBy) + ' ' + esc(niceDate(x.enteredAt)) : ''} · pages ${x.pages ? x.pages.join('–') : ''} of the scan</div></div>
-      <button type="button" class="btn2" id="closeInv">Close</button></div>
+      <div class="navbtns">${navIds.length > 1 ? `<button type="button" class="btn2" id="navPrev" ${idx > 0 ? '' : 'disabled'} title="Previous invoice">&#8249; Prev</button><span>${idx + 1} of ${navIds.length}</span><button type="button" class="btn2" id="navNext" ${idx < navIds.length - 1 ? '' : 'disabled'} title="Next invoice">Next &#8250;</button>` : ''}
+      <button type="button" class="btn2" id="closeInv">Close</button></div></div>
     ${x.status === 'review' && (x.reasons || []).length ? `<div style="margin-top:10px;">${x.reasons.map(r=>`<span class="chipq">${esc(r)}</span>`).join('')}</div>` : ''}
     <div class="grid2x"><div><label class="f2">Vendor</label><input type="text" data-d="vendor" value="${esc(draft.vendor)}" ${ro ? 'disabled' : ''}></div>
       <div><label class="f2">Invoice #</label><input type="text" data-d="number" value="${esc(draft.number)}" ${ro ? 'disabled' : ''}></div>
@@ -389,14 +493,17 @@ function renderSide(){
       <div><label class="f2">Total</label><input type="text" data-money data-d="total" value="${draft.total}" ${ro ? 'disabled' : ''}></div></div>
     ${x.poJob || x.shipTo ? `<div class="muted" style="font-size:12.5px; margin-top:8px;">${x.poJob ? 'PO / job: <b>' + esc(x.poJob) + '</b>' : ''}${x.poJob && x.shipTo ? ' · ' : ''}${x.shipTo ? 'Ship to: ' + esc(x.shipTo) : ''}</div>` : ''}
     <label class="f2">What it's for</label>
-    ${draft.splits.map((s, i)=>`<div class="split"><div class="r"><select data-s="${i}" data-k="houseId" ${ro ? 'disabled' : ''}>${homeOpts(s.houseId)}</select>
+    ${draft.splits.map((s, i)=>`<div class="split"><div class="r"><input type="text" list="homeDL" data-s="${i}" data-k="home" value="${esc(homeVal(s.houseId))}" placeholder="Which home? Type a lot, name or street" class="${s.houseId ? '' : 'bad'}" autocomplete="off" ${ro ? 'disabled' : ''}>
         <input type="text" data-money data-s="${i}" data-k="amount" value="${s.amount}" title="Amount" ${ro ? 'disabled' : ''}></div>
-      <div class="r2"><select data-s="${i}" data-k="code" style="flex:1" ${ro ? 'disabled' : ''}>${codeOpts(s.code)}</select>
+      <div class="r2"><input type="text" list="codeDL" data-s="${i}" data-k="codeT" value="${esc(codeText(s.code))}" placeholder="Cost code: type a number or name" class="${s.code ? '' : 'bad'}" style="flex:1" autocomplete="off" ${ro ? 'disabled' : ''}>
         <label style="display:inline-flex; gap:5px; align-items:center;"><input type="checkbox" data-s="${i}" data-k="labor" ${s.labor ? 'checked' : ''} ${ro ? 'disabled' : ''}> Labor</label>
         ${!ro && draft.splits.length > 1 ? `<button type="button" class="btn2" data-unsplit="${i}" title="Remove this part">&times;</button>` : ''}</div>
       ${s.why ? `<div class="why">${esc(s.why)}</div>` : ''}</div>`).join('')}
     ${ro ? '' : '<div style="margin-top:8px;"><button type="button" class="btn2" id="addSplit">+ Split it (another home or cost code)</button></div>'}
     ${draft.splits.length > 1 || off ? `<div class="sumline ${off ? 'bad' : ''}">Parts add up to ${money2(sum)} of ${money2(draft.total)}${off ? ' — they need to match the total' : ''}</div>` : ''}
+    ${(x.lines || []).length ? `<details style="margin-top:12px;"><summary class="f2" style="display:list-item; cursor:pointer; margin:0;">Items on this invoice (${x.lines.length})</summary>
+      <table class="lines" data-nosort><thead><tr><th>Item</th><th>Model / #</th><th class="num">Qty</th><th class="num">Each</th><th class="num">Amount</th></tr></thead><tbody>
+      ${x.lines.map(l=>`<tr><td>${esc(l.item)}</td><td>${esc(l.sku || '')}</td><td class="num">${l.qty || ''} ${esc(l.unit || '')}</td><td class="num">${l.unitPrice ? price(l.unitPrice) : ''}</td><td class="num">${money2(l.amount)}</td></tr>`).join('')}</tbody></table></details>` : ''}
     <label class="f2">Who should look at it</label>
     <div class="who-chips">${staff.map(s=>`<label><input type="checkbox" data-who="${esc(s.uid)}" ${draft.reviewers.includes(s.uid) ? 'checked' : ''} ${ro ? 'disabled' : ''}> ${esc(s.name)}</label>`).join('') || '<span class="muted">Loading…</span>'}</div>
     <label class="f2">Note</label><textarea data-d="note" rows="2" ${ro ? 'disabled' : ''}>${esc(draft.note)}</textarea>
@@ -409,7 +516,7 @@ function renderSide(){
       <a class="btn2" href="${esc(x.url)}" target="_blank" rel="noopener" style="text-decoration:none;">Open the PDF</a>
     </div>`;
 }
-function closeInvoice(){ $('ov').classList.remove('show'); $('pdf').src = 'about:blank'; openId = ''; draft = null; }
+function closeInvoice(){ $('ov').classList.remove('show'); $('pdf').src = 'about:blank'; $('pdf').dataset.u = ''; openId = ''; draft = null; }
 async function saveInvoice(status, extra){
   setSyncStatus('saving');
   try{
@@ -420,6 +527,7 @@ async function saveInvoice(status, extra){
   } catch(err){
     setSyncStatus('idle');
     if(err.status === 409 && err.body && err.body.why) alert('Not quite ready:\n\n' + err.body.why.join('\n'));
+    else if(err.status === 409) alert('This one isn\'t ready for QuickBooks yet.');
     else { console.error(err); alert('Couldn\'t save. Check your connection and try again.'); }
     return false;
   }
@@ -428,9 +536,30 @@ $('side').addEventListener('input', e=>{
   const el = e.target;
   if(el.dataset.d){ draft[el.dataset.d] = el.dataset.d === 'total' ? Number(el.value) || 0 : el.value; return; }
   if(el.dataset.s != null && el.dataset.k === 'amount'){ draft.splits[Number(el.dataset.s)].amount = Number(el.value) || 0; }
+  if(el.dataset.k === 'home' || el.dataset.k === 'codeT'){ if(pickFrom(el, false)) renderSide(); else renderStamp(invoices.find(i=>i.id === openId)); }
 });
+// match what was typed in a home / cost code box; loose = also accept the one option that contains the text
+function pickFrom(el, loose){
+  const s = draft.splits[Number(el.dataset.s)], v = el.value.trim().toLowerCase();
+  if(el.dataset.k === 'home'){
+    const act = jobs.filter(j=>[...$('homeDL').options].some(o=>o.value === homeText(j)));
+    let hit = act.filter(j=>homeText(j).toLowerCase() === v);
+    if(!hit.length && loose && v) hit = act.filter(j=>homeText(j).toLowerCase().includes(v));
+    if(hit.length === 1){ s.houseId = hit[0].id; return true; }
+    if(loose){ s.houseId = ''; return true; }
+    return false;
+  }
+  const num = (v.match(/^(\d+)\b/) || [])[1];
+  let k = num && codes[num] ? num : Object.keys(codes).find(c=>codeText(c).toLowerCase() === v);
+  if(!k && loose && v){ const m = Object.keys(codes).filter(c=>codeText(c).toLowerCase().includes(v)); if(m.length === 1) k = m[0]; }
+  if(k && (loose || codeText(k).toLowerCase() === v)){ s.code = Number(k); return true; }
+  if(loose){ s.code = 0; return true; }
+  return false;
+}
+$('side').addEventListener('focusin', e=>{ if(e.target.matches('[list]')) e.target.select(); });
 $('side').addEventListener('change', e=>{
   const el = e.target;
+  if(el.dataset.k === 'home' || el.dataset.k === 'codeT'){ pickFrom(el, true); renderSide(); return; }
   if(el.dataset.s != null){ const s = draft.splits[Number(el.dataset.s)], k = el.dataset.k;
     s[k] = k === 'labor' ? el.checked : k === 'code' ? Number(el.value) : k === 'amount' ? Number(el.value) || 0 : el.value; renderSide(); return; }
   if(el.dataset.who){ draft.reviewers = el.checked ? [...new Set([...draft.reviewers, el.dataset.who])] : draft.reviewers.filter(x=>x !== el.dataset.who); return; }
@@ -443,12 +572,14 @@ $('side').addEventListener('click', async e=>{
     draft.splits.push({ houseId: draft.splits[0] ? draft.splits[0].houseId : '', code:0, labor:false, amount: Math.max(0, left), why:'' }); renderSide(); return; }
   const un = t.closest('[data-unsplit]'); if(un){ draft.splits.splice(Number(un.dataset.unsplit), 1); renderSide(); return; }
   if(t.closest('#actSave')){ if(await saveInvoice()){ renderSide(); render(); } return; }
-  if(t.closest('#actReady')){ if(await saveInvoice('ready')){ closeInvoice(); render(); } return; }
-  if(t.closest('#actEntered')){ if(await saveInvoice('entered')){ closeInvoice(); render(); } return; }
+  if(t.closest('#navPrev')){ step(-1); return; }
+  if(t.closest('#navNext')){ step(1); return; }
+  if(t.closest('#actReady')){ if(await saveInvoice('ready')) step(1, tab === 'review'); return; }
+  if(t.closest('#actEntered')){ if(await saveInvoice('entered')) step(1, tab === 'ready'); return; }
   if(t.closest('#actUnenter')){ if(await saveInvoice('unentered')){ renderSide(); render(); } return; }
   if(t.closest('#actBack')){ const why = prompt('What needs a look?', ''); if(why === null) return; if(await saveInvoice('review', { reason: why || 'Sent back for a look' })){ renderSide(); render(); } return; }
   if(t.closest('#actRemove')){ if(!confirm('Remove this from the invoices? (Use it for a page that isn\'t an invoice, or a duplicate.)')) return;
-    try{ await api({ action:'remove', id:openId }); invoices = invoices.filter(x=>x.id !== openId); closeInvoice(); render(); } catch(err){ console.error(err); alert('Couldn\'t remove it.'); } return; }
+    try{ await api({ action:'remove', id:openId }); const gone = openId; invoices = invoices.filter(x=>x.id !== gone); step(1, true); } catch(err){ console.error(err); alert('Couldn\'t remove it.'); } return; }
 });
 document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && openId){ closeInvoice(); render(); } });
 
@@ -460,7 +591,20 @@ $('list').addEventListener('click', e=>{
     if(e.target.id === 'tickAll') ticks.forEach(c=>{ c.checked = e.target.checked; });
     const b = $('bulkEntered'); if(b){ const n = ticks.filter(c=>c.checked).length; b.disabled = !n; b.textContent = n ? `Mark ${n} as entered in QuickBooks` : 'Mark ticked as entered'; }
     return; }
-  const r = e.target.closest('[data-open]'); if(r) openInvoice(r.dataset.open);
+  const r = e.target.closest('[data-open]'); if(r){ e.preventDefault(); openInvoice(r.dataset.open); return; }
+  const it = e.target.closest('[data-item]'); if(it){ openItem = openItem === it.dataset.item ? '' : it.dataset.item; render(); }
+});
+$('list').addEventListener('change', e=>{ if(e.target.id === 'showOnce'){ showOnce = e.target.checked; render(); } });
+$('list').addEventListener('click', async e=>{
+  const b = e.target.closest('#readOld'); if(!b) return;
+  const todo = invoices.filter(x=>!Array.isArray(x.lines)); let done = 0, failed = 0;
+  b.disabled = true;
+  const note = ()=>{ const n = $('readOldNote'); if(n) n.textContent = 'Reading ' + (done + failed) + ' of ' + todo.length + '…'; };
+  note();
+  const one = async x=>{ try{ const r = await api({ action:'readLines', id:x.id }); x.lines = r.lines; done++; } catch(err){ console.error(err); failed++; } note(); };
+  for(let i = 0; i < todo.length; i += 3) await Promise.all(todo.slice(i, i + 3).map(one));
+  render();
+  if(failed) alert(failed + ' could not be read. Press "Read them now" again to retry those.');
 });
 $('bulk').addEventListener('click', async e=>{
   if(!e.target.closest('#bulkEntered')) return;
