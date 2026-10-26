@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | Permits</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  .titlebar{background:var(--paper-2); padding:20px clamp(16px,4vw,40px); border-bottom:4px solid var(--rust);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;}
+  .brand-mark{height:40px; flex:none; display:flex; align-items:center;}
+  .brand-mark img{height:100%; width:auto; display:block;}
+  h1{font-size:clamp(19px,2.4vw,24px); margin:0; font-weight:700; color:var(--navy);}
+  .subtitle{font-size:12px; color:var(--ink-soft); margin-top:3px; letter-spacing:.6px; text-transform:uppercase;}
+  .titlebar-stats{display:flex; gap:22px;}
+  .stat{text-align:center;}
+  .stat .n{font-size:22px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace;}
+  .stat .l{font-size:10px; color:var(--ink-soft); letter-spacing:.6px; text-transform:uppercase; margin-top:3px;}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+  .sync-badge{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-soft); font-family:"Courier New",monospace;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.offline{background:var(--danger);}
+  .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
+  .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
+
+  .wrap{max-width:1400px; margin:0 auto; padding:22px clamp(14px,4vw,40px) 60px;}
+  .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
+  .back-link:hover{color:var(--navy);}
+  .btn{padding:11px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-primary:hover{background:var(--navy-2);}
+  .btn:disabled{opacity:.5; cursor:default;}
+  input[type=text], input[type=password], select{padding:11px 11px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; color:var(--ink); background:#fff; font-family:inherit; min-width:0;}
+  input:focus, select:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+
+  /* add an item */
+  .add{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-top:4px solid var(--rust); padding:16px; margin-bottom:16px;}
+  .add-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .add-row #newText{flex:1 1 100%;}
+  .add-row select{flex:1 1 170px;}
+  .add-row .btn{flex:0 0 auto;}
+  .add-extras{display:flex; gap:10px 16px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:14px; color:var(--ink);}
+  .add-extras label{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
+  .add-extras input[type=date]{padding:8px 9px; font-size:14px;}
+  .add-extras input[type=checkbox]{width:18px; height:18px; accent-color:var(--danger);}
+  .pick-photo{border:1px dashed var(--steel-line); border-radius:var(--radius); padding:8px 12px; font-weight:600; color:var(--navy);}
+  /* high priority: red outline so it can't be missed */
+  .item.high{box-shadow:inset 0 0 0 2px var(--danger); background:#fff8f6;}
+  .tag{display:inline-block; border-radius:20px; padding:1px 9px; margin-right:6px; font-weight:700; font-size:11.5px;}
+  .tag.high{background:var(--danger); color:#fff;}
+  .tag.due{background:#ece8dd; color:var(--ink-soft);}
+  .tag.due.soon{background:#fdf0dc; color:#96661a;}
+  .tag.due.late{background:#fbeae4; color:var(--danger);}
+  .item-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .item-photos a{display:block; width:76px; height:76px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--steel-line);}
+  .item-photos img{width:100%; height:100%; object-fit:cover; display:block;}
+  .item-tools{display:flex; gap:14px; flex-wrap:wrap; margin-top:7px;}
+  .item-tools button{background:none; border:none; padding:0; font-size:12.5px; font-weight:700; color:var(--rust-2); cursor:pointer; font-family:inherit;}
+  .item-tools button:hover{text-decoration:underline;}
+  .item-tools button.warn{color:var(--danger);}
+  /* an item being edited: its wording, home and person become boxes */
+  .item-edit textarea{width:100%; min-height:64px; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; line-height:1.45; font-family:inherit; color:var(--ink); resize:vertical;}
+  .item-edit .row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .item-edit select{flex:1 1 180px; min-width:0; padding:8px 9px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; background:#fff; color:var(--ink);}
+  .item-edit .btns{display:flex; gap:8px; margin-top:10px;}
+  .item-edit .btns button{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:8px 16px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:var(--navy);}
+  .item-edit .btns button.save{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .hint{font-size:12.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
+
+  .filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .filters input{flex:1 1 200px;}
+  .filters select{flex:0 1 200px;}
+
+  /* the list: grouped by home, each item one big tap target */
+  .group{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); margin-bottom:14px; overflow:hidden;}
+  .group-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 14px; background:#f3f5ee; border-bottom:1px solid #dfe3d3; font-size:14px; font-weight:700; color:var(--rust-2);}
+  .group-head a{color:inherit; text-decoration:none;}
+  .group-head a:hover{text-decoration:underline;}
+  .group-head .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; color:var(--ink-soft);}
+  .item{display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-top:1px solid #f1ede3;}
+  .item:first-of-type{border-top:none;}
+  .check{flex:none; width:28px; height:28px; margin-top:1px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff; font-size:17px; font-weight:800; line-height:1; padding:0;}
+  .check:hover{border-color:var(--good);}
+  .check.on{background:var(--good); border-color:var(--good);}
+  .item-main{flex:1; min-width:0;}
+  .item-text{font-size:15.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word;}
+  .item.done .item-text{text-decoration:line-through; color:var(--ink-soft);}
+  .item-meta{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+  .who{display:inline-block; background:#eef0e8; color:var(--rust-2); font-weight:700; border-radius:20px; padding:1px 9px; margin-right:6px;}
+  .who.me{background:#fdf0dc; color:#96661a;}
+  .x-btn{flex:none; border:none; background:none; color:#b9b4a5; font-size:20px; line-height:1; cursor:pointer; padding:2px 4px;}
+  .x-btn:hover{color:var(--danger);}
+  .empty{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:36px 20px; text-align:center; color:var(--ink-soft); font-size:14.5px;}
+  .done-toggle{display:flex; align-items:center; gap:8px; width:100%; margin:22px 0 10px; padding:12px 14px; background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit; text-align:left;}
+  .done-toggle .arrow{display:inline-block; transition:transform .15s; font-size:11px;}
+  .done-toggle.open .arrow{transform:rotate(90deg);}
+  .done-toggle .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
+  .notice{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:13.5px; padding:11px 13px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .notice.show{display:block;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-gate.hidden{display:none;}
+  .auth-card{width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;}
+  .auth-card .brand{margin-bottom:22px; pointer-events:none;}
+  .auth-card h2{margin:0; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .auth-field input{width:100%;}
+  .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .auth-error.show{display:block;}
+  .auth-card .btn-primary{width:100%;}
+  .app-shell.locked{display:none;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  @media (max-width:640px){ .titlebar-stats{display:none;} }
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  @media (max-width:640px){
+    /* header buttons wrap instead of running off the side; the signed-in email drops to its own line */
+    .titlebar-account{flex-wrap:wrap; width:100%; gap:8px 10px;}
+    .titlebar-account #currentUserEmail{order:20; flex:1 1 100%; overflow-wrap:anywhere;}
+    /* the green "Synced" light sits up beside the page title, out of the button row */
+    .titlebar{position:relative;}
+    .titlebar .sync-badge{position:absolute; top:16px; right:14px;}
+    .titlebar .brand{padding-right:74px;}
+  }
+  .item-text, .group-head{overflow-wrap:anywhere;}
+  @media (max-width:640px){
+    .add-row select{flex:1 1 100%;}
+    .add-row .btn{flex:1 1 100%;}
+    .filters select{flex:1 1 100%;}
+    .item-tools{gap:6px 14px;}
+  }
+  /* job costing */
+  .card2{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:18px 20px; margin-top:16px;}
+  .card2 h2{font-size:17px; color:var(--navy); margin:0;}
+  .lede{color:var(--ink-soft); font-size:14px; line-height:1.5; margin-top:6px;}
+  .imp-row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;}
+  .imp-warn{background:#fdf3e2; border:1px solid #ecd9b0; color:#6e4a10; border-radius:var(--radius); padding:10px 12px; font-size:14px; margin-top:12px; line-height:1.45;}
+  .imp-ok{background:#eaf1ec; border:1px solid #c5dccb; color:#27573a; border-radius:var(--radius); padding:10px 12px; font-size:14px; margin-top:12px;}
+  table.jc{width:100%; border-collapse:collapse; font-size:14px; margin-top:10px;}
+  table.jc th{text-align:left; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); padding:7px 8px; border-bottom:2px solid var(--steel-line);}
+  table.jc td{padding:8px; border-bottom:1px solid #f1ede3; vertical-align:middle;}
+  table.jc .num{text-align:right; font-family:"Courier New",monospace; white-space:nowrap;}
+  table.jc tr.tot td{font-weight:700; border-top:2px solid var(--steel-line); border-bottom:none;}
+  table.jc select{max-width:260px; padding:6px 8px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:13.5px; font-family:inherit;}
+  .home{border-top:1px solid #f1ede3; padding:12px 0;}
+  .home:first-child{border-top:none;}
+  .home-h{display:flex; gap:12px; align-items:center; flex-wrap:wrap; width:100%; background:none; border:none; padding:0; text-align:left; cursor:pointer; font-family:inherit; color:inherit;}
+  .home-h b{font-size:15.5px; color:var(--navy);}
+  .home-h .amt{margin-left:auto; font-family:"Courier New",monospace; font-weight:700; color:var(--navy); font-size:16px;}
+  .home-h .sub{font-size:12.5px; color:var(--ink-soft);}
+  .bar{height:6px; background:#ece8dd; border-radius:3px; overflow:hidden; min-width:60px;}
+  /* a cost code opens to its invoices */
+  tr.code-row{cursor:pointer;} tr.code-row:hover td{background:#faf8f2;} tr.code-row.on td{background:#f3f5ee; font-weight:600;}
+  tr.code-row .caret{display:inline-block; width:12px; color:var(--ink-soft); font-size:11px;}
+  tr.code-lines > td{background:#fbfaf6; padding:4px 10px 10px 26px !important;}
+  table.jc.sublines{margin-top:4px; font-size:13px;} table.jc.sublines th{font-size:10.5px;}
+  .bar span{display:block; height:100%; background:var(--rust-2, #6B7355);}
+  .muted{color:var(--ink-soft);}
+  @media (max-width:700px){ table.jc{display:block; overflow-x:auto; white-space:nowrap;} }
+  /* invoices */
+  .card2{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:18px 20px; margin-top:16px;}
+  .card2 h2{font-size:17px; color:var(--navy); margin:0;}
+  .lede{color:var(--ink-soft); font-size:14px; line-height:1.5; margin-top:6px;}
+  .muted{color:var(--ink-soft);}
+  .tabs3{display:flex; gap:6px; flex-wrap:wrap; margin-top:16px;}
+  .tabs3 button{border:1px solid var(--steel-line); background:#fff; border-radius:20px; padding:8px 14px; font-size:14px; font-weight:700; color:var(--ink-soft); cursor:pointer; font-family:inherit;}
+  .tabs3 button.on{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .tabs3 .n{display:inline-block; margin-left:6px; font-size:12px; background:rgba(0,0,0,.08); border-radius:10px; padding:0 7px;}
+  .tabs3 button.on .n{background:rgba(255,255,255,.2);}
+  table.iv{width:100%; border-collapse:collapse; font-size:14px; margin-top:12px;}
+  table.iv th{text-align:left; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); padding:7px 8px; border-bottom:2px solid var(--steel-line); white-space:nowrap;}
+  table.iv td{padding:8px; border-bottom:1px solid #f1ede3; vertical-align:top;}
+  table.iv tr.row{cursor:pointer;} table.iv tr.row:hover td{background:#faf8f2;}
+  table.iv .num{text-align:right; font-family:"Courier New",monospace; white-space:nowrap;}
+  .chipq{display:inline-block; font-size:12px; border-radius:10px; padding:1px 8px; margin:2px 4px 0 0; background:#fdf3e2; color:#8a5d14;}
+  .chipok{display:inline-block; font-size:12px; border-radius:10px; padding:1px 8px; background:#eaf1ec; color:#27573a;}
+  .batch{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:8px 0; border-top:1px solid #f1ede3; font-size:14px;}
+  .batch:first-child{border-top:none;}
+  .bar{flex:0 1 160px; height:6px; background:#ece8dd; border-radius:3px; overflow:hidden;} .bar span{display:block; height:100%; background:var(--rust-2,#6B7355);}
+  .btn2{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:8px 13px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:var(--navy);}
+  .btn2.primary{background:var(--navy); border-color:var(--navy); color:#fff;} .btn2.good{background:var(--good); border-color:var(--good); color:#fff;}
+  .btn2:disabled{opacity:.5; cursor:default;}
+  /* one invoice */
+  .ov{position:fixed; inset:0; background:rgba(30,32,34,.45); z-index:150; display:none;} .ov.show{display:block;}
+  .ovbox{position:absolute; inset:16px; background:#fff; border-radius:var(--radius); display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,1fr); overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,.25);}
+  .ovbox iframe{width:100%; height:100%; border:none; background:#eee; display:block;}
+  .pdfwrap{position:relative; min-height:0;}
+  /* the lot + cost code in big red over the invoice while it's being reviewed (the saved copy gets the same stamp once ready) */
+  .stampv{position:absolute; top:52px; left:50%; transform:translateX(-50%); max-width:92%; pointer-events:none; text-align:center;
+    color:#c41212; font-weight:800; font-size:clamp(17px,2.2vw,28px); line-height:1.2; background:rgba(255,255,255,.88); border:2px solid #c41212;
+    border-radius:6px; padding:6px 14px; box-shadow:0 2px 8px rgba(0,0,0,.15);}
+  .stampv.none{color:#8a8f94; border-color:#c9ccd0; font-size:15px; font-weight:700;}
+  .navbtns{display:flex; gap:6px; align-items:center; font-size:13px; color:var(--ink-soft); white-space:nowrap;}
+  .ovside input.bad{border-color:var(--danger); background:#fdf3f0;}
+  .ovside{overflow:auto; padding:16px 18px;}
+  .ovside h2{margin:0; font-size:18px; color:var(--navy);}
+  .f2{display:block; font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft); margin:12px 0 4px;}
+  .ovside input[type=text], .ovside input[type=date], .ovside select, .ovside textarea{width:100%; padding:8px 9px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit;}
+  .grid2x{display:grid; grid-template-columns:1fr 1fr; gap:0 12px;}
+  .split{border:1px solid var(--steel-line); border-radius:var(--radius); padding:10px; margin-top:8px; background:#faf8f2;}
+  .split .r{display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:8px; align-items:center;}
+  .split .r2{display:flex; gap:10px; align-items:center; margin-top:8px; font-size:13.5px;}
+  .split .why{font-size:12px; color:var(--ink-soft); margin-top:6px; font-style:italic;}
+  .splitby{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:13px;}
+  .linepick{margin-top:8px; border:1px solid var(--steel-line); border-radius:var(--radius); padding:8px 10px; background:#fff;}
+  .linepick table{width:100%; border-collapse:collapse; font-size:12.5px;} .linepick td{padding:5px 4px; border-bottom:1px solid #f1ede3; vertical-align:middle;}
+  .linepick .num{text-align:right; white-space:nowrap;}
+  .partbtns{display:inline-flex; gap:3px;} .partbtns button{min-width:30px; padding:4px 7px; border:1px solid var(--steel-line); background:#fff; border-radius:6px; font-weight:700; font-family:inherit; cursor:pointer; font-size:12px;}
+  .partbtns button.on{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .split .pn{display:inline-block; font-size:11px; font-weight:800; color:var(--ink-soft); margin-bottom:4px;}
+  .sumline{font-size:13px; margin-top:8px;} .sumline.bad{color:var(--danger); font-weight:700;}
+  .who-chips{display:flex; gap:6px; flex-wrap:wrap;} .who-chips label{display:inline-flex; gap:5px; align-items:center; border:1px solid var(--steel-line); border-radius:20px; padding:4px 10px; font-size:13px; cursor:pointer;}
+  .acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; padding-top:12px; border-top:1px solid var(--steel-line);}
+  #list{overflow-x:auto;}
+  /* item prices */
+  .up{color:var(--danger); font-weight:700;} .down{color:var(--good); font-weight:700;}
+  tr.hist td{background:#faf8f2; font-size:13px;}
+  table.lines{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px;} table.lines td, table.lines th{padding:4px 6px; border-bottom:1px solid #f1ede3; text-align:left;}
+  table.lines th{font-size:10.5px; text-transform:uppercase; color:var(--ink-soft);} table.lines .num{text-align:right; white-space:nowrap;}
+  @media (max-width:860px){ .ovbox{grid-template-columns:1fr; grid-template-rows:38vh minmax(0,1fr); inset:6px;} }
+  /* permits app */
+  .pm-filters{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;}
+  .pm-filters select, .pm-filters input[type=text]{padding:8px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; background:#fff;}
+  .chip-todo{display:inline-block; font-size:12px; font-weight:700; border-radius:10px; padding:2px 9px; background:#fbeae4; color:#b3261e;}
+  .chip-wait{display:inline-block; font-size:12px; font-weight:700; border-radius:10px; padding:2px 9px; background:#eef2f7; color:#1f3550;}
+  .chip-done{display:inline-block; font-size:12px; font-weight:700; border-radius:10px; padding:2px 9px; background:#eaf1ec; color:#27573a;}
+  .chip-new{display:inline-block; font-size:12px; font-weight:700; border-radius:10px; padding:2px 9px; background:#f0efea; color:#7a7d80;}
+  .devtag{display:inline-block; font-size:11px; font-weight:800; border-radius:6px; padding:1px 6px; background:#e9ebe4; margin-right:6px;}
+  .ovbox.one{grid-template-columns:1fr; max-width:760px; margin:0 auto; left:0; right:0;}
+  .ovbox.one .ovside{padding:18px 20px;}
+  .pf-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-top:10px;}
+  .pf-grid label{display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:700; color:var(--ink-soft);}
+  .pf-grid input{padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit;}
+  #permitsMount .card-head{display:none;} #permitsMount .card2{box-shadow:none; padding:0; margin-top:0; background:transparent;}
+  table.sz input{width:90px; padding:7px 8px; border:1px solid var(--steel-line); border-radius:6px; font-size:14px; font-family:inherit;}
+</style>
+</head>
+<body>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand"><div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div><div><h2>Permits</h2></div></div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="auth-error" id="loginError"></div>
+    <div class="auth-field"><label for="loginEmail">Email</label><input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username"></div>
+    <div class="auth-field"><label for="loginPassword">Password</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+  <div class="titlebar">
+    <a class="brand" href="index.html" title="Back to Alden Homes Hub">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div><h1>Permits</h1><div class="subtitle">Fill out, send and track permit applications</div></div>
+    </a>
+    <div class="titlebar-stats">
+      <div class="stat"><div class="n" id="statTodo">0</div><div class="l">To send</div></div>
+      <div class="stat"><div class="n" id="statWait">0</div><div class="l">With the borough</div></div>
+    </div>
+    <div class="titlebar-account">
+      <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+      <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; Back to the hub</a>
+    <div class="tabs3" id="tabs">
+      <button type="button" data-tab="homes" class="on">Homes</button>
+      <button type="button" data-tab="settings">Settings for the forms</button>
+    </div>
+
+    <div id="homesView">
+      <div class="card2" style="margin-top:10px;">
+        <div class="pm-filters">
+          <select id="fDev"><option value="">Every development</option></select>
+          <select id="fState"><option value="open">Still to do</option><option value="todo">To send</option><option value="new">Nothing recorded yet</option><option value="waiting">With the borough</option><option value="done">All approved</option><option value="all">Every home</option></select>
+          <input type="text" id="fFind" placeholder="Find a lot, buyer or street…" style="flex:1 1 200px;">
+        </div>
+        <div id="list" style="overflow-x:auto;"><p class="muted" style="margin-top:12px;">Loading…</p></div>
+        <p class="muted" style="font-size:12.5px; margin-top:10px;">Homes still being built (no settlement date yet, or one still to come). A home signed through Selections and not yet sent shows first. Pick a home to fill out its forms and record the dates.</p>
+      </div>
+    </div>
+
+    <div id="settingsView" style="display:none;">
+      <div class="card2">
+        <h2>Alden's details</h2>
+        <p class="lede">What the forms say for Alden Homes as property owner, contractor and billing. Saved as you type.</p>
+        <div class="pf-grid">
+          <label>Company name<input type="text" data-co="name" placeholder="Alden Homes"></label>
+          <label>Mailing address<input type="text" data-co="address" placeholder="Street, town, state zip"></label>
+          <label>Phone<input type="text" data-co="phone"></label>
+          <label>Email<input type="text" data-co="email"></label>
+          <label>State contractor license #<input type="text" data-co="license"></label>
+          <label>Applicant (prints and signs)<input type="text" data-co="applicant" placeholder="Full name"></label>
+        </div>
+      </div>
+      <div class="card2">
+        <h2>Applicant's signature</h2>
+        <p class="lede">Draw the applicant's signature once with a finger or the mouse. On a home's form screen, tick "add the signature" on each signature line and the finished PDF is signed, ready to email. Only add it where the applicant has agreed to sign.</p>
+        <div id="sigNow" style="margin-top:10px;"></div>
+        <canvas id="sigPad" width="900" height="240" style="display:block; width:100%; max-width:600px; height:auto; aspect-ratio:900/240; border:1px dashed #b9b4a4; border-radius:8px; background:#fff; touch-action:none; margin-top:10px; cursor:crosshair;"></canvas>
+        <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"><button type="button" class="btn2 primary" id="sigSave">Save this signature</button><button type="button" class="btn2" id="sigClear">Clear the pad</button><button type="button" class="btn2" id="sigRemove" style="color:var(--danger);">Remove the saved signature</button></div>
+      </div>
+      <div class="card2">
+        <h2>Home style sizes</h2>
+        <p class="lede">Length, width and height (feet) and total square feet of each home style, as the zoning form asks for them. A home starts with its style's numbers; anything typed on a single home stays with that home. A home signed through Selections uses its own sheet's square feet.</p>
+        <div id="sizes" style="overflow-x:auto;"></div>
+      </div>
+      <div class="card2">
+        <h2>Developments</h2>
+        <div id="devs"></div>
+        <p class="muted" style="font-size:13px; margin-top:10px;">To add another development's forms: send Claude a blank copy of each form and one the office filled out, and say what order they go in.</p>
+      </div>
+    </div>
+    <footer>Permit dates are saved on each home, and the same Permits card is on the home's own page.</footer>
+  </div>
+</div>
+
+<div class="ov" id="ov"><div class="ovbox one"><div class="ovside" id="side">
+  <div style="display:flex; gap:10px; align-items:flex-start;"><div style="flex:1"><h2 id="pmTitle"></h2><div class="muted" id="pmSub" style="font-size:13px; margin-top:3px;"></div></div>
+    <a class="btn2" id="pmHome" href="#" style="text-decoration:none;">Open the home</a><button type="button" class="btn2" id="pmClose">Close</button></div>
+  <div id="permitsMount" style="margin-top:10px;"></div>
+</div></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+/* ============================================================
+   PERMITS APP (owner, 2026-10-26: "a central place … choose development and the house and have it fill out permits … also edit the
+   auto fill settings"). Lists the homes still being built with where their permits stand (window.Permits.status from permits.js),
+   opens one home's Permits card (the same one as on house.html, mounted in #permitsMount with window.PERMIT_JOB = that home), and
+   holds the settings the forms are filled from: settings/permits.company (Alden's details) and .models (size per home style).
+   Stores nothing of its own.
+   ============================================================ */
+const $ = id=>document.getElementById(id);
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function setSyncStatus(state){ $('syncDot').classList.toggle('offline', state==='offline'); $('syncLabel').textContent = state==='offline' ? 'Offline' : (state==='saving' ? 'Saving…' : 'Synced'); }
+const nice = s=>{ if(!s) return ''; const [y, m, d] = s.slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); };
+const todayStr = ()=>{ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+let jobs = [], openId = '', tab = 'homes';
+const label = j=>[j.lot ? 'Lot ' + j.lot : '', j.client].filter(Boolean).join(' · ') || 'Home';
+const active = j=>!j.settle || j.settle >= todayStr();
+
+function renderList(){
+  if(!window.Permits) return;
+  const devs = [...new Set(jobs.map(j=>j.community).filter(Boolean))].sort();
+  const fd = $('fDev'), keep = fd.value;
+  fd.innerHTML = '<option value="">Every development</option>' + devs.map(d=>`<option value="${esc(d)}">${esc(d)}${Permits.DEVS[d] ? ' (forms ready)' : ''}</option>`).join('');
+  fd.value = devs.includes(keep) ? keep : '';
+  const dev = fd.value, st = $('fState').value, q = $('fFind').value.trim().toLowerCase();
+  const rows = jobs.filter(active).map(j=>({ j, s: Permits.status(j) }));
+  $('statTodo').textContent = rows.filter(r=>r.s.state === 'todo').length;
+  $('statWait').textContent = rows.filter(r=>r.s.state === 'waiting').length;
+  const shown = rows.filter(r=>(!dev || r.j.community === dev) && (st === 'all' || (st === 'open' ? r.s.state !== 'done' : r.s.state === st))
+      && (!q || [r.j.community, r.j.lot, r.j.client, r.j.address, r.j.model].join(' ').toLowerCase().includes(q)))
+    .sort((a, b)=>({ todo:0, waiting:1, new:2, done:3 }[a.s.state] - { todo:0, waiting:1, new:2, done:3 }[b.s.state]) || ((b.j.selectionSheet ? 1 : 0) - (a.j.selectionSheet ? 1 : 0))
+      || String(a.j.community).localeCompare(String(b.j.community)) || String(a.j.lot).localeCompare(String(b.j.lot), undefined, { numeric:true }));
+  $('list').innerHTML = shown.length ? `<table class="iv"><thead><tr><th>Home</th><th>Address</th><th>Style</th><th>Permits</th><th>Step</th><th>Since</th></tr></thead><tbody>
+    ${shown.map(({ j, s })=>`<tr class="row" data-open="${esc(j.id)}"><td><span class="devtag">${esc(j.community || '?')}</span>${esc(label(j))}${j.selectionSheet && s.state === 'todo' ? ' <span class="chip-todo" title="Signed through Selections">signed</span>' : ''}</td>
+      <td>${esc(j.address || '')}</td><td>${esc(j.model || '')}</td>
+      <td><span class="${s.state === 'todo' ? 'chip-todo' : s.state === 'waiting' ? 'chip-wait' : s.state === 'new' ? 'chip-new' : 'chip-done'}">${esc(s.label)}</span></td>
+      <td>${s.done} of ${s.of} approved</td><td>${s.since ? esc(nice(s.since)) : ''}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="muted" style="margin-top:12px;">No homes here.</p>';
+}
+function openHome(id){
+  const j = jobs.find(x=>x.id === id); if(!j) return;
+  openId = id; window.PERMIT_JOB = j;
+  $('pmTitle').textContent = (j.community ? j.community + ' ' : '') + label(j);
+  $('pmSub').textContent = [j.address, j.model, Permits.DEVS[j.community] ? Permits.DEVS[j.community].borough : ''].filter(Boolean).join(' · ');
+  $('pmHome').href = 'house.html?id=' + encodeURIComponent(id);
+  $('ov').classList.add('show');
+  renderPermits();
+}
+function closeHome(){ $('ov').classList.remove('show'); openId = ''; window.PERMIT_JOB = null; }
+$('list').addEventListener('click', e=>{ const r = e.target.closest('[data-open]'); if(r) openHome(r.dataset.open); });
+$('pmClose').addEventListener('click', closeHome);
+$('ov').addEventListener('click', e=>{ if(e.target.id === 'ov') closeHome(); });
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && openId) closeHome(); });
+['fDev', 'fState'].forEach(id=>$(id).addEventListener('change', renderList));
+$('fFind').addEventListener('input', renderList);
+$('tabs').addEventListener('click', e=>{ const b = e.target.closest('[data-tab]'); if(!b) return; tab = b.dataset.tab;
+  document.querySelectorAll('#tabs [data-tab]').forEach(x=>x.classList.toggle('on', x === b));
+  $('homesView').style.display = tab === 'homes' ? '' : 'none'; $('settingsView').style.display = tab === 'settings' ? '' : 'none';
+  if(tab === 'settings') renderSettings(); });
+
+/* ---- settings for the forms ---- */
+function renderSettings(){
+  const s = (window.Permits && Permits.settings()) || {}, co = s.company || {}, models = s.models || {};
+  $('sigNow').innerHTML = s.signature ? `<div class="muted" style="font-size:13px;">Saved signature:</div><img src="${esc(s.signature)}" alt="Saved signature" style="height:60px; border-bottom:1px solid #ccc; margin-top:4px;">` : '<div class="muted" style="font-size:13px;">No signature saved yet.</div>';
+  $('sigRemove').style.display = s.signature ? '' : 'none';
+  document.querySelectorAll('[data-co]').forEach(el=>{ if(document.activeElement !== el) el.value = co[el.dataset.co] || ''; });
+  // styles: every style used by a home in a development with forms, plus any already saved
+  const names = {};
+  jobs.filter(j=>window.Permits && Permits.DEVS[j.community] && j.model).forEach(j=>{ names[String(j.model).toLowerCase()] = names[String(j.model).toLowerCase()] || j.model.replace(/\b\w/g, c=>c.toUpperCase()); });
+  Object.keys(models).forEach(k=>{ names[k] = names[k] || k.replace(/\b\w/g, c=>c.toUpperCase()); });
+  const keys = Object.keys(names).sort();
+  if(!$('sizes').contains(document.activeElement))
+    $('sizes').innerHTML = keys.length ? `<table class="iv sz" data-nosort><thead><tr><th>Home style</th><th>Length (ft)</th><th>Width (ft)</th><th>Height (ft)</th><th>Total sq ft</th></tr></thead><tbody>
+      ${keys.map(k=>`<tr><td><b>${esc(names[k])}</b></td>${['len', 'wid', 'hgt', 'sqft'].map(f=>`<td><input type="number" step="${f === 'sqft' ? 1 : 0.5}" data-size="${esc(k + '|' + f)}" value="${esc((models[k] || {})[f] || '')}"></td>`).join('')}</tr>`).join('')}</tbody></table>`
+      : '<p class="muted">No home styles yet.</p>';
+  $('devs').innerHTML = window.Permits ? `<table class="iv" data-nosort><thead><tr><th>Development</th><th>Borough</th><th>Forms in the hub</th></tr></thead><tbody>
+    ${[...new Set(jobs.map(j=>j.community).filter(Boolean))].sort().map(d=>{ const x = Permits.DEVS[d];
+      return `<tr><td><b>${esc(d)}</b>${x ? ' · ' + esc(x.subdivision) : ''}</td><td>${x ? esc(x.borough) : '<span class="muted">—</span>'}</td><td>${x ? 'Water & sewer application → zoning permit → building permit (dates only)' : '<span class="muted">None yet — dates are tracked, forms filled by hand</span>'}</td></tr>`; }).join('')}</tbody></table>` : '';
+}
+document.addEventListener('change', async e=>{
+  const el = e.target;
+  const pf = el.closest && el.closest('[data-co]'), sz = el.closest && el.closest('[data-size]');
+  if(!pf && !sz) return;
+  setSyncStatus('saving');
+  try{
+    if(pf) await db.collection('settings').doc('permits').set({ company: { [pf.dataset.co]: pf.value.trim().slice(0, 160) } }, { merge: true });
+    else {
+      const [k, f] = sz.dataset.size.split('|'), v = sz.value === '' ? firebase.firestore.FieldValue.delete() : Number(sz.value);
+      await db.collection('settings').doc('permits').set({ models: { [k]: { [f]: v } } }, { merge: true });
+    }
+  } catch(err){ console.error(err); alert('Could not save — check your connection and try again.'); }
+  setSyncStatus('idle');
+});
+
+/* ---- the signature pad: drawn strokes, saved trimmed as a PNG in settings/permits.signature ---- */
+(function(){
+  const c = $('sigPad'), g = c.getContext('2d'); let down = false, drawn = false, last = null;
+  g.lineWidth = 4; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#0d1f6e';
+  const at = e=>{ const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  c.addEventListener('pointerdown', e=>{ down = true; last = at(e); c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointermove', e=>{ if(!down) return; const p = at(e); g.beginPath(); g.moveTo(last[0], last[1]); g.lineTo(p[0], p[1]); g.stroke(); last = p; drawn = true; });
+  c.addEventListener('pointerup', ()=>{ down = false; });
+  $('sigClear').addEventListener('click', ()=>{ g.clearRect(0, 0, c.width, c.height); drawn = false; });
+  $('sigSave').addEventListener('click', async ()=>{
+    if(!drawn){ alert('Draw the signature on the pad first.'); return; }
+    // trim to the ink so it sits neatly on the line
+    const d = g.getImageData(0, 0, c.width, c.height).data; let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+    for(let y = 0; y < c.height; y++) for(let x = 0; x < c.width; x++) if(d[(y * c.width + x) * 4 + 3] > 20){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }
+    const t = document.createElement('canvas'); t.width = x1 - x0 + 12; t.height = y1 - y0 + 12;
+    t.getContext('2d').drawImage(c, x0 - 6, y0 - 6, t.width, t.height, 0, 0, t.width, t.height);
+    setSyncStatus('saving');
+    try{ await db.collection('settings').doc('permits').set({ signature: t.toDataURL('image/png') }, { merge: true }); g.clearRect(0, 0, c.width, c.height); drawn = false; }
+    catch(err){ console.error(err); alert('Could not save the signature — check your connection.'); }
+    setSyncStatus('idle');
+  });
+  $('sigRemove').addEventListener('click', async ()=>{
+    if(!confirm('Remove the saved signature? Forms already downloaded keep it; new ones won\'t have it.')) return;
+    try{ await db.collection('settings').doc('permits').update({ signature: firebase.firestore.FieldValue.delete() }); } catch(err){ console.error(err); alert('Could not remove it.'); }
+  });
+})();
+
+/* ---- sign-in ---- */
+function showLoginGate(){ $('loginGate').classList.remove('hidden'); $('appShell').classList.add('locked'); }
+function showApp(user){ $('loginGate').classList.add('hidden'); $('appShell').classList.remove('locked'); $('currentUserEmail').textContent = user.email || ''; }
+function doLogin(){
+  const email = $('loginEmail').value.trim(), password = $('loginPassword').value, errBox = $('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){ errBox.textContent = 'Enter both an email and a password.'; errBox.classList.add('show'); return; }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(err.code) ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show'); });
+}
+$('loginSubmitBtn').addEventListener('click', doLogin);
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let started = false;
+firebase.auth().onAuthStateChanged(user=>{
+  if(user && !user.isAnonymous){
+    showApp(user);
+    if(started) return; started = true;
+    db.collection('jobs').onSnapshot(s=>{
+      jobs = s.docs.map(d=>({ id:d.id, ...d.data() }));
+      renderList(); if(tab === 'settings') renderSettings();
+      if(openId){ const j = jobs.find(x=>x.id === openId); if(j){ window.PERMIT_JOB = j; renderPermits(); } }
+      const want = new URLSearchParams(location.search).get('home');
+      if(want && !openHome.done && jobs.some(x=>x.id === want)){ openHome.done = true; openHome(want); }
+      setSyncStatus('idle');
+    }, err=>{ console.error('jobs', err); setSyncStatus('offline'); });
+    const wait = ()=>window.Permits ? Permits.onSettings(()=>{ if(tab === 'settings') renderSettings(); renderList(); }) : setTimeout(wait, 300);
+    wait();
+  } else showLoginGate();
+});
+</script>
+<script src="permits.js"></script>
+<script src="moneyfmt.js"></script>
+<script src="sorttables.js"></script>
+<script src="hubsearch.js"></script>
+<script src="assistant.js"></script>
+</body>
+</html>
