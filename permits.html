@@ -374,7 +374,8 @@ const label = j=>[j.lot ? 'Lot ' + j.lot : '', j.client].filter(Boolean).join(' 
 const active = j=>!j.settle || j.settle >= todayStr();
 
 function renderList(){
-  if(!window.Permits) return;
+  // an old copy of permits.js (kept by the browser for a few minutes after an update) has no window.Permits
+  if(!window.Permits || !Permits.status){ if(jobs.length) $('list').innerHTML = '<p class="muted" style="margin-top:12px;">The page needs a fresh copy — press <b>Ctrl + F5</b> (or close and reopen it).</p>'; return; }
   const devs = [...new Set(jobs.map(j=>j.community).filter(Boolean))].sort();
   const fd = $('fDev'), keep = fd.value;
   fd.innerHTML = '<option value="">Every development</option>' + devs.map(d=>`<option value="${esc(d)}">${esc(d)}${Permits.DEVS[d] ? ' (forms ready)' : ''}</option>`).join('');
@@ -510,7 +511,7 @@ firebase.auth().onAuthStateChanged(user=>{
   } else showLoginGate();
 });
 </script>
-<script src="permits.js"></script>
+<script src="permits.js?v=3"></script>
 <script src="moneyfmt.js"></script>
 <script src="sorttables.js"></script>
 <script src="hubsearch.js"></script>
