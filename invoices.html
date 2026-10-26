@@ -413,7 +413,7 @@ function render(){
   else {
   const rows = invoices.filter(x=>(tab === 'all' || x.status === tab) && (!q || [x.vendor, x.number, x.poJob, x.shipTo, ...(x.splits || []).map(s=>s.houseLabel)].join(' ').toLowerCase().includes(q)))
     .sort((a, b)=>String(b.date || b.createdAt).localeCompare(String(a.date || a.createdAt)));
-  $('bulk').innerHTML = tab === 'ready' && rows.length ? `<button type="button" class="btn2 good" id="bulkEntered" disabled>Mark ticked as entered</button>` : '';
+  $('bulk').innerHTML = tab === 'ready' && rows.length ? `<button type="button" class="btn2" id="bulkPrint" disabled>Print ticked</button> <button type="button" class="btn2 good" id="bulkEntered" disabled>Mark ticked as entered</button>` : '';
   $('list').innerHTML = rows.length ? `<table class="iv"><thead><tr>${tab === 'ready' ? '<th data-nosort><input type="checkbox" id="tickAll" title="Tick all"></th>' : ''}<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Home</th><th>Cost code</th><th class="num">Total</th><th>${tab === 'review' ? 'Needs' : 'Status'}</th></tr></thead><tbody>
     ${rows.map(x=>{ const sp = x.splits || [];
       return `<tr class="row" data-open="${esc(x.id)}">${tab === 'ready' ? `<td><input type="checkbox" class="tick" data-tick="${esc(x.id)}"></td>` : ''}<td>${esc(niceDate(x.date) || '—')}</td><td>${esc(x.vendor || '?')}</td><td>${esc(x.number || '')}</td>
@@ -589,7 +589,9 @@ $('search').addEventListener('input', render);
 $('list').addEventListener('click', e=>{
   if(e.target.closest('input[type=checkbox]')){ const ticks = [...document.querySelectorAll('.tick')];
     if(e.target.id === 'tickAll') ticks.forEach(c=>{ c.checked = e.target.checked; });
-    const b = $('bulkEntered'); if(b){ const n = ticks.filter(c=>c.checked).length; b.disabled = !n; b.textContent = n ? `Mark ${n} as entered in QuickBooks` : 'Mark ticked as entered'; }
+    const b = $('bulkEntered'), n = ticks.filter(c=>c.checked).length;
+    if(b){ b.disabled = !n; b.textContent = n ? `Mark ${n} as entered in QuickBooks` : 'Mark ticked as entered'; }
+    const pb = $('bulkPrint'); if(pb){ pb.disabled = !n; pb.textContent = n ? `Print ${n} (with the red stamp)` : 'Print ticked'; }
     return; }
   const r = e.target.closest('[data-open]'); if(r){ e.preventDefault(); openInvoice(r.dataset.open); return; }
   const it = e.target.closest('[data-item]'); if(it){ openItem = openItem === it.dataset.item ? '' : it.dataset.item; render(); }
@@ -605,6 +607,21 @@ $('list').addEventListener('click', async e=>{
   for(let i = 0; i < todo.length; i += 3) await Promise.all(todo.slice(i, i + 3).map(one));
   render();
   if(failed) alert(failed + ' could not be read. Press "Read them now" again to retry those.');
+});
+// print: the ticked invoices, stamped, as one PDF in a new tab (opened right away so the browser doesn't block it)
+$('bulk').addEventListener('click', async e=>{
+  const pb = e.target.closest('#bulkPrint'); if(!pb) return;
+  const ids = [...document.querySelectorAll('.tick')].filter(c=>c.checked).map(c=>c.dataset.tick);
+  if(!ids.length) return;
+  const w = window.open('', '_blank');
+  if(w) w.document.write('<p style="font:16px sans-serif;padding:24px">Putting ' + ids.length + ' invoice' + (ids.length === 1 ? '' : 's') + ' together for printing…</p>');
+  pb.disabled = true; const was = pb.textContent; pb.textContent = 'Getting them ready…';
+  try{
+    const r = await api({ action:'printPack', ids });
+    if(w) w.location = r.url; else location.href = r.url;
+    toast('Opened as one PDF (' + r.pages + ' page' + (r.pages === 1 ? '' : 's') + '). Press Print there.');
+  } catch(err){ console.error(err); if(w) w.close(); alert('Couldn\'t put them together for printing. Try again.'); }
+  pb.disabled = false; pb.textContent = was;
 });
 $('bulk').addEventListener('click', async e=>{
   if(!e.target.closest('#bulkEntered')) return;

@@ -2168,6 +2168,26 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       res.json({ invoice: { id: ref.id, ...(await ref.get()).data() } });
       return;
     }
+    if(b.action === 'printPack'){
+      // owner, 2026-10-26: "print selected … with the red stamps on it" — the ticked invoices (stamped copies) joined into one PDF,
+      // in the order given. One file per person (replaced each time), so print files don't pile up.
+      const ids = (Array.isArray(b.ids) ? b.ids : []).filter(x=>typeof x === 'string').slice(0, 200);
+      if(!ids.length){ res.status(400).json({ error: 'ids' }); return; }
+      const { PDFDocument } = require('pdf-lib');
+      const bucket = admin.storage().bucket(), out = await PDFDocument.create();
+      const docs = await Promise.all(ids.map(id=>db.collection('invoices').doc(id).get()));
+      for(const d of docs){
+        if(!d.exists) continue;
+        const [bytes] = await bucket.file(d.data().stampPath || d.data().path).download();
+        const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+        (await out.copyPages(src, src.getPageIndices())).forEach(p=>out.addPage(p));
+      }
+      if(!out.getPageCount()){ res.status(404).json({ error: 'none' }); return; }
+      const p = `invoices/print/${who.uid}.pdf`, token = crypto.randomUUID();
+      await bucket.file(p).save(Buffer.from(await out.save()), { resumable: false, metadata: { contentType: 'application/pdf', cacheControl: 'no-store', metadata: { firebaseStorageDownloadTokens: token } } });
+      res.json({ url: fileUrl(p, token), pages: out.getPageCount() });
+      return;
+    }
     if(b.action === 'stamp'){
       const ref = db.collection('invoices').doc(String(b.id || '-')), d = await ref.get();
       if(!d.exists){ res.status(404).json({ error: 'invoice' }); return; }
