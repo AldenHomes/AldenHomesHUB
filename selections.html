@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alden Homes | Selections</title>
+<script src="moneyfmt.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#ffffff">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -45,6 +46,7 @@
   .pr .pt{flex:1 1 260px;font-size:14.5px} .pr .pv{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .pr input{padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius)}
   .pnote{font-size:12.5px;color:var(--ink-soft)} .pnote .chg{color:#8a5d14}
+  .chgby{display:block;font-size:11.5px;color:var(--ink-soft);font-style:italic;margin-top:2px;flex-basis:100%}
   .linkbtn{background:none;border:none;padding:0;color:var(--sage-2);font-weight:700;font-size:12.5px;text-decoration:underline;cursor:pointer}
   /* the same title bar as the hub's other apps: logo (back to the hub), app name */
   .top .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
@@ -490,6 +492,11 @@ let PRICE_OVER = {};
    rep types the lot price, and house + lot = the lead's base price (L.basePrice). L.housePrice / L.lotPrice are office only: the buyer
    only ever sees the base price. */
 let BASE_CFG = {};
+/* who changed each back-end price last (owner, 2026-10-26): { 'group:key': { by, at } } from the server (settings/selections.changed),
+   groups prices / over / allow / ceil / bases. chg() is the small line shown under a price box. */
+let CHANGED = {};
+const chg = (g, k)=>{ const c = CHANGED[g + ':' + k]; if(!c) return '';
+  const d = new Date(c.at); return `<span class="chgby">changed by ${esc(c.by)} · ${d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' })}</span>`; };
 const houseOf = L=>L.housePrice != null ? Number(L.housePrice) || 0 : (Number(L.basePrice) || 0) - (Number(L.lotPrice) || 0);
 const setBase = (L, house, lot)=>{ L.housePrice = Math.round(house); L.lotPrice = Math.round(lot); L.basePrice = L.housePrice + L.lotPrice; };
 const overKey = (q, c)=>q.id + '|' + c.t;
@@ -723,7 +730,7 @@ const lead = ()=>leads.find(l=>l.id===cur);
 const base = L=>Number(L.basePrice) || 0;
 const locked = L=>L.stage === 'signed';
 const plus = n=>n < 0 ? '− ' + money(-n) + ' credit' : '+ ' + money(n);
-const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2);
+const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
 /* Standards shown as a choice (owner, 2026-10-14: "show it like the other options, just preset to it and marked no charge"):
    the toilet's "Standard toilet", the finish's chrome, the home's standard ceiling height. The standard is "picked" while nothing else
    is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
@@ -1172,18 +1179,18 @@ const styColl = name=>Object.keys(STYLES).find(k=>STYLES[k].includes(name)) || '
 let styView = 'show';   // back end: 'show' = what each style's sheet shows; 'prices' = every price
 function pricesScreen(){
   const cell = (q, c, i)=>{
-    if(isAllow(q, c)) return `<span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(q.id + '#' + i)}" value="${allowDefault(q, i)}" style="width:110px"><span class="pnote">allowance (typed on the sheet)</span>`;
+    if(isAllow(q, c)) return `<span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(q.id + '#' + i)}" value="${allowDefault(q, i)}" style="width:110px"><span class="pnote">allowance (typed on the sheet)</span>${chg('allow', q.id + '#' + i)}`;
     if(c.rate) return '<span class="pnote">price typed on the sheet</span>';
     if(c.h) return '<span class="pnote">ceiling moves are priced in the card at the top</span>';
-    if(c.k) return `<span class="muted">$</span><input type="number" step="0.01" data-optp="${esc(c.k)}" value="${optPrice(c.k) == null ? '' : optPrice(c.k)}" placeholder="price to come" style="width:110px">`;
+    if(c.k) return `<span class="muted">$</span><input type="number" step="0.01" data-optp="${esc(c.k)}" value="${optPrice(c.k) == null ? '' : optPrice(c.k)}" placeholder="price to come" style="width:110px">${chg('prices', c.k)}`;
     const k = overKey(q, c), on = PRICE_OVER[k] != null;
     return `<span class="muted">$</span><input type="number" step="0.01" data-over="${esc(k)}" value="${on ? PRICE_OVER[k] : ''}" placeholder="${c.p0 == null ? 'price to come' : c.p0}" style="width:110px">
-      <span class="pnote">${on ? `<b class="chg">changed</b> · BuilderTrend ${c.p0 == null ? 'had none' : money2(c.p0)} <button type="button" class="linkbtn" data-overclear="${esc(k)}">Use BuilderTrend's</button>` : 'BuilderTrend\'s price'}${c.unit ? ' · per ' + esc(c.unit) : ''}</span>`;
+      <span class="pnote">${on ? `<b class="chg">changed</b> · BuilderTrend ${c.p0 == null ? 'had none' : money2(c.p0)} <button type="button" class="linkbtn" data-overclear="${esc(k)}">Use BuilderTrend's</button>` : 'BuilderTrend\'s price'}${c.unit ? ' · per ' + esc(c.unit) : ''}</span>${chg('over', k)}`;
   };
   const n = Object.keys(PRICE_OVER).length;
   return `<div class="card"><h2 style="font-size:18px">House price per home style</h2>
       <p class="muted" style="font-size:13.5px;margin-top:4px">A new lead starts with its style's house price; the rep types the lot price, and house + lot is the base price the customer sees. A sheet already started keeps its own prices (they can be changed on the sheet).</p>
-      ${Object.keys(STYLES).map(k=>`<div class="eyebrow" style="margin-top:12px">${esc(LINE_NAMES[k])}</div>${STYLES[k].map(m=>`<div class="pr"><span class="pt"><b>${esc(m)}</b></span><span class="pv"><span class="muted">$</span><input type="number" min="0" step="100" data-basep="${esc(m)}" value="${BASE_CFG[m] || ''}" placeholder="not set" style="width:130px"></span></div>`).join('')}`).join('')}</div>
+      ${Object.keys(STYLES).map(k=>`<div class="eyebrow" style="margin-top:12px">${esc(LINE_NAMES[k])}</div>${STYLES[k].map(m=>`<div class="pr"><span class="pt"><b>${esc(m)}</b></span><span class="pv"><span class="muted">$</span><input type="number" min="0" step="100" data-basep="${esc(m)}" value="${BASE_CFG[m] || ''}" placeholder="not set" style="width:130px">${chg('bases', m)}</span></div>`).join('')}`).join('')}</div>
     <div class="card"><h2 style="font-size:18px">Every price</h2>
       <p class="muted" style="font-size:13.5px;margin-top:4px">Every choice on the pricing and selection sheets. Type a new price to change it; leave the box empty to use BuilderTrend's (shown greyed in the box). A credit is a minus number. Prices on sheets already quoted don't change by themselves: those sheets get the usual "prices have changed" offer.</p>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px"><input type="search" id="priceFind" placeholder="Find a question or choice…" style="flex:1 1 260px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius)">
@@ -1230,11 +1237,11 @@ function floorCard(){
       ${FLOOR_TYPES.filter(x=>x.levels.length).map(x=>`<tr><td style="padding:4px 8px;white-space:nowrap"><b>${esc(x.t)}</b></td>${lvls.map(n=>{
         if(!x.levels.includes(n)) return '<td></td>';
         const k = 'floor-' + x.key + n, v = optPrice(k);
-        return `<td style="padding:4px 6px"><input type="number" step="0.01" data-optp="${k}" value="${v == null ? '' : v}" placeholder="—" style="width:80px"></td>`; }).join('')}</tr>`).join('')}
+        const c = CHANGED['prices:' + k]; return `<td style="padding:4px 6px"${c ? ` title="Changed by ${esc(c.by)} · ${esc(new Date(c.at).toLocaleDateString())}"` : ''}><input type="number" step="0.01" data-optp="${k}" value="${v == null ? '' : v}" placeholder="—" style="width:80px">${c ? '<span class="chgby">' + esc(c.by) + '</span>' : ''}</td>`; }).join('')}</tr>`).join('')}
     </table></div></div>`;
 }
 function bathCard(){
-  const row = (k, name, note)=>`<div class="sty-row"><div class="t"><b>${name}</b><small>${note}</small></div>
+  const row = (k, name, note)=>`<div class="sty-row"><div class="t"><b>${name}</b><small>${note}</small>${chg('prices', k)}</div>
     <span class="muted">$</span><input type="number" step="0.01" data-optp="${k}" value="${optPrice(k) == null ? '' : optPrice(k)}" placeholder="price to come" style="width:130px"></div>`;
   return `<div class="card"><h2 style="font-size:18px">Other option prices</h2>
     <p class="muted" style="font-size:13.5px;margin-top:4px">Prices for options BuilderTrend doesn't have (or prices per foot). Shower doors and finishes are the same in every bathroom; chrome is standard at no charge. Leave a box empty and the sheet says "price to come".</p>
@@ -1253,7 +1260,7 @@ function bathCard(){
 </div>${floorCard()}`;
 }
 function ceilCard(){
-  const row = (k, name)=>`<div class="sty-row"><div class="t"><b>${name}</b><small>${k === '9-8' ? 'A credit: type it as a minus number' : k === '8-10' ? 'Not in BuilderTrend' : 'From BuilderTrend'}</small></div>
+  const row = (k, name)=>`<div class="sty-row"><div class="t"><b>${name}</b><small>${k === '9-8' ? 'A credit: type it as a minus number' : k === '8-10' ? 'Not in BuilderTrend' : 'From BuilderTrend'}</small>${chg('ceil', k)}</div>
     <span class="muted">$</span><input type="number" step="1" data-ceilp="${k}" value="${ceilPrice(k.split('-')[0], k.split('-')[1])}" style="width:120px"></div>`;
   return `<div class="card"><h2 style="font-size:18px">Ceiling height prices</h2>
     <p class="muted" style="font-size:13.5px;margin-top:4px">Each style's standard height is set with the style below. The sheet offers the moves from it at these prices.</p>
@@ -1265,7 +1272,7 @@ function allowCard(){
   return `<div class="card"><h2 style="font-size:18px">Allowance amounts</h2>
     <p class="muted" style="font-size:13.5px;margin-top:4px">What each allowance starts at on every pricing sheet. The rep can type a different amount for a buyer; these are the only amounts that can be typed on the sheet. Every other price comes from the selection sheet.</p>
     ${rows.map(({ q, c, i })=>{ const k = q.id + '#' + i;
-      return `<div class="sty-row"><div class="t"><b>${esc(q.t)}</b><small>BT ${esc(q.bt || '—')}${q.line ? ' · ' + esc(LINE_NAMES[q.line] || q.line) : ''} · ${esc(c.t)}</small></div>
+      return `<div class="sty-row"><div class="t"><b>${esc(q.t)}</b><small>BT ${esc(q.bt || '—')}${q.line ? ' · ' + esc(LINE_NAMES[q.line] || q.line) : ''} · ${esc(c.t)}</small>${chg('allow', k)}</div>
         <span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(k)}" value="${allowDefault(q, i)}" style="width:120px"></div>`; }).join('')}</div>`;
 }
 function styleSave(){
@@ -1273,7 +1280,8 @@ function styleSave(){
   clearTimeout(styTimer);
   styTimer = setTimeout(async ()=>{
     try{
-      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER, bases:BASE_CFG }); PRICE_OVER = saved.over || PRICE_OVER; BASE_CFG = saved.bases || BASE_CFG; STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
+      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER, bases:BASE_CFG }); PRICE_OVER = saved.over || PRICE_OVER; BASE_CFG = saved.bases || BASE_CFG; CHANGED = saved.changed || CHANGED;
+      const y = window.scrollY, f = document.activeElement && document.activeElement.id; if(styleEdit && !(document.activeElement && document.activeElement.matches('input,textarea'))){ render(); window.scrollTo(0, y); } STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
     } catch(err){ console.error(err); styState = 'Not saved — check the connection'; }
     const e2 = $('styState'); if(e2) e2.textContent = styState;
   }, 500);
@@ -2188,7 +2196,7 @@ document.addEventListener('change', e=>{
    A customer screen / their pricing sheet / the share page opens with the sheet's link key instead (no sign-in). */
 let DEVS_SEEN = false;
 function applySetup(data){
-  PRICE_OVER = data.over || {}; BASE_CFG = data.bases || {};
+  PRICE_OVER = data.over || {}; BASE_CFG = data.bases || {}; CHANGED = data.changed || {};
   buildCatalog(data.catalog || []);
   STYLE_CFG = data.styles || {}; ALLOW_CFG = data.allow || {}; CEIL_CFG = data.ceil || {}; OPT_PRICES = data.prices || {};
 }
