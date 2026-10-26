@@ -168,6 +168,11 @@ html, body{max-width:100%; overflow-x:clip;}
   .home-h .amt{margin-left:auto; font-family:"Courier New",monospace; font-weight:700; color:var(--navy); font-size:16px;}
   .home-h .sub{font-size:12.5px; color:var(--ink-soft);}
   .bar{height:6px; background:#ece8dd; border-radius:3px; overflow:hidden; min-width:60px;}
+  /* a cost code opens to its invoices */
+  tr.code-row{cursor:pointer;} tr.code-row:hover td{background:#faf8f2;} tr.code-row.on td{background:#f3f5ee; font-weight:600;}
+  tr.code-row .caret{display:inline-block; width:12px; color:var(--ink-soft); font-size:11px;}
+  tr.code-lines > td{background:#fbfaf6; padding:4px 10px 10px 26px !important;}
+  table.jc.sublines{margin-top:4px; font-size:13px;} table.jc.sublines th{font-size:10.5px;}
   .bar span{display:block; height:100%; background:var(--rust-2, #6B7355);}
   .muted{color:var(--ink-soft);}
   @media (max-width:700px){ table.jc{display:block; overflow-x:auto; white-space:nowrap;} }
@@ -451,7 +456,27 @@ $('impPreview').addEventListener('click', async e=>{
   setSyncStatus('idle');
 });
 
-/* ---- the homes ---- */
+/* ---- the homes ----
+   A home opens to its cost codes; clicking a code shows the invoices behind it (owner, 2026-10-26), clicking again closes it, and
+   "Expand all" / "Collapse all" open or close every code. The invoice lines come from costsGet the first time a home is opened. */
+const openCodes = new Set();      // 'houseId|code'
+const linesCache = {};            // houseId -> invoice lines (null while loading, 'err' if they couldn't be read)
+async function loadLines(id){
+  if(linesCache[id] !== undefined) return;
+  linesCache[id] = null;
+  try{ const c = (await api({ action:'costsGet', houseId:id })).costs; linesCache[id] = (c && c.lines) || []; }
+  catch(err){ console.error(err); linesCache[id] = 'err'; }
+  renderHomes();
+}
+function codeLines(id, code, cols){
+  const ls = linesCache[id];
+  const body = ls === null || ls === undefined ? '<p class="muted" style="margin:6px 0;">Loading the invoices…</p>'
+    : ls === 'err' ? '<p class="muted" style="margin:6px 0;">Couldn\'t load the invoices. Check your connection and open the home again.</p>'
+    : (mine=>mine.length ? `<table class="jc sublines"><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Item</th><th class="num">Amount</th></tr></thead><tbody>
+        ${mine.map(l=>`<tr><td>${esc(l.date)}</td><td>${esc(l.vendor)}${l.type && !/^expense|^bill$/i.test(l.type) ? ` <span class="muted">(${esc(l.type)})</span>` : ''}${l.memo ? `<div class="muted" style="font-size:12px;">${esc(l.memo)}</div>` : ''}</td><td>${esc(l.num)}</td><td>${esc(l.item)}</td><td class="num">${money2(l.amount)}</td></tr>`).join('')}</tbody></table>`
+      : '<p class="muted" style="margin:6px 0;">No invoice lines for this code.</p>')(ls.filter(l=>String(l.code) === String(code)).sort((a, b)=>String(b.date).localeCompare(String(a.date))));
+  return `<tr class="code-lines"><td colspan="${cols}">${body}</td></tr>`;
+}
 function renderHomes(){
   const q = ($('search').value || '').trim().toLowerCase();
   const list = homes.map(h=>({ ...h, job: jobs.find(j=>j.id === h.houseId) })).filter(h=>!q || [h.label, h.project, h.job ? homeLabel(h.job) + ' ' + (h.job.address || '') : ''].join(' ').toLowerCase().includes(q))
@@ -468,21 +493,31 @@ function renderHomes(){
           ${sold[h.houseId] ? `<div class="sub">Sold for ${money(sold[h.houseId])}${h.lotCost ? ' · lot ' + money(h.lotCost) : ''}${overhead ? ' · overhead ' + money(overhead) : ''} · ${money(sold[h.houseId] - (h.total || 0) - (h.lotCost || 0) - overhead)} left (${((sold[h.houseId] - (h.total || 0) - (h.lotCost || 0) - overhead) / (sold[h.houseId] - (h.lotCost || 0)) * 100).toFixed(2)}% gross profit)</div>` : ''}</div>
         <div class="bar" style="flex:0 1 160px;"><span style="width:${Math.round((h.total || 0) / top * 100)}%"></span></div>
         <span class="amt">${money(h.total || 0)}</span></button>
-      ${open ? `<table class="jc"><thead><tr><th>Code</th><th>Cost code</th><th class="num">Material</th><th class="num">Labor</th><th class="num">Total</th>${tg ? '<th class="num">Last ' + esc(tg.style + (tg.bsmtLabel || '')) + '</th><th class="num">Average</th>' : ''}</tr></thead><tbody>
-          ${codes.map(([c, b])=>`<tr><td class="num" style="text-align:left;">${c === '0' ? '—' : esc(c)}</td><td>${esc(b.name || '')}</td><td class="num">${b.material ? money2(b.material) : ''}</td><td class="num">${b.labor ? money2(b.labor) : ''}</td><td class="num">${money2(b.total)}</td>${tg ? `<td class="num" ${flags.some(f=>f.code === c) ? 'style="color:var(--danger); font-weight:700;" title="Over what the last ' + esc(tg.style + (tg.bsmtLabel || '')) + ' (' + lastBuilt(tg.codes[c]) + ') spent"' : ''}>${tg.codes[c] ? (flags.some(f=>f.code === c) ? '&#9873; ' : '') + money(tg.codes[c].avg) : '—'}</td><td class="num muted">${tg.codes[c] && tg.codes[c].mean ? money(tg.codes[c].mean) : '—'}</td>` : ''}</tr>`).join('')}
+      ${open ? `<div style="display:flex; gap:10px; align-items:center; margin-top:10px;"><span class="muted" style="font-size:13px;">Click a cost code to see its invoices.</span><div style="flex:1"></div>
+          <button class="btn" data-expand="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff; padding:7px 12px; font-size:13px;">${codes.length && codes.every(([c])=>openCodes.has(h.houseId + '|' + c)) ? 'Collapse all' : 'Expand all'}</button></div>
+        <table class="jc"><thead><tr><th>Code</th><th>Cost code</th><th class="num">Material</th><th class="num">Labor</th><th class="num">Total</th>${tg ? '<th class="num">Last ' + esc(tg.style + (tg.bsmtLabel || '')) + '</th><th class="num">Average</th>' : ''}</tr></thead><tbody>
+          ${codes.map(([c, b])=>{ const ok = openCodes.has(h.houseId + '|' + c); return `<tr class="code-row${ok ? ' on' : ''}" data-code="${esc(h.houseId + '|' + c)}" title="${ok ? 'Hide' : 'Show'} the invoices"><td class="num" style="text-align:left;"><span class="caret">${ok ? '&#9662;' : '&#9656;'}</span> ${c === '0' ? '—' : esc(c)}</td><td>${esc(b.name || '')}</td><td class="num">${b.material ? money2(b.material) : ''}</td><td class="num">${b.labor ? money2(b.labor) : ''}</td><td class="num">${money2(b.total)}</td>${tg ? `<td class="num" ${flags.some(f=>f.code === c) ? 'style="color:var(--danger); font-weight:700;" title="Over what the last ' + esc(tg.style + (tg.bsmtLabel || '')) + ' (' + lastBuilt(tg.codes[c]) + ') spent"' : ''}>${tg.codes[c] ? (flags.some(f=>f.code === c) ? '&#9873; ' : '') + money(tg.codes[c].avg) : '—'}</td><td class="num muted">${tg.codes[c] && tg.codes[c].mean ? money(tg.codes[c].mean) : '—'}</td>` : ''}</tr>${ok ? codeLines(h.houseId, c, tg ? 7 : 5) : ''}`; }).join('')}
           <tr class="tot"><td colspan="2">Total</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.material, 0))}</td><td class="num">${money2(codes.reduce((t, [, b])=>t + b.labor, 0))}</td><td class="num">${money2(h.total || 0)}</td>${tg ? '<td></td><td></td>' : ''}</tr></tbody></table>
         ${tg ? `<div class="muted" style="font-size:12px; margin-top:4px;">"Last ${esc(tg.style + (tg.bsmtLabel || ''))}" = what the last ${esc(tg.style + (tg.bsmtLabel || ''))} built (${lastBuilt(tg.last)}) spent on each code; "Average" = the latest ${tg.recentN || 8} ${esc(tg.style + (tg.bsmtLabel || ''))} builds averaged, from Cost History. &#9873; = more than 10% (and $1,000) over the last build.</div>` : ''}
-        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><button class="btn" data-lines="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">Show every line</button><a class="btn" href="house.html?id=${encodeURIComponent(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff; text-decoration:none;">Open the home</a>
+        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"><a class="btn" href="house.html?id=${encodeURIComponent(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff; text-decoration:none;">Open the home</a>
           <button class="btn" data-sold="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">${sold[h.houseId] ? 'Change sale price' : 'Set sale price'}</button>
           <button class="btn" data-hist="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff;">${h.job && h.job.settle && h.job.settle < new Date().toISOString().slice(0, 10) ? 'Closed: add to Cost History' : 'Add to Cost History'}</button></div>
-        <div id="hist-${esc(h.houseId)}"></div>
-        <div id="lines-${esc(h.houseId)}"></div>` : ''}</div>`;
+        <div id="hist-${esc(h.houseId)}"></div>` : ''}</div>`;
   }).join('') : `<p class="muted" style="margin-top:12px;">${homes.length ? 'No homes match.' : 'Nothing imported yet. Choose the QuickBooks report above to bring costs in.'}</p>`;
 }
 $('search').addEventListener('input', renderHomes);
 $('homesList').addEventListener('click', async e=>{
   const h = e.target.closest('[data-home]');
-  if(h){ openHome = openHome === h.dataset.home ? '' : h.dataset.home; renderHomes(); return; }
+  if(h){ openHome = openHome === h.dataset.home ? '' : h.dataset.home; renderHomes(); if(openHome) loadLines(openHome); return; }
+  const cr = e.target.closest('[data-code]');
+  if(cr){ const k = cr.dataset.code; if(openCodes.has(k)) openCodes.delete(k); else openCodes.add(k); renderHomes(); return; }
+  const ex = e.target.closest('[data-expand]');
+  if(ex){
+    const id = ex.dataset.expand, home = homes.find(x=>x.houseId === id), keys = Object.keys((home && home.byCode) || {}).map(c=>id + '|' + c);
+    const all = keys.length && keys.every(k=>openCodes.has(k));
+    keys.forEach(k=>{ if(all) openCodes.delete(k); else openCodes.add(k); });
+    renderHomes(); return;
+  }
   const sb = e.target.closest('[data-sold]');
   if(sb){
     const id = sb.dataset.sold, job = jobs.find(j=>j.id === id) || {};
@@ -506,17 +541,6 @@ $('homesList').addEventListener('click', async e=>{
       hb.textContent = 'Added to Cost History';
     } catch(err){ console.error(err); hb.disabled = false; hb.textContent = 'Add to Cost History'; alert('Couldn\'t add it. Check your connection and try again.'); }
     return;
-  }
-  const lb = e.target.closest('[data-lines]');
-  if(lb){
-    const id = lb.dataset.lines, box = document.getElementById('lines-' + id);
-    box.innerHTML = '<p class="muted">Loading…</p>';
-    try{
-      const c = (await api({ action:'costsGet', houseId:id })).costs;
-      const ls = (c && c.lines || []).slice().sort((a, b)=>String(b.date).localeCompare(String(a.date)));
-      box.innerHTML = `<table class="jc"><thead><tr><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Cost code</th><th class="num">Amount</th></tr></thead><tbody>
-        ${ls.map(l=>`<tr><td>${esc(l.date)}</td><td>${esc(l.vendor)}${l.type && !/^expense|^bill$/i.test(l.type) ? ` <span class="muted">(${esc(l.type)})</span>` : ''}${l.memo ? `<div class="muted" style="font-size:12px;">${esc(l.memo)}</div>` : ''}</td><td>${esc(l.num)}</td><td>${esc(l.item)}</td><td class="num">${money2(l.amount)}</td></tr>`).join('')}</tbody></table>`;
-    } catch(err){ console.error(err); box.innerHTML = '<p class="muted">Couldn\'t load the lines.</p>'; }
   }
 });
 
@@ -573,5 +597,6 @@ if('serviceWorker' in navigator){
 </script>
 <script src="hubsearch.js"></script>
 <script src="assistant.js"></script>
+<script src="sorttables.js"></script>
 </body>
 </html>

@@ -282,6 +282,16 @@
   .photo .move{position:absolute; top:4px; left:4px; max-width:calc(100% - 38px); font-size:11px; padding:3px 4px; border:none; border-radius:3px; background:rgba(20,20,22,.6); color:#fff; cursor:pointer; opacity:0; transition:opacity .12s;}
   .photo:hover .move, .photo .move:focus{opacity:1;}
   .photo .move option{color:#33363a; background:#fff;}
+  /* picking photos to move several at once (owner, 2026-10-26) */
+  .pick-bar{display:flex; gap:8px 12px; align-items:center; flex-wrap:wrap; margin:8px 0; font-size:13.5px;}
+  .pick-bar button, .pick-bar select{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:6px 11px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; color:var(--navy);}
+  .pick-bar button.primary{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .pick-bar.on{background:#f3f5ee; border:1px solid #dfe3d3; border-radius:var(--radius); padding:8px 10px;}
+  .photo.picking{cursor:pointer;} .photo.picking a{pointer-events:none;}
+  .photo.picking .share, .photo.picking .move, .photo.picking .x-btn{display:none;}
+  .photo .pick{position:absolute; top:6px; left:6px; width:24px; height:24px; border-radius:50%; border:2px solid #fff; background:rgba(20,20,22,.35); color:#fff; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,.3); z-index:3;}
+  .photo.picked::after{content:''; position:absolute; inset:0; border:4px solid var(--navy); border-radius:inherit; pointer-events:none; z-index:2;} .photo.picked .pick{background:var(--navy);}
+  .photo.picked img{opacity:.85;}
   @media (hover:none){ .photo .move{opacity:1;} }
   /* whether the customer sees this photo on their page: off unless switched on */
   .photo .share{position:absolute; top:4px; right:34px; border:none; border-radius:3px; padding:3px 7px; font-size:10.5px; font-weight:700; cursor:pointer; font-family:inherit; background:rgba(20,20,22,.6); color:#fff;}
@@ -528,6 +538,7 @@ html, body{max-width:100%; overflow-x:clip;}
             <div class="folder-row" id="folderRow" style="display:none;"></div>
             <div class="muted" style="font-size:12.5px; min-height:16px;"><span id="uploadTarget"></span> <span id="uploadNote"></span> <span class="drag-hint">You can also drag photos, or a folder of photos, onto this box.</span></div>
             <div class="share-bar" id="shareBar"></div>
+            <div class="pick-bar" id="pickBar"></div>
             <div class="photo-grid" id="photoGrid"></div>
           </div>
         </div>
@@ -1792,6 +1803,21 @@ function renderOrders(){
                      : '<div class="muted" style="font-size:12px;">Everything is ordered.</div>')}`;
 }
 
+/* picking photos: "Select photos" turns the grid into tap-to-pick; the bar moves the picked ones to a folder (or a new one) in one go */
+let photoPick = false;
+const picked = new Set();
+function renderPickBar(photos, folders){
+  const bar = $('pickBar');
+  if(filesState !== 'ready' || !files.some(f=>f.kind === 'photo')){ bar.innerHTML = ''; bar.classList.remove('on'); photoPick = false; picked.clear(); return; }
+  [...picked].forEach(id=>{ if(!files.some(f=>f.id === id && f.kind === 'photo')) picked.delete(id); });   // removed meanwhile
+  bar.classList.toggle('on', photoPick);
+  if(!photoPick){ bar.innerHTML = '<button type="button" id="pickStart">Select photos</button><span class="muted">to move several into a folder at once</span>'; return; }
+  const n = picked.size, inView = photos.length, allIn = inView && photos.every(f=>picked.has(f.id));
+  bar.innerHTML = `<strong>${n} selected</strong>
+    <button type="button" id="pickAll">${allIn ? 'Unselect all' : 'Select all ' + inView}</button>
+    <select id="pickMove" ${n ? '' : 'disabled'}><option value="">Move to…</option><option value="__none">Not in a folder</option>${folders.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}<option value="__new">New folder…</option></select>
+    <div style="flex:1"></div><button type="button" class="primary" id="pickDone">Done</button>`;
+}
 function renderFiles(){
   const has = isSafeUrl(job.filesUrl);
   $('filesBtn').style.display = has ? '' : 'none';
@@ -1841,11 +1867,12 @@ function renderFiles(){
     + ((f.folder || '') !== '' ? `<option value="__none">Not in a folder</option>` : '')
     + folders.filter(n=>n !== (f.folder || '')).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
 
+  renderPickBar(photos, folders);
   $('photoGrid').innerHTML = filesState === 'blocked' ? blocked
     : photos.length ? photos.map(f=>{
         const by = (f.by && f.by.name) || 'Alden Homes';
         const detail = [f.taskTitle, f.uploadedAt ? fmtDate(f.uploadedAt.slice(0,10)) : '', currentFolder === ALL && f.folder ? f.folder : ''].filter(Boolean).join(' · ');
-        return `<div class="photo${f.shared ? ' shared' : ''}">
+        return `<div class="photo${f.shared ? ' shared' : ''}${photoPick ? ' picking' : ''}${photoPick && picked.has(f.id) ? ' picked' : ''}" data-photo="${esc(f.id)}">${photoPick ? `<span class="pick">${picked.has(f.id) ? '&#10003;' : ''}</span>` : ''}
           <a href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="" loading="lazy"></a>
           <button type="button" class="share${f.shared ? ' on' : ''}" data-share="${esc(f.id)}" title="${f.shared ? 'The customer can see this photo. Click to hide it from them.' : 'The customer can NOT see this photo. Click to show it on their page.'}">${f.shared ? '&#10003; Customer' : 'Show customer'}</button>
           <div class="who" title="${esc(by + (detail ? ' · ' + detail : ''))}"><strong>${esc(by)}</strong>${detail ? `<br>${esc(detail)}` : ''}</div>
@@ -1946,6 +1973,52 @@ document.getElementById('folderRow').addEventListener('click', async e=>{
     } catch(err){ console.error(err); alert('Could not remove the folder — check your connection and try again.'); }
   }
 });
+// picking: a tap picks or unpicks the photo instead of opening it
+document.getElementById('photoGrid').addEventListener('click', e=>{
+  if(!photoPick) return;
+  const tile = e.target.closest('[data-photo]'); if(!tile) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const id = tile.dataset.photo; if(picked.has(id)) picked.delete(id); else picked.add(id);
+  renderFiles();
+}, true);
+document.getElementById('pickBar').addEventListener('click', e=>{
+  if(e.target.closest('#pickStart')){ photoPick = true; picked.clear(); renderFiles(); return; }
+  if(e.target.closest('#pickDone')){ photoPick = false; picked.clear(); renderFiles(); return; }
+  if(e.target.closest('#pickAll')){
+    const inView = files.filter(f=>f.kind === 'photo' && (currentFolder === ALL || (f.folder || '') === currentFolder));
+    if(inView.every(f=>picked.has(f.id))) inView.forEach(f=>picked.delete(f.id)); else inView.forEach(f=>picked.add(f.id));
+    renderFiles(); return;
+  }
+});
+document.getElementById('pickBar').addEventListener('change', async e=>{
+  const sel = e.target.closest('#pickMove'); if(!sel || !sel.value) return;
+  let folder = sel.value === '__none' ? '' : sel.value;
+  const user = firebase.auth().currentUser;
+  try{
+    if(sel.value === '__new'){
+      folder = (prompt('Name for the new folder (for example Framing, Kitchen, or Before drywall):') || '').trim().slice(0, 60);
+      if(!folder){ sel.value = ''; return; }
+      const same = folderNames().find(n=>n.toLowerCase() === folder.toLowerCase());
+      if(same) folder = same;
+      else await db.collection('house-files').add({ houseId, kind:'folder', name:folder, uploadedAt: new Date().toISOString(), by: { type:'staff', id: user ? user.uid : '', name: staffName() } });
+    }
+    const ids = [...picked];
+    for(let i = 0; i < ids.length; i += 400){
+      const batch = db.batch();
+      ids.slice(i, i + 400).forEach(id=>batch.update(db.collection('house-files').doc(id), { folder }));
+      await batch.commit();
+    }
+    picked.clear(); photoPick = false;
+    if(folder) currentFolder = folder;
+    renderFiles();
+    alertMoved(ids.length, folder);
+  } catch(err){ console.error(err); alert('Could not move the photos — check your connection and try again.'); sel.value = ''; }
+});
+function alertMoved(n, folder){
+  const t = document.createElement('div'); t.textContent = n + ' photo' + (n === 1 ? '' : 's') + ' moved to ' + (folder ? '“' + folder + '”' : '“Not in a folder”');
+  t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#33363a;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:300;box-shadow:0 4px 14px rgba(0,0,0,.2)';
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 2600);
+}
 // show / hide one photo on the customer's page
 document.getElementById('photoGrid').addEventListener('click', async e=>{
   const btn = e.target.closest('[data-share]');
