@@ -1701,7 +1701,7 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
       const [setup, snap, users] = await Promise.all([selSetup(), db.collection('selection-sheets').get(), admin.auth().listUsers(1000)]);
       const team = users.users.filter(u=>u.email && !u.disabled).map(u=>({ uid: u.uid, name: staffName(u) })).sort((x, y)=>x.name.localeCompare(y.name));
       const sheets = snap.docs.map(d=>({ id: d.id, key: d.data().key, rev: d.data().rev || 0, houseId: d.data().houseId || '', sheet: JSON.parse(d.data().sheet) }));
-      res.json({ catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {}, over: setup.over || {}, bases: setup.bases || {}, changed: setup.changed || {}, sheets, team });
+      res.json({ catalog: DEMO_CATALOG, styles: setup.styles || {}, allow: setup.allow || {}, ceil: setup.ceil || {}, prices: setup.prices || {}, over: setup.over || {}, bases: setup.bases || {}, sizes: setup.sizes || {}, changed: setup.changed || {}, sheets, team });
       return;
     }
     if(b.action === 'stylesSet'){
@@ -1739,9 +1739,19 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
         const n = Math.round(Number(v));
         if(typeof k === 'string' && k.trim() && k.length <= 40 && v !== null && v !== '' && isFinite(n) && n > 0 && n <= 20000000) bases[k.trim()] = n;
       });
+      const before = (await db.collection('settings').doc('selections').get()).data() || {};
+      // size per home style (owner, 2026-10-26, for permit forms): { 'Percy': { sqft, len, wid, hgt } } — kept as is when not sent
+      let sizes = before.sizes && typeof before.sizes === 'object' ? before.sizes : {};
+      if(b.sizes && typeof b.sizes === 'object'){
+        sizes = {};
+        Object.entries(b.sizes).slice(0, 120).forEach(([k, v])=>{
+          if(typeof k !== 'string' || !k.trim() || k.length > 40 || !v || typeof v !== 'object') return;
+          const o = {}; ['sqft', 'len', 'wid', 'hgt'].forEach(f=>{ const n = Math.round(Number(v[f]) * 10) / 10; if(v[f] !== '' && v[f] != null && isFinite(n) && n > 0 && n < 100000) o[f] = n; });
+          if(Object.keys(o).length) sizes[k.trim()] = o;
+        });
+      }
       /* who changed each price last (owner, 2026-10-26): compared with what was saved before, every price that's different (set, changed
          or cleared) gets { by, at } under 'group:key' — groups prices / over / allow / ceil / bases. Older entries are kept. */
-      const before = (await db.collection('settings').doc('selections').get()).data() || {};
       const changed = { ...(before.changed && typeof before.changed === 'object' ? before.changed : {}) };
       const by = String(who.name || String(who.email || '').split('@')[0] || 'Someone').slice(0, 60), at = now.toISOString();
       Object.entries({ prices, over, allow, ceil, bases }).forEach(([g, next])=>{
@@ -1749,8 +1759,8 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
         new Set([...Object.keys(prev), ...Object.keys(next)]).forEach(k=>{ if(prev[k] !== next[k]) changed[g + ':' + k] = { by, at }; });
       });
       Object.keys(changed).slice(0, Math.max(0, Object.keys(changed).length - 4000)).forEach(k=>{ delete changed[k]; });
-      await db.collection('settings').doc('selections').set({ styles, allow, ceil, prices, over, bases, changed, updatedAt: now.toISOString(), updatedBy: who.email || who.uid });
-      res.json({ ok: true, styles, allow, ceil, prices, over, bases, changed });
+      await db.collection('settings').doc('selections').set({ styles, allow, ceil, prices, over, bases, sizes, changed, updatedAt: now.toISOString(), updatedBy: who.email || who.uid });
+      res.json({ ok: true, styles, allow, ceil, prices, over, bases, sizes, changed });
       return;
     }
     if(!id){ res.status(400).json({ error: 'id' }); return; }
@@ -1845,6 +1855,11 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
         await ref.update(fill);
       }
       if(typeof b.basement === 'boolean') await db.collection('jobs').doc(houseId).update({ basement: b.basement });
+      // the home's size from its sheet (style size + what the buyer added), for permit forms
+      if(b.size && typeof b.size === 'object' && Number(b.size.sqft) > 0){
+        const sz = {}; ['sqft', 'added', 'other', 'len', 'wid', 'hgt'].forEach(f=>{ const n = Math.round(Number(b.size[f]) * 10) / 10; if(isFinite(n) && n) sz[f] = n; });
+        await db.collection('jobs').doc(houseId).update({ sqft: sz.sqft, size: sz });
+      }
       await db.collection('job-sales').doc(houseId).set({ price, lines, source: 'hub', sheetId: id, note: 'From the signed selection sheet', setAt: now.toISOString(), setBy: staffName(who) });
       sheet.houseId = houseId;
       await selRef(id).update({ houseId, sheet: JSON.stringify(sheet), rev: (d.rev || 0) + 1 });

@@ -492,6 +492,47 @@ let PRICE_OVER = {};
    rep types the lot price, and house + lot = the lead's base price (L.basePrice). L.housePrice / L.lotPrice are office only: the buyer
    only ever sees the base price. */
 let BASE_CFG = {};
+/* HOME SIZES (owner, 2026-10-26: square footage per home style, plus whatever the selection sheet adds — for permit forms):
+   SIZE_CFG = { style: { sqft, len, wid, hgt } } typed in Home styles → "Home style sizes" (settings/selections.sizes). */
+let SIZE_CFG = {};
+// which picks change a home's size. fin = finished living space (in the total); other = garage, porch, unfinished (listed, not counted)
+function sizeRule(q, c){
+  const bt = String(q.bt || ''), t = String(c.t || '');
+  if(bt === '248') return /smaller/i.test(t) ? { kind:'fin', sign:-1 } : /expand/i.test(t) ? { kind:'fin' } : null;
+  if(bt === '136') return { kind:'fin' };
+  if(bt === '740') return /finished space/i.test(t) ? { kind:'fin' } : { kind:'other' };
+  if(bt === '768') return /unfinished/i.test(t) ? { kind:'other' } : { kind:'fin' };
+  if(bt === '764') return /trim|hvac/i.test(t) ? { kind:'fin' } : { kind:'other' };
+  if(bt === '766' || bt === '672' || bt === '674') return { kind:'fin' };
+  if(bt === '154' || bt === '662' || bt === '684' || bt === '686') return { kind:'other' };
+  return null;
+}
+// sq ft of one pick: what was typed for per-sq-ft choices, or the size in the name ("9' x 12' - Sun Room")
+function pickSqft(c, a){
+  if(c.unit === 'sq ft') return Number(a.qty) || 0;
+  const m = String(c.t).match(/(\d+(?:\.\d+)?)\s*'?\s*x\s*(\d+(?:\.\d+)?)\s*'/i);
+  return m ? Number(m[1]) * Number(m[2]) * (Number(a.qty) || 1) : 0;
+}
+function sizeOf(L){
+  const st = SIZE_CFG[L.model] || {}, adds = [];
+  Object.entries(L.answers || {}).forEach(([k, a])=>{
+    const m = k.match(/^(.+)#(\d+)$/); if(!m || !a || a.auto) return;
+    const q = qById(m[1]), c = q && q.c[Number(m[2])]; if(!c) return;
+    const r = sizeRule(q, c); if(!r) return;
+    const sf = pickSqft(c, a); if(!sf) return;
+    adds.push({ t: c.t.replace(/\s*\((credit )?per sq ft\)/i, ''), q: q.t, sf: sf * (r.sign || 1), kind: r.kind });
+  });
+  const added = adds.filter(x=>x.kind === 'fin').reduce((t, x)=>t + x.sf, 0), other = adds.filter(x=>x.kind === 'other').reduce((t, x)=>t + x.sf, 0);
+  return { base: st.sqft || 0, len: st.len, wid: st.wid, hgt: st.hgt, adds, added, other, total: st.sqft ? st.sqft + added : 0 };
+}
+const sqf = n=>Math.round(n).toLocaleString() + ' sq ft';
+// one line under the sheet's title (office only): "1,850 sq ft finished (Percy 1,730 + 120 added)"
+function sizeLine(L){
+  const z = sizeOf(L);
+  if(!z.base && !z.adds.length) return '';
+  const parts = z.adds.map(x=>`${x.sf < 0 ? '−' : '+'}${Math.abs(Math.round(x.sf)).toLocaleString()} ${esc(x.t)}${x.kind === 'other' ? ' (not counted)' : ''}`);
+  return `<div class="staffline noprint" style="margin-top:3px;font-size:13px" title="${esc(parts.join(' · '))}">${z.base ? '<b>' + sqf(z.total) + '</b> finished' : '<b>Size not set</b> for ' + esc(L.model || 'this style') + ' (Home styles → Home style sizes)'}${z.base ? ' (' + esc(L.model) + ' ' + sqf(z.base) + (z.added ? (z.added < 0 ? ' − ' : ' + ') + sqf(Math.abs(z.added)) + (z.added < 0 ? ' smaller' : ' added') : '') + ')' : ''}${z.other ? ' · ' + sqf(z.other) + ' garage / porch / unfinished not counted' : ''}</div>`;
+}
 /* who changed each back-end price last (owner, 2026-10-26): { 'group:key': { by, at } } from the server (settings/selections.changed),
    groups prices / over / allow / ceil / bases. chg() is the small line shown under a price box. */
 let CHANGED = {};
@@ -1176,7 +1217,17 @@ function render(){
 let baseEdit = false;   // the base price box in a sheet's header is open
 let styleEdit = false, styName = STYLES.ALDEN[0], styState = '', styTimer = null;
 const styColl = name=>Object.keys(STYLES).find(k=>STYLES[k].includes(name)) || 'ALDEN';
-let styView = 'show';   // back end: 'show' = what each style's sheet shows; 'prices' = every price
+let styView = 'show';   // back end: 'show' = what each style's sheet shows; 'prices' = every price; 'sizes' = home style sizes
+function sizesScreen(){
+  const box = (m, f, ph)=>`<input type="number" min="0" step="${f === 'sqft' ? 1 : 0.5}" data-size="${esc(m + '|' + f)}" value="${(SIZE_CFG[m] || {})[f] || ''}" placeholder="${ph}" style="width:${f === 'sqft' ? 110 : 80}px">`;
+  const set = Object.keys(SIZE_CFG).length;
+  return `<style>.sztab{border-collapse:collapse;margin-top:6px;font-size:14px}.sztab th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#777;padding:6px 10px 6px 0}.sztab td{padding:4px 10px 4px 0}.sztab input{padding:7px 8px;border:1px solid var(--line);border-radius:var(--radius)}</style><div class="card"><h2 style="font-size:18px">Home style sizes</h2>
+      <p class="muted" style="font-size:13.5px;margin-top:4px">The finished square feet of each home style as drawn, and its outside length, width and height in feet (for permit forms). A sheet adds or takes off whatever the buyer picks: a bigger or smaller first floor, a finished basement, second floor or attic, a sun room. Garage, porch and unfinished space are shown on the sheet but not counted. Saved as you type · <span id="styState">${esc(styState)}</span></p>
+      <p class="muted" style="font-size:13px;margin-top:6px">${set} of ${Object.values(STYLES).flat().length} styles set.</p>
+      ${Object.keys(STYLES).map(k=>`<div class="eyebrow" style="margin-top:14px">${esc(LINE_NAMES[k])}</div>
+        <table class="sztab" data-nosort><thead><tr><th>Home style</th><th>Finished sq ft</th><th>Length (ft)</th><th>Width (ft)</th><th>Height (ft)</th></tr></thead><tbody>
+        ${STYLES[k].map(m=>`<tr><td><b>${esc(m)}</b></td><td>${box(m, 'sqft', 'not set')}</td><td>${box(m, 'len', '')}</td><td>${box(m, 'wid', '')}</td><td>${box(m, 'hgt', '')}</td></tr>`).join('')}</tbody></table>`).join('')}</div>`;
+}
 function pricesScreen(){
   const cell = (q, c, i)=>{
     if(isAllow(q, c)) return `<span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(q.id + '#' + i)}" value="${allowDefault(q, i)}" style="width:110px"><span class="pnote">allowance (typed on the sheet)</span>${chg('allow', q.id + '#' + i)}`;
@@ -1215,9 +1266,9 @@ function stylesScreen(){
         <div class="tri"><button type="button" class="${st === 'show' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="show">Show</button><button type="button" class="incl ${st === 'incl' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="incl">Included</button><button type="button" class="hide ${st === 'hide' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="hide">Hide</button></div></div>`; }).join('')}</div>`; }).join('');
   return `<div style="margin-top:18px"><a href="#" id="styBack" class="muted" style="font-size:13px;text-decoration:none">&larr; All leads</a>
       <div class="eyebrow" style="margin-top:6px">Office setup</div><h1>Home style pricing sheets</h1>
-      <div class="viewsw noprint" style="display:inline-flex;margin-top:10px"><button type="button" data-styview="show" class="${styView === 'show' ? 'on' : ''}">What each style shows</button><button type="button" data-styview="prices" class="${styView === 'prices' ? 'on' : ''}">Every price</button></div>
-      <p class="lede">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
-    <div class="card" style="display:${styView === 'prices' ? 'none' : 'flex'};gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
+      <div class="viewsw noprint" style="display:inline-flex;margin-top:10px"><button type="button" data-styview="show" class="${styView === 'show' ? 'on' : ''}">What each style shows</button><button type="button" data-styview="prices" class="${styView === 'prices' ? 'on' : ''}">Every price</button><button type="button" data-styview="sizes" class="${styView === 'sizes' ? 'on' : ''}">Home style sizes</button></div>
+      <p class="lede" style="display:${styView === 'sizes' ? 'none' : ''}">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
+    <div class="card" style="display:${styView !== 'show' ? 'none' : 'flex'};gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
       <div><label class="f">Home style</label><select id="styPick">${opts}</select></div>
       <div><label class="f">House price</label><span class="muted">$</span> <input type="number" min="0" step="100" data-basep="${esc(styName)}" value="${BASE_CFG[styName] || ''}" placeholder="not set" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:var(--radius)"></div>
       <div><label class="f">Standard ceilings</label><select id="styCeil"><option value="8" ${ceilStd(fake) === 8 ? 'selected' : ''}>8'</option><option value="9" ${ceilStd(fake) === 9 ? 'selected' : ''}>9'</option></select></div>
@@ -1226,7 +1277,7 @@ function stylesScreen(){
       <div><label class="f">Same as another style?</label><div style="display:flex;gap:8px"><select id="styFrom"><option value="">Copy from…</option>${others}</select><button type="button" class="btn sm" id="styCopy">Copy</button></div></div>
       ${n.incl || n.hide ? '<button type="button" class="btn sm" id="styClear">Show everything</button>' : ''}
     </div>
-    ${styView === 'prices' ? ceilCard() + pricesScreen() : allowCard() + ceilCard() + bathCard() + secs}`;
+    ${styView === 'sizes' ? sizesScreen() : styView === 'prices' ? ceilCard() + pricesScreen() : allowCard() + ceilCard() + bathCard() + secs}`;
 }
 function floorCard(){
   const lvls = [10, 20, 30, 40, 50, 60];
@@ -1280,7 +1331,7 @@ function styleSave(){
   clearTimeout(styTimer);
   styTimer = setTimeout(async ()=>{
     try{
-      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER, bases:BASE_CFG }); PRICE_OVER = saved.over || PRICE_OVER; BASE_CFG = saved.bases || BASE_CFG; CHANGED = saved.changed || CHANGED;
+      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER, bases:BASE_CFG, sizes:SIZE_CFG }); PRICE_OVER = saved.over || PRICE_OVER; BASE_CFG = saved.bases || BASE_CFG; SIZE_CFG = saved.sizes || SIZE_CFG; CHANGED = saved.changed || CHANGED;
       const y = window.scrollY, f = document.activeElement && document.activeElement.id; if(styleEdit && !(document.activeElement && document.activeElement.matches('input,textarea'))){ render(); window.scrollTo(0, y); } STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
     } catch(err){ console.error(err); styState = 'Not saved — check the connection'; }
     const e2 = $('styState'); if(e2) e2.textContent = styState;
@@ -1357,7 +1408,8 @@ function leadScreen(L){
         <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</h1>
         <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${baseEdit && staff && !PRESENT && !locked(L)
           ? `<span class="noprint" style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;vertical-align:middle">house $<input type="number" id="baseIn" min="0" step="100" value="${houseOf(L) || ''}" style="width:120px;padding:6px 8px"> + lot $<input type="number" id="lotIn" min="0" step="100" value="${Number(L.lotPrice) || ''}" style="width:110px;padding:6px 8px"><button type="button" class="btn sm primary" id="baseSave">Save</button><button type="button" class="btn sm" id="baseCancel">Cancel</button></span>`
-          : money(base(L)) + (staff && !PRESENT ? ` <span class="staffline" style="display:inline">(house ${money(houseOf(L))} + lot ${money(Number(L.lotPrice) || 0)})</span>` : '') + (staff && !PRESENT && !locked(L) ? ' <button type="button" class="btn sm noprint" id="baseChange" style="padding:2px 9px;margin-left:4px">Change</button>' : '')}</div></div>
+          : money(base(L)) + (staff && !PRESENT ? ` <span class="staffline" style="display:inline">(house ${money(houseOf(L))} + lot ${money(Number(L.lotPrice) || 0)})</span>` : '') + (staff && !PRESENT && !locked(L) ? ' <button type="button" class="btn sm noprint" id="baseChange" style="padding:2px 9px;margin-left:4px">Change</button>' : '')}</div>
+        ${staff && !PRESENT ? sizeLine(L) : ''}</div>
       <div style="text-align:right">${PRESENT ? (sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live"><i></i>Live with your Alden Homes rep</span>')
         : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">Pricing meeting ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
           <div class="noprint" style="margin-top:8px;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap">${present[L.id] ? liveBadge() : ''}<button type="button" class="btn sm" id="shareBtn">${shareOpen ? 'Hide' : present[L.id] ? 'Customer screen' : 'Open customer screen'}</button>${staff && !locked(L) ? '<button type="button" class="btn sm" id="delLead">Delete lead</button>' : ''}</div>`}</div>
@@ -2153,6 +2205,13 @@ document.addEventListener('change', e=>{
   }
   if(e.target.id === 'followDate' && e.target.value && lead()){ const L = lead(); L.follow = { date:e.target.value, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(L.follow.date)); return; }
   if(e.target.id === 'styCeil'){ const c = STYLE_CFG[styName] = STYLE_CFG[styName] || { skip:[], incl:[] }; c.ceil = Number(e.target.value); render(); styleSave(); toast(styName + ': standard ceilings ' + c.ceil + "'"); return; }
+  if(e.target.dataset && e.target.dataset.size){
+    const [m, f] = e.target.dataset.size.split('|'), v = Number(e.target.value);
+    const o = SIZE_CFG[m] = SIZE_CFG[m] || {};
+    if(e.target.value === '' || !(v > 0)) delete o[f]; else o[f] = Math.round(v * 10) / 10;
+    if(!Object.keys(o).length) delete SIZE_CFG[m];
+    styleSave(); return;
+  }
   if(e.target.dataset && e.target.dataset.basep){
     const m = e.target.dataset.basep, v = Math.round(Number(e.target.value));
     if(e.target.value === '') delete BASE_CFG[m];
@@ -2196,7 +2255,7 @@ document.addEventListener('change', e=>{
    A customer screen / their pricing sheet / the share page opens with the sheet's link key instead (no sign-in). */
 let DEVS_SEEN = false;
 function applySetup(data){
-  PRICE_OVER = data.over || {}; BASE_CFG = data.bases || {}; CHANGED = data.changed || {};
+  PRICE_OVER = data.over || {}; BASE_CFG = data.bases || {}; SIZE_CFG = data.sizes || {}; CHANGED = data.changed || {};
   buildCatalog(data.catalog || []);
   STYLE_CFG = data.styles || {}; ALLOW_CFG = data.allow || {}; CEIL_CFG = data.ceil || {}; OPT_PRICES = data.prices || {};
 }
@@ -2283,7 +2342,8 @@ async function makeHome(L){
     ...L.custom.filter(c=>!c.pending).map(c=>({ bt:'', title:'Custom item', choice:c.desc, price:c.price }))];
   try{
     // whether the home has a basement goes onto the home too: its budget is compared with past builds that match (Cost History)
-    const r = await selApi({ action:'sign', id:L.id, basement: !!hasFeat(L, FEATURES.find(f=>f.id === 'bsmt')), sale:{ price: base(L) + upgrades(L), lines: saleLines } });
+    const z = sizeOf(L);
+    const r = await selApi({ action:'sign', id:L.id, basement: !!hasFeat(L, FEATURES.find(f=>f.id === 'bsmt')), size: z.total ? { sqft: z.total, added: z.added, other: z.other, len: z.len, wid: z.wid, hgt: z.hgt } : null, sale:{ price: base(L) + upgrades(L), lines: saleLines } });
     L.houseId = r.houseId; if(REMOTE[L.id]) REMOTE[L.id].sheet.houseId = r.houseId; if(sync.last) sync.last.houseId = r.houseId;
     toast(r.created ? 'The home is in Active Homes now, with its sale price' : 'The sale price is on the home in Active Homes');
   } catch(err){ console.error(err); toast('The sheet is signed, but the home couldn\'t be added yet. Press "Add the home" to try again.'); }
