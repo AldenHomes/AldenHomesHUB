@@ -1861,6 +1861,17 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
         await db.collection('jobs').doc(houseId).update({ sqft: sz.sqft, size: sz });
       }
       await db.collection('job-sales').doc(houseId).set({ price, lines, source: 'hub', sheetId: id, note: 'From the signed selection sheet', setAt: now.toISOString(), setBy: staffName(who) });
+      // signed = ready to go: whoever switched on "A home is signed and needs permits" hears about it (bell + email), once per home
+      try{
+        const jref = db.collection('jobs').doc(houseId), jj = (await jref.get()).data() || {};
+        if(!jj.permitsNotified){
+          const wanted = await staffWanting('permitsNeeded');
+          if(wanted.length) await db.collection('notes').add({ houseId, houseLabel: cut([jj.community, jj.lot ? 'Lot ' + jj.lot : '', jj.client].filter(Boolean).join(' · '), 120),
+            text: `${jj.client || 'This home'} signed their selection sheet. The permit applications need to be filled out, checked and sent.`,
+            by: { uid: '', name: 'Selections' }, mentions: wanted, kind: 'permitsNeeded', at: now.toISOString(), readBy: {} });
+          await jref.update({ permitsNotified: now.toISOString() });
+        }
+      } catch(err){ logger.error('permits notice failed', { houseId, error: String(err) }); }
       sheet.houseId = houseId;
       await selRef(id).update({ houseId, sheet: JSON.stringify(sheet), rev: (d.rev || 0) + 1 });
       logger.info('Selection sheet signed', { id, houseId, created, price, by: who.email });
@@ -2272,6 +2283,7 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   // a punch list item (a note with todo: true) given to someone opens the punch list
   const link = note.kind === 'invReview' ? `${site}invoices.html${note.invoiceId ? '?open=' + encodeURIComponent(note.invoiceId) : ''}`
     : note.kind === 'selPrice' ? `${site}selections.html?open=${encodeURIComponent(note.sheetId || '')}`
+    : note.kind === 'permitsNeeded' ? `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#permitsCard`
     : note.todo ? `${site}punch.html`
     : fromSub ? `${site}construction.html?house=${encodeURIComponent(note.houseId || '')}&task=${encodeURIComponent(note.taskId || '')}`
     : `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
@@ -2282,6 +2294,7 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   const wording = note.todo ? { heading: urgent ? 'High priority punch list item' : 'Punch list item for you', subject: `${urgent ? 'HIGH PRIORITY — ' : ''}Punch list: ${String(note.text || '').slice(0, 60)}`, lead: `<strong>${esc(who)}</strong> added a ${urgent ? '<strong style="color:#b3452f;">high priority</strong> ' : ''}punch list item for you${where}${esc(dueBy)}:`, plain: `${who} added a ${urgent ? 'HIGH PRIORITY ' : ''}punch list item for you${note.houseId ? ' for ' + house : ''}${dueBy}:`, button: 'Open the punch list' } : {
     subDeclined: { heading: 'A sub declined a job', subject: `Declined: ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> declined a job on <strong>${esc(house)}</strong>:`, plain: `${who} declined a job on ${house}:`, button: 'Open this job' },
     subNote: { heading: 'Note from a sub', subject: `Note from ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> sent a note about <strong>${esc(house)}</strong>:`, plain: `${who} sent a note about ${house}:`, button: 'Open this job' },
+    permitsNeeded: { heading: 'Permits needed', subject: `Permits needed: ${house}`, lead: `<strong>${esc(house)}</strong> is signed and ready to go:`, plain: `${house} is signed and ready to go:`, button: 'Open the home' },
     invReview: { heading: 'Invoices to review', subject: 'Invoices to review', lead: `<strong>${esc(who)}</strong>:`, plain: `${who}:`, button: 'Open Invoices' },
     selPrice: { heading: 'A price is needed', subject: `Price needed: ${house}`, lead: `<strong>${esc(who)}</strong> needs a price from you on a selection sheet (<strong>${esc(house)}</strong>):`, plain: `${who} needs a price from you on a selection sheet (${house}):`, button: 'Open the selection sheet' },
     subWaiting: { heading: 'Still waiting on a sub', subject: `Still waiting on an answer — ${house}`, lead: `A job on <strong>${esc(house)}</strong> has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, plain: `A job on ${house} has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, button: 'Open this job' },

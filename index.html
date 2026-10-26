@@ -84,6 +84,7 @@
   .bell-item .kind.subDeclined{background:#fbeae4; color:var(--danger);}
   .bell-item .kind.subNote{background:#eef0e8; color:var(--rust-2);}
   .bell-item .kind.costOver{background:#fbeae4; color:var(--danger);}
+  .bell-item .kind.permitsNeeded{background:#fbeae4; color:var(--danger);}
   .bell-item .kind.selPrice{background:#fdf3e2; color:#8a5d14;}
   .bell-item .kind.invReview{background:#fdf3e2; color:#8a5d14;}
   .bell-item .kind.subWaiting{background:#fbeee0; color:#96661a;}
@@ -677,11 +678,12 @@ function renderBell(){
   document.getElementById('bellClear').style.display = unread ? '' : 'none';
   // Something from a sub (declined, sent a note, hasn't answered) opens that job on the schedule,
   // where another vendor can be picked. A staff note opens the home's notes.
-  const BELL_KINDS = { subDeclined:'Declined', subNote:'Sub note', subWaiting:'No answer', costOver:'Over usual', selPrice:'Price needed', invReview:'Invoices' };
+  const BELL_KINDS = { subDeclined:'Declined', subNote:'Sub note', subWaiting:'No answer', costOver:'Over usual', selPrice:'Price needed', invReview:'Invoices', permitsNeeded:'Permits' };
   const bellLink = n=>n.todo && !(n.houseId && (n.replies || []).length) ? 'punch.html'   // a comment on a punch item is read on the home's page
     : n.kind === 'selPrice' ? `selections.html?open=${encodeURIComponent(n.sheetId || '')}`
     : n.kind === 'invReview' ? (n.invoiceId ? `invoices.html?open=${encodeURIComponent(n.invoiceId)}` : 'invoices.html')
     : n.kind === 'costOver' ? `house.html?id=${encodeURIComponent(n.houseId || '')}#costs`
+    : n.kind === 'permitsNeeded' ? `house.html?id=${encodeURIComponent(n.houseId || '')}#permitsCard`
     : BELL_KINDS[n.kind] ? `construction.html?house=${encodeURIComponent(n.houseId || '')}&task=${encodeURIComponent(n.taskId || '')}`
     : `house.html?id=${encodeURIComponent(n.houseId || '')}#notes`;
   // if the newest thing on a note is a comment, that's what the bell shows
@@ -1078,6 +1080,7 @@ function renderMyWork(){
   const punchRow = t=>`<div class="mw-row"><button type="button" class="mw-check" data-mw-check="${escHtml(t.id)}" aria-label="Mark as done" title="Done"></button>
       <div class="mw-main"><div class="mw-t">${escHtml(t.text || '')}</div><div class="mw-m">${t.priority === 'high' ? '<span class="mw-chip red">High priority</span> ' : ''}${dueTag(t)}${escHtml(where(t))}</div>${punchPics(t)}</div></div>`;
   const noteHref = x=>x.kind === 'selPrice' ? `selections.html?open=${encodeURIComponent(x.sheetId || '')}`
+    : x.kind === 'permitsNeeded' ? `house.html?id=${encodeURIComponent(x.houseId || '')}#permitsCard`
     : x.kind === 'invReview' ? (x.invoiceId ? `invoices.html?open=${encodeURIComponent(x.invoiceId)}` : 'invoices.html')
     : ['subDeclined', 'subNote', 'subWaiting'].includes(x.kind)
     ? `construction.html?house=${encodeURIComponent(x.houseId || '')}&task=${encodeURIComponent(x.taskId || '')}`

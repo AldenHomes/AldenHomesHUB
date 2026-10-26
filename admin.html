@@ -222,6 +222,23 @@ html, body{max-width:100%; overflow-x:clip;}
       </div>
     </div>
 
+    <!-- ===================== PERMIT FORMS ===================== -->
+    <div class="section">
+      <h2>Permit forms</h2>
+      <p class="lead">What the hub writes on permit applications for Alden Homes (property owner, contractor and billing). A home's Permits card fills the forms from these and the home's own address and lot.</p>
+      <div class="pf-grid">
+        <label>Company name<input type="text" data-pf="name" placeholder="Alden Homes"></label>
+        <label>Mailing address<input type="text" data-pf="address" placeholder="Street, town, state zip"></label>
+        <label>Phone<input type="text" data-pf="phone"></label>
+        <label>Email<input type="text" data-pf="email"></label>
+        <label>State contractor license #<input type="text" data-pf="license"></label>
+        <label>Applicant (prints and signs)<input type="text" data-pf="applicant" placeholder="Full name"></label>
+      </div>
+      <style>.pf-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-top:10px;}
+        .pf-grid label{display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:700; color:var(--ink-soft);}
+        .pf-grid input{padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit;}</style>
+    </div>
+
     <!-- ===================== TEAM ===================== -->
     <div class="section">
       <h2>Team</h2>
@@ -315,6 +332,7 @@ firebase.auth().onAuthStateChanged(user=>{
       }, err=>{ console.error('notification choices listener error', err); $('myNotices').innerHTML = '<div class="note">Couldn\'t load your choices just now. Check your connection and reload the page.</div>'; });
       loadTeam();
       loadOverhead();
+      loadPermitForms();
     }
   } else {
     showLoginGate();
@@ -334,6 +352,7 @@ const NOTICES = [
   { key: 'subDeclined', name: 'A sub declines a job', what: 'Includes their reason if they gave one. Opens the job so you can choose another vendor.' },
   { key: 'subNote', name: 'A sub sends a note', what: 'A question, or asking to move the dates, sent from their link.' },
   { key: 'subWaiting', name: 'A job has had no answer for 3 weeks', what: 'A sub was asked and still hasn\'t approved or declined after 21 days.' },
+  { key: 'permitsNeeded', name: 'A home is signed and needs permits', what: 'A buyer\'s selection sheet was signed, so the home is ready to go and its permit applications need to be filled out and sent. Opens the home\'s Permits card.' },
   { key: 'costOver', name: 'A cost code goes over the last build', what: 'After a QuickBooks import, a home\'s cost code (say plumbing) has cost more than 10% over what the last home of that style built spent on it. Bell only, once per code per home.' },
 ];
 const noticeRef = db.collection('settings').doc('staff-notify');
@@ -441,6 +460,22 @@ $('overhead').addEventListener('change', async e=>{
     overheadNow = (await costSettings({ overhead: v })).overhead; e.target.value = overheadNow;
     $('savedNote').classList.add('show'); clearTimeout(savedTimer); savedTimer = setTimeout(()=>$('savedNote').classList.remove('show'), 1800);
   } catch(err){ console.error(err); e.target.value = overheadNow; alert('Could not save — check your connection and try again.'); }
+  setSyncStatus('idle');
+});
+// permit forms: Alden's details (settings/permits.company — staff collection, like the other settings)
+function loadPermitForms(){
+  db.collection('settings').doc('permits').onSnapshot(d=>{
+    const co = (d.exists && d.data().company) || {};
+    document.querySelectorAll('[data-pf]').forEach(el=>{ if(document.activeElement !== el) el.value = co[el.dataset.pf] || ''; });
+  }, err=>console.error('permit forms', err));
+}
+document.addEventListener('change', async e=>{
+  const el = e.target.closest && e.target.closest('[data-pf]'); if(!el) return;
+  setSyncStatus('saving');
+  try{
+    await db.collection('settings').doc('permits').set({ company: { [el.dataset.pf]: el.value.trim().slice(0, 160) } }, { merge: true });
+    $('savedNote').classList.add('show'); clearTimeout(savedTimer); savedTimer = setTimeout(()=>$('savedNote').classList.remove('show'), 1800);
+  } catch(err){ console.error(err); alert('Could not save — check your connection and try again.'); }
   setSyncStatus('idle');
 });
 let team = [];

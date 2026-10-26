@@ -943,6 +943,7 @@ function render(){
   $('missing').style.display = job ? 'none' : 'block';
   $('home').style.display = job ? 'block' : 'none';
   if(!job) return;
+  if(window.renderPermits) renderPermits();
 
   const title = [job.lot ? 'Lot '+job.lot : '', job.client].filter(Boolean).join(' · ') || 'Home';
   document.title = `Alden Homes | ${title}`;
@@ -2235,6 +2236,7 @@ if('serviceWorker' in navigator){
 }
 </script>
 <script src="hubsearch.js"></script>
+<script src="permits.js"></script>
 <script src="assistant.js"></script>
 </body>
 </html>
