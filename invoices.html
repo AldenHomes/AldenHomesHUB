@@ -220,6 +220,13 @@ html, body{max-width:100%; overflow-x:clip;}
   .split .r{display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:8px; align-items:center;}
   .split .r2{display:flex; gap:10px; align-items:center; margin-top:8px; font-size:13.5px;}
   .split .why{font-size:12px; color:var(--ink-soft); margin-top:6px; font-style:italic;}
+  .splitby{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:13px;}
+  .linepick{margin-top:8px; border:1px solid var(--steel-line); border-radius:var(--radius); padding:8px 10px; background:#fff;}
+  .linepick table{width:100%; border-collapse:collapse; font-size:12.5px;} .linepick td{padding:5px 4px; border-bottom:1px solid #f1ede3; vertical-align:middle;}
+  .linepick .num{text-align:right; white-space:nowrap;}
+  .partbtns{display:inline-flex; gap:3px;} .partbtns button{min-width:30px; padding:4px 7px; border:1px solid var(--steel-line); background:#fff; border-radius:6px; font-weight:700; font-family:inherit; cursor:pointer; font-size:12px;}
+  .partbtns button.on{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .split .pn{display:inline-block; font-size:11px; font-weight:800; color:var(--ink-soft); margin-bottom:4px;}
   .sumline{font-size:13px; margin-top:8px;} .sumline.bad{color:var(--danger); font-weight:700;}
   .who-chips{display:flex; gap:6px; flex-wrap:wrap;} .who-chips label{display:inline-flex; gap:5px; align-items:center; border:1px solid var(--steel-line); border-radius:20px; padding:4px 10px; font-size:13px; cursor:pointer;}
   .acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; padding-top:12px; border-top:1px solid var(--steel-line);}
@@ -440,6 +447,12 @@ function openInvoice(id){
   draft = { vendor:x.vendor || '', number:x.number || '', date:x.date || '', total:x.total || 0, note:x.note || '',
     splits:(x.splits || []).map(s=>({ ...s })), reviewers:[...(x.reviewers || [])] };
   if(!draft.splits.length) draft.splits.push({ houseId:'', code:0, labor:false, amount:x.total || 0, why:'' });
+  // split by item lines: lineMap[line index] = part index (only when the parts were saved that way)
+  draft.lineMap = null; byLines = false;
+  if(draft.splits.length > 1 && draft.splits.some(s=>(s.lines || []).length)){
+    draft.lineMap = (x.lines || []).map(()=>0);
+    draft.splits.forEach((s, p)=>(s.lines || []).forEach(n=>{ if(n < draft.lineMap.length) draft.lineMap[n] = p; }));
+  }
   // Prev / Next follow the list as it's shown (its tab, search and sort)
   const shown = [...document.querySelectorAll('#list tr[data-open]')].map(r=>r.dataset.open);
   if(shown.includes(id)) navIds = shown; else if(!navIds.includes(id)) navIds = [id];
@@ -448,6 +461,24 @@ function openInvoice(id){
   renderSide();
 }
 let navIds = [];
+let byLines = false;   // the "split by item lines" list is open
+const r2 = n=>Math.round(n * 100) / 100;
+// amounts per part from the lines picked for each; what isn't on a line (tax, delivery) is shared in proportion
+function linesToAmounts(x){
+  const ls = x.lines || [], n = draft.splits.length, per = Array(n).fill(0);
+  ls.forEach((l, i)=>{ per[draft.lineMap[i] || 0] += Number(l.amount) || 0; });
+  const linesSum = per.reduce((a, b)=>a + b, 0), total = Number(draft.total) || 0, extra = total - linesSum;
+  const amts = per.map(v=>r2(v + (linesSum ? extra * v / linesSum : extra / n)));
+  amts[n - 1] = r2(amts[n - 1] + total - amts.reduce((a, b)=>a + b, 0));   // the odd cent
+  draft.splits.forEach((s, p)=>{ s.amount = amts[p]; s.lines = ls.map((l, i)=>i).filter(i=>(draft.lineMap[i] || 0) === p); });
+}
+function splitEvenly(){
+  const n = draft.splits.length, total = Number(draft.total) || 0, each = Math.floor(total / n * 100) / 100;
+  draft.splits.forEach((s, p)=>{ s.amount = p === n - 1 ? r2(total - each * (n - 1)) : each; s.lines = []; });
+  draft.lineMap = null; byLines = false;
+}
+function partName(p){ const s = draft.splits[p], j = jobs.find(h=>h.id === s.houseId);
+  return 'Part ' + (p + 1) + (j ? ' · ' + ([j.community, j.lot].filter(Boolean).join(' ') || homeLabel(j)) : '') + (s.code ? ' · ' + s.code + ' ' + (codes[s.code] || '') : ''); }
 const pdfOf = x=>x.stampUrl && x.status !== 'review' ? x.stampUrl : x.url;
 function showPdf(x){ const u = pdfOf(x); if($('pdf').dataset.u !== u){ $('pdf').src = u; $('pdf').dataset.u = u; } }
 // "CL 98 - 40 Siding/Fascia", one per part (same wording as the stamp the server puts on the PDF)
@@ -501,13 +532,18 @@ function renderSide(){
       <div><label class="f2">Total</label><input type="text" data-money data-d="total" value="${draft.total}" ${ro ? 'disabled' : ''}></div></div>
     ${x.poJob || x.shipTo ? `<div class="muted" style="font-size:12.5px; margin-top:8px;">${x.poJob ? 'PO / job: <b>' + esc(x.poJob) + '</b>' : ''}${x.poJob && x.shipTo ? ' · ' : ''}${x.shipTo ? 'Ship to: ' + esc(x.shipTo) : ''}</div>` : ''}
     <label class="f2">What it's for</label>
-    ${draft.splits.map((s, i)=>`<div class="split"><div class="r"><input type="text" list="homeDL" data-s="${i}" data-k="home" value="${esc(homeVal(s.houseId))}" placeholder="Which home? Type a lot, name or street" class="${s.houseId ? '' : 'bad'}" autocomplete="off" ${ro ? 'disabled' : ''}>
+    ${draft.splits.map((s, i)=>`<div class="split">${draft.splits.length > 1 ? `<span class="pn">PART ${i + 1}</span>` : ''}<div class="r"><input type="text" list="homeDL" data-s="${i}" data-k="home" value="${esc(homeVal(s.houseId))}" placeholder="Which home? Type a lot, name or street" class="${s.houseId ? '' : 'bad'}" autocomplete="off" ${ro ? 'disabled' : ''}>
         <input type="text" data-money data-s="${i}" data-k="amount" value="${s.amount}" title="Amount" ${ro ? 'disabled' : ''}></div>
       <div class="r2"><input type="text" list="codeDL" data-s="${i}" data-k="codeT" value="${esc(codeText(s.code))}" placeholder="Cost code: type a number or name" class="${s.code ? '' : 'bad'}" style="flex:1" autocomplete="off" ${ro ? 'disabled' : ''}>
         <label style="display:inline-flex; gap:5px; align-items:center;"><input type="checkbox" data-s="${i}" data-k="labor" ${s.labor ? 'checked' : ''} ${ro ? 'disabled' : ''}> Labor</label>
         ${!ro && draft.splits.length > 1 ? `<button type="button" class="btn2" data-unsplit="${i}" title="Remove this part">&times;</button>` : ''}</div>
       ${s.why ? `<div class="why">${esc(s.why)}</div>` : ''}</div>`).join('')}
     ${ro ? '' : '<div style="margin-top:8px;"><button type="button" class="btn2" id="addSplit">+ Split it (another home or cost code)</button></div>'}
+    ${!ro && draft.splits.length > 1 ? `<div class="splitby"><span class="muted">Set the amounts:</span><button type="button" class="btn2" id="splitEven">Split evenly</button>${(x.lines || []).length ? `<button type="button" class="btn2 ${byLines ? 'primary' : ''}" id="splitLines">${byLines ? 'Hide the lines' : 'Split by item lines'}</button>` : ''}</div>` : ''}
+    ${!ro && byLines && draft.splits.length > 1 && (x.lines || []).length ? `<div class="linepick"><div class="muted" style="font-size:12.5px; margin-bottom:6px;">Pick the part each line goes to. Tax and delivery (not on the lines) are shared in proportion.</div>
+      <table><tbody>${x.lines.map((l, i)=>`<tr><td>${esc(l.item)}${l.sku ? ' <span class="muted">' + esc(l.sku) + '</span>' : ''}</td><td class="num">${money2(l.amount)}</td>
+        <td class="num"><span class="partbtns">${draft.splits.map((s, p)=>`<button type="button" data-linepart="${i}|${p}" class="${(draft.lineMap[i] || 0) === p ? 'on' : ''}" title="${esc(partName(p))}">${p + 1}</button>`).join('')}</span></td></tr>`).join('')}</tbody></table>
+      <div style="font-size:12.5px; margin-top:6px;">${draft.splits.map((s, p)=>esc(partName(p)) + ': <b>' + money2(s.amount) + '</b>').join(' &nbsp;·&nbsp; ')}</div></div>` : ''}
     ${draft.splits.length > 1 || off ? `<div class="sumline ${off ? 'bad' : ''}">Parts add up to ${money2(sum)} of ${money2(draft.total)}${off ? ' — they need to match the total' : ''}</div>` : ''}
     ${(x.lines || []).length ? `<details style="margin-top:12px;"><summary class="f2" style="display:list-item; cursor:pointer; margin:0;">Items on this invoice (${x.lines.length})</summary>
       <table class="lines" data-nosort><thead><tr><th>Item</th><th>Model / #</th><th class="num">Qty</th><th class="num">Each</th><th class="num">Amount</th></tr></thead><tbody>
@@ -577,8 +613,17 @@ $('side').addEventListener('click', async e=>{
   const t = e.target;
   if(t.closest('#closeInv')){ closeInvoice(); render(); return; }
   if(t.closest('#addSplit')){ const left = Math.round(((Number(draft.total) || 0) - draft.splits.reduce((a, s)=>a + (Number(s.amount) || 0), 0)) * 100) / 100;
-    draft.splits.push({ houseId: draft.splits[0] ? draft.splits[0].houseId : '', code:0, labor:false, amount: Math.max(0, left), why:'' }); renderSide(); return; }
-  const un = t.closest('[data-unsplit]'); if(un){ draft.splits.splice(Number(un.dataset.unsplit), 1); renderSide(); return; }
+    draft.splits.push({ houseId: draft.splits[0] ? draft.splits[0].houseId : '', code:0, labor:false, amount: Math.max(0, left), why:'' });
+    if(draft.lineMap) linesToAmounts(invoices.find(i=>i.id === openId));
+    renderSide(); return; }
+  const un = t.closest('[data-unsplit]'); if(un){ const k = Number(un.dataset.unsplit); draft.splits.splice(k, 1);
+    if(draft.lineMap){ draft.lineMap = draft.lineMap.map(p=>p === k ? 0 : p > k ? p - 1 : p); if(draft.splits.length > 1) linesToAmounts(invoices.find(i=>i.id === openId)); else { draft.lineMap = null; byLines = false; draft.splits[0].amount = Number(draft.total) || 0; draft.splits[0].lines = []; } }
+    renderSide(); return; }
+  if(t.closest('#splitEven')){ splitEvenly(); renderSide(); return; }
+  if(t.closest('#splitLines')){ byLines = !byLines;
+    if(byLines && !draft.lineMap){ draft.lineMap = (invoices.find(i=>i.id === openId).lines || []).map(()=>0); linesToAmounts(invoices.find(i=>i.id === openId)); }
+    renderSide(); return; }
+  const lp = t.closest('[data-linepart]'); if(lp){ const [i, p] = lp.dataset.linepart.split('|').map(Number); draft.lineMap[i] = p; linesToAmounts(invoices.find(x=>x.id === openId)); renderSide(); return; }
   if(t.closest('#actSave')){ if(await saveInvoice()){ renderSide(); render(); } return; }
   if(t.closest('#navPrev')){ step(-1); return; }
   if(t.closest('#navNext')){ step(1); return; }

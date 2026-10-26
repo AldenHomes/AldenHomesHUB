@@ -2152,7 +2152,9 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       if(b.date !== undefined) up.date = /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : '';
       if(b.total !== undefined) up.total = num(b.total);
       if(Array.isArray(b.splits)) up.splits = b.splits.slice(0, 20).map(s=>({ houseId: jobs[s.houseId] ? s.houseId : '', houseLabel: jobs[s.houseId] ? invHomeLabel(jobs[s.houseId]) : '',
-        code: INV_CODES[s.code] ? Number(s.code) : 0, labor: !!s.labor, amount: num(s.amount), why: cut(s.why, 200) }));
+        code: INV_CODES[s.code] ? Number(s.code) : 0, labor: !!s.labor, amount: num(s.amount), why: cut(s.why, 200),
+        // which item lines this part was split by (indexes into the invoice's lines), when split by lines
+        lines: Array.isArray(s.lines) ? s.lines.filter(n=>Number.isInteger(n) && n >= 0 && n < 200).slice(0, 200) : [] }));
       if(Array.isArray(b.reviewers)) up.reviewers = b.reviewers.filter(x=>typeof x === 'string').slice(0, 10);
       const merged = { ...old, ...up };
       if(b.status === 'ready'){
