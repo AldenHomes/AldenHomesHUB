@@ -31,7 +31,7 @@
   /* Every blank on each form. p = page in the finished PDF; x, y = where the text starts; s = text size; def(c) = the hub's answer.
      type 'choice': opts each circle (ring: x, y, width, height) or tick (mark: x, y) their spot. type 'sig': the applicant's signature. */
   const FORMS = {
-    'cornwall-ws': { title: 'Water & Sewer application', files: ['forms/cornwall-water.pdf', 'forms/cornwall-sewer.pdf'], fields: [
+    'cornwall-ws': { title: 'Water & Sewer application', pages: 3, files: ['forms/cornwall-water.pdf', 'forms/cornwall-sewer.pdf'], fields: [
       { sec: 'Water service — the property' },
       { k: 'street', l: 'Street address', p: 0, x: 80, y: 606, def: c=>c.street },
       { k: 'city', l: 'City and state', p: 0, x: 358, y: 606, def: c=>c.dev.city },
@@ -78,10 +78,10 @@
       { k: 'sdev', l: 'Development', p: 2, x: 172, y: 436, def: c=>c.dev.subdivision },
       { k: 'scomp', l: 'Company', p: 2, x: 160, y: 401, def: c=>c.co.name },
       { k: 'sphone', l: 'Applicant\'s phone number', p: 2, x: 172, y: 367, def: c=>c.co.phone },
-      { k: 'ssig', l: 'Signature of applicant', type: 'sig', p: 2, x: 40, y: 322 },
+      { k: 'ssig', l: 'Signature of applicant', type: 'sig', p: 2, x: 40, y: 322, w: 100 },
       { k: 'sdate', l: 'Date', p: 2, x: 150, y: 321, def: c=>c.date },
     ] },
-    'cornwall-zoning': { title: 'Zoning permit application', files: ['forms/cornwall-zoning.pdf'], fields: [
+    'cornwall-zoning': { title: 'Zoning permit application', pages: 1, files: ['forms/cornwall-zoning.pdf'], fields: [
       { sec: 'Land / property owner' },
       { k: 'owner', l: 'Property owner(s)', p: 0, x: 142, y: 628, def: c=>c.co.name },
       { k: 'maddr', l: 'Mailing address', p: 0, x: 130, y: 612, def: c=>c.co.address },
@@ -113,6 +113,17 @@
     ] },
   };
 
+  /* REQUIRED (owner, 2026-10-26: "marked in red [the] sections that need to be filled out before you can send"): the lines the
+     borough marks "(Required)" plus what the office's filled CL 113 applications always had. Empty ones show red; Download / Print
+     list what's missing first. Lines left blank on those examples (UPI, zoning district, value, cell phones, second owner) stay optional. */
+  const REQUIRED = {
+    'cornwall-ws': ['street', 'city', 'zip', 'subdiv', 'lot', 'use', 'units', 'oname', 'oaddr', 'owork', 'cname', 'lic', 'wdate1', 'wsig1', 'wname1',
+      'sname', 'btype', 'saddr1', 'saddr2', 'saddr3', 'sphone', 'ssig', 'sdate'],
+    'cornwall-zoning': ['owner', 'maddr', 'ophone', 'bname', 'baddr', 'bphone', 'site', 'ptype', 'future', 'desc', 'puse', 'cost', 'len', 'wid', 'hgt', 'sqft', 'sig', 'date'],
+  };
+  Object.entries(REQUIRED).forEach(([id, ks])=>FORMS[id].fields.forEach(f=>{ if(ks.includes(f.k)) f.req = true; }));
+  // a choice that needs its own line filled: "Other" needs the explanation, "Apartments" the number of units
+  const NEEDS_TEXT = { ptype: { Other: 'pother' }, btype: { Apartments: 'aunits', Other: 'bother' } };
   let settings = null, ed = null;   // ed = the form screen that's open { form, step }
   const $ = id=>document.getElementById(id);
   const esc = s=>(s == null ? '' : String(s)).replace(/[&<>"']/g, c=>({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -165,7 +176,31 @@
     .pf-f .pf-x{font-size:11px; font-weight:600; color:#a07a1c; cursor:pointer; background:none; border:none; padding:0; text-align:left; font-family:inherit;}
     .pf-sig{display:flex; gap:8px; align-items:center; font-size:13.5px; font-weight:600; color:#333; padding:8px 0;}
     .pf-sig img{height:30px; border-bottom:1px solid #ccc;}
-    .pf-note{font-size:12.5px; color:#777; margin-top:4px;}`;
+    .pf-note{font-size:12.5px; color:#777; margin-top:4px;}
+    .pf-box.wide{width:min(900px,100%);}
+    .pf-needn{font-size:13px; font-weight:800; border-radius:12px; padding:4px 10px;} .pf-needn.bad{background:#fbeae4; color:#b3261e;} .pf-needn.ok{background:#eaf1ec; color:#27573a;}
+    .pf-ol input.pf-in.need{background:rgba(220,40,30,.13); border-bottom:2px solid #c62828 !important; box-shadow:0 0 0 1px rgba(198,40,40,.55) !important;}
+    .pf-ol input.pf-in.need::placeholder{color:rgba(180,30,30,.55);}
+    .pf-ring.need{border:1.5px dashed #c62828;} .pf-mark.need{border:1.5px dashed #c62828; background:rgba(220,40,30,.12);}
+    .pf-sigbox.need{border:1.5px dashed #c62828; background:rgba(220,40,30,.1);} .pf-sigbox.need span{color:#b3261e; font-weight:700;}
+    .pf-f.need input, .pf-f.need select{border-color:#c62828; background:#fdf1ef;} .pf-f.need{color:#b3261e;} .pf-sig.need{color:#b3261e;}
+    .pf-views{display:inline-flex; border:1px solid #d6d2c4; border-radius:20px; overflow:hidden;}
+    .pf-views button{border:none; background:#fff; padding:7px 12px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; color:#666;}
+    .pf-views button.on{background:#1f3550; color:#fff;}
+    .pf-pages{display:flex; flex-direction:column; gap:16px; align-items:center; margin-top:10px;}
+    .pf-page{position:relative; width:100%; max-width:860px; aspect-ratio:612/792; background:#fff; box-shadow:0 1px 8px rgba(0,0,0,.2); container-type:inline-size;}
+    .pf-cv, .pf-ol{position:absolute; inset:0;} .pf-cv canvas{width:100%; height:100%; display:block;}
+    .pf-loading{padding:30px; color:#999; font-size:14px;}
+    .pf-ol input.pf-in{position:absolute; box-sizing:border-box; border:none !important; border-bottom:1px dashed rgba(31,53,80,.3) !important; background:rgba(255,228,120,.22); color:#0d1f73; font-family:Helvetica,Arial,sans-serif; padding:0 2px !important; margin:0; outline:none; border-radius:2px; box-shadow:none !important; min-height:0; line-height:1;}
+    .pf-ol input.pf-in:hover{background:rgba(255,228,120,.38);} .pf-ol input.pf-in:focus{background:rgba(120,170,255,.22); border-bottom:1px solid #1f3550 !important;}
+    .pf-ol input.pf-in.changed{background:rgba(255,190,60,.38);}
+    .pf-in::placeholder{color:rgba(60,60,60,.28);}
+    .pf-ring{position:absolute; border:1.5px dashed rgba(31,53,80,.25); border-radius:50%; background:none; cursor:pointer; padding:0; margin:0;}
+    .pf-ring:hover{border-color:rgba(31,53,80,.6);} .pf-ring.on{border:2px solid #1f3d8a;}
+    .pf-mark{position:absolute; border:1px dashed rgba(31,53,80,.3); background:rgba(255,228,120,.22); cursor:pointer; color:#0d1f73; font-weight:700; font-size:2.1cqw; padding:0; margin:0; line-height:1; font-family:Helvetica,Arial,sans-serif;}
+    .pf-mark.on{border-color:transparent; background:none;}
+    .pf-sigbox{position:absolute; border:1px dashed rgba(31,53,80,.35); background:rgba(255,228,120,.2); cursor:pointer; padding:0; margin:0; display:flex; align-items:flex-end; overflow:hidden;}
+    .pf-sigbox span{font-size:1.5cqw; color:#8a6d1a; padding:0 0 2px 4px;} .pf-sigbox img{height:100%; display:block;} .pf-sigbox.on{border-color:transparent; background:none;}`;
 
   function card(){
     let c = $('permitsCard');
@@ -202,7 +237,7 @@
       ${STEPS.map((s, i)=>{ const st = p[s.id] || {};
         return `<div class="pm-step ${st.ok ? 'ok' : i === nowIdx ? 'now' : ''}"><div class="pm-n">${st.ok ? '&#10003;' : i + 1}</div>
           <div><div class="pm-t">${esc(s.t)}</div><div class="pm-h">${esc(s.hint)}</div></div>
-          <div class="pm-row">${s.form && dev && dev.forms[s.form] ? `<button type="button" class="pm-btn ${i === nowIdx && !st.sent ? 'primary' : ''}" data-fill="${s.form}">Fill out the form${s.form === 'ws' ? 's' : ''}</button>` : ''}
+          <div class="pm-row">${s.form && dev && dev.forms[s.form] ? `<button type="button" class="pm-btn ${i === nowIdx && !st.sent ? 'primary' : ''}" data-fill="${s.form}">Fill out the form${s.form === 'ws' ? 's' : ''}${(()=>{ const n = missingFor(dev.forms[s.form]).length; return n ? ` · <span style="color:${i === nowIdx && !st.sent ? '#ffd6d2' : '#b3261e'}">${n} to fill in</span>` : ' · ready'; })()}</button>` : ''}
             <label>Submitted<input type="date" data-pm="${s.id}.sent" value="${esc(st.sent || '')}"></label>
             <label>Approved<input type="date" data-pm="${s.id}.ok" value="${esc(st.ok || '')}"></label>
             ${s.no ? `<label>Permit #<input type="text" data-pm="${s.id}.no" value="${esc(st.no || '')}" style="width:130px"></label>` : ''}</div></div>`; }).join('')}`;
@@ -237,18 +272,80 @@
     return v == null ? '' : String(v);
   }
   function valOf(f, c, form){ const s = saved(form); return Object.prototype.hasOwnProperty.call(s, f.k) ? s[f.k] : defOf(f, c); }
-  function renderEditor(){
-    if(!ed || !hasJob()) return;
-    const form = { id: ed.form, ...FORMS[ed.form] }, c = ctx(), s = saved(form), sig = settings && settings.signature;
-    let ov = $('pfOv');
-    if(!ov){
-      ov = document.createElement('div'); ov.className = 'pf-ov'; ov.id = 'pfOv';
-      ov.addEventListener('click', onEdClick); ov.addEventListener('change', onEdChange);
-      document.body.appendChild(ov);
-      if(!$('pfCss')){ const st = document.createElement('style'); st.id = 'pfCss'; st.textContent = CSS; document.head.appendChild(st); }
+  // the blanks still empty that must be filled (labels, in form order)
+  function missingKeys(formId, c){
+    const form = { id: formId, ...FORMS[formId] }, out = [];
+    const need = new Set(form.fields.filter(f=>f.req).map(f=>f.k));
+    form.fields.forEach(f=>{ if(f.type === 'choice' && NEEDS_TEXT[f.k]){ const k = NEEDS_TEXT[f.k][valOf(f, c, form)]; if(k) need.add(k); } });
+    form.fields.forEach(f=>{
+      if(f.sec || !need.has(f.k)) return;
+      const v = valOf(f, c, form);
+      if(f.type === 'sig' ? !((v === true || v === 'yes') && settings && settings.signature) : String(v == null ? '' : v).trim() === '') out.push(f.k);
+    });
+    return out;
+  }
+  function missingFor(formId){ try{ return missingKeys(formId, ctx()); } catch(e){ return []; } }
+  /* ON THE FORM (owner, 2026-10-26: the list "is a little disorienting if you're used to filling out the paper version"): the form
+     screen shows the borough's own pages (drawn with pdf.js) with a box on every blank, a click spot on every circle / X and on each
+     signature line — the same positions the PDF is written at. "As a list" keeps the plain list of boxes. */
+  const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs', PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+  let pdfjsP = null;
+  const pdfjsLib = ()=>pdfjsP || (pdfjsP = import(PDFJS).then(m=>{ m.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; return m; }));
+  // a box's place on the page as % (x, top edge, width, height in PDF points; the page is 612 x 792)
+  const pos = (x, yTop, w, h)=>`left:${(x / 612 * 100).toFixed(3)}%; top:${((792 - yTop) / 792 * 100).toFixed(3)}%; width:${(w / 612 * 100).toFixed(3)}%; height:${(h / 792 * 100).toFixed(3)}%;`;
+  // how wide a blank is: up to the next blank on the same line, or the page's right margin
+  function widthOf(f, form){
+    const next = form.fields.filter(g=>!g.sec && g.p === f.p && g.type !== 'choice' && g.x > f.x + 5 && Math.abs(g.y - f.y) < 6).map(g=>g.x);
+    return Math.max(30, Math.min(next.length ? Math.min(...next) - 8 : 575, 575) - f.x);
+  }
+  async function drawPages(formId, host){
+    const lib = await pdfjsLib(), form = FORMS[formId]; let n = 0;
+    for(const file of form.files){
+      const doc = await lib.getDocument(file).promise;
+      for(let i = 1; i <= doc.numPages; i++, n++){
+        const wrap = host.querySelector(`[data-page="${n}"] .pf-cv`); if(!wrap || !wrap.isConnected) return;
+        const page = await doc.getPage(i), dpr = Math.min(2, window.devicePixelRatio || 1);
+        const vp = page.getViewport({ scale: Math.max(1, wrap.clientWidth / 612) * dpr });
+        const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+        await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        wrap.replaceChildren(cv);
+      }
     }
-    const focus = document.activeElement && ov.contains(document.activeElement) ? document.activeElement.dataset.pf : null;
-    const missing = !c.co.name || !c.co.address;
+  }
+  // the boxes on each page: made once, then kept up to date (so typing is never interrupted)
+  function buildOverlays(form){
+    for(let p = 0; p < form.pages; p++){
+      const ol = document.querySelector(`#pfPages [data-page="${p}"] .pf-ol`); if(!ol) continue;
+      ol.innerHTML = form.fields.filter(f=>!f.sec && f.p === p).map(f=>{
+        if(f.type === 'choice') return f.opts.map(o=>o.ring
+          ? `<button type="button" class="pf-ring" data-choice="${f.k}|${esc(o.v)}" title="${esc(f.l)}: ${esc(o.v)}" style="${pos(o.ring[0] - o.ring[2], o.ring[1] + o.ring[3], o.ring[2] * 2, o.ring[3] * 2)}"></button>`
+          : `<button type="button" class="pf-mark" data-choice="${f.k}|${esc(o.v)}" title="${esc(f.l)}: ${esc(o.v)}" style="${pos(o.mark[0] - 3, o.mark[1] + 13, 16, 15)}"></button>`).join('');
+        if(f.type === 'sig') return `<button type="button" class="pf-sigbox" data-sig="${f.k}" title="${esc(f.l)}" style="${pos(f.x, f.y + 26, f.w || 190, 30)}"></button>`;
+        const sz = f.s || 10.5;
+        return `<input type="text" class="pf-in" data-pf="${f.k}" title="${esc(f.l)}" placeholder="${esc(f.l)}" autocomplete="off" ${f.money ? 'inputmode="decimal"' : ''} style="${pos(f.x - 2, f.y + sz + 1.5, widthOf(f, form), sz + 5)} font-size:${(sz / 612 * 100).toFixed(3)}cqw;">`;
+      }).join('');
+    }
+  }
+  function refreshOverlays(form, c){
+    const s = saved(form), sig = settings && settings.signature, host = $('pfPages'); if(!host) return;
+    const miss = new Set(missingKeys(form.id, c));
+    host.querySelectorAll('.need').forEach(x=>x.classList.remove('need'));
+    miss.forEach(k=>host.querySelectorAll(`[data-pf="${k}"], [data-sig="${k}"], [data-choice^="${k}|"]`).forEach(x=>x.classList.add('need')));
+    needCount(miss.size);
+    form.fields.forEach(f=>{
+      if(f.sec) return;
+      const v = valOf(f, c, form), changed = Object.prototype.hasOwnProperty.call(s, f.k) && String(s[f.k]) !== defOf(f, c);
+      if(f.type === 'choice'){ host.querySelectorAll(`[data-choice^="${f.k}|"]`).forEach(b=>{ const on = b.dataset.choice.slice(f.k.length + 1) === v; b.classList.toggle('on', on); if(b.classList.contains('pf-mark')) b.textContent = on ? 'X' : ''; }); return; }
+      if(f.type === 'sig'){ const b = host.querySelector(`[data-sig="${f.k}"]`); if(!b) return; const on = (v === true || v === 'yes') && !!sig;
+        b.classList.toggle('on', on); b.innerHTML = on ? `<img src="${esc(sig)}" alt="">` : `<span>${sig ? (f.req ? 'Sign here' : 'Click to sign') : 'No signature saved — sign by hand'}</span>`; return; }
+      const el = host.querySelector(`[data-pf="${f.k}"]`); if(!el) return;
+      el.classList.toggle('changed', changed);
+      if(document.activeElement !== el) el.value = f.money && v ? Number(v).toLocaleString('en-US') : v;
+    });
+  }
+  function listBody(form, c){
+    const s = saved(form), sig = settings && settings.signature, miss = new Set(missingKeys(form.id, c));
+    needCount(miss.size);
     let body = '', grid = [];
     const flush = ()=>{ if(grid.length){ body += `<div class="pf-grid">${grid.join('')}</div>`; grid = []; } };
     form.fields.forEach(f=>{
@@ -257,39 +354,74 @@
       const undo = changed ? `<button type="button" class="pf-x" data-undo="${f.k}">Use the hub's: ${esc(defOf(f, c) || '(blank)')}</button>` : '';
       if(f.type === 'sig'){
         flush();
-        body += `<div class="pf-sig"><label style="display:flex; gap:8px; align-items:center; cursor:${sig ? 'pointer' : 'default'};"><input type="checkbox" data-pf="${f.k}" ${v === true || v === 'yes' ? 'checked' : ''} ${sig ? '' : 'disabled'}> ${esc(f.l)}: add ${esc(c.co.applicant || 'the applicant')}'s signature</label>
+        body += `<div class="pf-sig ${miss.has(f.k) ? 'need' : ''}"><label style="display:flex; gap:8px; align-items:center; cursor:${sig ? 'pointer' : 'default'};"><input type="checkbox" data-pf="${f.k}" ${v === true || v === 'yes' ? 'checked' : ''} ${sig ? '' : 'disabled'}> ${esc(f.l)}: add ${esc(c.co.applicant || 'the applicant')}'s signature</label>
           ${sig ? `<img src="${esc(sig)}" alt="">` : '<span class="pf-note">No signature saved yet — draw it in the Permits app → Settings for the forms.</span>'}</div>`;
         return;
       }
       if(f.type === 'choice'){
-        grid.push(`<label class="pf-f ${changed ? 'changed' : ''}">${esc(f.l)}<select data-pf="${f.k}"><option value="">(none)</option>${f.opts.map(o=>`<option ${o.v === v ? 'selected' : ''}>${esc(o.v)}</option>`).join('')}</select>${undo}</label>`);
+        grid.push(`<label class="pf-f ${changed ? 'changed' : ''} ${miss.has(f.k) ? 'need' : ''}">${esc(f.l)}${f.req ? ' *' : ''}<select data-pf="${f.k}"><option value="">(none)</option>${f.opts.map(o=>`<option ${o.v === v ? 'selected' : ''}>${esc(o.v)}</option>`).join('')}</select>${undo}</label>`);
         return;
       }
-      grid.push(`<label class="pf-f ${changed ? 'changed' : ''}">${esc(f.l)}<input type="text" data-pf="${f.k}" value="${esc(f.money && v ? Number(v).toLocaleString('en-US') : v)}" ${f.money ? 'inputmode="decimal"' : ''}>${undo}</label>`);
+      grid.push(`<label class="pf-f ${changed ? 'changed' : ''} ${miss.has(f.k) ? 'need' : ''}">${esc(f.l)}${f.req ? ' *' : ''}<input type="text" data-pf="${f.k}" value="${esc(f.money && v ? Number(v).toLocaleString('en-US') : v)}" ${f.money ? 'inputmode="decimal"' : ''}>${undo}</label>`);
     });
     flush();
-    ov.innerHTML = `<div class="pf-box"><div class="pf-head"><h2>${esc(form.title)} · ${esc([c.job.community, c.job.lot ? 'Lot ' + c.job.lot : ''].filter(Boolean).join(' '))}</h2>
-        <button type="button" class="pm-btn primary" data-act="download">Download PDF</button><button type="button" class="pm-btn" data-act="open">Open to print</button><button type="button" class="pm-btn" data-act="close">Close</button></div>
-      <div class="pf-body">${missing ? '<p class="pf-note" style="color:#b3261e; font-weight:700;">Alden\'s details aren\'t set yet — type them in the Permits app → Settings for the forms.</p>' : ''}
-        <p class="pf-note">Every blank on the form. Boxes start with what the hub knows; change anything, or fill in what's empty. Changes are saved for this home (a yellow box was changed by hand). Leave a box empty to leave that blank on the form.</p>
-        ${body}
-        <p class="pf-note" style="margin-top:14px;">The office-use-only parts of the form are left for the borough.</p></div></div>`;
-    if(focus){ const el = ov.querySelector(`[data-pf="${focus}"]`); if(el){ el.focus(); if(el.setSelectionRange && el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } }
+    return body;
   }
-  function closeEditor(){ ed = null; const ov = $('pfOv'); if(ov) ov.remove(); }
+  function renderEditor(){
+    if(!ed || !hasJob()) return;
+    const form = { id: ed.form, ...FORMS[ed.form] }, c = ctx(), view = ed.view || 'form';
+    let ov = $('pfOv');
+    if(!ov){
+      ov = document.createElement('div'); ov.className = 'pf-ov'; ov.id = 'pfOv';
+      ov.addEventListener('click', onEdClick); ov.addEventListener('change', onEdChange);
+      document.body.appendChild(ov);
+      if(!$('pfCss')){ const st = document.createElement('style'); st.id = 'pfCss'; st.textContent = CSS; document.head.appendChild(st); }
+    }
+    const key = ed.form + '|' + view + '|' + J().id;
+    if(ov.dataset.built !== key){
+      const missing = !c.co.name || !c.co.address;
+      ov.dataset.built = key;
+      ov.innerHTML = `<div class="pf-box ${view === 'form' ? 'wide' : ''}"><div class="pf-head"><h2>${esc(form.title)} · ${esc([c.job.community, c.job.lot ? 'Lot ' + c.job.lot : ''].filter(Boolean).join(' '))}</h2>
+          <span class="pf-needn" id="pfNeed"></span>
+          <span class="pf-views"><button type="button" data-view="form" class="${view === 'form' ? 'on' : ''}">On the form</button><button type="button" data-view="list" class="${view === 'list' ? 'on' : ''}">As a list</button></span>
+          <button type="button" class="pm-btn primary" data-act="download">Download PDF</button><button type="button" class="pm-btn" data-act="open">Open to print</button><button type="button" class="pm-btn" data-act="close">Close</button></div>
+        <div class="pf-body">${missing ? '<p class="pf-note" style="color:#b3261e; font-weight:700;">Alden\'s details aren\'t set yet — type them in the Permits app → Settings for the forms.</p>' : ''}
+          ${view === 'form'
+            ? `<p class="pf-note">Fill it in like the paper form: type on any line (the hub has filled in what it knows), click a choice to circle or mark it, click a signature line to sign. Changes are saved for this home; a darker yellow box was changed by hand. The office-use-only parts are left for the borough.</p>
+               <div class="pf-pages" id="pfPages">${Array.from({ length: form.pages }, (_, p)=>`<div class="pf-page" data-page="${p}"><div class="pf-cv"><div class="pf-loading">Loading the page…</div></div><div class="pf-ol"></div></div>`).join('')}</div>`
+            : `<p class="pf-note">Every blank on the form. Boxes start with what the hub knows; change anything, or fill in what's empty. Changes are saved for this home (a yellow box was changed by hand). Leave a box empty to leave that blank on the form.</p><div id="pfList"></div><p class="pf-note" style="margin-top:14px;">The office-use-only parts of the form are left for the borough.</p>`}</div></div>`;
+      if(view === 'form'){ buildOverlays(form); drawPages(ed.form, $('pfPages')).catch(err=>{ console.error(err); document.querySelectorAll('.pf-loading').forEach(x=>{ x.textContent = 'The page couldn\'t be shown — use "As a list".'; }); }); }
+    }
+    if(view === 'form') refreshOverlays(form, c);
+    else {
+      const focus = document.activeElement && ov.contains(document.activeElement) ? document.activeElement.dataset.pf : null;
+      $('pfList').innerHTML = listBody(form, c);
+      if(focus){ const el = ov.querySelector(`[data-pf="${focus}"]`); if(el){ el.focus(); if(el.setSelectionRange && el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } }
+    }
+  }
+  function needCount(n){ const el = $('pfNeed'); if(!el) return; el.className = 'pf-needn ' + (n ? 'bad' : 'ok'); el.textContent = n ? n + ' still to fill in' : 'All filled in'; }
+  function closeEditor(){ ed = null; const ov = $('pfOv'); if(ov) ov.remove(); if(hasJob()) renderPermits(); }
   document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && ed) closeEditor(); });
-  function onEdChange(e){
-    const el = e.target; if(!el.dataset || !el.dataset.pf) return;
-    const form = FORMS[ed.form], f = form.fields.find(x=>x.k === el.dataset.pf); if(!f) return;
-    let v = el.type === 'checkbox' ? el.checked : el.value.trim().slice(0, 200);
-    if(f.money && v !== '') v = String(v).replace(/[$,\s]/g, '');
+  // one answer changed: shown at once, saved for this home; a home style's size is remembered for the next house of that style
+  function setVal(f, v){
     const s = { ...(saved({ id: ed.form })) }; s[f.k] = v;
-    J().permits = { ...(J().permits || {}), forms: { ...((J().permits || {}).forms || {}), [ed.form]: s } };   // shows at once; the save follows
+    J().permits = { ...(J().permits || {}), forms: { ...((J().permits || {}).forms || {}), [ed.form]: s } };
     save({ forms: { [ed.form]: { [f.k]: v } } });
-    // a home style's size: remember it for the next house of that style
     if(f.size && J().model && v !== '' && isFinite(Number(String(v).replace(/[^\d.]/g, '')))){
       db.collection('settings').doc('permits').set({ models: { [String(J().model).toLowerCase()]: { [f.size]: Number(String(v).replace(/[^\d.]/g, '')) } } }, { merge: true }).catch(err=>console.error(err));
     }
+  }
+  function onEdChange(e){
+    const el = e.target; if(!el.dataset || !el.dataset.pf) return;
+    const f = FORMS[ed.form].fields.find(x=>x.k === el.dataset.pf); if(!f) return;
+    let v = el.type === 'checkbox' ? el.checked : el.value.trim().slice(0, 200);
+    if(f.money && v !== '') v = String(v).replace(/[$,\s]/g, '');
+    setVal(f, v);
+    // a typed box: just mark it (redrawing now would take away the box the person is moving to)
+    if(el.type === 'text'){ const c = ctx(), changed = String(v) !== defOf(f, c); el.classList.toggle('changed', changed); const lab = el.closest('.pf-f'); if(lab) lab.classList.toggle('changed', changed);
+      const miss = new Set(missingKeys(ed.form, c)); needCount(miss.size);
+      document.querySelectorAll('#pfOv [data-pf]').forEach(x=>{ const t = x.closest('.pf-f') || x; t.classList.toggle('need', miss.has(x.dataset.pf)); });
+      return; }
     renderEditor();
   }
   async function onEdClick(e){
@@ -298,8 +430,22 @@
     if(u){ const k = u.dataset.undo, s = { ...(saved({ id: ed.form })) }; delete s[k];
       J().permits = { ...(J().permits || {}), forms: { ...((J().permits || {}).forms || {}), [ed.form]: s } };
       save({ forms: { [ed.form]: { [k]: firebase.firestore.FieldValue.delete() } } }); renderEditor(); return; }
+    const vw = e.target.closest('[data-view]'); if(vw){ ed.view = vw.dataset.view; renderEditor(); return; }
+    const ch = e.target.closest('[data-choice]');
+    if(ch){ const i = ch.dataset.choice.indexOf('|'), k = ch.dataset.choice.slice(0, i), v = ch.dataset.choice.slice(i + 1);
+      const f = FORMS[ed.form].fields.find(x=>x.k === k), cur = valOf(f, ctx(), { id: ed.form });
+      setVal(f, cur === v ? '' : v); renderEditor(); return; }
+    const sg = e.target.closest('[data-sig]');
+    if(sg){ if(!settings || !settings.signature){ alert('No signature saved yet — draw it in the Permits app → Settings for the forms.'); return; }
+      const f = FORMS[ed.form].fields.find(x=>x.k === sg.dataset.sig), cur = valOf(f, ctx(), { id: ed.form });
+      setVal(f, !(cur === true || cur === 'yes')); renderEditor(); return; }
     const a = e.target.closest('[data-act]'); if(!a) return;
     if(a.dataset.act === 'close'){ closeEditor(); return; }
+    const miss = missingKeys(ed.form, ctx());
+    if(miss.length){
+      const names = miss.map(k=>(FORMS[ed.form].fields.find(f=>f.k === k) || {}).l);
+      if(!confirm('Still to fill in (red on the form):\n\n• ' + names.join('\n• ') + '\n\n' + (a.dataset.act === 'open' ? 'Open it to print anyway?' : 'Download it anyway?'))) return;
+    }
     const w = a.dataset.act === 'open' ? window.open('', '_blank') : null;
     if(w) w.document.write('<p style="font:16px sans-serif;padding:24px">Filling in the form…</p>');
     a.disabled = true; const was = a.textContent; a.textContent = 'Filling in…';
@@ -334,7 +480,7 @@
       if(f.sec) return;
       const v = valOf(f, c, form), page = pages[f.p]; if(!page) return;
       if(f.type === 'sig'){
-        if((v === true || v === 'yes') && sigImg){ const h = 26, w = Math.min(190, sigImg.width * h / sigImg.height); page.drawImage(sigImg, { x: f.x, y: f.y - 4, width: w, height: w * sigImg.height / sigImg.width }); }
+        if((v === true || v === 'yes') && sigImg){ const h = 26, w = Math.min(f.w || 190, sigImg.width * h / sigImg.height); page.drawImage(sigImg, { x: f.x, y: f.y - 4, width: w, height: w * sigImg.height / sigImg.width }); }
         return;
       }
       if(f.type === 'choice'){
