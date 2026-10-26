@@ -341,12 +341,20 @@ const UP_FLAG = 0.10;   // a rise of 10% or more is shown in red
 let openItem = '', showOnce = false;
 const normKey = s=>String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const vendKey = v=>normKey(v).replace(/\b(inc|llc|co|company|corp|the)\b/g, '').replace(/\s+/g, ' ').trim();
+/* only REAL items (owner, 2026-10-26: "not concrete or the boom material line, just real items with model numbers that might be bought
+   on repeat"): the line needs a model / part number with a digit in it (so LABOR, INSTALL, BOOMCHARGE… are out), a positive quantity,
+   and isn't labor, installation, delivery, a fee, a rental or a credit. */
+const NOT_ITEM = /\b(labou?r|install(ation)?|deliver(y|ed)?|freight|fuel|haul(ing)?|boom|charge|fee|rental|rent|waiver|credit|deposit|permit|service call|trip)\b/i;
+const realItem = (l, x)=>{
+  const sku = String(l.sku || '').trim();
+  return sku.length >= 3 && /\d/.test(sku) && (Number(l.qty) || 0) > 0 && !NOT_ITEM.test(l.item || '') && !NOT_ITEM.test(sku) && !/rental/i.test(x.vendor || '');
+};
 function itemGroups(){
   const g = {};
-  invoices.forEach(x=>(x.lines || []).forEach(l=>{
+  invoices.forEach(x=>(x.lines || []).filter(l=>realItem(l, x)).forEach(l=>{
     const unit = Number(l.unitPrice) || (Number(l.qty) ? (Number(l.amount) || 0) / Number(l.qty) : 0);
     if(!(unit > 0)) return;
-    const key = vendKey(x.vendor) + '|' + (l.sku ? 'sku ' + normKey(l.sku) : normKey(l.item));
+    const key = vendKey(x.vendor) + '|sku ' + normKey(l.sku);
     const e = g[key] || (g[key] = { key, item: l.item, sku: l.sku, vendor: x.vendor, unit: l.unit, buys: [] });
     e.buys.push({ date: x.date || String(x.createdAt || '').slice(0, 10), inv: x.id, number: x.number, home: (x.splits || []).map(s=>s.houseLabel).filter(Boolean).join(', '), qty: l.qty, price: unit, item: l.item });
   }));
@@ -370,7 +378,7 @@ function itemsView(q){
   const ups = all.filter(e=>e.change != null && e.change >= UP_FLAG).length;
   const pct = Math.round(UP_FLAG * 100);
   return (missing ? `<div class="batch" style="margin-top:8px;"><span>${missing} invoice${missing === 1 ? " from before item tracking hasn't" : "s from before item tracking haven't"} had their items read yet.</span><button type="button" class="btn2 primary" id="readOld">Read them now</button><span class="muted" id="readOldNote"></span></div>` : '')
-    + `<p class="lede" style="margin-top:10px;">Items bought more than once, grouped by vendor and model / item number. The newest price is compared with the one before it; a rise of ${pct}% or more is in red. Click an item to see every time it was bought. ${ups ? `<b class="up">${ups} item${ups === 1 ? ' has' : 's have'} gone up ${pct}% or more.</b>` : ''}</p>
+    + `<p class="lede" style="margin-top:10px;">Products with a model or part number (not concrete, labor, delivery, fees or rentals), grouped by vendor and model number. The newest price is compared with the one before it; a rise of ${pct}% or more is in red. Click an item to see every time it was bought. ${ups ? `<b class="up">${ups} item${ups === 1 ? ' has' : 's have'} gone up ${pct}% or more.</b>` : ''}</p>
     <label style="font-size:13.5px; display:inline-flex; gap:6px; align-items:center; margin-top:6px;"><input type="checkbox" id="showOnce" ${showOnce ? 'checked' : ''}> Also show items bought only once (${all.length - many})</label>`
     + (rows.length ? `<table class="iv"><thead><tr><th>Item</th><th>Model / #</th><th>Vendor</th><th class="num">Times</th><th class="num">Latest</th><th class="num">Before</th><th class="num">Change</th><th>Last bought</th></tr></thead><tbody>`
       + rows.map(e=>{ const ch = e.change == null ? '' : `<span class="${e.change >= UP_FLAG ? 'up' : e.change < 0 ? 'down' : ''}">${e.change > 0 ? '+' : ''}${(e.change * 100).toFixed(1)}%</span>`;
