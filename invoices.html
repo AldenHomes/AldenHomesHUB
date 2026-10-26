@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alden Hub">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Alden Homes | Invoices</title>
+<style>
+  :root{
+    --navy:#4B4F54; --navy-2:#33363a; --steel-line:#d4d2c8; --paper:#f5f4ef; --paper-2:#ffffff;
+    --ink:#33363a; --ink-soft:#6b6f72; --rust:#A3AA83; --rust-2:#6B7355; --amber:#c98a2b;
+    --good:#3f7a4e; --danger:#b3452f;
+    --shadow: 0 1px 2px rgba(30,32,34,.08), 0 4px 14px rgba(30,32,34,.06);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  .titlebar{background:var(--paper-2); padding:20px clamp(16px,4vw,40px); border-bottom:4px solid var(--rust);
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;}
+  .brand-mark{height:40px; flex:none; display:flex; align-items:center;}
+  .brand-mark img{height:100%; width:auto; display:block;}
+  h1{font-size:clamp(19px,2.4vw,24px); margin:0; font-weight:700; color:var(--navy);}
+  .subtitle{font-size:12px; color:var(--ink-soft); margin-top:3px; letter-spacing:.6px; text-transform:uppercase;}
+  .titlebar-stats{display:flex; gap:22px;}
+  .stat{text-align:center;}
+  .stat .n{font-size:22px; font-weight:700; color:var(--navy); font-family:"Courier New",monospace;}
+  .stat .l{font-size:10px; color:var(--ink-soft); letter-spacing:.6px; text-transform:uppercase; margin-top:3px;}
+  .titlebar-account{display:flex; align-items:center; gap:12px;}
+  .sync-badge{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-soft); font-family:"Courier New",monospace;}
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:#7fbf8f; flex:none;}
+  .sync-dot.offline{background:var(--danger);}
+  .signout-btn{background:transparent; border:1px solid var(--steel-line); color:var(--ink-soft); padding:5px 10px; border-radius:var(--radius); font-size:11.5px; cursor:pointer;}
+  .signout-btn:hover{background:#f3f1ea; color:var(--navy);}
+
+  .wrap{max-width:1400px; margin:0 auto; padding:22px clamp(14px,4vw,40px) 60px;}
+  .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
+  .back-link:hover{color:var(--navy);}
+  .btn{padding:11px 16px; border-radius:var(--radius); border:1px solid transparent; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-primary:hover{background:var(--navy-2);}
+  .btn:disabled{opacity:.5; cursor:default;}
+  input[type=text], input[type=password], select{padding:11px 11px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; color:var(--ink); background:#fff; font-family:inherit; min-width:0;}
+  input:focus, select:focus{outline:2px solid var(--amber); outline-offset:0; border-color:var(--amber);}
+
+  /* add an item */
+  .add{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); border-top:4px solid var(--rust); padding:16px; margin-bottom:16px;}
+  .add-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .add-row #newText{flex:1 1 100%;}
+  .add-row select{flex:1 1 170px;}
+  .add-row .btn{flex:0 0 auto;}
+  .add-extras{display:flex; gap:10px 16px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:14px; color:var(--ink);}
+  .add-extras label{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
+  .add-extras input[type=date]{padding:8px 9px; font-size:14px;}
+  .add-extras input[type=checkbox]{width:18px; height:18px; accent-color:var(--danger);}
+  .pick-photo{border:1px dashed var(--steel-line); border-radius:var(--radius); padding:8px 12px; font-weight:600; color:var(--navy);}
+  /* high priority: red outline so it can't be missed */
+  .item.high{box-shadow:inset 0 0 0 2px var(--danger); background:#fff8f6;}
+  .tag{display:inline-block; border-radius:20px; padding:1px 9px; margin-right:6px; font-weight:700; font-size:11.5px;}
+  .tag.high{background:var(--danger); color:#fff;}
+  .tag.due{background:#ece8dd; color:var(--ink-soft);}
+  .tag.due.soon{background:#fdf0dc; color:#96661a;}
+  .tag.due.late{background:#fbeae4; color:var(--danger);}
+  .item-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .item-photos a{display:block; width:76px; height:76px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--steel-line);}
+  .item-photos img{width:100%; height:100%; object-fit:cover; display:block;}
+  .item-tools{display:flex; gap:14px; flex-wrap:wrap; margin-top:7px;}
+  .item-tools button{background:none; border:none; padding:0; font-size:12.5px; font-weight:700; color:var(--rust-2); cursor:pointer; font-family:inherit;}
+  .item-tools button:hover{text-decoration:underline;}
+  .item-tools button.warn{color:var(--danger);}
+  /* an item being edited: its wording, home and person become boxes */
+  .item-edit textarea{width:100%; min-height:64px; padding:9px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:15px; line-height:1.45; font-family:inherit; color:var(--ink); resize:vertical;}
+  .item-edit .row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .item-edit select{flex:1 1 180px; min-width:0; padding:8px 9px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit; background:#fff; color:var(--ink);}
+  .item-edit .btns{display:flex; gap:8px; margin-top:10px;}
+  .item-edit .btns button{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:8px 16px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:var(--navy);}
+  .item-edit .btns button.save{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .hint{font-size:12.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
+
+  .filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .filters input{flex:1 1 200px;}
+  .filters select{flex:0 1 200px;}
+
+  /* the list: grouped by home, each item one big tap target */
+  .group{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); margin-bottom:14px; overflow:hidden;}
+  .group-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 14px; background:#f3f5ee; border-bottom:1px solid #dfe3d3; font-size:14px; font-weight:700; color:var(--rust-2);}
+  .group-head a{color:inherit; text-decoration:none;}
+  .group-head a:hover{text-decoration:underline;}
+  .group-head .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; color:var(--ink-soft);}
+  .item{display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-top:1px solid #f1ede3;}
+  .item:first-of-type{border-top:none;}
+  .check{flex:none; width:28px; height:28px; margin-top:1px; border:2px solid var(--steel-line); border-radius:6px; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff; font-size:17px; font-weight:800; line-height:1; padding:0;}
+  .check:hover{border-color:var(--good);}
+  .check.on{background:var(--good); border-color:var(--good);}
+  .item-main{flex:1; min-width:0;}
+  .item-text{font-size:15.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word;}
+  .item.done .item-text{text-decoration:line-through; color:var(--ink-soft);}
+  .item-meta{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+  .who{display:inline-block; background:#eef0e8; color:var(--rust-2); font-weight:700; border-radius:20px; padding:1px 9px; margin-right:6px;}
+  .who.me{background:#fdf0dc; color:#96661a;}
+  .x-btn{flex:none; border:none; background:none; color:#b9b4a5; font-size:20px; line-height:1; cursor:pointer; padding:2px 4px;}
+  .x-btn:hover{color:var(--danger);}
+  .empty{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:36px 20px; text-align:center; color:var(--ink-soft); font-size:14.5px;}
+  .done-toggle{display:flex; align-items:center; gap:8px; width:100%; margin:22px 0 10px; padding:12px 14px; background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-weight:700; color:var(--navy); cursor:pointer; font-family:inherit; text-align:left;}
+  .done-toggle .arrow{display:inline-block; transition:transform .15s; font-size:11px;}
+  .done-toggle.open .arrow{transform:rotate(90deg);}
+  .done-toggle .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
+  .notice{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:13.5px; padding:11px 13px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .notice.show{display:block;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed; inset:0; background:var(--paper); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .auth-gate.hidden{display:none;}
+  .auth-card{width:100%; max-width:400px; background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust); padding:32px 28px;}
+  .auth-card .brand{margin-bottom:22px; pointer-events:none;}
+  .auth-card h2{margin:0; font-size:19px;}
+  .auth-card p{margin:0 0 22px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-soft); margin-bottom:5px;}
+  .auth-field input{width:100%;}
+  .auth-error{background:#fbeae4; border:1px solid #f0c3ae; color:#a8451a; font-size:12.5px; padding:9px 11px; border-radius:var(--radius); margin-bottom:14px; display:none;}
+  .auth-error.show{display:block;}
+  .auth-card .btn-primary{width:100%;}
+  .app-shell.locked{display:none;}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:26px;}
+  @media (max-width:640px){ .titlebar-stats{display:none;} }
+  /* ---- phone-size fixes ---- */
+html, body{max-width:100%; overflow-x:clip;}
+  @media (max-width:640px){
+    /* header buttons wrap instead of running off the side; the signed-in email drops to its own line */
+    .titlebar-account{flex-wrap:wrap; width:100%; gap:8px 10px;}
+    .titlebar-account #currentUserEmail{order:20; flex:1 1 100%; overflow-wrap:anywhere;}
+    /* the green "Synced" light sits up beside the page title, out of the button row */
+    .titlebar{position:relative;}
+    .titlebar .sync-badge{position:absolute; top:16px; right:14px;}
+    .titlebar .brand{padding-right:74px;}
+  }
+  .item-text, .group-head{overflow-wrap:anywhere;}
+  @media (max-width:640px){
+    .add-row select{flex:1 1 100%;}
+    .add-row .btn{flex:1 1 100%;}
+    .filters select{flex:1 1 100%;}
+    .item-tools{gap:6px 14px;}
+  }
+  /* job costing */
+  .card2{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:18px 20px; margin-top:16px;}
+  .card2 h2{font-size:17px; color:var(--navy); margin:0;}
+  .lede{color:var(--ink-soft); font-size:14px; line-height:1.5; margin-top:6px;}
+  .imp-row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;}
+  .imp-warn{background:#fdf3e2; border:1px solid #ecd9b0; color:#6e4a10; border-radius:var(--radius); padding:10px 12px; font-size:14px; margin-top:12px; line-height:1.45;}
+  .imp-ok{background:#eaf1ec; border:1px solid #c5dccb; color:#27573a; border-radius:var(--radius); padding:10px 12px; font-size:14px; margin-top:12px;}
+  table.jc{width:100%; border-collapse:collapse; font-size:14px; margin-top:10px;}
+  table.jc th{text-align:left; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); padding:7px 8px; border-bottom:2px solid var(--steel-line);}
+  table.jc td{padding:8px; border-bottom:1px solid #f1ede3; vertical-align:middle;}
+  table.jc .num{text-align:right; font-family:"Courier New",monospace; white-space:nowrap;}
+  table.jc tr.tot td{font-weight:700; border-top:2px solid var(--steel-line); border-bottom:none;}
+  table.jc select{max-width:260px; padding:6px 8px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:13.5px; font-family:inherit;}
+  .home{border-top:1px solid #f1ede3; padding:12px 0;}
+  .home:first-child{border-top:none;}
+  .home-h{display:flex; gap:12px; align-items:center; flex-wrap:wrap; width:100%; background:none; border:none; padding:0; text-align:left; cursor:pointer; font-family:inherit; color:inherit;}
+  .home-h b{font-size:15.5px; color:var(--navy);}
+  .home-h .amt{margin-left:auto; font-family:"Courier New",monospace; font-weight:700; color:var(--navy); font-size:16px;}
+  .home-h .sub{font-size:12.5px; color:var(--ink-soft);}
+  .bar{height:6px; background:#ece8dd; border-radius:3px; overflow:hidden; min-width:60px;}
+  /* a cost code opens to its invoices */
+  tr.code-row{cursor:pointer;} tr.code-row:hover td{background:#faf8f2;} tr.code-row.on td{background:#f3f5ee; font-weight:600;}
+  tr.code-row .caret{display:inline-block; width:12px; color:var(--ink-soft); font-size:11px;}
+  tr.code-lines > td{background:#fbfaf6; padding:4px 10px 10px 26px !important;}
+  table.jc.sublines{margin-top:4px; font-size:13px;} table.jc.sublines th{font-size:10.5px;}
+  .bar span{display:block; height:100%; background:var(--rust-2, #6B7355);}
+  .muted{color:var(--ink-soft);}
+  @media (max-width:700px){ table.jc{display:block; overflow-x:auto; white-space:nowrap;} }
+  /* invoices */
+  .card2{background:var(--paper-2); box-shadow:var(--shadow); border-radius:var(--radius); padding:18px 20px; margin-top:16px;}
+  .card2 h2{font-size:17px; color:var(--navy); margin:0;}
+  .lede{color:var(--ink-soft); font-size:14px; line-height:1.5; margin-top:6px;}
+  .muted{color:var(--ink-soft);}
+  .tabs3{display:flex; gap:6px; flex-wrap:wrap; margin-top:16px;}
+  .tabs3 button{border:1px solid var(--steel-line); background:#fff; border-radius:20px; padding:8px 14px; font-size:14px; font-weight:700; color:var(--ink-soft); cursor:pointer; font-family:inherit;}
+  .tabs3 button.on{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .tabs3 .n{display:inline-block; margin-left:6px; font-size:12px; background:rgba(0,0,0,.08); border-radius:10px; padding:0 7px;}
+  .tabs3 button.on .n{background:rgba(255,255,255,.2);}
+  table.iv{width:100%; border-collapse:collapse; font-size:14px; margin-top:12px;}
+  table.iv th{text-align:left; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); padding:7px 8px; border-bottom:2px solid var(--steel-line); white-space:nowrap;}
+  table.iv td{padding:8px; border-bottom:1px solid #f1ede3; vertical-align:top;}
+  table.iv tr.row{cursor:pointer;} table.iv tr.row:hover td{background:#faf8f2;}
+  table.iv .num{text-align:right; font-family:"Courier New",monospace; white-space:nowrap;}
+  .chipq{display:inline-block; font-size:12px; border-radius:10px; padding:1px 8px; margin:2px 4px 0 0; background:#fdf3e2; color:#8a5d14;}
+  .chipok{display:inline-block; font-size:12px; border-radius:10px; padding:1px 8px; background:#eaf1ec; color:#27573a;}
+  .batch{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:8px 0; border-top:1px solid #f1ede3; font-size:14px;}
+  .batch:first-child{border-top:none;}
+  .bar{flex:0 1 160px; height:6px; background:#ece8dd; border-radius:3px; overflow:hidden;} .bar span{display:block; height:100%; background:var(--rust-2,#6B7355);}
+  .btn2{border:1px solid var(--steel-line); background:#fff; border-radius:var(--radius); padding:8px 13px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:var(--navy);}
+  .btn2.primary{background:var(--navy); border-color:var(--navy); color:#fff;} .btn2.good{background:var(--good); border-color:var(--good); color:#fff;}
+  .btn2:disabled{opacity:.5; cursor:default;}
+  /* one invoice */
+  .ov{position:fixed; inset:0; background:rgba(30,32,34,.45); z-index:150; display:none;} .ov.show{display:block;}
+  .ovbox{position:absolute; inset:16px; background:#fff; border-radius:var(--radius); display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,1fr); overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,.25);}
+  .ovbox iframe{width:100%; height:100%; border:none; background:#eee;}
+  .ovside{overflow:auto; padding:16px 18px;}
+  .ovside h2{margin:0; font-size:18px; color:var(--navy);}
+  .f2{display:block; font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft); margin:12px 0 4px;}
+  .ovside input[type=text], .ovside input[type=date], .ovside select, .ovside textarea{width:100%; padding:8px 9px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit;}
+  .grid2x{display:grid; grid-template-columns:1fr 1fr; gap:0 12px;}
+  .split{border:1px solid var(--steel-line); border-radius:var(--radius); padding:10px; margin-top:8px; background:#faf8f2;}
+  .split .r{display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:8px; align-items:center;}
+  .split .r2{display:flex; gap:10px; align-items:center; margin-top:8px; font-size:13.5px;}
+  .split .why{font-size:12px; color:var(--ink-soft); margin-top:6px; font-style:italic;}
+  .sumline{font-size:13px; margin-top:8px;} .sumline.bad{color:var(--danger); font-weight:700;}
+  .who-chips{display:flex; gap:6px; flex-wrap:wrap;} .who-chips label{display:inline-flex; gap:5px; align-items:center; border:1px solid var(--steel-line); border-radius:20px; padding:4px 10px; font-size:13px; cursor:pointer;}
+  .acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; padding-top:12px; border-top:1px solid var(--steel-line);}
+  @media (max-width:860px){ .ovbox{grid-template-columns:1fr; grid-template-rows:38vh minmax(0,1fr); inset:6px;} }
+</style>
+</head>
+<body>
+
+<div class="auth-gate hidden" id="loginGate">
+  <div class="auth-card">
+    <div class="brand"><div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div><div><h2>Invoices</h2></div></div>
+    <p>Sign in with the account your team set up for you.</p>
+    <div class="auth-error" id="loginError"></div>
+    <div class="auth-field"><label for="loginEmail">Email</label><input type="text" id="loginEmail" placeholder="you@example.com" autocomplete="username"></div>
+    <div class="auth-field"><label for="loginPassword">Password</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="app-shell locked" id="appShell">
+  <div class="titlebar">
+    <a class="brand" href="index.html" title="Back to Alden Homes Hub">
+      <div class="brand-mark"><img src="icons/logo.png" alt="Alden Homes"></div>
+      <div><h1>Invoices</h1><div class="subtitle">Scan, check, then into QuickBooks</div></div>
+    </a>
+    <div class="titlebar-stats">
+      <div class="stat"><div class="n" id="statReview">0</div><div class="l">To review</div></div>
+      <div class="stat"><div class="n" id="statReady">0</div><div class="l">Ready</div></div>
+    </div>
+    <div class="titlebar-account">
+      <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+      <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; Back to the hub</a>
+    <div class="notice" id="blockedNotice">Invoices couldn't be loaded. Check your connection and reload the page.</div>
+
+    <div class="card2">
+      <h2>Upload this week's scan</h2>
+      <p class="lede">One PDF of all the invoices (mail and emailed ones, scanned together) is fine. The hub splits it into invoices, reads each one, and fills in the lot and cost code where it can tell. Anything it isn't sure about goes to <strong>To review</strong>.</p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+        <label class="btn2 primary" style="cursor:pointer;">Choose the PDF<input type="file" id="scanFile" accept=".pdf,application/pdf" multiple style="display:none;"></label>
+        <span class="muted" id="scanNote" style="font-size:13.5px;"></span>
+      </div>
+      <div id="batches" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="tabs3" id="tabs"></div>
+    <div class="card2" style="margin-top:10px;">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;"><input type="text" id="search" placeholder="Search vendor, invoice #, lot…" style="flex:1 1 220px; padding:8px 10px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:14px; font-family:inherit;">
+        <span id="bulk"></span></div>
+      <div id="list"><p class="muted" style="margin-top:12px;">Loading…</p></div>
+    </div>
+
+    <div class="card2">
+      <h2>Who reviews</h2>
+      <p class="lede">These people get a notice on their bell (and an email) when a scan has invoices to review. Anyone can still be added on a single invoice.</p>
+      <div class="who-chips" id="reviewers" style="margin-top:10px;"></div>
+    </div>
+    <footer>Invoices are kept for good, with their PDF, and can be found again here.</footer>
+  </div>
+</div>
+
+<div class="ov" id="ov"><div class="ovbox"><iframe id="pdf" title="The invoice"></iframe><div class="ovside" id="side"></div></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDgANXWyuPfVq9OK_v-a-8rGgesCB-wzz4",
+  authDomain: "alden-homes-hub.firebaseapp.com",
+  projectId: "alden-homes-hub",
+  storageBucket: "alden-homes-hub.firebasestorage.app",
+  messagingSenderId: "70316619103",
+  appId: "1:70316619103:web:8843743409eca22faab2ea",
+  measurementId: "G-RT6T7EEBL0"
+};
+
+/* ============================================================
+   INVOICES (owner, 2026-10-26)
+   The accountant uploads the week's scan; the server (invoicesApi + onInvoiceBatch) splits it into invoices and has Claude read
+   each one: vendor, invoice #, date, total, and which home (lot) and cost code — split when one bill covers more than one.
+   Sure ones go to "Ready for QuickBooks"; the rest to "To review" with the reason, for the reviewers (bell + email).
+   A reviewer fixes the home / code / split and presses "Looks right". The accountant keys ready ones into QuickBooks and ticks
+   "Entered". Nothing is sent to QuickBooks automatically (the accountant prefers to key them in). All data goes through
+   invoicesApi — the collections are server-only, so there is no security rule for them.
+   ============================================================ */
+const INV_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/invoicesApi';
+const HUB_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/hubApi';
+const $ = id=>document.getElementById(id);
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+const money2 = n=>(n < 0 ? '-$' : '$') + Math.abs(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+function setSyncStatus(state){ $('syncDot').classList.toggle('offline', state==='offline'); $('syncLabel').textContent = state==='offline' ? 'Offline' : (state==='saving' ? 'Saving…' : 'Synced'); }
+function homeLabel(j){ return [j.community, j.lot ? 'Lot '+j.lot : '', j.client].filter(Boolean).join(' · ') || 'Unnamed home'; }
+const niceDate = s=>{ if(!s) return ''; const [y, m, d] = s.slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); };
+async function api(body, url){
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(url || INV_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify(body) });
+  if(!res.ok){ const e = new Error('invoicesApi ' + res.status); e.status = res.status; try{ e.body = await res.json(); } catch(x){} throw e; }
+  return res.json();
+}
+let invoices = [], batches = [], codes = {}, reviewers = [], staff = [], jobs = [], tab = 'review', openId = '', draft = null;
+const STATUS = { review:'To review', ready:'Ready for QuickBooks', entered:'Entered in QuickBooks', all:'All' };
+const codeName = c=>c && codes[c] ? c + ' ' + codes[c] : '';
+async function load(){
+  try{
+    const d = await api({ action:'list' });
+    invoices = d.invoices || []; batches = d.batches || []; codes = d.codes || {}; reviewers = d.reviewers || [];
+    $('blockedNotice').classList.remove('show');
+  } catch(err){ console.error(err); $('blockedNotice').classList.add('show'); }
+  render();
+  // still reading a scan: look again shortly
+  clearTimeout(load.t);
+  if(batches.some(b=>b.status === 'waiting' || b.status === 'reading')) load.t = setTimeout(load, 6000);
+  const want = new URLSearchParams(location.search).get('open');
+  if(want && !load.opened && invoices.some(x=>x.id === want)){ load.opened = true; openInvoice(want); }
+}
+
+function render(){
+  const n = s=>invoices.filter(x=>x.status === s).length;
+  $('statReview').textContent = n('review'); $('statReady').textContent = n('ready');
+  $('tabs').innerHTML = ['review', 'ready', 'entered', 'all'].map(k=>`<button type="button" data-tab="${k}" class="${tab === k ? 'on' : ''}">${STATUS[k]}<span class="n">${k === 'all' ? invoices.length : n(k)}</span></button>`).join('');
+  // the scans: being read, done, or failed
+  $('batches').innerHTML = batches.filter(b=>b.status !== 'retried').slice(0, 6).map(b=>{
+    const pct = b.pages ? Math.round((b.progress || 0) / b.pages * 100) : 0;
+    return `<div class="batch"><b>${esc(b.name)}</b><span class="muted">${esc(niceDate(b.at))}${b.by ? ' · ' + esc(b.by) : ''}</span>
+      ${b.status === 'done' ? `<span class="chipok">&#10003; ${b.invoices} invoice${b.invoices === 1 ? '' : 's'} read${b.review ? ' · ' + b.review + ' to review' : ''}</span>`
+      : b.status === 'error' ? `<span class="chipq">Couldn't read it: ${esc(b.error || '')}</span><button type="button" class="btn2" data-retry="${esc(b.id)}">Try again</button>`
+      : `<span class="muted">${b.status === 'waiting' ? 'Waiting to start…' : 'Reading' + (b.pages ? ' page ' + (b.progress || 0) + ' of ' + b.pages : '…')}</span><div class="bar"><span style="width:${pct}%"></span></div>`}</div>`; }).join('');
+  // the list
+  const q = ($('search').value || '').trim().toLowerCase();
+  const rows = invoices.filter(x=>(tab === 'all' || x.status === tab) && (!q || [x.vendor, x.number, x.poJob, x.shipTo, ...(x.splits || []).map(s=>s.houseLabel)].join(' ').toLowerCase().includes(q)))
+    .sort((a, b)=>String(b.date || b.createdAt).localeCompare(String(a.date || a.createdAt)));
+  $('bulk').innerHTML = tab === 'ready' && rows.length ? `<button type="button" class="btn2 good" id="bulkEntered" disabled>Mark ticked as entered</button>` : '';
+  $('list').innerHTML = rows.length ? `<table class="iv"><thead><tr>${tab === 'ready' ? '<th data-nosort><input type="checkbox" id="tickAll" title="Tick all"></th>' : ''}<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Home</th><th>Cost code</th><th class="num">Total</th><th>${tab === 'review' ? 'Needs' : 'Status'}</th></tr></thead><tbody>
+    ${rows.map(x=>{ const sp = x.splits || [];
+      return `<tr class="row" data-open="${esc(x.id)}">${tab === 'ready' ? `<td><input type="checkbox" class="tick" data-tick="${esc(x.id)}"></td>` : ''}<td>${esc(niceDate(x.date) || '—')}</td><td>${esc(x.vendor || '?')}</td><td>${esc(x.number || '')}</td>
+        <td>${sp.length ? sp.map(s=>esc(s.houseLabel || '?')).join('<br>') : '<span class="muted">?</span>'}</td><td>${sp.length ? sp.map(s=>esc(codeName(s.code) || '?') + (s.labor ? ' <span class="muted">labor</span>' : '')).join('<br>') : '<span class="muted">?</span>'}</td>
+        <td class="num">${money2(x.total)}</td>
+        <td>${x.status === 'review' ? (x.reasons || []).slice(0, 3).map(r=>`<span class="chipq">${esc(r)}</span>`).join('') : x.status === 'entered' ? `<span class="chipok">Entered${x.enteredBy ? ' by ' + esc(x.enteredBy) : ''}</span>` : '<span class="chipok">Ready</span>'}</td></tr>`; }).join('')}</tbody></table>`
+    : `<p class="muted" style="margin-top:12px;">${invoices.length ? 'Nothing here.' : 'No invoices yet. Upload a scan above.'}</p>`;
+  $('reviewers').innerHTML = staff.length ? staff.map(s=>`<label><input type="checkbox" data-rev="${esc(s.uid)}" ${reviewers.includes(s.uid) ? 'checked' : ''}> ${esc(s.name)}</label>`).join('') : '<span class="muted">Loading the team…</span>';
+}
+
+/* ---- one invoice: the PDF on the left, what it's for on the right ---- */
+function openInvoice(id){
+  const x = invoices.find(i=>i.id === id); if(!x) return;
+  openId = id;
+  draft = { vendor:x.vendor || '', number:x.number || '', date:x.date || '', total:x.total || 0, note:x.note || '',
+    splits:(x.splits || []).map(s=>({ ...s })), reviewers:[...(x.reviewers || [])] };
+  if(!draft.splits.length) draft.splits.push({ houseId:'', code:0, labor:false, amount:x.total || 0, why:'' });
+  $('pdf').src = x.url;
+  $('ov').classList.add('show');
+  renderSide();
+}
+function renderSide(){
+  const x = invoices.find(i=>i.id === openId); if(!x){ closeInvoice(); return; }
+  const active = jobs.filter(j=>!j.settle || j.settle >= new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)).sort((a, b)=>homeLabel(a).localeCompare(homeLabel(b), undefined, { numeric:true }));
+  const homeOpts = h=>'<option value="">Which home?</option>' + active.map(j=>`<option value="${esc(j.id)}" ${j.id === h ? 'selected' : ''}>${esc(homeLabel(j))}${j.address ? ' — ' + esc(j.address) : ''}</option>`).join('')
+    + (h && !active.some(j=>j.id === h) ? `<option value="${esc(h)}" selected>${esc((jobs.find(j=>j.id === h) && homeLabel(jobs.find(j=>j.id === h))) || 'A home')}</option>` : '');
+  const codeOpts = c=>'<option value="0">Which cost code?</option>' + Object.entries(codes).map(([k, n])=>`<option value="${k}" ${Number(k) === Number(c) ? 'selected' : ''}>${k} ${esc(n)}</option>`).join('');
+  const sum = draft.splits.reduce((t, s)=>t + (Number(s.amount) || 0), 0), off = Math.abs(sum - (Number(draft.total) || 0)) > 0.99;
+  const ro = x.status === 'entered';
+  $('side').innerHTML = `<div style="display:flex; gap:10px; align-items:flex-start;"><div style="flex:1"><h2>${esc(x.vendor || 'Invoice')}</h2>
+      <div class="muted" style="font-size:13px; margin-top:3px;">${esc(STATUS[x.status] || '')}${x.checkedBy ? ' · checked by ' + esc(x.checkedBy) : ''}${x.enteredBy ? ' · entered by ' + esc(x.enteredBy) + ' ' + esc(niceDate(x.enteredAt)) : ''} · pages ${x.pages ? x.pages.join('–') : ''} of the scan</div></div>
+      <button type="button" class="btn2" id="closeInv">Close</button></div>
+    ${x.status === 'review' && (x.reasons || []).length ? `<div style="margin-top:10px;">${x.reasons.map(r=>`<span class="chipq">${esc(r)}</span>`).join('')}</div>` : ''}
+    <div class="grid2x"><div><label class="f2">Vendor</label><input type="text" data-d="vendor" value="${esc(draft.vendor)}" ${ro ? 'disabled' : ''}></div>
+      <div><label class="f2">Invoice #</label><input type="text" data-d="number" value="${esc(draft.number)}" ${ro ? 'disabled' : ''}></div>
+      <div><label class="f2">Date</label><input type="date" data-d="date" value="${esc(draft.date)}" ${ro ? 'disabled' : ''}></div>
+      <div><label class="f2">Total</label><input type="text" data-money data-d="total" value="${draft.total}" ${ro ? 'disabled' : ''}></div></div>
+    ${x.poJob || x.shipTo ? `<div class="muted" style="font-size:12.5px; margin-top:8px;">${x.poJob ? 'PO / job: <b>' + esc(x.poJob) + '</b>' : ''}${x.poJob && x.shipTo ? ' · ' : ''}${x.shipTo ? 'Ship to: ' + esc(x.shipTo) : ''}</div>` : ''}
+    <label class="f2">What it's for</label>
+    ${draft.splits.map((s, i)=>`<div class="split"><div class="r"><select data-s="${i}" data-k="houseId" ${ro ? 'disabled' : ''}>${homeOpts(s.houseId)}</select>
+        <input type="text" data-money data-s="${i}" data-k="amount" value="${s.amount}" title="Amount" ${ro ? 'disabled' : ''}></div>
+      <div class="r2"><select data-s="${i}" data-k="code" style="flex:1" ${ro ? 'disabled' : ''}>${codeOpts(s.code)}</select>
+        <label style="display:inline-flex; gap:5px; align-items:center;"><input type="checkbox" data-s="${i}" data-k="labor" ${s.labor ? 'checked' : ''} ${ro ? 'disabled' : ''}> Labor</label>
+        ${!ro && draft.splits.length > 1 ? `<button type="button" class="btn2" data-unsplit="${i}" title="Remove this part">&times;</button>` : ''}</div>
+      ${s.why ? `<div class="why">${esc(s.why)}</div>` : ''}</div>`).join('')}
+    ${ro ? '' : '<div style="margin-top:8px;"><button type="button" class="btn2" id="addSplit">+ Split it (another home or cost code)</button></div>'}
+    ${draft.splits.length > 1 || off ? `<div class="sumline ${off ? 'bad' : ''}">Parts add up to ${money2(sum)} of ${money2(draft.total)}${off ? ' — they need to match the total' : ''}</div>` : ''}
+    <label class="f2">Who should look at it</label>
+    <div class="who-chips">${staff.map(s=>`<label><input type="checkbox" data-who="${esc(s.uid)}" ${draft.reviewers.includes(s.uid) ? 'checked' : ''} ${ro ? 'disabled' : ''}> ${esc(s.name)}</label>`).join('') || '<span class="muted">Loading…</span>'}</div>
+    <label class="f2">Note</label><textarea data-d="note" rows="2" ${ro ? 'disabled' : ''}>${esc(draft.note)}</textarea>
+    <div class="acts">
+      ${x.status === 'review' ? '<button type="button" class="btn2 good" id="actReady">Looks right → Ready for QuickBooks</button><button type="button" class="btn2" id="actSave">Save</button>' : ''}
+      ${x.status === 'ready' ? '<button type="button" class="btn2 good" id="actEntered">Entered in QuickBooks</button><button type="button" class="btn2" id="actSave">Save changes</button><button type="button" class="btn2" id="actBack">Send back to review</button>' : ''}
+      ${x.status === 'entered' ? '<button type="button" class="btn2" id="actUnenter">Not entered after all</button>' : ''}
+      <div style="flex:1"></div>
+      ${x.status !== 'entered' ? '<button type="button" class="btn2" id="actRemove" style="color:var(--danger);">Not an invoice / remove</button>' : ''}
+      <a class="btn2" href="${esc(x.url)}" target="_blank" rel="noopener" style="text-decoration:none;">Open the PDF</a>
+    </div>`;
+}
+function closeInvoice(){ $('ov').classList.remove('show'); $('pdf').src = 'about:blank'; openId = ''; draft = null; }
+async function saveInvoice(status, extra){
+  setSyncStatus('saving');
+  try{
+    const r = await api({ action:'save', id:openId, status, ...draft, ...(extra || {}) });
+    const i = invoices.findIndex(x=>x.id === openId); if(i >= 0) invoices[i] = r.invoice;
+    setSyncStatus('idle');
+    return true;
+  } catch(err){
+    setSyncStatus('idle');
+    if(err.status === 409 && err.body && err.body.why) alert('Not quite ready:\n\n' + err.body.why.join('\n'));
+    else { console.error(err); alert('Couldn\'t save. Check your connection and try again.'); }
+    return false;
+  }
+}
+$('side').addEventListener('input', e=>{
+  const el = e.target;
+  if(el.dataset.d){ draft[el.dataset.d] = el.dataset.d === 'total' ? Number(el.value) || 0 : el.value; return; }
+  if(el.dataset.s != null && el.dataset.k === 'amount'){ draft.splits[Number(el.dataset.s)].amount = Number(el.value) || 0; }
+});
+$('side').addEventListener('change', e=>{
+  const el = e.target;
+  if(el.dataset.s != null){ const s = draft.splits[Number(el.dataset.s)], k = el.dataset.k;
+    s[k] = k === 'labor' ? el.checked : k === 'code' ? Number(el.value) : k === 'amount' ? Number(el.value) || 0 : el.value; renderSide(); return; }
+  if(el.dataset.who){ draft.reviewers = el.checked ? [...new Set([...draft.reviewers, el.dataset.who])] : draft.reviewers.filter(x=>x !== el.dataset.who); return; }
+  if(el.dataset.d === 'total'){ draft.total = Number(el.value) || 0; renderSide(); }
+});
+$('side').addEventListener('click', async e=>{
+  const t = e.target;
+  if(t.closest('#closeInv')){ closeInvoice(); render(); return; }
+  if(t.closest('#addSplit')){ const left = Math.round(((Number(draft.total) || 0) - draft.splits.reduce((a, s)=>a + (Number(s.amount) || 0), 0)) * 100) / 100;
+    draft.splits.push({ houseId: draft.splits[0] ? draft.splits[0].houseId : '', code:0, labor:false, amount: Math.max(0, left), why:'' }); renderSide(); return; }
+  const un = t.closest('[data-unsplit]'); if(un){ draft.splits.splice(Number(un.dataset.unsplit), 1); renderSide(); return; }
+  if(t.closest('#actSave')){ if(await saveInvoice()){ renderSide(); render(); } return; }
+  if(t.closest('#actReady')){ if(await saveInvoice('ready')){ closeInvoice(); render(); } return; }
+  if(t.closest('#actEntered')){ if(await saveInvoice('entered')){ closeInvoice(); render(); } return; }
+  if(t.closest('#actUnenter')){ if(await saveInvoice('unentered')){ renderSide(); render(); } return; }
+  if(t.closest('#actBack')){ const why = prompt('What needs a look?', ''); if(why === null) return; if(await saveInvoice('review', { reason: why || 'Sent back for a look' })){ renderSide(); render(); } return; }
+  if(t.closest('#actRemove')){ if(!confirm('Remove this from the invoices? (Use it for a page that isn\'t an invoice, or a duplicate.)')) return;
+    try{ await api({ action:'remove', id:openId }); invoices = invoices.filter(x=>x.id !== openId); closeInvoice(); render(); } catch(err){ console.error(err); alert('Couldn\'t remove it.'); } return; }
+});
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && openId){ closeInvoice(); render(); } });
+
+/* ---- the list, tabs, scans, reviewers ---- */
+$('tabs').addEventListener('click', e=>{ const b = e.target.closest('[data-tab]'); if(b){ tab = b.dataset.tab; render(); } });
+$('search').addEventListener('input', render);
+$('list').addEventListener('click', e=>{
+  if(e.target.closest('input[type=checkbox]')){ const ticks = [...document.querySelectorAll('.tick')];
+    if(e.target.id === 'tickAll') ticks.forEach(c=>{ c.checked = e.target.checked; });
+    const b = $('bulkEntered'); if(b){ const n = ticks.filter(c=>c.checked).length; b.disabled = !n; b.textContent = n ? `Mark ${n} as entered in QuickBooks` : 'Mark ticked as entered'; }
+    return; }
+  const r = e.target.closest('[data-open]'); if(r) openInvoice(r.dataset.open);
+});
+$('bulk').addEventListener('click', async e=>{
+  if(!e.target.closest('#bulkEntered')) return;
+  const ids = [...document.querySelectorAll('.tick')].filter(c=>c.checked).map(c=>c.dataset.tick);
+  if(!ids.length || !confirm(`Mark ${ids.length} invoice${ids.length === 1 ? '' : 's'} as entered in QuickBooks?`)) return;
+  setSyncStatus('saving');
+  for(const id of ids){ try{ const r = await api({ action:'save', id, status:'entered' }); const i = invoices.findIndex(x=>x.id === id); if(i >= 0) invoices[i] = r.invoice; } catch(err){ console.error(err); } }
+  setSyncStatus('idle'); render();
+});
+$('batches').addEventListener('click', async e=>{
+  const b = e.target.closest('[data-retry]'); if(!b) return;
+  b.disabled = true;
+  try{ await api({ action:'retry', id:b.dataset.retry }); await load(); } catch(err){ console.error(err); alert('Couldn\'t start it again.'); b.disabled = false; }
+});
+$('reviewers').addEventListener('change', async e=>{
+  const c = e.target.closest('[data-rev]'); if(!c) return;
+  reviewers = c.checked ? [...new Set([...reviewers, c.dataset.rev])] : reviewers.filter(x=>x !== c.dataset.rev);
+  try{ await api({ action:'settings', reviewers }); } catch(err){ console.error(err); alert('Couldn\'t save who reviews.'); }
+});
+// upload: read the file in the browser and send it (a scan up to about 20 MB)
+$('scanFile').addEventListener('change', async e=>{
+  const files = [...e.target.files]; e.target.value = '';
+  for(const f of files){
+    if(f.size > 20 * 1024 * 1024){ alert(f.name + ' is too big (over about 20 MB). Scan it in two parts.'); continue; }
+    $('scanNote').textContent = 'Uploading ' + f.name + '…';
+    try{
+      const data = await new Promise((ok, bad)=>{ const r = new FileReader(); r.onload = ()=>ok(String(r.result).split(',')[1]); r.onerror = bad; r.readAsDataURL(f); });
+      await api({ action:'upload', name:f.name, data });
+      $('scanNote').textContent = 'Uploaded. The hub is reading it now; this takes a minute or two. You can leave this page.';
+    } catch(err){ console.error(err); $('scanNote').textContent = ''; alert(err.status === 503 ? 'Reading invoices is switched off on the server.' : err.status === 400 ? f.name + ' isn\'t a PDF the hub can read.' : 'The upload didn\'t go through. Check your connection and try again.'); }
+  }
+  await load();
+});
+
+/* ---- sign-in ---- */
+function showLoginGate(){ $('loginGate').classList.remove('hidden'); $('appShell').classList.add('locked'); }
+function showApp(user){ $('loginGate').classList.add('hidden'); $('appShell').classList.remove('locked'); $('currentUserEmail').textContent = user.email || ''; }
+function doLogin(){
+  const email = $('loginEmail').value.trim(), password = $('loginPassword').value, errBox = $('loginError');
+  errBox.classList.remove('show');
+  if(!email || !password){ errBox.textContent = 'Enter both an email and a password.'; errBox.classList.add('show'); return; }
+  firebase.auth().signInWithEmailAndPassword(email, password).catch(err=>{
+    errBox.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(err.code) ? 'Email or password is incorrect.' : 'Sign-in failed: ' + err.message;
+    errBox.classList.add('show'); });
+}
+$('loginSubmitBtn').addEventListener('click', doLogin);
+$('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let started = false;
+firebase.auth().onAuthStateChanged(user=>{
+  if(user && !user.isAnonymous){
+    showApp(user);
+    if(started) return; started = true;
+    db.collection('jobs').onSnapshot(s=>{ jobs = s.docs.map(d=>({ id:d.id, ...d.data() })); if(openId) renderSide(); }, err=>console.error('jobs', err));
+    api({ action:'staff' }, HUB_API).then(d=>{ staff = d.staff || []; render(); if(openId) renderSide(); }).catch(err=>console.error('team', err));
+    load();
+  } else showLoginGate();
+});
+</script>
+<script src="moneyfmt.js"></script>
+<script src="sorttables.js"></script>
+<script src="hubsearch.js"></script>
+<script src="assistant.js"></script>
+</body>
+</html>

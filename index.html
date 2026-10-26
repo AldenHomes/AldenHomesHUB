@@ -85,6 +85,7 @@
   .bell-item .kind.subNote{background:#eef0e8; color:var(--rust-2);}
   .bell-item .kind.costOver{background:#fbeae4; color:var(--danger);}
   .bell-item .kind.selPrice{background:#fdf3e2; color:#8a5d14;}
+  .bell-item .kind.invReview{background:#fdf3e2; color:#8a5d14;}
   .bell-item .kind.subWaiting{background:#fbeee0; color:#96661a;}
   .bell-foot{display:block; padding:10px 14px; border-top:1px solid #ece8dd; text-align:center; font-size:12px; color:var(--ink-soft);}
 
@@ -483,6 +484,15 @@ html, body{max-width:100%; overflow-x:clip;}
           <p class="tile-desc">What each home has cost, by cost code. Import the QuickBooks report here.</p>
         </div>
       </a>
+      <a class="tile" id="invoicesTile" href="invoices.html">
+        <div class="tile-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+        </div>
+        <div>
+          <h3 class="tile-title">Invoices</h3>
+          <p class="tile-desc">Upload the week's scanned invoices. The hub fills in the lot and cost code, flags the unsure ones for review, and lists what's ready for QuickBooks.</p>
+        </div>
+      </a>
       <a class="tile" id="historyTile" href="history.html">
         <div class="tile-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
@@ -667,9 +677,10 @@ function renderBell(){
   document.getElementById('bellClear').style.display = unread ? '' : 'none';
   // Something from a sub (declined, sent a note, hasn't answered) opens that job on the schedule,
   // where another vendor can be picked. A staff note opens the home's notes.
-  const BELL_KINDS = { subDeclined:'Declined', subNote:'Sub note', subWaiting:'No answer', costOver:'Over usual', selPrice:'Price needed' };
+  const BELL_KINDS = { subDeclined:'Declined', subNote:'Sub note', subWaiting:'No answer', costOver:'Over usual', selPrice:'Price needed', invReview:'Invoices' };
   const bellLink = n=>n.todo && !(n.houseId && (n.replies || []).length) ? 'punch.html'   // a comment on a punch item is read on the home's page
     : n.kind === 'selPrice' ? `selections.html?open=${encodeURIComponent(n.sheetId || '')}`
+    : n.kind === 'invReview' ? (n.invoiceId ? `invoices.html?open=${encodeURIComponent(n.invoiceId)}` : 'invoices.html')
     : n.kind === 'costOver' ? `house.html?id=${encodeURIComponent(n.houseId || '')}#costs`
     : BELL_KINDS[n.kind] ? `construction.html?house=${encodeURIComponent(n.houseId || '')}&task=${encodeURIComponent(n.taskId || '')}`
     : `house.html?id=${encodeURIComponent(n.houseId || '')}#notes`;
@@ -1067,6 +1078,7 @@ function renderMyWork(){
   const punchRow = t=>`<div class="mw-row"><button type="button" class="mw-check" data-mw-check="${escHtml(t.id)}" aria-label="Mark as done" title="Done"></button>
       <div class="mw-main"><div class="mw-t">${escHtml(t.text || '')}</div><div class="mw-m">${t.priority === 'high' ? '<span class="mw-chip red">High priority</span> ' : ''}${dueTag(t)}${escHtml(where(t))}</div>${punchPics(t)}</div></div>`;
   const noteHref = x=>x.kind === 'selPrice' ? `selections.html?open=${encodeURIComponent(x.sheetId || '')}`
+    : x.kind === 'invReview' ? (x.invoiceId ? `invoices.html?open=${encodeURIComponent(x.invoiceId)}` : 'invoices.html')
     : ['subDeclined', 'subNote', 'subWaiting'].includes(x.kind)
     ? `construction.html?house=${encodeURIComponent(x.houseId || '')}&task=${encodeURIComponent(x.taskId || '')}`
     : (x.houseId ? `house.html?id=${encodeURIComponent(x.houseId)}#notes` : 'punch.html');

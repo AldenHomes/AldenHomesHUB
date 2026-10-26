@@ -1860,6 +1860,261 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
 });
 
 /* ============================================================
+   INVOICES (owner, 2026-10-26). The accountant scans the week's invoices (mail and PDFs) into one PDF and uploads it on
+   invoices.html. Claude reads every page: where each invoice starts and ends, vendor, invoice #, date, total, PO / job and ship-to,
+   then which home (lot) it's for and which cost code — split over homes or codes when an invoice covers more than one. Sure ones
+   are "Ready for QuickBooks"; the rest "Need review" with the reason, for the reviewers (the accountant and/or Chase), who get a bell
+   notice. The accountant keys ready ones into QuickBooks and ticks "Entered". Corrections teach the hub each vendor's usual code.
+   Everything is read and written through invoicesApi (staff token) — no security rule: the collections `invoices`,
+   `invoice-batches` and `settings/invoices` are server-only, and PDFs live in Storage under invoices/ with a download-token url.
+   ============================================================ */
+const INV_MODEL = 'claude-opus-5-5';
+const INV_PAGES_PER_CALL = 20;      // pages per Claude request; an invoice running across two requests is joined back together
+// the cost codes the office uses (from Cost History); "labor" marks a subcontractor's work rather than material
+const INV_CODES = { 5: 'Engineering', 10: 'Permits', 12: 'Excavation', 14: 'Footers/Found.', 16: 'Concrete', 30: 'Lumber', 32: 'Windows & Doors',
+  34: 'Framing', 36: 'Shingles', 38: 'Insulation', 40: 'Siding/Fascia', 41: 'Railing', 42: 'Brick', 44: 'Spouting', 50: 'Plumbing', 51: 'Sprinklers',
+  52: 'Heating', 54: 'Electrical', 55: 'Energy Star', 56: 'Drywall', 57: 'Special Stairs', 58: 'Trim', 59: 'Shelving/Mirrors', 60: 'Paint',
+  70: 'Kitchen/Vanities', 71: 'Fireplace', 72: 'Flooring', 74: 'Appliances', 76: 'Driveway', 78: 'Landscape', 80: 'Utilities', 90: 'Miscellaneous', 91: 'Warranty' };
+const invKey = v=>String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\b(inc|llc|co|company|corp|the)\b/g, '').trim();
+const invHomeLabel = j=>[j.community, j.lot ? 'Lot ' + j.lot : '', j.client].filter(Boolean).join(' · ') || 'A home';
+async function invSettings(){ const d = await db.collection('settings').doc('invoices').get(); return d.exists ? d.data() : {}; }
+// is an invoice complete enough to go straight to the accountant?
+function invCheck(inv, jobsById){
+  const why = [];
+  const splits = inv.splits || [];
+  if(!splits.length) why.push('No home or cost code yet');
+  splits.forEach(s=>{ if(!s.houseId || !jobsById[s.houseId]) why.push('Which home?'); if(!INV_CODES[s.code]) why.push('Which cost code?'); });
+  const sum = splits.reduce((t, s)=>t + (Number(s.amount) || 0), 0);
+  if(splits.length && Math.abs(sum - (Number(inv.total) || 0)) > 0.99) why.push('The split amounts don\'t add up to the total');
+  return [...new Set(why)];
+}
+const INV_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['invoices'],
+  properties: { invoices: { type: 'array', items: {
+    type: 'object', additionalProperties: false,
+    required: ['firstPage', 'lastPage', 'continuesPrevious', 'isInvoice', 'vendor', 'invoiceNumber', 'invoiceDate', 'total', 'poJob', 'shipTo', 'splits', 'sure', 'questions'],
+    properties: {
+      firstPage: { type: 'integer' }, lastPage: { type: 'integer' },
+      continuesPrevious: { type: 'boolean' }, isInvoice: { type: 'boolean' },
+      vendor: { type: 'string' }, invoiceNumber: { type: 'string' }, invoiceDate: { type: 'string' }, total: { type: 'number' },
+      poJob: { type: 'string' }, shipTo: { type: 'string' },
+      splits: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['homeId', 'code', 'labor', 'amount', 'why'],
+        properties: { homeId: { type: 'string' }, code: { type: 'integer' }, labor: { type: 'boolean' }, amount: { type: 'number' }, why: { type: 'string' } } } },
+      sure: { type: 'boolean' }, questions: { type: 'array', items: { type: 'string' } },
+    } } } },
+};
+const INV_RULES = `You read scanned invoices for Alden Homes, a home builder in Lebanon, PA. The pages are one week's invoices scanned together
+(supplier bills and subcontractor bills), in any order. For each invoice return one entry:
+- firstPage / lastPage: the page numbers in THIS document (1-based). An invoice can run over several pages; a remittance stub, terms page or
+  back of a page belongs to the invoice it came with. If the first page(s) here clearly continue an invoice that started before this
+  document, return them as an entry with continuesPrevious true (with whatever fields you can read). A page that isn't an invoice (a
+  statement, a blank page, a cover sheet) gets its own entry with isInvoice false.
+- vendor (who sent the bill), invoiceNumber, invoiceDate as YYYY-MM-DD ('' if not shown), total = the amount due on this invoice
+  including tax, poJob = whatever the PO / job / lot / reference fields say, shipTo = the ship-to or job address.
+- splits: which home and cost code the money goes to. homeId MUST be an id from the homes list (or '' if you can't tell). Match by the
+  job / PO / lot fields ("CLIFFS 98", "CL-98", "AP#422", "Lot 73"), development names (AP = Alden Place, CL = The Cliffs), the ship-to
+  street address, or the buyer's name. code MUST be one of the cost code numbers listed. labor = true for a subcontractor's work /
+  installation, false for materials and supplies. Usually one split for the whole total. Split only when the invoice clearly covers more
+  than one home or clearly different cost codes; the split amounts must add up to the total (put tax, fuel and delivery charges with
+  the main item). why = a few words on how you decided.
+- sure: true only when you are confident about every home and cost code. Otherwise false, and questions = short plain questions for
+  the office ("Which lot is this for? No lot or address on it.", "Lumber or Trim?").
+Use the vendor habits list when it applies, but the invoice itself wins.`;
+async function invReadChunk(client, Anthropic, pdfBytes, facts){
+  const request = {
+    model: INV_MODEL, max_tokens: 32000,
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: INV_SCHEMA } },
+    system: [{ type: 'text', text: INV_RULES, cache_control: { type: 'ephemeral' } }, { type: 'text', text: facts }],
+    messages: [{ role: 'user', content: [
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: Buffer.from(pdfBytes).toString('base64') } },
+      { type: 'text', text: 'Here are the scanned pages. List every invoice (and every non-invoice page) as described.' } ] }],
+  };
+  let msg;
+  try{ msg = await client.beta.messages.stream({ ...request, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }).finalMessage(); }
+  catch(err){
+    if(!(err instanceof Anthropic.BadRequestError)) throw err;
+    logger.warn('Invoices: fallback option not accepted, continuing without it', { message: err.message });
+    msg = await client.messages.stream(request).finalMessage();
+  }
+  if(msg.stop_reason === 'refusal') throw new Error('The reader declined these pages');
+  if(msg.stop_reason === 'max_tokens') throw new Error('Too many invoices in one go — try a smaller scan');
+  const text = msg.content.filter(b=>b.type === 'text').map(b=>b.text).join('');
+  const out = JSON.parse(text);
+  return { invoices: Array.isArray(out.invoices) ? out.invoices : [], usage: msg.usage };
+}
+async function invProcessBatch(batchId){
+  const ref = db.collection('invoice-batches').doc(batchId);
+  const batch = (await ref.get()).data();
+  if(!batch || batch.status === 'done') return;
+  await ref.update({ status: 'reading', startedAt: new Date().toISOString(), error: '' });
+  try{
+    const { PDFDocument } = require('pdf-lib');
+    const sdk = require('@anthropic-ai/sdk');
+    const Anthropic = sdk.Anthropic || sdk.default || sdk;
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value().trim() });
+    const bucket = admin.storage().bucket();
+    const [bytes] = await bucket.file(batch.path).download();
+    const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+    const pageCount = src.getPageCount();
+    // what the reader needs to know: the homes, the cost codes, each vendor's usual code
+    const [jobsSnap, settings] = await Promise.all([db.collection('jobs').get(), invSettings()]);
+    const jobs = {}; jobsSnap.docs.forEach(d=>{ jobs[d.id] = d.data(); });
+    const homes = Object.entries(jobs).map(([id, j])=>`${id} | ${j.community || ''} ${j.lot || ''} | ${j.address || ''} | ${j.client || ''} | ${j.model || ''}${j.settle ? ' | settles ' + j.settle : ''}`).join('\n');
+    const habits = Object.values(settings.vendors || {}).filter(v=>v && v.code).sort((a, b)=>(b.n || 0) - (a.n || 0)).slice(0, 200)
+      .map(v=>`${v.name}: usually ${v.code} ${INV_CODES[v.code] || ''}${v.labor ? ' (labor)' : ''}`).join('\n');
+    const facts = `Homes (id | development lot | address | buyer | model):\n${homes}\n\nCost codes:\n${Object.entries(INV_CODES).map(([c, n])=>c + ' ' + n).join('\n')}\n\nVendor habits:\n${habits || '(none yet)'}`;
+    // read the pages a chunk at a time; entries are kept in page order with absolute page numbers
+    const found = [];
+    for(let start = 0; start < pageCount; start += INV_PAGES_PER_CALL){
+      const end = Math.min(pageCount, start + INV_PAGES_PER_CALL);
+      const part = await PDFDocument.create();
+      (await part.copyPages(src, Array.from({ length: end - start }, (_, i)=>start + i))).forEach(p=>part.addPage(p));
+      const { invoices } = await invReadChunk(client, Anthropic, await part.save(), facts);
+      invoices.forEach(x=>{
+        const a = Math.max(1, Math.min(end - start, x.firstPage | 0)), b = Math.max(a, Math.min(end - start, x.lastPage | 0));
+        const e = { ...x, firstPage: start + a, lastPage: start + b };
+        const prev = found[found.length - 1];
+        if(x.continuesPrevious && prev && prev.isInvoice){ prev.lastPage = Math.max(prev.lastPage, e.lastPage); if(!prev.total && e.total) prev.total = e.total; return; }
+        found.push(e);
+      });
+      await ref.update({ progress: end, pages: pageCount });
+    }
+    // each invoice becomes its own PDF and record
+    const settingsReviewers = Array.isArray(settings.reviewers) ? settings.reviewers : [];
+    const now = new Date().toISOString();
+    let made = 0, review = 0, skipped = 0;
+    for(const x of found){
+      if(!x.isInvoice){ skipped++; continue; }
+      const one = await PDFDocument.create();
+      (await one.copyPages(src, Array.from({ length: x.lastPage - x.firstPage + 1 }, (_, i)=>x.firstPage - 1 + i))).forEach(p=>one.addPage(p));
+      const docRef = db.collection('invoices').doc();
+      const path = `invoices/${docRef.id}.pdf`, token = crypto.randomUUID();
+      await bucket.file(path).save(Buffer.from(await one.save()), { resumable: false, metadata: { contentType: 'application/pdf', metadata: { firebaseStorageDownloadTokens: token } } });
+      const splits = (x.splits || []).map(s=>({ houseId: jobs[s.homeId] ? s.homeId : '', houseLabel: jobs[s.homeId] ? invHomeLabel(jobs[s.homeId]) : '',
+        code: INV_CODES[s.code] ? s.code : 0, labor: !!s.labor, amount: Math.round((Number(s.amount) || 0) * 100) / 100, why: String(s.why || '').slice(0, 200) }));
+      const inv = { batchId, pages: [x.firstPage, x.lastPage], path, url: fileUrl(path, token),
+        vendor: String(x.vendor || '').slice(0, 120), number: String(x.invoiceNumber || '').slice(0, 60),
+        date: /^\d{4}-\d{2}-\d{2}$/.test(x.invoiceDate || '') ? x.invoiceDate : '', total: Math.round((Number(x.total) || 0) * 100) / 100,
+        poJob: String(x.poJob || '').slice(0, 200), shipTo: String(x.shipTo || '').slice(0, 200), splits,
+        questions: (x.questions || []).map(q=>String(q).slice(0, 200)).slice(0, 6), aiSure: !!x.sure, createdAt: now };
+      const why = invCheck(inv, jobs);
+      inv.status = x.sure && !why.length ? 'ready' : 'review';
+      inv.reasons = inv.status === 'review' ? [...new Set([...why, ...inv.questions])] : [];
+      inv.reviewers = inv.status === 'review' ? settingsReviewers : [];
+      await docRef.set(inv);
+      made++; if(inv.status === 'review') review++;
+    }
+    await ref.update({ status: 'done', doneAt: new Date().toISOString(), invoices: made, review, skipped, pages: pageCount, progress: pageCount });
+    // the reviewers hear about it once per scan (bell; the email says the same)
+    if(review && settingsReviewers.length){
+      await db.collection('notes').add({ houseId: '', houseLabel: 'Invoices', kind: 'invReview',
+        text: `${review} invoice${review === 1 ? ' needs' : 's need'} a look from "${batch.name || 'the scan'}" (${made} read in all).`,
+        by: { uid: '', name: 'Invoices' }, mentions: settingsReviewers, at: new Date().toISOString(), readBy: {} });
+    }
+    logger.info('Invoice scan read', { batchId, pages: pageCount, made, review, skipped });
+  } catch(err){
+    logger.error('Invoice scan failed', { batchId, error: String(err) });
+    await ref.update({ status: 'error', error: String(err && err.message || err).slice(0, 300) });
+  }
+}
+if(ASSISTANT_ON) exports.onInvoiceBatch = onDocumentCreated({ document: 'invoice-batches/{batchId}', timeoutSeconds: 540, memory: '1GiB', secrets: [ANTHROPIC_API_KEY] },
+  async event=>{ await invProcessBatch(event.params.batchId); });
+exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeoutSeconds: 120, memory: '1GiB' }, async (req, res)=>{
+  if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
+  try{
+    const who = await staffFromRequest(req);
+    if(!who){ res.status(401).json({ error: 'sign-in' }); return; }
+    const b = req.body || {}, now = new Date().toISOString();
+    const by = String(who.name || String(who.email || '').split('@')[0] || 'Someone').slice(0, 60);
+    if(b.action === 'list'){
+      const [inv, bat, settings] = await Promise.all([db.collection('invoices').orderBy('createdAt', 'desc').limit(1500).get(),
+        db.collection('invoice-batches').orderBy('at', 'desc').limit(15).get(), invSettings()]);
+      res.json({ invoices: inv.docs.map(d=>({ id: d.id, ...d.data() })), batches: bat.docs.map(d=>({ id: d.id, ...d.data() })),
+        reviewers: settings.reviewers || [], codes: INV_CODES, reading: ASSISTANT_ON });
+      return;
+    }
+    if(b.action === 'upload'){
+      // one scanned PDF (sent as base64); the reading starts by itself (onInvoiceBatch)
+      if(!ASSISTANT_ON){ res.status(503).json({ error: 'reader-off' }); return; }
+      const bytes = Buffer.from(String(b.data || ''), 'base64');
+      if(bytes.length < 500 || bytes.slice(0, 5).toString() !== '%PDF-'){ res.status(400).json({ error: 'pdf' }); return; }
+      const ref = db.collection('invoice-batches').doc(), path = `invoices/scans/${ref.id}.pdf`;
+      await admin.storage().bucket().file(path).save(bytes, { resumable: false, metadata: { contentType: 'application/pdf' } });
+      await ref.set({ name: String(b.name || 'Scan').slice(0, 120), path, size: bytes.length, status: 'waiting', at: now, by });
+      res.json({ id: ref.id });
+      return;
+    }
+    if(b.action === 'retry'){
+      const ref = db.collection('invoice-batches').doc(String(b.id || '-')), d = await ref.get();
+      if(!d.exists || d.data().status !== 'error'){ res.status(400).json({ error: 'batch' }); return; }
+      // a fresh batch record for the same file starts the reading again (onInvoiceBatch); the failed one is marked as retried
+      const nb = db.collection('invoice-batches').doc();
+      await nb.set({ ...d.data(), status: 'waiting', error: '', progress: 0, at: now, by, retryOf: ref.id });
+      await ref.update({ status: 'retried' });
+      res.json({ id: nb.id });
+      return;
+    }
+    if(b.action === 'save'){
+      // a person's corrections; "ready" sends it to the accountant, "entered" = keyed into QuickBooks
+      const ref = db.collection('invoices').doc(String(b.id || '-')), d = await ref.get();
+      if(!d.exists){ res.status(404).json({ error: 'invoice' }); return; }
+      const old = d.data(), jobsSnap = await db.collection('jobs').get();
+      const jobs = {}; jobsSnap.docs.forEach(x=>{ jobs[x.id] = x.data(); });
+      const num = v=>Math.round((Number(v) || 0) * 100) / 100, cut = (v, n)=>String(v == null ? '' : v).slice(0, n);
+      const up = { updatedAt: now, updatedBy: by };
+      ['vendor', 'number', 'poJob', 'note'].forEach(f=>{ if(b[f] !== undefined) up[f] = cut(b[f], f === 'note' ? 600 : 160); });
+      if(b.date !== undefined) up.date = /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : '';
+      if(b.total !== undefined) up.total = num(b.total);
+      if(Array.isArray(b.splits)) up.splits = b.splits.slice(0, 20).map(s=>({ houseId: jobs[s.houseId] ? s.houseId : '', houseLabel: jobs[s.houseId] ? invHomeLabel(jobs[s.houseId]) : '',
+        code: INV_CODES[s.code] ? Number(s.code) : 0, labor: !!s.labor, amount: num(s.amount), why: cut(s.why, 200) }));
+      if(Array.isArray(b.reviewers)) up.reviewers = b.reviewers.filter(x=>typeof x === 'string').slice(0, 10);
+      const merged = { ...old, ...up };
+      if(b.status === 'ready'){
+        const why = invCheck(merged, jobs);
+        if(why.length){ res.status(409).json({ error: 'incomplete', why }); return; }
+        up.status = 'ready'; up.reasons = []; up.checkedBy = by; up.checkedAt = now;
+        // learn the vendor's usual cost code from what a person settled on (one-code invoices only)
+        const codes = [...new Set(merged.splits.map(s=>s.code + (s.labor ? 'L' : '')))];
+        if(merged.vendor && codes.length === 1){
+          const k = invKey(merged.vendor);
+          if(k) await db.collection('settings').doc('invoices').set({ vendors: { [k]: { name: merged.vendor, code: merged.splits[0].code, labor: !!merged.splits[0].labor, n: admin.firestore.FieldValue.increment(1), at: now } } }, { merge: true });
+        }
+      } else if(b.status === 'review'){ up.status = 'review'; up.reasons = [cut(b.reason || 'Sent back for a look', 200)]; }
+      else if(b.status === 'entered'){ if(old.status !== 'ready'){ res.status(409).json({ error: 'not-ready' }); return; } up.status = 'entered'; up.enteredBy = by; up.enteredAt = now; }
+      else if(b.status === 'unentered'){ up.status = 'ready'; up.enteredBy = ''; up.enteredAt = ''; }
+      await ref.update(up);
+      // a reviewer added by hand hears about it
+      const added = (up.reviewers || []).filter(x=>!(old.reviewers || []).includes(x) && x !== who.uid);
+      if(added.length) await db.collection('notes').add({ houseId: '', houseLabel: 'Invoices', kind: 'invReview', invoiceId: ref.id,
+        text: `Please look at ${merged.vendor || 'an invoice'}${merged.number ? ' #' + merged.number : ''}${merged.total ? ' ($' + Number(merged.total).toLocaleString('en-US', { minimumFractionDigits: 2 }) + ')' : ''}.`,
+        by: { uid: who.uid, name: by }, mentions: added, at: now, readBy: {} });
+      res.json({ invoice: { id: ref.id, ...(await ref.get()).data() } });
+      return;
+    }
+    if(b.action === 'remove'){
+      // a page read as an invoice by mistake, or a duplicate
+      const ref = db.collection('invoices').doc(String(b.id || '-')), d = await ref.get();
+      if(!d.exists){ res.json({ ok: true }); return; }
+      if(d.data().status === 'entered'){ res.status(409).json({ error: 'entered' }); return; }
+      await admin.storage().bucket().file(d.data().path).delete().catch(()=>{});
+      await ref.delete();
+      res.json({ ok: true });
+      return;
+    }
+    if(b.action === 'settings'){
+      const reviewers = (Array.isArray(b.reviewers) ? b.reviewers : []).filter(x=>typeof x === 'string').slice(0, 10);
+      await db.collection('settings').doc('invoices').set({ reviewers }, { merge: true });
+      res.json({ reviewers });
+      return;
+    }
+    res.status(400).json({ error: 'action' });
+  } catch(err){
+    logger.error('invoicesApi failed', { action: (req.body || {}).action, error: String(err) });
+    res.status(500).json({ error: 'server' });
+  }
+});
+
+/* ============================================================
    onNoteCreated — someone was @mentioned in a note on a home.
    Email each person mentioned, at the address they sign in to the hub with.
    (The "emails to subs" switch on Admin Settings doesn't affect this — these go to staff.)
@@ -1881,7 +2136,8 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   // which is where another vendor can be picked.
   const fromSub = ['subDeclined', 'subNote', 'subWaiting'].includes(note.kind);
   // a punch list item (a note with todo: true) given to someone opens the punch list
-  const link = note.kind === 'selPrice' ? `${site}selections.html?open=${encodeURIComponent(note.sheetId || '')}`
+  const link = note.kind === 'invReview' ? `${site}invoices.html${note.invoiceId ? '?open=' + encodeURIComponent(note.invoiceId) : ''}`
+    : note.kind === 'selPrice' ? `${site}selections.html?open=${encodeURIComponent(note.sheetId || '')}`
     : note.todo ? `${site}punch.html`
     : fromSub ? `${site}construction.html?house=${encodeURIComponent(note.houseId || '')}&task=${encodeURIComponent(note.taskId || '')}`
     : `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
@@ -1892,6 +2148,7 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   const wording = note.todo ? { heading: urgent ? 'High priority punch list item' : 'Punch list item for you', subject: `${urgent ? 'HIGH PRIORITY — ' : ''}Punch list: ${String(note.text || '').slice(0, 60)}`, lead: `<strong>${esc(who)}</strong> added a ${urgent ? '<strong style="color:#b3452f;">high priority</strong> ' : ''}punch list item for you${where}${esc(dueBy)}:`, plain: `${who} added a ${urgent ? 'HIGH PRIORITY ' : ''}punch list item for you${note.houseId ? ' for ' + house : ''}${dueBy}:`, button: 'Open the punch list' } : {
     subDeclined: { heading: 'A sub declined a job', subject: `Declined: ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> declined a job on <strong>${esc(house)}</strong>:`, plain: `${who} declined a job on ${house}:`, button: 'Open this job' },
     subNote: { heading: 'Note from a sub', subject: `Note from ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> sent a note about <strong>${esc(house)}</strong>:`, plain: `${who} sent a note about ${house}:`, button: 'Open this job' },
+    invReview: { heading: 'Invoices to review', subject: 'Invoices to review', lead: `<strong>${esc(who)}</strong>:`, plain: `${who}:`, button: 'Open Invoices' },
     selPrice: { heading: 'A price is needed', subject: `Price needed: ${house}`, lead: `<strong>${esc(who)}</strong> needs a price from you on a selection sheet (<strong>${esc(house)}</strong>):`, plain: `${who} needs a price from you on a selection sheet (${house}):`, button: 'Open the selection sheet' },
     subWaiting: { heading: 'Still waiting on a sub', subject: `Still waiting on an answer — ${house}`, lead: `A job on <strong>${esc(house)}</strong> has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, plain: `A job on ${house} has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, button: 'Open this job' },
   }[note.kind] || { heading: 'New note for you', subject: `New note for you on ${house}`, lead: `<strong>${esc(who)}</strong> mentioned you in a note on <strong>${esc(house)}</strong>:`, plain: `${who} mentioned you in a note on ${house}:`, button: 'Open this home' };
