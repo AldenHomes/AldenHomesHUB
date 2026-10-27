@@ -612,9 +612,9 @@ const FIN_LABEL = { ch:'Chrome', bn:'Brushed nickel', brass:'Brushed gold', orb:
 const FAUCETS = [
   { name:'Gibson', fins:['ch','bn','black'], hw:'DN07', ring:'Towel ring', spa:'UT2921', spaParts:'T2902EP shower trim, UT2921 transfer valve trim, 3669EP handheld', lav:[['6150', '2-handle 4" faucet'], ['T6142', 'Widespread 8" faucet'], ['6145', 'Single-handle faucet']], shower:'T2902EP', tub:'T2903EP' },
   { name:'Glyde', fins:['ch','bn','black'], hw:'YB23', ring:'Towel ring', spa:'UT2721', spaParts:'T2742 shower trim, UT2721 transfer valve trim, 3669EP handheld', lav:[['6172', '2-handle 4" faucet'], ['T6173', 'Widespread 8" faucet'], ['6170', 'Single-handle faucet']], shower:'T2742', tub:'T2743' },
-  { name:'Voss', fins:['ch','bn','brass','orb'], hw:'YB51', ring:'Towel ring', spa:'T2690', spaParts:'T2690 transfer & volume trim, 3868EP handheld, S6340 shower head', lav:[['6901', '2-handle 4" faucet'], ['T6905', 'Widespread 8" faucet'], ['6903', 'Single-handle faucet']], shower:'T2692', tub:'T2693' },
-  { name:'Align', fins:['ch','bn','brass','black'], hw:'YB04', ring:'Hand towel bar', spa:'T2190', spaParts:'T2190 transfer & volume trim, 3887EP handheld, S176 shower head', lav:[['6190', 'Single-handle faucet']], shower:'T2192', tub:'T2193' },
-  { name:'90 Degree', fins:['ch','bn'], hw:'YB88', ring:'Hand towel bar', spa:'TS2710', spaParts:'TS2710 transfer & volume trim, S3880EP handheld, S6340 shower head', lav:[['S6700', 'Single-handle faucet'], ['TS6720', 'Widespread 8" faucet']], shower:'TS2712', tub:'TS2713' },
+  { name:'Voss', fins:['ch','bn','brass','orb'], hw:'YB51', ring:'Towel ring', spa:'T2690', spaDisp:{ ch:'display-voss' }, spaParts:'T2690 transfer & volume trim, 3868EP handheld, S6340 shower head', lav:[['6901', '2-handle 4" faucet'], ['T6905', 'Widespread 8" faucet'], ['6903', 'Single-handle faucet']], shower:'T2692', tub:'T2693' },
+  { name:'Align', fins:['ch','bn','brass','black'], hw:'YB04', ring:'Hand towel bar', spa:'T2190', spaDisp:{ ch:'display-align', black:'display-align-black' }, spaParts:'T2190 transfer & volume trim, 3887EP handheld, S176 shower head', lav:[['6190', 'Single-handle faucet']], shower:'T2192', tub:'T2193' },
+  { name:'90 Degree', fins:['ch','bn'], hw:'YB88', ring:'Hand towel bar', spa:'TS2710', spaDisp:{ ch:'display-90-degree' }, spaParts:'TS2710 transfer & volume trim, S3880EP handheld, S6340 shower head', lav:[['S6700', 'Single-handle faucet'], ['TS6720', 'Widespread 8" faucet']], shower:'TS2712', tub:'TS2713' },
   { name:'Doux', fins:['ch','bn','black'], hw:'YB02', ring:'Hand towel bar', spa:'TS22000', spaParts:'TS22000 transfer & volume trim, 3887EP handheld, S176 shower head', lav:[['S6910', 'Single-handle faucet'], ['TS6925', 'Widespread 8" faucet']], shower:'TS2202', tub:'TS2203' },
   { name:'Brantford', fins:['ch','bn','orb'], hw:'YB22', ring:'Towel ring', spa:'UT2021', spaParts:'T2152EP shower trim, UT2021 transfer valve trim, 3667EP handheld', lav:[['6610', '2-handle 4" faucet'], ['T6620', 'Widespread 8" faucet'], ['6600', 'Single-handle faucet']], shower:'T2152', tub:'T2153' },
   { name:'Eva', fins:['ch','bn','orb'], hw:'YB28', ring:'Towel ring', spa:'UT2021', spaParts:'T2152EP shower trim, UT2021 transfer valve trim, 3667EP handheld', lav:[['6410', '2-handle 4" faucet'], ['T6420', 'Widespread 8" faucet'], ['6400', 'Single-handle faucet']], shower:'T2132', tub:'T2133' },
@@ -638,10 +638,15 @@ const FIN_DOT = { ch:'linear-gradient(135deg,#f4f6f8,#aab1b8)', bn:'linear-gradi
 const bathFin = (L, rid)=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + rid); if(!fq) return 'ch'; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : 'ch'; };
 // the finish a tile is showing, and its photo
 const tileFinOf = (q, c, L)=>{ const k = q.id + '#' + c.i; if(tileFin[k] && c.fins.includes(tileFin[k])) return tileFin[k]; const b = bathFin(L, q.room.id); return c.fins.includes(b) ? b : 'ch'; };
-const tileImg = (q, c, L)=>c.fins && c.model ? moenImg(c.model, tileFinOf(q, c, L)) : c.img;
+/* SPA DISPLAY BOARDS (owner, 2026-10-27: the vertical spa is a kit of parts; "not sure the best way to add a photo… for reference"): a spa
+   tile shows the showroom display board from the office's wall photo (selection-photos/faucets/display-<collection>[-black].jpg) for the
+   finish it was photographed in — 90 Degree and Voss in chrome, Align in chrome and matte black; other finishes / collections show
+   Moen's picture of the main part. The parts list stays in the name. */
+const tileImg = (q, c, L)=>{ if(c.disp){ const d = c.disp[tileFinOf(q, c, L)]; if(d) return 'selection-photos/faucets/' + d + '.jpg'; }
+  return c.fins && c.model ? moenImg(c.model, tileFinOf(q, c, L)) : c.img; };
 const faucetChoices = kind=>FAUCETS.flatMap(x=>{
   const pc = (code, label, extra)=>({ t: x.name + ' - ' + label + ' (' + code + ')', p:0, unit:'', brand:x.name, img:moenImg(code), model:code, fins:x.fins, ...(extra || {}) });
-  if(kind === 'spa') return [{ ...pc(x.spa, 'Spa package'), t: x.name + ' - Spa package (' + x.spaParts + ')' }];
+  if(kind === 'spa') return [{ ...pc(x.spa, 'Spa package', x.spaDisp ? { disp:x.spaDisp, sub:'Photo: our showroom display' } : {}), t: x.name + ' - Spa package (' + x.spaParts + ')' }];
   if(kind === 'hwset' || kind === 'hwset-m'){ const parts = [x.hw + '08 paper holder', x.hw + '86 ' + x.ring.toLowerCase()].concat(kind === 'hwset-m' ? [x.hw + '03 robe hook'] : []);
     return [{ ...pc(x.hw + '86', 'Standard set'), t: x.name + ' - Standard set: ' + parts.join(', ') }]; }
   if(kind === 'hwadd') return [pc(x.hw + '18', '18" towel bar'), pc(x.hw + '24', '24" towel bar'), pc(x.hw + '86', x.ring)];
@@ -924,7 +929,7 @@ function buildCatalog(cat){
     const std = STD_FIRST[s.bt] || [];
     sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt], fauc: !!FAUCET_KIND[s.bt], v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
