@@ -102,7 +102,11 @@
   @media (max-width:820px){ .rooms{grid-template-columns:1fr} .roomnav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;position:static!important} .roomnav button{flex:none;width:auto;min-width:150px;background:var(--paper-2);border-color:var(--line-soft)} }
   .roomnav{position:sticky;top:76px}
   .roomnav button{display:block;width:100%;text-align:left;border:1px solid transparent;background:none;border-radius:var(--radius);padding:9px 11px;margin-bottom:4px;color:var(--ink)}
-  .roomnav button.on{background:var(--paper-2);border-color:var(--line);box-shadow:var(--shadow)}
+  .roomnav button.on{background:var(--paper-2);border-color:var(--line);box-shadow:var(--shadow);border-left:4px solid var(--navy)}
+  .roomnav .tick{color:var(--good);font-weight:800}
+  .roomnav button.has .rp{color:var(--good)}
+  .nav-prog{padding:4px 11px 12px;font-size:12px;color:var(--ink-soft)} .nav-prog b{display:block;font-size:14px;color:var(--ink)}
+  .nav-prog .bar{height:5px;background:var(--line-soft);border-radius:3px;margin-top:6px;overflow:hidden} .nav-prog .bar span{display:block;height:100%;background:var(--sage-2)}
   .roomnav .rn{font-weight:700;font-size:14.5px;display:flex;justify-content:space-between;gap:8px}
   .roomnav .rp{font-size:12px;color:var(--ink-soft);margin-top:2px}
   .roomnav .done{color:var(--good)}
@@ -289,7 +293,7 @@
   .ph-fins{position:absolute; top:8px; left:50%; transform:translateX(-50%); display:flex; gap:6px; padding:4px 6px; background:rgba(255,255,255,.92); border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.18);}
   .ph-fin{width:18px; height:18px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.25); cursor:pointer; padding:0;}
   .ph-fin.on{box-shadow:0 0 0 2px var(--navy,#1f3550);}
-  .ph-tile.on .ph-check{top:auto; bottom:44px;}
+  .ph-tile.on .ph-check{display:none;}
   .ph-sub{display:block; font-weight:600; font-size:12px; color:var(--muted,#777); margin-top:2px;}
   .ph-warn{display:block; font-weight:700; font-size:12px; color:#b3261e; margin-top:2px;}
   .ph-group{margin-top:10px;} .ph-note{text-transform:none; letter-spacing:0; font-weight:600;} .ph-brand{font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted,#777); margin:6px 0 6px;}
@@ -328,7 +332,11 @@
   .ph-pick img{display:block; width:100%; aspect-ratio:3/2; object-fit:cover;}
   .ph-none{display:flex; align-items:center; justify-content:center; aspect-ratio:3/2; background:repeating-linear-gradient(45deg,#f4f2ec,#f4f2ec 8px,#ece9e1 8px,#ece9e1 16px); color:#999; font-size:12.5px; font-weight:700;}
   .ph-name{display:block; padding:8px 10px; font-size:14px; font-weight:700; color:var(--ink,#222);}
-  .ph-tile.on .ph-pick{border-color:var(--navy,#1f3550); box-shadow:0 0 0 2px var(--navy,#1f3550);}
+  .ph-tile.on .ph-pick{border-color:var(--good,#2e6b34); box-shadow:0 0 0 2px var(--good,#2e6b34);}
+  .ph-tile.on .ph-name{background:var(--good-soft,#eaf4ea); color:#1f4d2a;}
+  .ph-tile.on .ph-name::before{content:'\2713  Chosen'; display:block; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--good,#2e6b34); margin-bottom:2px; white-space:pre;}
+  .ph-pick{transition:box-shadow .15s, border-color .15s, transform .15s;}
+  .ph-pick:hover{transform:translateY(-2px);}
   .ph-check{position:absolute; top:8px; left:8px; width:28px; height:28px; border-radius:50%; background:var(--navy,#1f3550); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; box-shadow:0 1px 4px rgba(0,0,0,.3);}
   .ph-zoom{position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%; border:none; background:rgba(255,255,255,.92); color:#333; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.25);}
   body.present .ph-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));}
@@ -405,13 +413,14 @@
   .modesw button{border:none;background:none;padding:6px 13px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
   .modesw button.on{background:var(--navy);color:#fff}
   /* one selection at a time */
-  .g-top{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .g-top{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:13px;font-weight:700;color:var(--ink-soft);white-space:nowrap}
   .g-top .bar{flex:1;height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden}
   .g-top .bar span{display:block;height:100%;background:var(--sage-2);transition:width .2s}
-  .guide .q{padding:22px 24px 20px;margin-top:12px}
+  .guide .q{padding:28px 30px 24px;margin-top:12px;border-radius:16px;box-shadow:0 2px 14px rgba(31,53,80,.08)}
   .guide .sel{border-top:none;padding:0}
   .guide .sel-h{cursor:default}
-  .guide .sel-h b{font-size:24px;font-family:Georgia,serif;text-decoration:none!important}
+  .guide .sel-h b{font-size:28px;font-family:Georgia,serif;text-decoration:none!important;line-height:1.2}
+  .guide .q-sub{font-size:14.5px;margin-bottom:6px}
   .guide .sel-h .arrow{display:none}
   .guide .cho{padding:14px 16px;margin-top:10px}
   .guide .cho .ct{font-size:16.5px}
@@ -419,6 +428,10 @@
   .guide .cho button.tog{padding:9px 20px;font-size:15px}
   .g-nav{display:flex;gap:10px;align-items:center;margin-top:16px}
   .g-nav .btn{padding:13px 22px;font-size:16px}
+  .g-nav .g-next{display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding:10px 24px;max-width:70%;text-align:right;border-radius:12px}
+  .g-nav .g-next small{font-size:11.5px;font-weight:600;opacity:.8;text-transform:uppercase;letter-spacing:.5px}
+  .g-nav .g-next span{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .g-nav .g-back{background:transparent;border-color:transparent;color:var(--ink-soft)} .g-nav .g-back:hover{border-color:var(--line);color:var(--navy)}
   .g-std{font-size:13.5px;color:var(--ink-soft);margin-top:12px}
   body.present .guide .sel-h b{font-size:30px}
   body.present .guide .cho .ct{font-size:20px}
@@ -1289,7 +1302,7 @@ function prow(q, L, force){
   const autoNow = q.tw && !L.answers['own:' + q.id] && shown.some(c=>(L.answers[q.id + '#' + c.i] || {}).auto);
   const got = shown.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty), sum = got.reduce((t, c)=>{ const a = L.answers[q.id + '#' + c.i]; return t + a.price * a.qty; }, 0);
   const picked = std && stdActive && !got.length ? `<span class="picked">Standard: ${esc(std.label)}</span>` : got.length ? `<span class="picked">${got.length === 1 ? esc(got[0].t.length > 34 ? got[0].t.slice(0, 32) + '…' : got[0].t) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
-  return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" ${force ? '' : `data-sel="${esc(q.id)}"`} aria-expanded="${isOpen}"><b>${esc(q.t)}</b>${autoNow ? '<span class="chip plain">same as master bath</span>' : ''}${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
+  return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" ${force ? '' : `data-sel="${esc(q.id)}"`} aria-expanded="${isOpen}"><b>${esc(qTitle(q))}</b>${autoNow ? '<span class="chip plain">same as master bath</span>' : ''}${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
       ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}${isOpen || got.length || std ? '' : `<span class="cnt">${shown.length} choice${shown.length === 1 ? '' : 's'}</span>`}
       <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
     ${isOpen ? stdNote + (rows || '<div class="q-sub">No choices are set up for this one yet.</div>') : ''}</div>`;
@@ -1784,7 +1797,7 @@ function leadScreen(L){
           : money(base(L)) + (staff && !PRESENT ? ` <span class="staffline" style="display:inline">(house ${money(houseOf(L))} + lot ${money(Number(L.lotPrice) || 0)})</span>` : '') + (staff && !PRESENT && !locked(L) ? ' <button type="button" class="btn sm noprint" id="baseChange" style="padding:2px 9px;margin-left:4px">Change</button>' : '')}</div>
         ${staff && !PRESENT ? sizeLine(L) : ''}</div>
       <div style="text-align:right">${PRESENT ? (sync.state === 'lost' ? '<span class="live" style="color:var(--red)">Connection lost — trying again</span>' : '<span class="live"><i></i>Live with your Alden Homes rep</span>')
-        : stageChip(L) + `<div class="muted" style="font-size:12.5px;margin-top:5px">Pricing meeting ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
+        : (custView() ? '' : stageChip(L)) + `<div class="muted" style="font-size:12.5px;margin-top:5px">Pricing meeting ${esc(nice(L.v1Date))}${L.signedOn ? ' · signed ' + esc(nice(L.signedOn)) : ''}</div>
           <div class="noprint" style="margin-top:8px;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap">${present[L.id] ? liveBadge() : ''}<button type="button" class="btn sm" id="shareBtn">${shareOpen ? 'Hide' : present[L.id] ? 'Customer screen' : 'Open customer screen'}</button>${staff && !locked(L) ? '<button type="button" class="btn sm" id="delLead">Delete lead</button>' : ''}</div>`}</div>
     </div>
     ${!PRESENT && shareOpen ? `<div class="sharebox noprint"><strong>A second screen for the customer.</strong> ${liveBadge()}
@@ -1890,6 +1903,14 @@ const pickedOn = (q, L)=>choicesOf(q, L).some(c=>{ const a = L.answers[q.id + '#
 // the shower photos were hidden because those lines are on the pricing sheet too and were left at standard there)
 const onSelSide = (q, L)=>!isLotPrem(q) && !(q.v1 && !q.fauc && !q.sh && !pickedOn(q, L));
 const askedFor = (q, L, sel)=>asked(q, L) && (!sel || onSelSide(q, L));
+/* THE WALK-THROUGH (owner, 2026-10-27: "feel so clear and easy for the customer and the person going over it with them… look nice"):
+   Customer view hides the office-only parts (lot premium, notes, custom-item adding, the "this home has" switches and view switch, the
+   sheet's status chip) — Office view shows everything. Question titles drop the repeated room name (`qTitle`); the section list shows
+   how far along each section is; Next names the question it goes to. Order of sections and questions is unchanged. */
+const custView = ()=>view === 'customer';
+const shownFor = (q, L, sel)=>askedFor(q, L, sel) && !(custView() && isLotPrem(q));
+const reEsc = t=>String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const qTitle = q=>q.room && q.room.name ? q.t.replace(new RegExp('\\s*-\\s*' + reEsc(q.room.name) + '\\s*$', 'i'), '') || q.t : q.t;
 const sectionsFor = (L, list)=>list.filter(r=>r.qs.some(q=>askedFor(q, L, list === ROOMS)));
 
 /* ---------- one at a time, or the whole section ---------- */
@@ -1904,20 +1925,20 @@ function setNavRoom(str){ const p = String(str || '').split('~'); if(p[0]) roomI
 // One meeting's worth of sections, with the list down the side. kind 'v1' = Pricing (the lines on the paper pricing sheet),
 // 'full' = Selections (everything). Same answers either way. Each can be worked one selection at a time or as a whole section.
 function sheetView(L, kind){
-  const pricing = kind === 'v1', list = sectionsFor(L, pricing ? PRICING : ROOMS);
+  const pricing = kind === 'v1', list = (pricing ? PRICING : ROOMS).filter(x=>x.qs.some(q=>shownFor(q, L, !pricing)));
   if(!list.length) return '<div class="card"><p class="muted">Nothing to choose for this home.</p></div>';
   const r = list.find(x=>x.id===roomId) || list[0], i = list.indexOf(r), next = list[i+1], prev = list[i-1];
   if(r.id !== roomId) roomId = r.id;
   const ls = lines(L), lock = locked(L);
-  const nav = list.map(x=>{ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length + L.custom.filter(c=>c.room === x.id).length;
-    return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? `<span class="done" style="font-size:12px">${n}</span>` : ''}</div></button>`; }).join('');
-  const qs = r.qs.filter(q=>askedFor(q, L, !pricing));
+  const nav = `<div class="nav-prog"><span>${pricing ? 'Pricing' : 'Selections'}</span><b>Section ${i + 1} of ${list.length}</b><div class="bar"><span style="width:${(i + 1) / list.length * 100}%"></span></div></div>` + list.map(x=>{ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length + L.custom.filter(c=>c.room === x.id).length;
+    return `<button type="button" class="${r.id===x.id?'on':''} ${n ? 'has' : ''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? '<span class="tick">&#10003;</span>' : ''}</div><div class="rp">${n ? n + ' chosen' : pricing ? 'standard' : 'nothing chosen yet'}</div></button>`; }).join('');
+  const qs = r.qs.filter(q=>shownFor(q, L, !pricing));
   const nk = noteKey(r), note = L.answers[nk];
   const guide = modeOf() === 'guide';
-  const hasbar = PRESENT ? '' : `<div class="hasbar noprint"><span>This home has:</span>${FEATURES.map(f=>{ const on = hasFeat(L, f), n = featCount(L, f);
+  const hasbar = PRESENT || custView() ? '' : `<div class="hasbar noprint"><span>This home has:</span>${FEATURES.map(f=>{ const on = hasFeat(L, f), n = featCount(L, f);
       return `<button type="button" class="${on ? 'on' : ''}" data-has="${f.id}" ${lock ? 'disabled' : ''} title="${on ? 'Its selections are on the sheet' : 'Its selections are left off the sheet'}">${on ? '&#10003; ' : ''}${esc(f.name)}${n ? ' · ' + n : ''}</button>`; }).join('')}
       <div class="grow"></div><div class="modesw"><button type="button" class="${guide ? 'on' : ''}" data-mode="guide">One at a time</button><button type="button" class="${guide ? '' : 'on'}" data-mode="list">Whole section</button></div></div>`;
-  const notes = `<div class="sel"><div class="sel-h" style="cursor:default"><b style="font-size:15.5px;font-family:inherit">Notes for ${esc(r.name)}</b></div><textarea data-note="${esc(nk)}" maxlength="600" style="margin-top:8px;min-height:54px;resize:vertical" ${lock ? 'disabled' : ''}>${esc(note ? note.label : '')}</textarea></div>`;
+  const notes = custView() ? '' : `<div class="sel"><div class="sel-h" style="cursor:default"><b style="font-size:15.5px;font-family:inherit">Notes for ${esc(r.name)}</b></div><textarea data-note="${esc(nk)}" maxlength="600" style="margin-top:8px;min-height:54px;resize:vertical" ${lock ? 'disabled' : ''}>${esc(note ? note.label : '')}</textarea></div>`;
   const finish = pricing && !next && !lock ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <p style="flex:1 1 260px"><strong>That's the whole pricing sheet.</strong> Anything left untouched stays at standard. It's saved as a lead either way, and everything picked here is already on the selections sheet for the next meeting.</p>
       ${PRESENT ? '' : '<button type="button" class="btn" id="saveClose">Save &amp; close</button>'}
@@ -1927,17 +1948,18 @@ function sheetView(L, kind){
     gIdx = Math.max(0, Math.min(qs.length - 1, gIdx));
     const q = qs[gIdx], atEnd = gIdx >= qs.length - 1;
     const picked = q ? choicesOf(q, L).some(c=>(L.answers[q.id + '#' + c.i] || {}).qty) || L.custom.some(c=>c.q === q.id) : false;
-    const fwd = !atEnd ? (picked ? 'Next' : 'Keep standard') : next ? 'On to ' + next.name : pricing ? 'Finish pricing' : 'See the summary';
+    const nq = qs[gIdx + 1], fwdTop = !atEnd ? (picked ? 'Next' : 'Skip for now · next') : next ? 'Next section' : '';
+    const fwd = !atEnd ? qTitle(nq) : next ? next.name : pricing ? 'Finish pricing' : 'See the summary';
     body = `<div class="guide">
-      <div class="g-top"><span>${esc(r.name)} · ${qs.length ? gIdx + 1 : 0} of ${qs.length}</span><div class="bar"><span style="width:${qs.length ? (gIdx + 1) / qs.length * 100 : 0}%"></span></div></div>
+      <div class="g-top"><span>Question ${qs.length ? gIdx + 1 : 0} of ${qs.length}</span><div class="bar"><span style="width:${qs.length ? (gIdx + 1) / qs.length * 100 : 0}%"></span></div></div>
       <div class="q">${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
         ${q && !picked && !lock && !stdOf(q, L) && !isIncl(q, L) ? '<div class="g-std">Nothing picked means this stays standard.</div>' : ''}
         ${q ? customBlock(L, r, q) : ''}
-        ${q && !PRESENT ? (n=>`<div class="qnote noprint"><label class="f">Note for this question</label><textarea data-note="${esc(qNoteKey(q))}" maxlength="600" placeholder="Anything to remember about ${esc(q.t)}" ${lock ? 'disabled' : ''}>${esc(n ? n.label : '')}</textarea></div>`)(L.answers[qNoteKey(q)]) : ''}</div>
+        ${q && !PRESENT && !custView() ? (n=>`<div class="qnote noprint"><label class="f">Note for this question</label><textarea data-note="${esc(qNoteKey(q))}" maxlength="600" placeholder="Anything to remember about ${esc(q.t)}" ${lock ? 'disabled' : ''}>${esc(n ? n.label : '')}</textarea></div>`)(L.answers[qNoteKey(q)]) : ''}</div>
       <div class="g-nav noprint">
-        ${gIdx > 0 || prev ? `<button type="button" class="btn" data-g="-1">&larr; Back</button>` : ''}
+        ${gIdx > 0 || prev ? `<button type="button" class="btn g-back" data-g="-1">&larr; Back</button>` : ''}
         <div class="grow"></div>
-        <button type="button" class="btn primary" data-g="1">${esc(fwd)} &rarr;</button></div>
+        <button type="button" class="btn primary g-next" data-g="1">${fwdTop ? `<small>${esc(fwdTop)}</small>` : ''}<span>${esc(fwd)} &rarr;</span></button></div>
       ${atEnd ? `<div class="q" style="padding:6px 18px 12px;margin-top:16px">${notes}</div>${customBlock(L, r, null, true)}${finish}` : ''}
     </div>`;
   } else {
@@ -1969,15 +1991,16 @@ const waiting = L=>L.custom.filter(c=>c.pending);
 // q given: that question's custom items and its own "add" (One at a time). No q: everything in the section (Whole section).
 // loose: only the section's items that aren't tied to a question, with no add button (end of a section in One at a time).
 function customBlock(L, r, q, loose){
+  if(custView() && !L.custom.some(c=>c.room === r.id && (q ? c.q === q.id : loose ? !c.q : true))) return '';
   const staff = view === 'staff', lock = locked(L), forId = q ? q.id : r.id;
   const mine = L.custom.map((c, ci)=>({ c, ci })).filter(x=>x.c.room === r.id && (q ? x.c.q === q.id : loose ? !x.c.q : true));
   const items = mine.map(({ c, ci })=>`<div class="custom ${c.pending ? 'wait' : ''}">
       <div class="q-head"><h3 style="font-size:16px;color:var(--navy)">${esc(c.desc)}</h3><span class="chip plain">custom item</span>${c.pending ? `<span class="chip soon">price to come${c.ask ? ' · asked ' + esc(c.ask) : ''}</span>` : ''}</div>
       ${c.pending ? (PRESENT ? '<div class="q-sub">We\'re getting a price on this for you.</div>'
           : `<div class="row2 noprint"><span class="muted">$</span><input type="number" min="0" step="1" placeholder="Price" data-cuprice="${ci}">${staff ? `<input type="number" min="0" step="1" placeholder="Our cost" data-cucost="${ci}">` : ''}<button type="button" class="btn sm primary" data-cuset="${ci}">Set price</button>${lock ? '' : `<button type="button" class="btn sm" data-delcustom="${ci}">Remove</button>`}</div>`)
-        : `<div class="row2">${view === 'customer' ? '' : `<span class="mono" style="font-weight:700;color:var(--navy)">${plus(c.price)}</span>`}${staff ? `<span class="staffline">our cost ${money(c.cost)} · margin ${money(c.price - c.cost)} · code ${c.cc}</span>` : ''}${!lock && !PRESENT ? `<button type="button" class="btn sm noprint" data-delcustom="${ci}">Remove</button>` : ''}</div>`}
+        : `<div class="row2">${view === 'customer' ? '' : `<span class="mono" style="font-weight:700;color:var(--navy)">${plus(c.price)}</span>`}${staff ? `<span class="staffline">our cost ${money(c.cost)} · margin ${money(c.price - c.cost)} · code ${c.cc}</span>` : ''}${!lock && !PRESENT && !custView() ? `<button type="button" class="btn sm noprint" data-delcustom="${ci}">Remove</button>` : ''}</div>`}
     </div>`).join('');
-  if(lock || PRESENT || loose) return items;
+  if(lock || PRESENT || loose || custView()) return items;
   const form = cuOpen === forId ? `<div class="custom" style="border-left-color:var(--navy)"><div class="q-head"><h3 style="font-size:16px;color:var(--navy)">Add a custom item to ${esc(q ? q.t : r.name)}</h3></div>
       <div style="margin-top:10px"><label class="f">What is it</label><input type="text" id="cuDesc" maxlength="200" placeholder="e.g. Built-in bench with cubbies"></div>
       <div class="radio2"><label><input type="radio" name="cuMode" value="now" ${cuMode === 'now' ? 'checked' : ''}> I have a price</label><label><input type="radio" name="cuMode" value="ask" ${cuMode === 'ask' ? 'checked' : ''}> It needs a price</label></div>
