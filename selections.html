@@ -893,13 +893,20 @@ const ceilStd = L=>{ const c = cfgOf(L).ceil; return c === 8 || c === 9 ? c : (L
 const ceilPrice = (std, h)=>{ const k = std + '-' + h; return CEIL_CFG[k] != null ? CEIL_CFG[k] : CEIL_BASE[k] != null ? CEIL_BASE[k] : 0; };
 const ceilLabel = (std, h)=>(h < std ? 'Credit to ' : 'Upgrade to ') + h + "' ceilings";
 // what a choice costs when it's first taken: ceiling moves and allowances have their own; everything else is the selection sheet's
-const choicePrice = (q, i, L)=>(q.opts || q.c[i].k) ? (optPrice(q.c[i].k) || 0) : q.ceil ? ceilPrice(ceilStd(L), q.c[i].h) : isAllow(q, q.c[i]) ? allowDefault(q, i) : (q.c[i].p || 0);
+const choicePrice = (q, i, L)=>q.c[i].kf ? (optPrice(headPriceKey(q.c[i], L, q)) || 0) : (q.opts || q.c[i].k) ? (optPrice(q.c[i].k) || 0) : q.ceil ? ceilPrice(ceilStd(L), q.c[i].h) : isAllow(q, q.c[i]) ? allowDefault(q, i) : (q.c[i].p || 0);
 const ALLOW_BASE = { '193': 0 };                         // BT numbers that are allowances though not named so (amount: from the server)
 const isAllow = (q, c)=>!!c && (/allowance/i.test(c.t) || ALLOW_BASE[q.bt] != null);
 const allowDefault = (q, i)=>{ const k = q.id + '#' + i; return ALLOW_CFG[k] != null ? ALLOW_CFG[k] : ALLOW_BASE[q.bt] != null ? ALLOW_BASE[q.bt] : (q.c[i].p || 0); };
 const qById = id=>ALL_QS.find(q=>q.id===id);
 const qOfKey = k=>qById(String(k).split('#')[0]);
 function applyOver(){ ALL_QS.forEach(q=>q.c.forEach(c=>{ if(!('p0' in c) || !overOn(c)) return; const v = PRICE_OVER[overKey(q, c)]; c.p = v != null ? v : c.p0; })); }
+/* SHOWER HEAD UPGRADES (owner, 2026-10-27: "they also have the option to upgrade to these shower heads"; from the supplier's "Magnetix by Moen"
+   page): BuilderTrend has no shower head line, so each bath with a shower gets 'shead_<room>' "Shower Head Upgrade" after its Shower Faucet
+   (on the pricing sheet AND always on the Selections side, like the faucets). Photo picks in every finish the head comes in (finish dots);
+   the line carries the full order number in the bath's finish. The PRICE depends on the finish: `kf` = key prefix, price = OPT_PRICES[kf +
+   '-' + finish] (Home styles → Other option prices; empty = price to come). More heads from the same page go in SHOWER_HEADS. */
+const SHOWER_HEADS = [{ model:'3662EP', t:'Magnetix Eco Performance handheld shower', fins:['ch','bn','orb','brass','black'], kf:'head-3662ep' }];
+const headPriceKey = (c, L, q)=>c.kf + '-' + bathFin(L, q.room.id);
 function buildCatalog(cat){
   CAT_RAW = cat;
   const skipBt = new Set(['602']);                   // folded into 600's patio / deck choices
@@ -929,7 +936,7 @@ function buildCatalog(cat){
     const std = STD_FIRST[s.bt] || [];
     sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt], fauc: !!FAUCET_KIND[s.bt], v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -957,6 +964,10 @@ function buildCatalog(cat){
       c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) });
     sec.qs.unshift({ id:'col_' + rid, bt:'', num, t:'Faucet Collection - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, col:true, tw:'Faucet Collection',
       c:FAUCETS.map(x=>({ t:x.name, p:0, p0:0, unit:'', img:moenImg(x.lav[0][0]), model:x.lav[0][0], fins:x.fins, sub:x.fins.map(k=>FIN_LABEL[k]).join(' · ') })) }); });
+  [['mbath', '270'], ['bath2', '310'], ['bath3', '350']].forEach(([rid, bt])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec) return;
+    const at = sec.qs.findIndex(q=>q.bt === bt); if(at < 0) return;
+    sec.qs.splice(at + 1, 0, { id:'shead_' + rid, bt:'', num:parseInt(bt, 10), t:'Shower Head Upgrade - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:1, photo:true, sh:true, tw:'Shower Head Upgrade',
+      c:SHOWER_HEADS.map(h=>({ t:'Magnetix by Moen - ' + h.t + ' (' + h.model + ')', p:null, unit:'', brand:'Magnetix by Moen', img:moenImg(h.model), model:h.model, fins:h.fins, kf:h.kf })) }); });
   SECTIONS = SECTIONS.filter(r=>r.qs.length);
   ROOMS = SECTIONS;
   PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
@@ -1071,7 +1082,7 @@ const choicesOf = (q, L)=>{ if(q.opts){ const all = q.c.map((c, i)=>({ ...c, i, 
     return all; }
   if(q.fauc){ const col = faucetCol(L, q.room.id), all = q.c.map((c, i)=>({ ...c, i })); return col ? all.filter(c=>c.brand === col || (L.answers[q.id + '#' + c.i] || {}).qty) : all; }
   if(q.ceil){ const std = ceilStd(L); return q.c.map((c, i)=>({ ...c, i, t:ceilLabel(std, c.h), p:ceilPrice(std, c.h) })).filter(c=>c.h !== std); }
-  const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p:optPrice(c.k) } : {}) }));
+  const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p:optPrice(c.k) } : {}), ...(c.kf && L ? { p:optPrice(headPriceKey(c, L, q)) } : {}) }));
   if(q.bt === '642'){ const cov = ALL_QS.find(x=>x.bt === '640'); const got = cov ? cov.c.map((c, i)=>(L.answers[cov.id + '#' + i] || {}).qty ? c.t : '').filter(Boolean).join(' ') : '';
     if(/patio/i.test(got) || /deck/i.test(got)) return all.filter(c=>/patio/i.test(got) ? /patio/i.test(c.t) : /deck/i.test(c.t)); } if(q.bt !== '126' || !L.model) return all; const mine = all.filter(c=>c.t.toLowerCase().replace(/ basement$/, '') === L.model.toLowerCase()); return mine.length ? mine : all; };
 const missing = ()=>[];                       // nothing on either sheet has to be answered: untouched = standard
@@ -1103,7 +1114,7 @@ function lines(L){
     r.qs.forEach(q=>{ if(!asked(q, L)) return;
       q.c.forEach((c, i)=>{
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
-      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : q.fauc && c.model ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.k ? optPrice(c.k) == null : c.p == null });
+      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : (q.fauc || q.sh) && c.model ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.p == null });
       });
       const qn = L.answers[qNoteKey(q)];   // the question's own note, after its picks
       if(qn && qn.label) out.push({ key:qNoteKey(q), q, where:'', label:qn.label, price:0, cost:0, std:false, typed:true });
@@ -1499,6 +1510,7 @@ function pricesScreen(){
     if(isAllow(q, c)) return `<span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(q.id + '#' + i)}" value="${allowDefault(q, i)}" style="width:110px"><span class="pnote">allowance (typed on the sheet)</span>${chg('allow', q.id + '#' + i)}`;
     if(c.rate) return '<span class="pnote">price typed on the sheet</span>';
     if(c.h) return '<span class="pnote">ceiling moves are priced in the card at the top</span>';
+    if(c.kf) return '<span class="pnote">priced per finish in Other option prices</span>';
     if(c.k) return `<span class="muted">$</span><input type="number" step="0.01" data-optp="${esc(c.k)}" value="${optPrice(c.k) == null ? '' : optPrice(c.k)}" placeholder="price to come" style="width:110px">${chg('prices', c.k)}`;
     const k = overKey(q, c), on = PRICE_OVER[k] != null;
     return `<span class="muted">$</span><input type="number" step="0.01" data-over="${esc(k)}" value="${on ? PRICE_OVER[k] : ''}" placeholder="${c.p0 == null ? 'price to come' : c.p0}" style="width:110px">
@@ -1566,6 +1578,7 @@ function bathCard(){
     ${FIN_CHOICES.map(x=>row(x.k, x.t + ' finish', 'Every bath except the master: added once per bathroom that picks it (door, faucets and hardware)')).join('')}
     ${FIN_CHOICES.map(x=>`<div class="sty-row"><div class="t"><b>Master bath: ${esc(x.t)} finish</b><small>The master often has double fixtures. Empty = the same as the other baths${optPrice(x.k) != null ? ' (' + money2(optPrice(x.k)) + ')' : ''}</small></div>
       <span class="muted">$</span><input type="number" step="0.01" data-optp="${x.k}-m" value="${OPT_PRICES[x.k + '-m'] == null ? '' : OPT_PRICES[x.k + '-m']}" placeholder="same as other baths" style="width:130px"></div>`).join('')}
+    ${SHOWER_HEADS.flatMap(h=>h.fins.map(fk=>row(h.kf + '-' + fk, 'Shower head ' + h.model + ' · ' + FIN_LABEL[fk], 'Magnetix by Moen; the price follows the bathroom\'s finish'))).join('')}
     ${row('pantry-lf', 'Added pantry shelves, per linear ft', '4 wire shelves are standard; this is each extra foot of shelf')}
     ${row('rail-lf', 'Deck railing, per linear ft', 'Asked on the patio & deck section')}
     ${row('bsmt-open', 'Open stairs to basement', 'Basement section; closed stairs are standard')}
@@ -1781,7 +1794,7 @@ function hasFeat(L, f){
 const pickedOn = (q, L)=>choicesOf(q, L).some(c=>{ const a = L.answers[q.id + '#' + c.i]; return a && (a.qty || (c.rate && a.price)); }) || L.custom.some(c=>c.q === q.id);
 // the Moen faucet / shower / spa / hardware picks are made at the selections meeting, so they always come over (owner, 2026-10-27:
 // the shower photos were hidden because those lines are on the pricing sheet too and were left at standard there)
-const onSelSide = (q, L)=>!isLotPrem(q) && !(q.v1 && !q.fauc && !pickedOn(q, L));
+const onSelSide = (q, L)=>!isLotPrem(q) && !(q.v1 && !q.fauc && !q.sh && !pickedOn(q, L));
 const askedFor = (q, L, sel)=>asked(q, L) && (!sel || onSelSide(q, L));
 const sectionsFor = (L, list)=>list.filter(r=>r.qs.some(q=>askedFor(q, L, list === ROOMS)));
 
@@ -2467,9 +2480,9 @@ document.addEventListener('change', e=>{
     const k = e.target.dataset.bmName || e.target.dataset.bmHex, q = qOfKey(k); if(!q) return;
     const nameBox = document.querySelector('[data-bm-name="' + k + '"]'), hexBox = document.querySelector('[data-bm-hex="' + k + '"]');
     
-    const label = (nameBox ? nameBox.value : '').trim(), hex = hexBox ? hexBox.value : '', num = (label.match(/([A-Z]{1,3}-?d{1,4}(?:-d{1,2})?|d{3,4}(?:-d{1,2})?)s*$/) || [])[1] || '';
+    const label = (nameBox ? nameBox.value : '').trim(), hex = hexBox ? hexBox.value : '';
     if(!label){ delete L3.answers[k]; }
-    else { q.c.forEach((x, j)=>{ if(q.id + '#' + j !== k) delete L3.answers[q.id + '#' + j]; }); L3.answers[k] = { qty:1, price:0, label, hex, num }; }
+    else { q.c.forEach((x, j)=>{ if(q.id + '#' + j !== k) delete L3.answers[q.id + '#' + j]; }); L3.answers[k] = { qty:1, price:0, label }; }
     touch(L3); const y = window.scrollY; render(); window.scrollTo(0, y); return;
   }
   if(e.target.dataset && e.target.dataset.lotprem){
