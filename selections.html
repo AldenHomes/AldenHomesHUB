@@ -285,6 +285,10 @@
   .doc h3{font-family:Georgia,serif;font-size:17px;color:var(--navy);margin:22px 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid #d9d6cc;padding:7px 10px 6px;background:#eeede8;border-radius:4px 4px 0 0;break-after:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   /* photo picks */
   .ph-product .ph-pick img{object-fit:contain; aspect-ratio:1/1; background:#fff; padding:6px; box-sizing:border-box;}
+  .ph-fins{position:absolute; top:8px; left:50%; transform:translateX(-50%); display:flex; gap:6px; padding:4px 6px; background:rgba(255,255,255,.92); border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.18);}
+  .ph-fin{width:18px; height:18px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.25); cursor:pointer; padding:0;}
+  .ph-fin.on{box-shadow:0 0 0 2px var(--navy,#1f3550);}
+  .ph-tile.on .ph-check{top:auto; bottom:44px;}
   .ph-sub{display:block; font-weight:600; font-size:12px; color:var(--muted,#777); margin-top:2px;}
   .ph-warn{display:block; font-weight:700; font-size:12px; color:#b3261e; margin-top:2px;}
   .ph-group{margin-top:10px;} .ph-note{text-transform:none; letter-spacing:0; font-weight:600;} .ph-brand{font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted,#777); margin:6px 0 6px;}
@@ -582,21 +586,46 @@ const FIN_CHOICES = [{ t:'Brushed nickel', k:'fin-bn' }, { t:'Brushed brass', k:
 const FIN_CODE = { 'Brushed nickel':'bn', 'Brushed brass':'brass', 'Black':'black', 'Oil rubbed bronze':'orb' };
 const FIN_LABEL = { ch:'Chrome', bn:'Brushed nickel', brass:'Brushed gold', orb:'Oil rubbed bronze', black:'Matte black' };
 const FAUCETS = [
-  { name:'Gibson', fins:['ch','bn','black'], lav:[['6150', '2-handle 4" faucet'], ['T6142', 'Widespread 8" faucet'], ['6145', 'Single-handle faucet']], shower:'T2902EP', tub:'T2903EP' },
-  { name:'Glyde', fins:['ch','bn','black'], lav:[['6172', '2-handle 4" faucet'], ['T6173', 'Widespread 8" faucet'], ['6170', 'Single-handle faucet']], shower:'T2742', tub:'T2743' },
-  { name:'Voss', fins:['ch','bn','brass','orb'], lav:[['6901', '2-handle 4" faucet'], ['T6905', 'Widespread 8" faucet'], ['6903', 'Single-handle faucet']], shower:'T2692', tub:'T2693' },
-  { name:'Align', fins:['ch','bn','brass','black'], lav:[['6190', 'Single-handle faucet']], shower:'T2192', tub:'T2193' },
-  { name:'90 Degree', fins:['ch','bn'], lav:[['S6700', 'Single-handle faucet'], ['TS6720', 'Widespread 8" faucet']], shower:'TS2712', tub:'TS2713' },
-  { name:'Doux', fins:['ch','bn','black'], lav:[['S6910', 'Single-handle faucet'], ['TS6925', 'Widespread 8" faucet']], shower:'TS2202', tub:'TS2203' },
-  { name:'Brantford', fins:['ch','bn','orb'], lav:[['6610', '2-handle 4" faucet'], ['T6620', 'Widespread 8" faucet'], ['6600', 'Single-handle faucet']], shower:'T2152', tub:'T2153' },
-  { name:'Eva', fins:['ch','bn','orb'], lav:[['6410', '2-handle 4" faucet'], ['T6420', 'Widespread 8" faucet'], ['6400', 'Single-handle faucet']], shower:'T2132', tub:'T2133' },
+  { name:'Gibson', fins:['ch','bn','black'], hw:'DN07', ring:'Towel ring', spa:'UT2921', spaParts:'T2902EP shower trim, UT2921 transfer valve trim, 3669EP handheld', lav:[['6150', '2-handle 4" faucet'], ['T6142', 'Widespread 8" faucet'], ['6145', 'Single-handle faucet']], shower:'T2902EP', tub:'T2903EP' },
+  { name:'Glyde', fins:['ch','bn','black'], hw:'YB23', ring:'Towel ring', spa:'UT2721', spaParts:'T2742 shower trim, UT2721 transfer valve trim, 3669EP handheld', lav:[['6172', '2-handle 4" faucet'], ['T6173', 'Widespread 8" faucet'], ['6170', 'Single-handle faucet']], shower:'T2742', tub:'T2743' },
+  { name:'Voss', fins:['ch','bn','brass','orb'], hw:'YB51', ring:'Towel ring', spa:'T2690', spaParts:'T2690 transfer & volume trim, 3868EP handheld, S6340 shower head', lav:[['6901', '2-handle 4" faucet'], ['T6905', 'Widespread 8" faucet'], ['6903', 'Single-handle faucet']], shower:'T2692', tub:'T2693' },
+  { name:'Align', fins:['ch','bn','brass','black'], hw:'YB04', ring:'Hand towel bar', spa:'T2190', spaParts:'T2190 transfer & volume trim, 3887EP handheld, S176 shower head', lav:[['6190', 'Single-handle faucet']], shower:'T2192', tub:'T2193' },
+  { name:'90 Degree', fins:['ch','bn'], hw:'YB88', ring:'Hand towel bar', spa:'TS2710', spaParts:'TS2710 transfer & volume trim, S3880EP handheld, S6340 shower head', lav:[['S6700', 'Single-handle faucet'], ['TS6720', 'Widespread 8" faucet']], shower:'TS2712', tub:'TS2713' },
+  { name:'Doux', fins:['ch','bn','black'], hw:'YB02', ring:'Hand towel bar', spa:'TS22000', spaParts:'TS22000 transfer & volume trim, 3887EP handheld, S176 shower head', lav:[['S6910', 'Single-handle faucet'], ['TS6925', 'Widespread 8" faucet']], shower:'TS2202', tub:'TS2203' },
+  { name:'Brantford', fins:['ch','bn','orb'], hw:'YB22', ring:'Towel ring', spa:'UT2021', spaParts:'T2152EP shower trim, UT2021 transfer valve trim, 3667EP handheld', lav:[['6610', '2-handle 4" faucet'], ['T6620', 'Widespread 8" faucet'], ['6600', 'Single-handle faucet']], shower:'T2152', tub:'T2153' },
+  { name:'Eva', fins:['ch','bn','orb'], hw:'YB28', ring:'Towel ring', spa:'UT2021', spaParts:'T2152EP shower trim, UT2021 transfer valve trim, 3667EP handheld', lav:[['6410', '2-handle 4" faucet'], ['T6420', 'Widespread 8" faucet'], ['6400', 'Single-handle faucet']], shower:'T2132', tub:'T2133' },
 ];
 const FAUCET_LAV_BT = ['278', '318', '358', '384'], FAUCET_SHOWER_BT = ['270', '310', '350'];
-const moenImg = m=>`selection-photos/faucets/moen-${m.toLowerCase()}.jpg`;
-const faucetChoices = kind=>FAUCETS.flatMap(x=>kind === 'lav'
-  ? x.lav.map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m }))
-  : [{ t: x.name + ' - Shower faucet (' + x.shower + ')', p:0, unit:'', brand:x.name, img:moenImg(x.shower), model:x.shower },
-     { t: x.name + ' - Tub/shower faucet (' + x.tub + ')', p:0, unit:'', brand:x.name, img:moenImg(x.tub), model:x.tub }]);
+/* BATH HARDWARE + SPAS (owner, 2026-10-27: "photos for the tub and towel bars and paper holders and all the other items"): every bath's
+   hardware lines and the vertical spa line become photo picks of the chosen collection's pieces (Moen photos, every offered finish).
+   The supplier sheet's note: the master gets a paper holder, towel ring and robe hook, the other baths a paper holder and towel ring —
+   that's the "standard set" (Bath Hardware, BT 282/322/362/388, one pick); extra 18"/24" towel bars and rings (BT 284/324/364/390) and
+   robe hooks (BT 286/326/366) are add-ons. Align / 90 Degree / Doux have a hand towel bar where the others have a ring (Moen's catalog). */
+const FAUCET_KIND = { '278':'lav', '318':'lav', '358':'lav', '384':'lav', '270':'shower', '310':'shower', '350':'shower', '272':'spa', '312':'spa', '352':'spa',
+  '282':'hwset-m', '322':'hwset', '362':'hwset', '388':'hwset', '284':'hwadd', '324':'hwadd', '364':'hwadd', '390':'hwadd', '286':'hook', '326':'hook', '366':'hook' };
+const FAUCET_ONE = ['lav', 'shower', 'spa', 'hwset', 'hwset-m'];
+const moenImg = (m, fin)=>`selection-photos/faucets/moen-${m.toLowerCase()}${fin && fin !== 'ch' ? '-' + fin : ''}.jpg`;
+/* FINISH PHOTOS (owner, 2026-10-27: "see the other finish photos… click through the finishes"): every faucet tile has finish dots along
+   the top (only the finishes its collection is offered in); a dot swaps that tile's photo (and the big view) to Moen's photo of that
+   finish — it doesn't change any pick. Tiles start in the bathroom's chosen finish when the collection comes in it. `tileFin` is
+   screen-only (not saved). 76 finish photos saved from Moen alongside the chrome ones. */
+const tileFin = {};
+const FIN_DOT = { ch:'linear-gradient(135deg,#f4f6f8,#aab1b8)', bn:'linear-gradient(135deg,#d8d3c8,#9d978a)', brass:'linear-gradient(135deg,#e6c77d,#a8823a)', orb:'linear-gradient(135deg,#6b4a35,#2e1f16)', black:'linear-gradient(135deg,#4a4a4a,#151515)' };
+const bathFin = (L, rid)=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + rid); if(!fq) return 'ch'; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : 'ch'; };
+// the finish a tile is showing, and its photo
+const tileFinOf = (q, c, L)=>{ const k = q.id + '#' + c.i; if(tileFin[k] && c.fins.includes(tileFin[k])) return tileFin[k]; const b = bathFin(L, q.room.id); return c.fins.includes(b) ? b : 'ch'; };
+const tileImg = (q, c, L)=>c.fins && c.model ? moenImg(c.model, tileFinOf(q, c, L)) : c.img;
+const faucetChoices = kind=>FAUCETS.flatMap(x=>{
+  const pc = (code, label, extra)=>({ t: x.name + ' - ' + label + ' (' + code + ')', p:0, unit:'', brand:x.name, img:moenImg(code), model:code, fins:x.fins, ...(extra || {}) });
+  if(kind === 'spa') return [{ ...pc(x.spa, 'Spa package'), t: x.name + ' - Spa package (' + x.spaParts + ')' }];
+  if(kind === 'hwset' || kind === 'hwset-m'){ const parts = [x.hw + '08 paper holder', x.hw + '86 ' + x.ring.toLowerCase()].concat(kind === 'hwset-m' ? [x.hw + '03 robe hook'] : []);
+    return [{ ...pc(x.hw + '86', 'Standard set'), t: x.name + ' - Standard set: ' + parts.join(', ') }]; }
+  if(kind === 'hwadd') return [pc(x.hw + '18', '18" towel bar'), pc(x.hw + '24', '24" towel bar'), pc(x.hw + '86', x.ring)];
+  if(kind === 'hook') return [pc(x.hw + '03', 'Robe hook')];
+  return null; }).filter(Boolean).concat(['spa', 'hwset', 'hwset-m', 'hwadd', 'hook'].includes(kind) ? [] : FAUCETS.flatMap(x=>kind === 'lav'
+  ? x.lav.map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m, fins:x.fins }))
+  : [{ t: x.name + ' - Shower faucet (' + x.shower + ')', p:0, unit:'', brand:x.name, img:moenImg(x.shower), model:x.shower, fins:x.fins },
+     { t: x.name + ' - Tub/shower faucet (' + x.tub + ')', p:0, unit:'', brand:x.name, img:moenImg(x.tub), model:x.tub, fins:x.fins }]));
 // the collection picked for a bathroom (its name), or ''
 const faucetCol = (L, rid)=>{ const q = ALL_QS.find(x=>x.id === 'col_' + rid); if(!q) return ''; const i = q.c.findIndex((c, j)=>(L.answers[q.id + '#' + j] || {}).qty); return i >= 0 ? q.c[i].t : ''; };
 const faucetOf = name=>FAUCETS.find(x=>x.name === name);
@@ -711,7 +740,7 @@ const PHOTO_SETS = {
 const slugOf = t=>String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const photoChoices = bt=>{ const set = PHOTO_SETS[bt]; if(!set) return null;
   return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, note: g.note || '', img: g.photos ? `selection-photos/${set.dir}/${g.code}-${slugOf(n)}.jpg` : '' }))); };
-const splitChoices = (bt, list)=>(FAUCET_LAV_BT.includes(bt) ? faucetChoices('lav') : FAUCET_SHOWER_BT.includes(bt) ? faucetChoices('shower') : null) || photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
+const splitChoices = (bt, list)=>(FAUCET_KIND[bt] ? faucetChoices(FAUCET_KIND[bt]) : null) || photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
     ...list.filter(c=>!PANTRY_DROP.test(String(c.t).trim())).map(c=>/appliance/i.test(c.t) ? c : { ...c, t: /\/\s*lf/i.test(c.t) ? c.t : c.t + ' (per linear ft)', unit:'ft' })] :list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }));
 /* The master bath sets the other bathrooms (owner, 2026-10-14: people often make the bathrooms the same). A line in the main, third
    or powder bath with the same name as a master bath line (`tw`) copies the master's choice, at its own price, marked auto. Touching
@@ -775,9 +804,9 @@ function buildCatalog(cat){
     const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
     const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
     const std = STD_FIRST[s.bt] || [];
-    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_LAV_BT.includes(s.bt) || FAUCET_SHOWER_BT.includes(s.bt) || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || FAUCET_LAV_BT.includes(s.bt) || FAUCET_SHOWER_BT.includes(s.bt), fauc: FAUCET_LAV_BT.includes(s.bt) || FAUCET_SHOWER_BT.includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt], fauc: !!FAUCET_KIND[s.bt], v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -798,7 +827,7 @@ function buildCatalog(cat){
       // the master bath's finishes have their own prices (owner, 2026-10-21: the master often has double fixtures): keys 'fin-bn-m' etc.
       c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) });
     sec.qs.unshift({ id:'col_' + rid, bt:'', num, t:'Faucet Collection - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, col:true, tw:'Faucet Collection',
-      c:FAUCETS.map(x=>({ t:x.name, p:0, p0:0, unit:'', img:moenImg(x.lav[0][0]), sub:x.fins.map(k=>FIN_LABEL[k]).join(' · ') })) }); });
+      c:FAUCETS.map(x=>({ t:x.name, p:0, p0:0, unit:'', img:moenImg(x.lav[0][0]), model:x.lav[0][0], fins:x.fins, sub:x.fins.map(k=>FIN_LABEL[k]).join(' · ') })) }); });
   SECTIONS = SECTIONS.filter(r=>r.qs.length);
   ROOMS = SECTIONS;
   PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
@@ -966,8 +995,9 @@ function photoGridInner(q, L, lock){
     const k = q.id + '#' + c.i, on = !!(L.answers[k] || {}).qty, name = c.brand ? c.t.slice(c.brand.length + 3) : c.t;
     return `<div class="ph-tile ${on ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">
       <button type="button" class="ph-pick" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''} aria-pressed="${on}" title="${on ? 'Chosen' : 'Choose'} ${esc(c.t)}">
-        ${c.img ? `<img src="${esc(c.img)}" alt="${esc(c.t)}" loading="lazy">` : '<span class="ph-none">Photo to come</span>'}
+        ${c.img ? `<img src="${esc(tileImg(q, c, L))}" alt="${esc(c.t)}" loading="lazy">` : '<span class="ph-none">Photo to come</span>'}
         <span class="ph-name">${esc(name)}${c.sub ? `<small class="ph-sub">${esc(c.sub)}</small>` : ''}${q.col && fin && !(faucetOf(c.t) || { fins:[] }).fins.includes(fin) ? `<small class="ph-warn">Not made in ${esc(FIN_LABEL[fin])}</small>` : ''}</span>${on ? '<span class="ph-check">&#10003;</span>' : ''}</button>
+      ${c.fins && c.model && c.fins.length > 1 ? `<div class="ph-fins">${c.fins.map(fk=>`<button type="button" class="ph-fin ${tileFinOf(q, c, L) === fk ? 'on' : ''}" data-fin-view="${esc(k)}|${fk}" title="See it in ${esc(FIN_LABEL[fk])}" aria-label="See it in ${esc(FIN_LABEL[fk])}" style="background:${FIN_DOT[fk]}"></button>`).join('')}</div>` : ''}
       ${c.img ? `<button type="button" class="ph-zoom" data-photo-view="${esc(k)}" title="See it bigger" aria-label="See ${esc(c.t)} bigger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>` : ''}</div>`; }).join('')}</div></div>`).join('');
 }
 function prow(q, L, force){
@@ -2160,6 +2190,10 @@ document.addEventListener('click', async e=>{
     a.qty = (a.qty || 0) + sq; L.answers[k] = a; markOwn(L, q); flashKey = k; touch(L);
     const y = window.scrollY; render(); window.scrollTo(0, y); flashKey = ''; return;
   }
+  const fv = t.closest('[data-fin-view]');
+  if(fv){ const [k, fk] = fv.dataset.finView.split('|'); tileFin[k] = fk; const q = qOfKey(k), c = q && q.c[Number(k.split('#')[1])];
+    const tile = fv.closest('.ph-tile'); if(q && c && tile){ const img = tile.querySelector('img'); if(img) img.src = tileImg(q, { ...c, i:Number(k.split('#')[1]) }, lead()); tile.querySelectorAll('.ph-fin').forEach(b=>b.classList.toggle('on', b === fv)); }
+    return; }
   const pv = t.closest('[data-photo-view]'); if(pv){ photoView(pv.dataset.photoView); return; }
   const tg = t.closest('[data-bt-tog]'), stp = t.closest('[data-bt-step]');
   if(tg || stp){
@@ -2557,8 +2591,9 @@ function photoView(k){
   const q = qOfKey(k), L = lead(); if(!q || !L){ return; }
   const c = q.c[Number(k.split('#')[1])]; if(!c || !c.img) return;
   pvKey = k;
-  document.getElementById('pvImg').src = c.img; document.getElementById('pvImg').alt = c.t;
-  document.getElementById('pvName').textContent = c.t;
+  const ci = { ...c, i:Number(k.split('#')[1]) }, fk = c.fins && c.model ? tileFinOf(q, ci, L) : '';
+  document.getElementById('pvImg').src = tileImg(q, ci, L); document.getElementById('pvImg').alt = c.t;
+  document.getElementById('pvName').textContent = c.t + (fk ? ' · ' + FIN_LABEL[fk] : '');
   const on = !!(L.answers[k] || {}).qty, lock = locked(L);
   const ch = document.getElementById('pvChoose'); ch.textContent = on ? '\u2713 Chosen' : 'Choose this'; ch.disabled = lock; ch.style.display = lock ? 'none' : '';
   document.getElementById('photoView').classList.add('show');
