@@ -317,6 +317,8 @@
   .ds-chip.on{border-color:#1f3550; background:#eef3f8;}
   .ds-other{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:10px; padding:10px; border:2px dashed #d6d1c4; border-radius:10px;}
   .ds-other.on{border-style:solid; border-color:#1f3550; background:#eef3f8;} .ds-other input[type=text]{flex:1; min-width:220px;}
+  .cho-img{flex:0 0 auto; width:64px; height:64px; padding:0; border:1px solid #e3e0d8; border-radius:8px; background:#fff; overflow:hidden; cursor:zoom-in; margin-right:4px;}
+  .cho-img img{width:100%; height:100%; object-fit:cover; display:block;}
   .ph-groups{display:flex; flex-wrap:wrap; gap:4px 18px; align-items:flex-start;}
   .ph-groups > .ph-group{flex:0 1 calc(var(--n, 1) * 224px); max-width:100%; min-width:min(210px, 100%);}
   .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;}
@@ -644,6 +646,28 @@ const KITCHEN = [
     ['S3946', 'Transitional soap dispenser', 'ch,ss,orb,brass,black', 'soap'], ['S3947', 'Modern soap dispenser', 'ch,ss,brass,black', 'soap'], ['S3948', 'Transitional soap dispenser', 'ch,ss,orb,black', 'soap']] },
   { name:'Garbage disposal air switch', items:[['ACR-4200', 'Air switch controller ACR-4200 + air button AS-4201', 'ch,ss,orb,brass,black', 'air']] },
 ];
+/* THE OFFICE'S PHOTO FOLDER (owner, 2026-10-27, "Uploaded to BT" zip; "I always default to finding the highest quality photos online"):
+   photos in selection-photos/misc/ (the office's own pictures shrunk to 900px, upright; TimberTech / mirrors / interior doors as sent —
+   no sharper source found by name). CHOICE_IMG puts a small photo beside an ordinary choice (tap = big view). FOLLOW_UPS are photo
+   questions on the Selections side that are only asked once their line is picked ("they would only need to choose a style if they
+   choose they want one"). WANT_FIRST lines ask "Add one?" before showing the styles. */
+const MISC = 'selection-photos/misc/';
+const CHOICE_IMG = { '156':[[/^laundry tub$/i, 'laundry-tub']], '518':[[/^wood pantry shelves/i, 'pantry-wood'], [/appliance shelf/i, 'pantry-wire-wood-appliance']],
+  '277':[[/rectangle mirror - black/i, 'mirror-black-rectangle'], [/rectangle mirror - gold/i, 'mirror-gold-rectangle'], [/rectangle mirror - silver/i, 'mirror-silver-rectangle'],
+    [/round mirror - gold/i, 'mirror-gold-round'], [/round mirror - silver/i, 'mirror-silver-round'], [/round mirror - black/i, 'mirror-black-round']] };
+const TIMBERTECH = ['American Walnut', 'Boardwalk', 'Brownstone', 'Castle Gate', 'Coastline', 'Dark Hickory', 'English Walnut', 'French White Oak', 'Kona', 'Mahogany', 'Slate Gray', 'Weathered Teak'];
+const INT_DOORS = ['Cambrian', 'Camdale', 'Colburn', 'Conmivo', 'Connelly', 'Crayburn', 'Maddox', 'Montgomery', 'Rochele'];
+// Moen Designer Grab Bars by collection; finishes = what Moen makes each in
+const GRAB_BARS = [['Align', 'YG0418', '18"', 'ch,bn,black'], ['Align', 'YG0424', '24"', 'ch,bn,brass,black'], ['Voss', 'YG5118', '18"', 'ch,bn,brass,black,orb'], ['Voss', 'YG5124', '24"', 'ch,bn,brass,black,orb'],
+  ['Eva', 'YG2818', '18"', 'ch,bn,orb'], ['Eva', 'YG2824', '24"', 'ch,bn,orb']];
+// [id, after-BT (the line it follows and depends on), section, title, cost code, choices]
+const FOLLOW_UPS = [
+  ...[['mbath', '280'], ['bath2', '320'], ['bath3', '360'], ['powder', '386']].map(([rid, bt])=>['gbar_' + rid, [bt], rid, 'Grab Bar Style', 50,
+    ()=>GRAB_BARS.map(([col, m, size, fins])=>({ t: col + ' - ' + size + ' designer grab bar (' + m + ')', p:0, unit:'', brand:col, img:moenImg(m), model:m, fins:fins.split(','), gb:true }))]),
+  ['ttcolor', ['182'], null, 'Composite Porch Color (TimberTech)', 40, ()=>TIMBERTECH.map(n=>({ t:'TimberTech - ' + n, p:0, unit:'', brand:'TimberTech', img:MISC + 'timbertech-' + slugOf(n) + '.jpg' }))],
+  ['railstyle', ['610'], null, 'Deck Railing Style', 41, ()=>[['Black pickets', 'railing-black-pickets'], ['Cable railing', 'railing-cable'], ['White railing', 'railing-white']].map(([t, img])=>({ t, p:0, unit:'', img:MISC + img + '.jpg' }))],
+];
+const WANT_FIRST = { '510':'Add a bar faucet in the butlers pantry', '530':'Add a soap dispenser', '532':'Add a pot filler', '534':'Add an air switch for the garbage disposal' };
 const KIT_CHROME_C = ['7594', '7185', 'S3945', 'S3946', 'S3947', 'S3948'];
 const AIR_BUTTON = { ch:'CH', ss:'SN', orb:'BRB', brass:'BG', black:'BL' };
 // Moen's order number for a kitchen item in a finish
@@ -709,7 +733,8 @@ const STD_FIRST = { '273':['Standard toilet'], '313':['Standard toilet'], '353':
 /* Countertop allowance (owner, 2026-10-19): BuilderTrend's one "Countertop Allowance" on Kitchen/Bath Cabinetry (BT 500) becomes a
    Granite and a Quartz allowance. Both are typed allowances (named "…allowance", so isAllow picks them up and the back end's
    Allowance amounts sets their starting amounts); they share grp 'counter', so taking one takes the other off. */
-const SPLIT = { '500': { 'countertop allowance': [{ t:'Granite countertop allowance', grp:'counter' }, { t:'Quartz countertop allowance', grp:'counter' }] } };
+const SPLIT = { '277': { 'rectangle mirror - black/gold/silver': [{ t:'Rectangle Mirror - black' }, { t:'Rectangle Mirror - gold' }, { t:'Rectangle Mirror - silver' }] },
+  '500': { 'countertop allowance': [{ t:'Granite countertop allowance', grp:'counter' }, { t:'Quartz countertop allowance', grp:'counter' }] } };
 /* Pantry shelves (owner, 2026-10-19): 4 wire shelves are standard at no charge (shown as the standard, and they stay standard when
    shelves are added); added shelves are charged by the linear foot at the price set in the back end (OPT_PRICES['pantry-lf'], kept on
    the server). BuilderTrend's blank "Number of Pantry Shelves:" and per-shelf "Add't wire pantry shelves" are replaced by it; its other
@@ -904,7 +929,7 @@ function doorsScreen(){
 }
 const photoChoices = bt=>{ const set = PHOTO_SETS[bt]; if(!set) return null;
   return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, note: g.note || '', img: g.photos ? `selection-photos/${set.dir}/${g.code}-${slugOf(n)}.jpg` : '' }))); };
-const splitChoices = (bt, list)=>(KITCHEN_KIND[bt] ? kitchenChoices(KITCHEN_KIND[bt]) : null) || (FAUCET_KIND[bt] ? faucetChoices(FAUCET_KIND[bt]) : null) || photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
+const splitChoices = (bt, list)=>(bt === '522' ? [{ t:'Stainless single bowl sink (AmeriSink AS130)', p:0, unit:'', img:MISC + 'sink-as130.jpg' }, { t:'Stainless double bowl sink (AmeriSink AS326)', p:0, unit:'', img:MISC + 'sink-as326.jpg' }] : null) || (KITCHEN_KIND[bt] ? kitchenChoices(KITCHEN_KIND[bt]) : null) || (FAUCET_KIND[bt] ? faucetChoices(FAUCET_KIND[bt]) : null) || photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
     ...list.filter(c=>!PANTRY_DROP.test(String(c.t).trim())).map(c=>/appliance/i.test(c.t) ? c : { ...c, t: /\/\s*lf/i.test(c.t) ? c.t : c.t + ' (per linear ft)', unit:'ft' })] :list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }));
 /* The master bath sets the other bathrooms (owner, 2026-10-14: people often make the bathrooms the same). A line in the main, third
    or powder bath with the same name as a master bath line (`tw`) copies the master's choice, at its own price, marked auto. Touching
@@ -975,9 +1000,10 @@ function buildCatalog(cat){
     const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
     const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
     const std = STD_FIRST[s.bt] || [];
-    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || !!KITCHEN_KIND[s.bt] || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], fauc: !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], mix: ['hwset', 'hwset-m', 'hwadd', 'hook'].includes(FAUCET_KIND[s.bt]), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || !!KITCHEN_KIND[s.bt] || s.bt === '522' || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt] || s.bt === '522', want: !!WANT_FIRST[s.bt], fauc: !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], mix: ['hwset', 'hwset-m', 'hwadd', 'hook'].includes(FAUCET_KIND[s.bt]), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, up:c.up, kitm:c.kitm, kit:c.kit, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, up:c.up, kitm:c.kitm, kit:c.kit, gb:c.gb,
+        ...(!c.img && CHOICE_IMG[s.bt] ? (m=>m ? { img:MISC + m[1] + '.jpg' } : {})(CHOICE_IMG[s.bt].find(([re])=>re.test(String(c.t).trim()))) : {}), unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -1006,6 +1032,13 @@ function buildCatalog(cat){
       c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) });
     sec.qs.unshift({ id:'col_' + rid, bt:'', num, t:'Faucet Collection - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, col:true, tw:'Faucet Collection',
       c:FAUCETS.map(x=>({ t:x.name, p:0, p0:0, unit:'', img:moenImg(x.lav[0][0]), model:x.lav[0][0], fins:x.fins, sub:x.fins.map(k=>FIN_LABEL[k]).join(' · ') })) }); });
+  FOLLOW_UPS.forEach(([id, after, rid, title, cc, make])=>{
+    const parent = SECTIONS.flatMap(r=>r.qs).filter(q=>after.includes(q.bt) && (!rid || q.room.id === rid)); if(!parent.length) return;
+    const sec = parent[0].room, at = sec.qs.lastIndexOf(parent[parent.length - 1]);
+    sec.qs.splice(at + 1, 0, { id, bt:'', num:parent[0].num, t: title + (rid ? ' - ' + sec.name : ''), cc, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, after:parent.map(q=>q.id), c:make() }); });
+  { const sec = SECTIONS.find(r=>r.id === 'doors'), at = sec ? sec.qs.findIndex(q=>q.bt === '200') : -1;
+    if(at >= 0) sec.qs.splice(at + 1, 0, { id:'idstyle', bt:'', num:200, t:'Interior Door Style', cc:32, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true,
+      c:INT_DOORS.map(n=>({ t:n, p:0, unit:'', img:MISC + 'door-int-' + slugOf(n) + '.jpg' })) }); }
   SECTIONS = SECTIONS.filter(r=>r.qs.length);
   ROOMS = SECTIONS;
   PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
@@ -1111,6 +1144,7 @@ const asked = (q, L)=>{
   if(isSkip(q, L)) return false;
   // a home with a basement doesn't need the slab foundation line (owner, 2026-10-27)
   if(q.bt === '122' && hasFeat(L, FEATURES.find(f=>f.id === 'bsmt'))) return false;
+  if(q.after && !q.after.some(id=>{ const p = qById(id); return p && p.c.some((c, i)=>(L.answers[id + '#' + i] || {}).qty); })) return false;
   const f = featOf(q);
   return !f || hasFeat(L, f);
 };
@@ -1142,7 +1176,7 @@ const snapVal = (a, q, k)=>{ const c = q && q.c ? q.c[Number(String(k).split('#'
    BL matte black, BG brushed gold, ORB oil rubbed bronze). A package (standard hardware set, spa) lists each part with its ending. A
    finish the collection isn't made in is flagged. Used by the pricing sheet, the vendor list and the signed sale lines alike. */
 const MOEN_END = { ch:'', bn:'BN', black:'BL', brass:'BG', orb:'ORB', ss:'SRS' };
-const moenOrder = (model, fin)=>model + (fin === 'ch' && /^(YB|DN)/.test(model) ? 'CH' : MOEN_END[fin] || '');
+const moenOrder = (model, fin)=>model + (fin === 'ch' && /^(YB|DN|YG)/.test(model) ? 'CH' : MOEN_END[fin] || '');
 function orderLabel(q, c, L){
   const fin = bathFin(L, q.room.id), ok = (c.fins || []).includes(fin), fname = FIN_LABEL[fin] || 'Chrome';
   if(!ok) return c.t + ' · ' + fname + ' (NOT MADE IN THIS FINISH — check the finish)';
@@ -1157,8 +1191,10 @@ function lines(L){
     r.qs.forEach(q=>{ if(!asked(q, L)) return;
       q.c.forEach((c, i)=>{
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
-      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : (q.fauc || q.sh) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.p == null });
+      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : (q.fauc || q.sh || c.gb) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.p == null });
       });
+      if(q.want && (L.answers['want:' + q.id] || {}).label && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty))
+        out.push({ key:'want:' + q.id, q, where:'', label:'Wanted — style still to pick', price:0, cost:0, std:false, typed:true });
       const qn = L.answers[qNoteKey(q)];   // the question's own note, after its picks
       if(qn && qn.label) out.push({ key:qNoteKey(q), q, where:'', label:qn.label, price:0, cost:0, std:false, typed:true });
     });
@@ -1184,7 +1220,10 @@ function openDefault(list){ const key = cur + '|' + tab + '|' + roomId; if(openF
    select"): on the bath hardware lines (q.mix) the bath's collection shows first; a button opens every other collection's pieces
    (`mixOpen`, screen only), and a piece from another collection stays picked when the collection changes. */
 const mixOpen = {};
+const wanted = (q, L)=>!!(L.answers['want:' + q.id] || {}).label || q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty);
 function photoGrid(q, L, lock){
+  if(q.want && !wanted(q, L)) return `<div class="cho"><span class="ct">${esc(WANT_FIRST[q.bt])}?</span><button type="button" class="tog" data-want="${esc(q.id)}" ${lock ? 'disabled' : ''}>Yes, add one</button></div>`;
+  if(q.want) return photoGridInner(q, L, lock) + `<div style="margin-top:10px"><button type="button" class="btn sm" data-unwant="${esc(q.id)}" ${lock ? 'disabled' : ''}>No thanks, take it off</button></div>`;
   if(q.mix && faucetCol(L, q.room.id)) return photoGridInner(q, L, lock) + `<div style="margin-top:10px"><button type="button" class="btn sm" data-mix="${esc(q.id)}">${mixOpen[q.id] ? 'Show only ' + esc(faucetCol(L, q.room.id)) : 'Mix and match: show the other collections'}</button></div>`;
   if(q.col) return '<div class="q-sub">The Moen faucets on the showroom wall. Pick the look here; the sink and shower faucets below then show only this collection, and the finish only the colours it comes in.</div>' + photoGridInner(q, L, lock);
   /* VERTICAL SPA AS AN UPGRADE TOO (owner, 2026-10-27: "the vertical spa can also be offered in the upgrade section [with] the Magnetix"):
@@ -1243,7 +1282,7 @@ function prow(q, L, force){
       ? `<input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.unit}</span>${n && view !== 'customer' ? `<span class="cp">= ${plus(p * n)}</span>` : ''}`
       : (n && !(q.one || q.opts || q.ceil || q.nostep || c.side || c.grp) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
         + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
-    return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
+    return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">${c.img ? `<button type="button" class="cho-img" data-photo-view="${esc(k)}" title="See it bigger"><img src="${esc(c.img)}" alt="${esc(c.t)}" loading="lazy"></button>` : ''}<span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
   }).join(''));
   const isOpen = force || openSel.has(q.id), shown = choicesOf(q, L);
   const stdNote = q.fin && q.id !== 'fin_kit' ? '<div class="q-sub">The finish covers the shower door, faucets and hardware in this bathroom.</div>' : '';
@@ -2404,6 +2443,10 @@ document.addEventListener('click', async e=>{
     a.qty = (a.qty || 0) + sq; L.answers[k] = a; markOwn(L, q); flashKey = k; touch(L);
     const y = window.scrollY; render(); window.scrollTo(0, y); flashKey = ''; return;
   }
+  const wa = t.closest('[data-want]'), uw = t.closest('[data-unwant]');
+  if((wa || uw) && !locked(L)){ const id = (wa || uw).dataset.want || (uw || {}).dataset && uw.dataset.unwant; const q = qById(wa ? wa.dataset.want : uw.dataset.unwant); if(!q) return;
+    if(wa) L.answers['want:' + q.id] = { label:'yes', qty:0, price:0 }; else { delete L.answers['want:' + q.id]; q.c.forEach((c, i)=>{ delete L.answers[q.id + '#' + i]; }); }
+    touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const mx = t.closest('[data-mix]'); if(mx){ mixOpen[mx.dataset.mix] = !mixOpen[mx.dataset.mix]; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const dn = t.closest('[data-door-nav]'), dg = t.closest('[data-door-go]');
   if(dn || dg){ const [qid, v] = (dn ? dn.dataset.doorNav : dg.dataset.doorGo).split('|'), q = qById(qid); if(!q) return;
