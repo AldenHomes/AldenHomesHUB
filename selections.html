@@ -23,7 +23,7 @@
   button{cursor:pointer}
   .mono{font-family:"Courier New",monospace}
   .muted{color:var(--ink-soft)}
-  .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(12px,3vw,28px)}
+  .wrap{max-width:1500px;margin:0 auto;padding:0 clamp(12px,3vw,28px)}   /* wider (owner, 2026-10-27: "widen to take up more of the screen") */
 
   .top{background:var(--paper-2);border-bottom:4px solid var(--sage);position:sticky;top:0;z-index:50}
   .top-in{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 0}
@@ -292,7 +292,7 @@
   .ph-sub{display:block; font-weight:600; font-size:12px; color:var(--muted,#777); margin-top:2px;}
   .ph-warn{display:block; font-weight:700; font-size:12px; color:#b3261e; margin-top:2px;}
   .ph-group{margin-top:10px;} .ph-note{text-transform:none; letter-spacing:0; font-weight:600;} .ph-brand{font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted,#777); margin:6px 0 6px;}
-  .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px;}
+  .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;}
   .ph-tile{position:relative;}
   .ph-pick{display:block; width:100%; padding:0; border:2px solid var(--line,#ddd); border-radius:10px; overflow:hidden; background:#fff; cursor:pointer; text-align:left; font-family:inherit; transition:box-shadow .15s, border-color .15s;}
   .ph-pick:hover{box-shadow:0 3px 12px rgba(0,0,0,.14);}
@@ -302,7 +302,7 @@
   .ph-tile.on .ph-pick{border-color:var(--navy,#1f3550); box-shadow:0 0 0 2px var(--navy,#1f3550);}
   .ph-check{position:absolute; top:8px; left:8px; width:28px; height:28px; border-radius:50%; background:var(--navy,#1f3550); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; box-shadow:0 1px 4px rgba(0,0,0,.3);}
   .ph-zoom{position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%; border:none; background:rgba(255,255,255,.92); color:#333; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.25);}
-  body.present .ph-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));}
+  body.present .ph-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));}
   #photoView{position:fixed; inset:0; background:rgba(20,22,24,.82); z-index:500; display:none; align-items:center; justify-content:center; padding:20px;}
   #photoView.show{display:flex;}
   #photoView .pv-box{max-width:min(1000px,96vw); width:100%; text-align:center;}
@@ -823,7 +823,7 @@ function buildCatalog(cat){
     if(at >= 0) kit.qs.splice(at, 0, { id:'fin_kit', bt:'', num:520, t:'Kitchen Faucet Finish', cc:50, line:'', room:kit, opt:1, type:'bt', v1:1, opts:true, fin:true,
       c:FIN_CHOICES.filter(x=>!x.baths).map(({ baths, ...x })=>({ ...x, k:x.k + '-k', p:null, unit:'' })) }); }
   [['mbath', 256], ['bath2', 300], ['bath3', 340], ['powder', 379]].forEach(([rid, num])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec || !sec.qs.length) return;
-    sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:72, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
+    sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
       // the master bath's finishes have their own prices (owner, 2026-10-21: the master often has double fixtures): keys 'fin-bn-m' etc.
       c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) });
     sec.qs.unshift({ id:'col_' + rid, bt:'', num, t:'Faucet Collection - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, col:true, tw:'Faucet Collection',
@@ -955,13 +955,26 @@ const snapQ = (q, L)=>q.c.map((c, i)=>{ const a = L.answers[q.id + '#' + i]; ret
 const snapAll = L=>Object.fromEntries(ALL_QS.filter(q=>q.v1).map(q=>[q.id, snapQ(q, L)]).filter(x=>x[1]));
 const snapVal = (a, q, k)=>{ const c = q && q.c ? q.c[Number(String(k).split('#')[1])] : null; return (c ? c.t : '') + (a && a.qty > 1 ? ' ×' + a.qty : ''); };
 // one line per choice that was taken, with what it adds
+/* ORDER NUMBERS (owner, 2026-10-27: "will all the part numbers flow into the vendor order sheets"): a Moen pick's line carries the bathroom's
+   finish and the full order number — Moen adds the finish to the model (faucets: chrome = no ending; hardware: CH; BN brushed nickel,
+   BL matte black, BG brushed gold, ORB oil rubbed bronze). A package (standard hardware set, spa) lists each part with its ending. A
+   finish the collection isn't made in is flagged. Used by the pricing sheet, the vendor list and the signed sale lines alike. */
+const MOEN_END = { ch:'', bn:'BN', black:'BL', brass:'BG', orb:'ORB' };
+const moenOrder = (model, fin)=>model + (fin === 'ch' && /^(YB|DN)/.test(model) ? 'CH' : MOEN_END[fin] || '');
+function orderLabel(q, c, L){
+  const fin = bathFin(L, q.room.id), ok = (c.fins || []).includes(fin), fname = FIN_LABEL[fin] || 'Chrome';
+  if(!ok) return c.t + ' · ' + fname + ' (NOT MADE IN THIS FINISH — check the finish)';
+  if(/Standard set/.test(c.t)) return c.t.replace(/\b(?:YB|DN)\d{4}\b/g, m=>moenOrder(m, fin)) + ' · ' + fname;
+  if(/Spa package/.test(c.t)) return c.t + ' · ' + fname + ' (order every part in ' + fname.toLowerCase() + ')';
+  return c.t + ' · ' + fname + ' · order ' + moenOrder(c.model, fin);
+}
 function lines(L){
   const out = [];
   SECTIONS.forEach(r=>{
     r.qs.forEach(q=>{ if(!asked(q, L)) return;
       q.c.forEach((c, i)=>{
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
-      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.k ? optPrice(c.k) == null : c.p == null });
+      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : q.fauc && c.model ? orderLabel(q, c, L) : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.k ? optPrice(c.k) == null : c.p == null });
       });
       const qn = L.answers[qNoteKey(q)];   // the question's own note, after its picks
       if(qn && qn.label) out.push({ key:qNoteKey(q), q, where:'', label:qn.label, price:0, cost:0, std:false, typed:true });
