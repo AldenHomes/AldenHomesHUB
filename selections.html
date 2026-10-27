@@ -477,7 +477,7 @@ const SECTION_RANGES = [['lot','Contract & lot',0,121],['bsmt','Foundation & bas
   ['porch','Screened porch, sunroom & 3 season',660,699],['win','Windows',700,719],['stairs','Stairs',720,739],['second','Second floor',740,759],
   ['attic','Attic & storage',760,779],['paint','Paint',780,789],['flr','Flooring',790,999]];
 // the BT numbers that appear on the Alden Collection Pricing Sheet
-const PRICING_BT = new Set([126,128,134,136,138,140,147,150,152,153,154,156,160,161,164,175,180,181,182,184,188,193,194,196,200,206,207,208,224,231,236,244,246,248,
+const PRICING_BT = new Set([170,126,128,134,136,138,140,147,150,152,153,154,156,160,161,164,175,180,181,182,184,188,193,194,196,200,206,207,208,224,231,236,244,246,248,
   256,264,270,272,273,274,278,280,282,300,304,310,312,313,314,318,320,322,340,344,350,352,353,354,358,360,362,379,380,384,388,420,424,426,446,450,500,514,516,518,520,523,526,
   550,552,553,554,560,600,602,606,608,610,612,616,618,620,622,640,642,644,660,664,672,684,700,701,702,704,720,722,724,726,740,744,760,762,764,768,780,790]);
 // home styles, as they appear on the basement line (126) of each collection
@@ -644,6 +644,9 @@ function patioChoices(bt, list){
   // front porch composite (owner, 2026-10-21): BuilderTrend's upgrade prices are per sq ft — typed in sq ft, one or the other
   if(bt === '182') return list.map(c=>({ ...c, t:String(c.t).replace(/^Upg(rade)?\.? to /i, 'Upgrade to ') + ' (per sq ft)', unit:'sq ft' }));
   // walkway (owner, 2026-10-21): additional walkway by the sq ft, priced in the back end (OPT_PRICES 'walk-sf'); stamped / colored stay
+  // EXTERIOR MATERIALS (owner, 2026-10-27): on the pricing sheet under Exterior — standard as per plan (preset, stdOf), or add stone /
+  // add wood as typed allowances (defaults in Home styles → Allowance amounts). BuilderTrend's swap choices (Flexlite / stone ilo …) dropped.
+  if(bt === '170') return [{ t:'Add stone allowance', p:0 }, { t:'Add wood allowance', p:0 }];
   if(bt === '181') return [{ t:'Additional walkway (per sq ft)', k:'walk-sf', p:null, unit:'sq ft' }, ...list];
   // under-cabinet rope lighting is priced per foot: typed in feet like the other per-foot lines
   if(bt === '514') return list.map(c=>/\(per foot\)/i.test(c.t) ? { ...c, t:c.t.replace(/\(per foot\)/i, '(per linear ft)'), unit:'ft' } : c);
@@ -824,7 +827,8 @@ const stdOf = (q, L)=>q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { 
   : q.id === 'bstairs' ? { label:'Closed stairs to basement' }
   : q.bt === '780' ? { label:'Interior paint - flat ceiling/flat walls' }
   : q.bt === '790' ? { label:'Standard flooring (vinyl / carpet)', keep:true }
-  : q.bt === '175' ? { label:'2 standard hose bibs', keep:true } : null;
+  : q.bt === '175' ? { label:'2 standard hose bibs', keep:true }
+  : q.bt === '170' ? { label:'Standard as per plan' } : null;
 /* Flooring areas (owner, 2026-10-19): like the calculator's rows — each added area is a type + level with its sq ft; the form
    below adds another (the same type + level again adds to its sq ft). */
 function floorRows(q, L, lock){
