@@ -292,6 +292,30 @@
   .ph-sub{display:block; font-weight:600; font-size:12px; color:var(--muted,#777); margin-top:2px;}
   .ph-warn{display:block; font-weight:700; font-size:12px; color:#b3261e; margin-top:2px;}
   .ph-group{margin-top:10px;} .ph-note{text-transform:none; letter-spacing:0; font-weight:600;} .ph-brand{font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted,#777); margin:6px 0 6px;}
+  .ds{max-width:900px; width:100%; contain:inline-size;}   /* the door strip must not widen the page on phones */
+  .ds-view{display:flex; align-items:center; justify-content:center; gap:18px; background:linear-gradient(#f3f1ea,#e4e1d7); border:1px solid #e3e0d8; border-radius:14px; padding:26px 10px 0; position:relative; overflow:hidden;}
+  .ds-view::after{content:''; position:absolute; left:0; right:0; bottom:0; height:22px; background:#b7b2a6; border-top:3px solid #9a958a;}
+  .ds-door{position:relative; z-index:1; height:470px; max-height:64vh; display:flex; align-items:flex-end;}
+  .ds-case{height:100%; padding:10px 10px 0; background:#fbfaf6; border:1px solid #d9d6cc; border-bottom:0; box-shadow:0 10px 24px rgba(0,0,0,.22), inset 0 0 0 1px #ecebe4;}
+  .ds-case img{height:100%; width:auto; display:block;}
+  .ds-door.in{animation:dsIn .35s ease;}
+  @keyframes dsIn{from{opacity:0; transform:translateX(30px);} to{opacity:1; transform:none;}}
+  .ds-dot{display:inline-block; width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,.2); vertical-align:-2px;}
+  .ds-arrow{z-index:1; width:52px; height:52px; border-radius:50%; border:1px solid #d6d1c4; background:#fff; font-size:34px; line-height:1; color:#1f3550; cursor:pointer; flex:0 0 auto; box-shadow:0 2px 6px rgba(0,0,0,.08);}
+  .ds-arrow:hover{border-color:#1f3550;}
+  .ds-name{text-align:center; margin-top:12px;} .ds-name b{display:block; font-size:18px;} .ds-name small{color:#6b6558;}
+  .ds-pick{text-align:center; margin:10px 0;}
+  .ds-strip{display:flex; gap:8px; overflow-x:auto; padding:6px 2px 10px;}
+  .ds-thumb{flex:0 0 auto; width:64px; border:2px solid #e3e0d8; border-radius:8px; background:#fff; padding:4px; cursor:pointer; text-align:center;}
+  .ds-thumb img{width:100%; height:110px; object-fit:contain; display:block;} .ds-thumb span{font-size:11px; color:#6b6558;}
+  .ds-thumb.cur{border-color:#1f3550;} .ds-thumb.on{background:#eaf4ea;} .ds-thumb.on span{color:#2e6b34; font-weight:700;}
+  .ds-sw{display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px;}
+  .ds-chip{display:flex; align-items:center; gap:8px; border:2px solid #e3e0d8; border-radius:10px; background:#fff; padding:6px 8px; cursor:pointer; text-align:left;}
+  .ds-chip span{width:28px; height:28px; border-radius:6px; border:1px solid rgba(0,0,0,.15); flex:0 0 auto;}
+  .ds-chip b{font-size:13px; display:block;} .ds-chip small{font-size:11px; color:#6b6558; display:block;}
+  .ds-chip.on{border-color:#1f3550; background:#eef3f8;}
+  .ds-other{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:10px; padding:10px; border:2px dashed #d6d1c4; border-radius:10px;}
+  .ds-other.on{border-style:solid; border-color:#1f3550; background:#eef3f8;} .ds-other input[type=text]{flex:1; min-width:220px;}
   .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;}
   .ph-tile{position:relative;}
   .ph-pick{display:block; width:100%; padding:0; border:2px solid var(--line,#ddd); border-radius:10px; overflow:hidden; background:#fff; cursor:pointer; text-align:left; font-family:inherit; transition:box-shadow .15s, border-color .15s;}
@@ -738,6 +762,97 @@ const PHOTO_SETS = {
   ] },
 };
 const slugOf = t=>String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+/* FRONT DOOR (owner, 2026-10-27: "click through and they would be on a fake house… as you hit next the next one pops in"; doors come
+   WHITE and are painted any Benjamin Moore colour). The drawn house + on-screen painting was tried and dropped (owner: didn't look real
+   enough). Two Selections-side questions in Doors & trim, after BT 231: 'fdstyle' (Therma-Tru Smooth-Star doors, the office's pictures in
+   selection-photos/doors/) shown one big door at a time with Back / Next and a strip (`doorStage`, `doorAt` screen only), and 'fdcolor'
+   (popular Benjamin Moore swatches + "another Benjamin Moore colour" typed; answer { label }). */
+const DOORS = [['S1','Narrow center lite'],['S1L','Narrow lite, left'],['S1R','Narrow lite, right'],['S2000','Full lite'],['S2103','4 lite over 1 panel'],['S2200','3/4 lite, 1 panel'],
+  ['S3600L','X pattern lites, left'],['S3600R','X pattern lites, right'],['S4810','Craftsman 1 lite, 2 panel'],['S4812','Craftsman 2 lite, 2 panel'],['S4813','Craftsman 3 lite, 2 panel'],
+  ['S4814','Craftsman 4 lite, 2 panel'],['S4816','Craftsman 6 lite, 2 panel'],['S5700','3 lite'],['S5710','4 lite'],['S5715','4 lite with grilles'],['S5720','5 lite'],['S685L','Modern offset lites'],['S691','11 lite']];
+const DOOR_PNG = ['S1', 'S1L', 'S1R', 'S3600L', 'S3600R'];
+/* Benjamin Moore colours (owner, 2026-10-27: "they can pick any Benjamin Moore color"): a starter list of popular front door colours
+   with close on-screen shades, plus the office's own list (`DOOR_CFG`, Home styles → "Door colours", saved as `doors` in
+   settings/selections). A pick stores its name and shade ON THE ANSWER ({ label, hex }), so the lists can change without upsetting
+   older sheets. "Another Benjamin Moore color" is choice 0 (typed name + a shade picker) so its key never moves. */
+const BM_COLORS = [['Hale Navy','HC-154','#434c56'],['Newburyport Blue','HC-155','#455668'],['Van Deusen Blue','HC-156','#3d5168'],['Gentleman\'s Gray','2062-20','#3f4c56'],
+  ['Polo Blue','2062-10','#2b3a4a'],['Blue Note','2129-30','#3b4f62'],['Black Beauty','2128-10','#2e2f31'],['Black','2132-10','#2b2c2e'],['Onyx','2133-10','#333435'],
+  ['Wrought Iron','2124-10','#4d5051'],['Iron Mountain','2134-30','#5a5b59'],['Kendall Charcoal','HC-166','#686a66'],['Amherst Gray','HC-167','#717571'],['Chelsea Gray','HC-168','#7e7c76'],
+  ['Caliente','AF-290','#a13a36'],['Heritage Red','HC-181','#8c2e2e'],['Dinner Party','AF-300','#8e3434'],['Cottage Red','HC-184','#7f3a33'],['Raspberry Truffle','2080-10','#6e3542'],
+  ['Salamander','2050-10','#333d3e'],['Essex Green','HC-188','#344139'],['Hunter Green','2041-10','#2f4b40'],['Tarrytown Green','HC-134','#4d5847'],['Backwoods','469','#6b7159'],
+  ['Aegean Teal','2136-40','#5a7e7c'],['Stratton Blue','HC-142','#8fa39e'],['Wythe Blue','HC-143','#a6beb9'],['Buxton Blue','HC-149','#9eb5b5'],
+  ['Simply White','OC-117','#f2f1e6'],['Chantilly Lace','OC-65','#f5f5f0'],['White Dove','OC-17','#efece2'],['Swiss Coffee','OC-45','#ede9dc'],['Revere Pewter','HC-172','#c5bfb0'],['Edgecomb Gray','HC-173','#d5cfc3']];
+let DOOR_CFG = [];                                   // the office's own colours [{ name, num, hex }] from the server
+const doorChoices = ()=>DOORS.map(([m, d])=>({ t:'Therma-Tru Smooth-Star ' + m + ' - ' + d, p:0, unit:'', model:m, img:'selection-photos/doors/' + m.toLowerCase() + (DOOR_PNG.includes(m) ? '.png' : '.jpg') }));
+const paintChoices = ()=>[{ t:'Another Benjamin Moore color', p:0, unit:'', bmOther:true }]
+  .concat(BM_COLORS.map(([n, num, hex])=>({ t:'Benjamin Moore ' + n + ' ' + num, p:0, unit:'', hex, short:n, num })))
+  .concat(DOOR_CFG.map(x=>({ t:'Benjamin Moore ' + x.name + (x.num ? ' ' + x.num : ''), p:0, unit:'', hex:x.hex, short:x.name, num:x.num || '', office:true })));
+const bmLink = (name, num)=>num ? `https://www.benjaminmoore.com/en-us/paint-colors/color/${encodeURIComponent(String(num).toLowerCase())}/${slugOf(name)}` : 'https://www.benjaminmoore.com/en-us/paint-colors';
+const doorAt = {};                                   // which door is showing, per question (screen only)
+let doorAnim = '';
+const pickedIdx = (q, L)=>q.c.findIndex((c, i)=>(L.answers[q.id + '#' + i] || {}).qty);
+function doorShown(L){ const q = qById('fdstyle'); if(!q) return null; const i = doorAt.fdstyle != null ? doorAt.fdstyle : Math.max(0, pickedIdx(q, L)); return { q, i, c:q.c[i] }; }
+// the colour on the sheet: { name, hex } or null (white)
+function paintNow(L){ const q = qById('fdcolor'); if(!q) return null; const i = pickedIdx(q, L); if(i < 0) return null; const a = L.answers[q.id + '#' + i], c = q.c[i];
+  const hex = a.hex || c.hex; return hex ? { hex, name: a.label || (c.short ? c.short + ' ' + c.num : 'Benjamin Moore color'), num: a.num || c.num || '' } : null; }
+/* PAINT (on screen only): the door drawings are an off-white door with cool grey glass. Every warm (off-white) pixel takes the colour,
+   keeping the drawing's shading; the grey glass, the dark edge and the sill stay. Thin pale lines right next to painted parts (glass
+   edges, panel grooves) are painted too, or they'd show as white hairlines. Cached per door + colour. */
+const paintCache = {}, paintDone = {};   // promise per door + colour; the finished picture once ready
+function paintDoor(src, hex){ const key = src + '|' + hex; if(paintCache[key]) return paintCache[key];
+  return paintCache[key] = new Promise(res=>{ const im = new Image(); im.onload = ()=>{ try {
+      const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight; const x = cv.getContext('2d'); x.drawImage(im, 0, 0);
+      const d = x.getImageData(0, 0, cv.width, cv.height), p = d.data, hr = parseInt(hex.slice(1, 3), 16), hg = parseInt(hex.slice(3, 5), 16), hb = parseInt(hex.slice(5, 7), 16);
+      const W = cv.width, H = cv.height, m = new Float32Array(W * H), lum = i=>0.3 * p[i] + 0.59 * p[i + 1] + 0.11 * p[i + 2];
+      for(let j = 0; j < m.length; j++) m[j] = Math.max(0, Math.min(1, (p[j * 4] - p[j * 4 + 2] - 6) / 7));
+      const m2 = m.slice();
+      for(let y = 0; y < H; y++) for(let x2 = 0; x2 < W; x2++){ const j = y * W + x2; if(m[j] >= 1 || lum(j * 4) < 224) continue;   // a pale highlight line
+        let near = false; for(let dy = -5; dy <= 5 && !near; dy++) for(let dx = -5; dx <= 5; dx++){ const yy = y + dy, xx = x2 + dx; if(yy >= 0 && yy < H && xx >= 0 && xx < W && m[yy * W + xx] >= 0.3){ near = true; break; } }
+        if(near) m2[j] = 1; }
+      // soft edges between door and glass: anything half-warm counts as door, so the glass bars don't look ragged
+      for(let j = 0; j < m2.length; j++) if(m2[j] > 0.25 && m2[j] < 1) m2[j] = 1;
+      for(let i = 0; i < p.length; i += 4){ const w = m2[i / 4]; if(!w) continue; const l = Math.min(1.04, lum(i) / 245);
+        p[i] = p[i] * (1 - w) + hr * l * w; p[i + 1] = p[i + 1] * (1 - w) + hg * l * w; p[i + 2] = p[i + 2] * (1 - w) + hb * l * w; }
+      x.putImageData(d, 0, 0); const u = cv.toDataURL('image/png'); paintDone[key] = u; res(u); } catch(e){ res(src); } }; im.onerror = ()=>res(src); im.src = src; }); }
+// PAINTING IS OFF (owner, 2026-10-27: the painted doors "still don't look that great" — show the plain white door). paintDoor is kept for a
+// better source picture some day; nothing calls it.
+function paintStages(){}
+// the big door: white casing, soft shadow, plain wall (a tiled siding photo behind it, and painting the door, were tried and dropped)
+function doorView(L, door, paint, anim){
+  return `<div class="ds-view">
+    <button type="button" class="ds-arrow" data-door-nav="fdstyle|-1" aria-label="Back">&lsaquo;</button>
+    <div class="ds-door ${anim ? 'in' : ''}"><div class="ds-case"><img src="${esc(door.img)}" alt="${esc(door.t)}"></div></div>
+    <button type="button" class="ds-arrow" data-door-nav="fdstyle|1" aria-label="Next">&rsaquo;</button></div>`;
+}
+function doorStage(q, L, lock){
+  const anim = doorAnim === q.id; if(anim) doorAnim = '';
+  const shown = doorShown(L); if(!shown) return '';
+  const paint = paintNow(L), sq = qById('fdstyle'), sk = 'fdstyle#' + shown.i, on = !!(L.answers[sk] || {}).qty, name = shown.c.t.replace('Therma-Tru Smooth-Star ', '');
+  const head = `${doorView(L, shown.c, paint, anim)}
+    <div class="ds-name"><b>${esc(name)}</b><small>${shown.i + 1} of ${sq.c.length} · ${paint ? `colour <span class="ds-dot" style="background:${esc(paint.hex)}"></span> <b>${esc(paint.name)}</b> · <a href="${esc(bmLink(paint.name.replace(/\s+\S+$/, ''), paint.num))}" target="_blank" rel="noopener">see the chip</a>` : 'colour not picked yet (under Front Door Color)'}</small></div>`;
+  if(q.id === 'fdstyle') return `<div class="ds">${head}
+      <div class="ds-pick"><button type="button" class="btn ${on ? '' : 'primary'}" data-bt-tog="${esc(sk)}" ${lock ? 'disabled' : ''}>${on ? '&#10003; This is their door (tap to undo)' : 'Choose this door'}</button></div>
+      <div class="ds-strip">${sq.c.map((c, i)=>`<button type="button" class="ds-thumb ${i === shown.i ? 'cur' : ''} ${(L.answers['fdstyle#' + i] || {}).qty ? 'on' : ''}" data-door-go="fdstyle|${i}" title="${esc(c.t)}"><img src="${esc(c.img)}" alt="" loading="lazy"><span>${esc(c.model)}</span></button>`).join('')}</div>
+      <div class="q-sub">Doors come white and are painted the colour picked under Front Door Color. <a href="https://www.thermatru.com/${/^S1[LR]?$/.test(shown.c.model) ? 'search?q=' : 'explore-products/door-style/'}${esc(shown.c.model)}" target="_blank" rel="noopener">This door on Therma-Tru's site</a>.</div></div>`;
+  const ok = q.id + '#0', oa = L.answers[ok] || {};
+  return `<div class="ds">${head}
+    <div class="ds-sw">${q.c.map((c, i)=>c.bmOther ? '' : `<button type="button" class="ds-chip ${(L.answers[q.id + '#' + i] || {}).qty ? 'on' : ''}" data-bt-tog="${esc(q.id + '#' + i)}" ${lock ? 'disabled' : ''}><span style="background:${c.hex}"></span><b>${esc(c.short)}</b><small>${esc(c.num)}${c.office ? ' · ours' : ''}</small></button>`).join('')}</div>
+    <div class="ds-other ${oa.qty ? 'on' : ''}"><b>Another Benjamin Moore color</b>
+      <input type="text" data-bm-name="${esc(ok)}" value="${esc(oa.label || '')}" placeholder="Name and number, e.g. Hale Navy HC-154" ${lock ? 'disabled' : ''}>
+      <label class="muted" style="font-size:13px">Shade for the screen <input type="color" data-bm-hex="${esc(ok)}" value="${esc(oa.hex || '#5a6470')}" ${lock ? 'disabled' : ''}></label></div>
+    <div class="q-sub">Any Benjamin Moore colour. The swatches are a guide — the paint chip is what counts. ${view === 'customer' ? '' : 'The office adds colours under Home styles → Door colours.'}</div></div>`;
+}
+{ const draw = render; render = function(){ const r = draw.apply(this, arguments); try { paintStages(); } catch(e){} return r; }; }
+// back end: the office's own Benjamin Moore door colours
+function doorsScreen(){
+  const row = (x, i)=>`<tr><td><input type="text" data-doorc="${i}|name" value="${esc(x.name)}" placeholder="Colour name" style="width:200px"></td><td><input type="text" data-doorc="${i}|num" value="${esc(x.num)}" placeholder="HC-154" style="width:110px"></td>
+    <td><input type="color" data-doorc="${i}|hex" value="${esc(x.hex)}"> <span class="ds-dot" style="background:${esc(x.hex)}"></span></td><td><button type="button" class="btn sm" data-doorc-del="${i}">Remove</button></td></tr>`;
+  return `<div class="card"><h2 style="font-size:18px">Door colours</h2>
+    <p class="muted" style="font-size:13.5px;margin-top:4px">Benjamin Moore colours offered for the front door, on top of the ${BM_COLORS.length} popular ones built in. Type the name and number from the fan deck and pick the closest shade for the screen (the real chip is what the painter uses). Saved as you type · <span id="styState">${esc(styState)}</span></p>
+    <table class="sztab" data-nosort><thead><tr><th>Colour</th><th>Number</th><th>Shade on screen</th><th></th></tr></thead><tbody>${DOOR_CFG.map(row).join('')}</tbody></table>
+    <div style="margin-top:10px"><button type="button" class="btn sm" data-doorc-add="1">+ Add a colour</button></div>
+    <div class="eyebrow" style="margin-top:18px">Built in</div><div class="ds-sw" style="margin-top:6px">${BM_COLORS.map(([n, num, hex])=>`<div class="ds-chip" style="cursor:default"><span style="background:${hex}"></span><b>${esc(n)}</b><small>${esc(num)}</small></div>`).join('')}</div></div>`;
+}
 const photoChoices = bt=>{ const set = PHOTO_SETS[bt]; if(!set) return null;
   return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, note: g.note || '', img: g.photos ? `selection-photos/${set.dir}/${g.code}-${slugOf(n)}.jpg` : '' }))); };
 const splitChoices = (bt, list)=>(FAUCET_KIND[bt] ? faucetChoices(FAUCET_KIND[bt]) : null) || photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
@@ -822,6 +937,12 @@ function buildCatalog(cat){
   { const kit = SECTIONS.find(r=>r.id === 'kit'), at = kit ? kit.qs.findIndex(q=>q.bt === '520') : -1;
     if(at >= 0) kit.qs.splice(at, 0, { id:'fin_kit', bt:'', num:520, t:'Kitchen Faucet Finish', cc:50, line:'', room:kit, opt:1, type:'bt', v1:1, opts:true, fin:true,
       c:FIN_CHOICES.filter(x=>!x.baths).map(({ baths, ...x })=>({ ...x, k:x.k + '-k', p:null, unit:'' })) }); }
+  // front door style + colour on a drawn house (see doorStage), right after BT 231 Front Door
+  { const sec = SECTIONS.find(r=>r.id === 'doors');
+    if(sec){ const at = sec.qs.findIndex(q=>q.bt === '231');
+      sec.qs.splice(at >= 0 ? at + 1 : sec.qs.length, 0,
+        { id:'fdstyle', bt:'', num:231, t:'Front Door Style', cc:32, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, door:true, c:doorChoices() },
+        { id:'fdcolor', bt:'', num:231, t:'Front Door Color (Benjamin Moore)', cc:60, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, door:true, c:paintChoices() }); } }
   [['mbath', 256], ['bath2', 300], ['bath3', 340], ['powder', 379]].forEach(([rid, num])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec || !sec.qs.length) return;
     sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
       // the master bath's finishes have their own prices (owner, 2026-10-21: the master often has double fixtures): keys 'fin-bn-m' etc.
@@ -974,7 +1095,7 @@ function lines(L){
     r.qs.forEach(q=>{ if(!asked(q, L)) return;
       q.c.forEach((c, i)=>{
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
-      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : q.fauc && c.model ? orderLabel(q, c, L) : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.k ? optPrice(c.k) == null : c.p == null });
+      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : q.fauc && c.model ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.k ? optPrice(c.k) == null : c.p == null });
       });
       const qn = L.answers[qNoteKey(q)];   // the question's own note, after its picks
       if(qn && qn.label) out.push({ key:qNoteKey(q), q, where:'', label:qn.label, price:0, cost:0, std:false, typed:true });
@@ -1030,7 +1151,7 @@ function prow(q, L, force){
   const changed = q.v1 && was !== null && was !== now ? `<span class="chip soon">changed since pricing${was ? ' · was ' + esc(was) : ' · added'}</span>` : '';
   const std = stdOf(q, L);
   const stdActive = std && (std.keep || !choicesOf(q, L).some(c=>c.i !== std.idx && !c.side && (L.answers[q.id + '#' + c.i] || {}).qty));
-  const rows = q.photo ? photoGrid(q, L, lock) : (std ? stdRow(q, L, std, stdActive, lock) : '') + (q.bt === '790' ? floorRows(q, L, lock) : choicesOf(q, L).filter(c=>!std || c.i !== std.idx).map(c=>{
+  const rows = q.door ? doorStage(q, L, lock) : q.photo ? photoGrid(q, L, lock) : (std ? stdRow(q, L, std, stdActive, lock) : '') + (q.bt === '790' ? floorRows(q, L, lock) : choicesOf(q, L).filter(c=>!std || c.i !== std.idx).map(c=>{
     const k = q.id + '#' + c.i, a = L.answers[k], n = a ? a.qty : 0, p = a ? a.price : c.p;
     const price = view === 'customer' ? '' : c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
     if(isAllow(q, c)){
@@ -1403,8 +1524,8 @@ function stylesScreen(){
         <div class="tri"><button type="button" class="${st === 'show' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="show">Show</button><button type="button" class="incl ${st === 'incl' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="incl">Included</button><button type="button" class="hide ${st === 'hide' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="hide">Hide</button></div></div>`; }).join('')}</div>`; }).join('');
   return `<div style="margin-top:18px"><a href="#" id="styBack" class="muted" style="font-size:13px;text-decoration:none">&larr; All leads</a>
       <div class="eyebrow" style="margin-top:6px">Office setup</div><h1>Home style pricing sheets</h1>
-      <div class="viewsw noprint" style="display:inline-flex;margin-top:10px"><button type="button" data-styview="show" class="${styView === 'show' ? 'on' : ''}">What each style shows</button><button type="button" data-styview="prices" class="${styView === 'prices' ? 'on' : ''}">Every price</button><button type="button" data-styview="sizes" class="${styView === 'sizes' ? 'on' : ''}">Home style sizes</button></div>
-      <p class="lede" style="display:${styView === 'sizes' ? 'none' : ''}">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
+      <div class="viewsw noprint" style="display:inline-flex;margin-top:10px"><button type="button" data-styview="show" class="${styView === 'show' ? 'on' : ''}">What each style shows</button><button type="button" data-styview="prices" class="${styView === 'prices' ? 'on' : ''}">Every price</button><button type="button" data-styview="sizes" class="${styView === 'sizes' ? 'on' : ''}">Home style sizes</button><button type="button" data-styview="doors" class="${styView === 'doors' ? 'on' : ''}">Door colours</button></div>
+      <p class="lede" style="display:${styView === 'sizes' || styView === 'doors' ? 'none' : ''}">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
     <div class="card" style="display:${styView !== 'show' ? 'none' : 'flex'};gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
       <div><label class="f">Home style</label><select id="styPick">${opts}</select></div>
       <div><label class="f">House price</label><span class="muted">$</span> <input type="number" min="0" step="100" data-basep="${esc(styName)}" value="${BASE_CFG[styName] || ''}" placeholder="not set" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:var(--radius)"></div>
@@ -1414,7 +1535,7 @@ function stylesScreen(){
       <div><label class="f">Same as another style?</label><div style="display:flex;gap:8px"><select id="styFrom"><option value="">Copy from…</option>${others}</select><button type="button" class="btn sm" id="styCopy">Copy</button></div></div>
       ${n.incl || n.hide ? '<button type="button" class="btn sm" id="styClear">Show everything</button>' : ''}
     </div>
-    ${styView === 'sizes' ? sizesScreen() : styView === 'prices' ? ceilCard() + pricesScreen() : allowCard() + ceilCard() + bathCard() + secs}`;
+    ${styView === 'doors' ? doorsScreen() : styView === 'sizes' ? sizesScreen() : styView === 'prices' ? ceilCard() + pricesScreen() : allowCard() + ceilCard() + bathCard() + secs}`;
 }
 function floorCard(){
   const lvls = [10, 20, 30, 40, 50, 60];
@@ -1468,7 +1589,7 @@ function styleSave(){
   clearTimeout(styTimer);
   styTimer = setTimeout(async ()=>{
     try{
-      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER, bases:BASE_CFG, sizes:SIZE_CFG }); PRICE_OVER = saved.over || PRICE_OVER; BASE_CFG = saved.bases || BASE_CFG; SIZE_CFG = saved.sizes || SIZE_CFG; CHANGED = saved.changed || CHANGED;
+      const saved = await selApi({ action:'stylesSet', styles:STYLE_CFG, allow:ALLOW_CFG, ceil:CEIL_CFG, prices:OPT_PRICES, over:PRICE_OVER, bases:BASE_CFG, sizes:SIZE_CFG, doors:DOOR_CFG }); PRICE_OVER = saved.over || PRICE_OVER; if(saved.doors){ DOOR_CFG = saved.doors; const dq = qById('fdcolor'); if(dq) dq.c = paintChoices(); } BASE_CFG = saved.bases || BASE_CFG; SIZE_CFG = saved.sizes || SIZE_CFG; CHANGED = saved.changed || CHANGED;
       const y = window.scrollY, f = document.activeElement && document.activeElement.id; if(styleEdit && !(document.activeElement && document.activeElement.matches('input,textarea'))){ render(); window.scrollTo(0, y); } STYLE_CFG = saved.styles || STYLE_CFG; ALLOW_CFG = saved.allow || ALLOW_CFG; CEIL_CFG = saved.ceil || CEIL_CFG; OPT_PRICES = saved.prices || OPT_PRICES; styState = 'Saved for every device';
     } catch(err){ console.error(err); styState = 'Not saved — check the connection'; }
     const e2 = $('styState'); if(e2) e2.textContent = styState;
@@ -2065,6 +2186,8 @@ document.addEventListener('click', async e=>{
     return;
   }
   const sv = t.closest('[data-styview]'); if(sv){ styView = sv.dataset.styview; render(); return; }
+  const da = t.closest('[data-doorc-add]'), dd = t.closest('[data-doorc-del]');
+  if(da || dd){ if(da) DOOR_CFG.push({ name:'', num:'', hex:'#5a6470' }); else DOOR_CFG.splice(Number(dd.dataset.doorcDel), 1); const dq = qById('fdcolor'); if(dq) dq.c = paintChoices(); const y = window.scrollY; render(); window.scrollTo(0, y); if(dd) styleSave(); return; }
   const oc = t.closest('[data-overclear]'); if(oc){ delete PRICE_OVER[oc.dataset.overclear]; applyOver(); styleSave(); const y = window.scrollY; render(); window.scrollTo(0, y); toast('Back to BuilderTrend\'s price'); return; }
   if(t.closest('#styleSetup')){ styleEdit = true; cur = null; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#styBack')){ e.preventDefault(); styleEdit = false; render(); window.scrollTo(0, 0); return; }
@@ -2205,6 +2328,11 @@ document.addEventListener('click', async e=>{
     a.qty = (a.qty || 0) + sq; L.answers[k] = a; markOwn(L, q); flashKey = k; touch(L);
     const y = window.scrollY; render(); window.scrollTo(0, y); flashKey = ''; return;
   }
+  const dn = t.closest('[data-door-nav]'), dg = t.closest('[data-door-go]');
+  if(dn || dg){ const [qid, v] = (dn ? dn.dataset.doorNav : dg.dataset.doorGo).split('|'), q = qById(qid); if(!q) return;
+    const curI = doorAt[qid] != null ? doorAt[qid] : Math.max(0, pickedIdx(q, L));
+    doorAt[qid] = dn ? (curI + Number(v) + q.c.length) % q.c.length : Number(v); doorAnim = qid;
+    const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const fv = t.closest('[data-fin-view]');
   if(fv){ const [k, fk] = fv.dataset.finView.split('|'); tileFin[k] = fk; const q = qOfKey(k), c = q && q.c[Number(k.split('#')[1])];
     const tile = fv.closest('.ph-tile'); if(q && c && tile){ const img = tile.querySelector('img'); if(img) img.src = tileImg(q, { ...c, i:Number(k.split('#')[1]) }, lead()); tile.querySelectorAll('.ph-fin').forEach(b=>b.classList.toggle('on', b === fv)); }
@@ -2220,6 +2348,7 @@ document.addEventListener('click', async e=>{
     if((q.ceil || q.opts || q.one) && tg && !a.qty) q.c.forEach((x, j)=>{ if(q.id + '#' + j !== k) delete L.answers[q.id + '#' + j]; });
     if(c.grp && tg && !a.qty) q.c.forEach((x, j)=>{ if(x.grp === c.grp && q.id + '#' + j !== k) delete L.answers[q.id + '#' + j]; });
     a.qty = tg ? (a.qty ? 0 : 1) : Math.max(0, Math.min(99, a.qty + Number(stp.dataset.d)));
+    if(q.id === 'fdcolor' && c.hex){ a.label = c.short + ' ' + c.num; a.hex = c.hex; a.num = c.num; }
     if(a.qty) L.answers[k] = a; else delete L.answers[k];
     if(q.col){ const col = faucetCol(L, q.room.id); ALL_QS.filter(x=>x.fauc && x.room.id === q.room.id).forEach(x=>x.c.forEach((c, j)=>{ if(col && c.brand !== col) delete L.answers[x.id + '#' + j]; })); }
     touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return;
@@ -2325,6 +2454,16 @@ document.addEventListener('change', e=>{
     if(!Number.isFinite(v) || v < 0){ toast('Type a dollar amount'); render(); return; }
     ALLOW_CFG[e.target.dataset.allowdef] = v; styleSave(); toast('Default allowance saved'); return;
   }
+  if(e.target.dataset && (e.target.dataset.bmName || e.target.dataset.bmHex)){   // another Benjamin Moore colour: typed name + a shade for the screen
+    const L3 = lead(); if(!L3 || locked(L3)) return;
+    const k = e.target.dataset.bmName || e.target.dataset.bmHex, q = qOfKey(k); if(!q) return;
+    const nameBox = document.querySelector('[data-bm-name="' + k + '"]'), hexBox = document.querySelector('[data-bm-hex="' + k + '"]');
+    
+    const label = (nameBox ? nameBox.value : '').trim(), hex = hexBox ? hexBox.value : '', num = (label.match(/([A-Z]{1,3}-?d{1,4}(?:-d{1,2})?|d{3,4}(?:-d{1,2})?)s*$/) || [])[1] || '';
+    if(!label){ delete L3.answers[k]; }
+    else { q.c.forEach((x, j)=>{ if(q.id + '#' + j !== k) delete L3.answers[q.id + '#' + j]; }); L3.answers[k] = { qty:1, price:0, label, hex, num }; }
+    touch(L3); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
   if(e.target.dataset && e.target.dataset.lotprem){
     const L2 = lead(); if(!L2 || locked(L2)) return;
     const k = e.target.dataset.lotprem + '#0', v = Math.max(0, Math.round(Number(e.target.value) || 0));
@@ -2356,6 +2495,7 @@ document.addEventListener('change', e=>{
   }
   if(e.target.id === 'followDate' && e.target.value && lead()){ const L = lead(); L.follow = { date:e.target.value, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(L.follow.date)); return; }
   if(e.target.id === 'styCeil'){ const c = STYLE_CFG[styName] = STYLE_CFG[styName] || { skip:[], incl:[] }; c.ceil = Number(e.target.value); render(); styleSave(); toast(styName + ': standard ceilings ' + c.ceil + "'"); return; }
+  if(e.target.dataset && e.target.dataset.doorc){ const [i, f] = e.target.dataset.doorc.split('|'), x = DOOR_CFG[Number(i)]; if(!x) return; x[f] = f === 'hex' ? e.target.value.toLowerCase() : e.target.value.trim(); const dq = qById('fdcolor'); if(dq) dq.c = paintChoices(); styleSave(); return; }
   if(e.target.dataset && e.target.dataset.size){
     const [m, f] = e.target.dataset.size.split('|'), v = Number(e.target.value);
     const o = SIZE_CFG[m] = SIZE_CFG[m] || {};
@@ -2406,7 +2546,7 @@ document.addEventListener('change', e=>{
    A customer screen / their pricing sheet / the share page opens with the sheet's link key instead (no sign-in). */
 let DEVS_SEEN = false;
 function applySetup(data){
-  PRICE_OVER = data.over || {}; BASE_CFG = data.bases || {}; SIZE_CFG = data.sizes || {}; CHANGED = data.changed || {};
+  PRICE_OVER = data.over || {}; BASE_CFG = data.bases || {}; SIZE_CFG = data.sizes || {}; DOOR_CFG = Array.isArray(data.doors) ? data.doors : []; CHANGED = data.changed || {};
   buildCatalog(data.catalog || []);
   STYLE_CFG = data.styles || {}; ALLOW_CFG = data.allow || {}; CEIL_CFG = data.ceil || {}; OPT_PRICES = data.prices || {};
 }
