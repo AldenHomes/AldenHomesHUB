@@ -2910,6 +2910,15 @@ document.getElementById('photoView').addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{ if(!document.getElementById('photoView').classList.contains('show')) return;
   if(e.key === 'Escape') document.getElementById('photoView').classList.remove('show'); if(e.key === 'ArrowRight') pvStep(1); if(e.key === 'ArrowLeft') pvStep(-1); });
+/* ARROW KEYS (owner, 2026-10-27): in One at a time, → = Next and ← = Back — the same as pressing the buttons. Not while typing in a box,
+   with Ctrl / Alt / Cmd held, or while the big photo view is open (there the arrows step through the photos). */
+document.addEventListener('keydown', e=>{
+  if((e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
+  if(document.getElementById('photoView').classList.contains('show')) return;
+  const t = e.target; if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  const b = document.querySelector('.g-nav [data-g="' + (e.key === 'ArrowRight' ? '1' : '-1') + '"]');
+  if(b && !b.disabled){ e.preventDefault(); b.click(); }
+});
 </script>
 </body>
 </html>
