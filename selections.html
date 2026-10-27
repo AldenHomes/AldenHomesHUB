@@ -648,7 +648,10 @@ const tileImg = (q, c, L)=>{ if(c.disp){ const d = c.disp[tileFinOf(q, c, L)]; i
   return c.fins && c.model ? moenImg(c.model, tileFinOf(q, c, L)) : c.img; };
 const faucetChoices = kind=>FAUCETS.flatMap(x=>{
   const pc = (code, label, extra)=>({ t: x.name + ' - ' + label + ' (' + code + ')', p:0, unit:'', brand:x.name, img:moenImg(code), model:code, fins:x.fins, ...(extra || {}) });
-  if(kind === 'spa') return [{ ...pc(x.spa, 'Spa package', x.spaDisp ? { disp:x.spaDisp, sub:'Photo: our showroom display' } : {}), t: x.name + ' - Spa package (' + x.spaParts + ')' }];
+  // every finish shows a picture of the whole kit: the showroom board where there is one, else kit-<collection>[-finish].jpg (Moen's photos of
+  // the kit's parts laid out together, made 2026-10-27 because one valve photo "would be nice to have a slightly better showing")
+  if(kind === 'spa') return [{ ...pc(x.spa, 'Spa package', { disp:Object.fromEntries(x.fins.map(fk=>[fk, (x.spaDisp || {})[fk] || 'kit-' + slugOf(x.name) + (fk === 'ch' ? '' : '-' + fk)])),
+    sub: x.spaDisp ? 'Photo: our showroom display' : 'Everything in the kit' }), t: x.name + ' - Spa package (' + x.spaParts + ')' }];
   if(kind === 'hwset' || kind === 'hwset-m'){ const parts = [x.hw + '08 paper holder', x.hw + '86 ' + x.ring.toLowerCase()].concat(kind === 'hwset-m' ? [x.hw + '03 robe hook'] : []);
     return [{ ...pc(x.hw + '86', 'Standard set'), t: x.name + ' - Standard set: ' + parts.join(', ') }]; }
   if(kind === 'hwadd') return [pc(x.hw + '18', '18" towel bar'), pc(x.hw + '24', '24" towel bar'), pc(x.hw + '86', x.ring)];
@@ -1140,12 +1143,17 @@ function openDefault(list){ const key = cur + '|' + tab + '|' + roomId; if(openF
 // one selection: its choices, each one tap to take (or a count / square feet where that's how it's priced)
 function photoGrid(q, L, lock){
   if(q.col) return '<div class="q-sub">The Moen faucets on the showroom wall. Pick the look here; the sink and shower faucets below then show only this collection, and the finish only the colours it comes in.</div>' + photoGridInner(q, L, lock);
+  /* VERTICAL SPA AS AN UPGRADE TOO (owner, 2026-10-27: "the vertical spa can also be offered in the upgrade section [with] the Magnetix"):
+     a Shower Faucet line also draws the same bath's Vertical Spa tiles under its own. They ARE that question's tiles (same keys), so a pick
+     here is the Vertical Spa pick there — one answer, one price (BuilderTrend's spa line). */
+  if(q.fauc && FAUCET_KIND[q.bt] === 'shower'){ const sq = ALL_QS.find(x=>x.room.id === q.room.id && FAUCET_KIND[x.bt] === 'spa');
+    if(sq && asked(sq, L)) return photoGridInner(q, L, lock) + photoGridInner(sq, L, lock, 'Vertical spa · upgrade — the whole kit'); }
   return photoGridInner(q, L, lock);
 }
-function photoGridInner(q, L, lock){
+function photoGridInner(q, L, lock, head){
   const cs = choicesOf(q, L), brands = [...new Set(cs.map(c=>c.brand || ''))];
   const fin = q.col ? (()=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + q.room.id); if(!fq) return ''; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : ''; })() : '';
-  return brands.map(b=>`<div class="ph-group ${q.fauc || q.col ? 'ph-product' : ''}">${b ? `<div class="ph-brand">${esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
+  return brands.map(b=>`<div class="ph-group ${q.fauc || q.col ? 'ph-product' : ''}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
     const k = q.id + '#' + c.i, on = !!(L.answers[k] || {}).qty, name = c.brand ? c.t.slice(c.brand.length + 3) : c.t;
     return `<div class="ph-tile ${on ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">
       <button type="button" class="ph-pick" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''} aria-pressed="${on}" title="${on ? 'Chosen' : 'Choose'} ${esc(c.t)}">
