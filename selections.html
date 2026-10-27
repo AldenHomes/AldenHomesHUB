@@ -657,7 +657,9 @@ const faucetChoices = kind=>FAUCETS.flatMap(x=>{
   ? x.lav.map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m, fins:x.fins }))
   : [{ t: x.name + ' - Shower faucet (' + x.shower + ')', p:0, unit:'', brand:x.name, img:moenImg(x.shower), model:x.shower, fins:x.fins },
      { t: x.name + ' - Tub/shower faucet (' + x.tub + ')', p:0, unit:'', brand:x.name, img:moenImg(x.tub), model:x.tub, fins:x.fins },
-     ...(x.alt || []).map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m, fins:x.fins }))]));
+     ...(x.alt || []).map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m, fins:x.fins }))]))
+  .concat(kind === 'shower' ? SHOWER_HEADS.map(h=>({ t:'Magnetix by Moen - ' + h.t + ' (' + h.model + ')', p:null, unit:'', brand:'Magnetix by Moen',
+    note:'upgrade — goes with any collection, added on top of the shower faucet', img:moenImg(h.model), model:h.model, fins:h.fins, kf:h.kf, side:true, up:true })) : []);
 // the collection picked for a bathroom (its name), or ''
 const faucetCol = (L, rid)=>{ const q = ALL_QS.find(x=>x.id === 'col_' + rid); if(!q) return ''; const i = q.c.findIndex((c, j)=>(L.answers[q.id + '#' + j] || {}).qty); return i >= 0 ? q.c[i].t : ''; };
 const faucetOf = name=>FAUCETS.find(x=>x.name === name);
@@ -904,11 +906,11 @@ const qById = id=>ALL_QS.find(q=>q.id===id);
 const qOfKey = k=>qById(String(k).split('#')[0]);
 function applyOver(){ ALL_QS.forEach(q=>q.c.forEach(c=>{ if(!('p0' in c) || !overOn(c)) return; const v = PRICE_OVER[overKey(q, c)]; c.p = v != null ? v : c.p0; })); }
 /* SHOWER HEAD UPGRADES (owner, 2026-10-27: "they also have the option to upgrade to these shower heads"; from the supplier's "Magnetix by Moen"
-   page): BuilderTrend has no shower head line, so each bath with a shower gets 'shead_<room>' "Shower Head Upgrade" after its Shower Faucet
-   (on the pricing sheet AND always on the Selections side, like the faucets). Photo picks in every finish the head comes in (finish dots);
-   the line carries the full order number in the bath's finish. The PRICE depends on the finish: `kf` = key prefix, price = OPT_PRICES[kf +
+   page). Owner then: show them INSIDE Shower Faucet (BT 270/310/350), under the collection's shower heads, for every collection — an add-on
+   (`side`: picking it doesn't replace the shower faucet, and picking a faucet doesn't drop it; `up`: never filtered by collection).
+   Photo picks in every finish the head comes in (finish dots); the line carries the full order number in the bath's finish. The PRICE depends on the finish: `kf` = key prefix, price = OPT_PRICES[kf +
    '-' + finish] (Home styles → Other option prices; empty = price to come). More heads from the same page go in SHOWER_HEADS. */
-const SHOWER_HEADS = [{ model:'3662EP', t:'Magnetix Eco Performance handheld shower', fins:['ch','bn','orb','brass','black'], kf:'head-3662ep' }];
+const SHOWER_HEADS = [{ model:'3662EP', t:'Eco Performance handheld shower', fins:['ch','bn','orb','brass','black'], kf:'head-3662ep' }];
 const headPriceKey = (c, L, q)=>c.kf + '-' + bathFin(L, q.room.id);
 function buildCatalog(cat){
   CAT_RAW = cat;
@@ -939,7 +941,7 @@ function buildCatalog(cat){
     const std = STD_FIRST[s.bt] || [];
     sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt], fauc: !!FAUCET_KIND[s.bt], v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, up:c.up, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -967,10 +969,6 @@ function buildCatalog(cat){
       c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) });
     sec.qs.unshift({ id:'col_' + rid, bt:'', num, t:'Faucet Collection - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, col:true, tw:'Faucet Collection',
       c:FAUCETS.map(x=>({ t:x.name, p:0, p0:0, unit:'', img:moenImg(x.lav[0][0]), model:x.lav[0][0], fins:x.fins, sub:x.fins.map(k=>FIN_LABEL[k]).join(' · ') })) }); });
-  [['mbath', '270'], ['bath2', '310'], ['bath3', '350']].forEach(([rid, bt])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec) return;
-    const at = sec.qs.findIndex(q=>q.bt === bt); if(at < 0) return;
-    sec.qs.splice(at + 1, 0, { id:'shead_' + rid, bt:'', num:parseInt(bt, 10), t:'Shower Head Upgrade - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:1, photo:true, sh:true, tw:'Shower Head Upgrade',
-      c:SHOWER_HEADS.map(h=>({ t:'Magnetix by Moen - ' + h.t + ' (' + h.model + ')', p:null, unit:'', brand:'Magnetix by Moen', img:moenImg(h.model), model:h.model, fins:h.fins, kf:h.kf })) }); });
   SECTIONS = SECTIONS.filter(r=>r.qs.length);
   ROOMS = SECTIONS;
   PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
@@ -1083,7 +1081,7 @@ const asked = (q, L)=>{
 const choicesOf = (q, L)=>{ if(q.opts){ const all = q.c.map((c, i)=>({ ...c, i, p:optPrice(c.k) }));
     if(q.fin && q.id !== 'fin_kit'){ const col = faucetOf(faucetCol(L, q.room.id)); if(col) return all.filter(c=>col.fins.includes(FIN_CODE[c.t]) || (L.answers[q.id + '#' + c.i] || {}).qty); }
     return all; }
-  if(q.fauc){ const col = faucetCol(L, q.room.id), all = q.c.map((c, i)=>({ ...c, i })); return col ? all.filter(c=>c.brand === col || (L.answers[q.id + '#' + c.i] || {}).qty) : all; }
+  if(q.fauc){ const col = faucetCol(L, q.room.id), all = q.c.map((c, i)=>({ ...c, i, ...(c.kf && L ? { p:optPrice(headPriceKey(c, L, q)) } : {}) })); return col ? all.filter(c=>c.brand === col || c.up || (L.answers[q.id + '#' + c.i] || {}).qty) : all; }
   if(q.ceil){ const std = ceilStd(L); return q.c.map((c, i)=>({ ...c, i, t:ceilLabel(std, c.h), p:ceilPrice(std, c.h) })).filter(c=>c.h !== std); }
   const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p:optPrice(c.k) } : {}), ...(c.kf && L ? { p:optPrice(headPriceKey(c, L, q)) } : {}) }));
   if(q.bt === '642'){ const cov = ALL_QS.find(x=>x.bt === '640'); const got = cov ? cov.c.map((c, i)=>(L.answers[cov.id + '#' + i] || {}).qty ? c.t : '').filter(Boolean).join(' ') : '';
@@ -2369,12 +2367,12 @@ document.addEventListener('click', async e=>{
     const box = isAllow(q, c) ? document.querySelector('[data-allow="' + k + '"]') : null;
     const a = L.answers[k] || { qty:0, price: box ? Math.max(0, Math.round(Number(box.value) || 0)) : choicePrice(q, Number(k.split('#')[1]), L) };     // the price is fixed the moment it's first picked
     markOwn(L, q); delete a.auto;
-    if((q.ceil || q.opts || q.one) && tg && !a.qty) q.c.forEach((x, j)=>{ if(q.id + '#' + j !== k) delete L.answers[q.id + '#' + j]; });
+    if((q.ceil || q.opts || q.one) && tg && !a.qty && !c.side) q.c.forEach((x, j)=>{ if(q.id + '#' + j !== k && !x.side) delete L.answers[q.id + '#' + j]; });
     if(c.grp && tg && !a.qty) q.c.forEach((x, j)=>{ if(x.grp === c.grp && q.id + '#' + j !== k) delete L.answers[q.id + '#' + j]; });
     a.qty = tg ? (a.qty ? 0 : 1) : Math.max(0, Math.min(99, a.qty + Number(stp.dataset.d)));
     if(q.id === 'fdcolor' && c.hex){ a.label = c.short + ' ' + c.num; a.hex = c.hex; a.num = c.num; }
     if(a.qty) L.answers[k] = a; else delete L.answers[k];
-    if(q.col){ const col = faucetCol(L, q.room.id); ALL_QS.filter(x=>x.fauc && x.room.id === q.room.id).forEach(x=>x.c.forEach((c, j)=>{ if(col && c.brand !== col) delete L.answers[x.id + '#' + j]; })); }
+    if(q.col){ const col = faucetCol(L, q.room.id); ALL_QS.filter(x=>x.fauc && x.room.id === q.room.id).forEach(x=>x.c.forEach((c, j)=>{ if(col && c.brand !== col && !c.up) delete L.answers[x.id + '#' + j]; })); }
     touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return;
   }
   const fav = t.closest('[data-fav]'); if(fav){ e.stopPropagation(); L.favs[fav.dataset.fav] = !L.favs[fav.dataset.fav]; if(!L.favs[fav.dataset.fav]) delete L.favs[fav.dataset.fav]; render(); return; }
