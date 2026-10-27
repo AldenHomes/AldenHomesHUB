@@ -1637,7 +1637,9 @@ function hasFeat(L, f){
    asked again — only pricing lines with something picked come over (to finish the details). The answers aren't touched: this only
    decides what the Selections tab walks through. */
 const pickedOn = (q, L)=>choicesOf(q, L).some(c=>{ const a = L.answers[q.id + '#' + c.i]; return a && (a.qty || (c.rate && a.price)); }) || L.custom.some(c=>c.q === q.id);
-const onSelSide = (q, L)=>!isLotPrem(q) && !(q.v1 && !pickedOn(q, L));
+// the Moen faucet / shower / spa / hardware picks are made at the selections meeting, so they always come over (owner, 2026-10-27:
+// the shower photos were hidden because those lines are on the pricing sheet too and were left at standard there)
+const onSelSide = (q, L)=>!isLotPrem(q) && !(q.v1 && !q.fauc && !pickedOn(q, L));
 const askedFor = (q, L, sel)=>asked(q, L) && (!sel || onSelSide(q, L));
 const sectionsFor = (L, list)=>list.filter(r=>r.qs.some(q=>askedFor(q, L, list === ROOMS)));
 
