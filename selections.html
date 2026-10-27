@@ -283,6 +283,28 @@
   .doc-facts div b{font-size:15.5px;color:var(--navy)}
   /* section heading + its total: light gray band so it stands out (owner, 2026-10-27); prints too */
   .doc h3{font-family:Georgia,serif;font-size:17px;color:var(--navy);margin:22px 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid #d9d6cc;padding:7px 10px 6px;background:#eeede8;border-radius:4px 4px 0 0;break-after:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* photo picks */
+  .ph-group{margin-top:10px;} .ph-brand{font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted,#777); margin:6px 0 6px;}
+  .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px;}
+  .ph-tile{position:relative;}
+  .ph-pick{display:block; width:100%; padding:0; border:2px solid var(--line,#ddd); border-radius:10px; overflow:hidden; background:#fff; cursor:pointer; text-align:left; font-family:inherit; transition:box-shadow .15s, border-color .15s;}
+  .ph-pick:hover{box-shadow:0 3px 12px rgba(0,0,0,.14);}
+  .ph-pick img{display:block; width:100%; aspect-ratio:3/2; object-fit:cover;}
+  .ph-none{display:flex; align-items:center; justify-content:center; aspect-ratio:3/2; background:repeating-linear-gradient(45deg,#f4f2ec,#f4f2ec 8px,#ece9e1 8px,#ece9e1 16px); color:#999; font-size:12.5px; font-weight:700;}
+  .ph-name{display:block; padding:8px 10px; font-size:14px; font-weight:700; color:var(--ink,#222);}
+  .ph-tile.on .ph-pick{border-color:var(--navy,#1f3550); box-shadow:0 0 0 2px var(--navy,#1f3550);}
+  .ph-check{position:absolute; top:8px; left:8px; width:28px; height:28px; border-radius:50%; background:var(--navy,#1f3550); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; box-shadow:0 1px 4px rgba(0,0,0,.3);}
+  .ph-zoom{position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%; border:none; background:rgba(255,255,255,.92); color:#333; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.25);}
+  body.present .ph-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));}
+  #photoView{position:fixed; inset:0; background:rgba(20,22,24,.82); z-index:500; display:none; align-items:center; justify-content:center; padding:20px;}
+  #photoView.show{display:flex;}
+  #photoView .pv-box{max-width:min(1000px,96vw); width:100%; text-align:center;}
+  #photoView img{max-width:100%; max-height:74vh; border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,.4); background:#fff;}
+  #photoView .pv-name{color:#fff; font-size:22px; font-weight:800; margin-top:12px;}
+  #photoView .pv-row{display:flex; gap:10px; justify-content:center; margin-top:12px; flex-wrap:wrap;}
+  #photoView button{border:none; border-radius:22px; padding:10px 18px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit;}
+  #photoView .pv-choose{background:#fff; color:var(--navy,#1f3550);} #photoView .pv-close, #photoView .pv-nav{background:rgba(255,255,255,.18); color:#fff;}
+  @media print{ #photoView{display:none !important;} .ph-zoom{display:none;} }
   .doc h3 span{font-family:"Courier New",monospace;font-size:14px}
   .doc table{font-size:14px;table-layout:fixed;width:100%}
   .doc td:first-child{width:46%}
@@ -641,7 +663,22 @@ function patioChoices(bt, list){
   return null;
 }
 /* Garbage disposal (owner, 2026-10-19): standard in every kitchen; BuilderTrend's "Garbage disposal credit" reads as "No garbage disposal". */
-const splitChoices = (bt, list)=>patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
+/* PHOTO PICKS (owner, 2026-10-27: "the siding photos and names… they should be able to nicely look at these and choose"): a
+   selection whose choices are colours with pictures. Photos are shrunk copies in selection-photos/<topic>/ (public product swatches);
+   a colour without a photo yet shows a "photo to come" tile. Each choice: t (name as on the sheet), brand (group heading), img, no
+   charge. The question becomes one pick (q.one) shown as a grid of tiles (`photoGrid`), with a big view (#photoView). */
+const PHOTO_SETS = {
+  '171': { dir: 'siding', groups: [
+    { brand: 'CT', names: ['Charcoal Gray', 'Colonial White', 'Cypress', 'Flagstone', 'Forest', 'Graystone', 'Natural Clay', 'Pacific Blue', 'Seagrass', 'Spruce'], photos: true },
+    { brand: 'EP', names: ['Almost Midnight', 'Aspen White', 'Bone', 'Canyon', 'Carbon', 'Clay', 'Country Beige', 'Cypress', 'Driftwood', 'Espresso', 'Graphite',
+      'Greystone', 'Indigo', 'Lighthouse Red', 'Metropolitan Gray', 'Mocha', 'Nantucket', 'Oceanside', 'Pearl', 'Polaris', 'Regatta', 'Rye', 'Saddle', 'Slate',
+      'Smoky Ash', 'Spruce', 'Stone Harbor', 'Wheat'], photos: false },   // the zip's EP files were all one white photo — real ones to come
+  ] },
+};
+const slugOf = t=>String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const photoChoices = bt=>{ const set = PHOTO_SETS[bt]; if(!set) return null;
+  return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, img: g.photos ? `selection-photos/${set.dir}/${slugOf(g.brand + ' ' + n)}.jpg` : '' }))); };
+const splitChoices = (bt, list)=>photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
     ...list.filter(c=>!PANTRY_DROP.test(String(c.t).trim())).map(c=>/appliance/i.test(c.t) ? c : { ...c, t: /\/\s*lf/i.test(c.t) ? c.t : c.t + ' (per linear ft)', unit:'ft' })] :list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }));
 /* The master bath sets the other bathrooms (owner, 2026-10-14: people often make the bathrooms the same). A line in the main, third
    or powder bath with the same name as a master bath line (`tw`) copies the master's choice, at its own price, marked auto. Touching
@@ -705,9 +742,9 @@ function buildCatalog(cat){
     const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
     const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
     const std = STD_FIRST[s.bt] || [];
-    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt], v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -829,6 +866,8 @@ const asked = (q, L)=>{
   if(q.mvAway && !tubMoved(q, L)) return false;      // BuilderTrend's unnumbered "Contract Price" and "Miscellaneous" lines hold nothing
   if(q.line && L.line && q.line !== L.line && LINE_NAMES[q.line]) return false;
   if(isSkip(q, L)) return false;
+  // a home with a basement doesn't need the slab foundation line (owner, 2026-10-27)
+  if(q.bt === '122' && hasFeat(L, FEATURES.find(f=>f.id === 'bsmt'))) return false;
   const f = featOf(q);
   return !f || hasFeat(L, f);
 };
@@ -877,6 +916,16 @@ function drift(L){
 let openSel = new Set(), openFor = '';
 function openDefault(list){ const key = cur + '|' + tab + '|' + roomId; if(openFor !== key){ openFor = key; openSel = new Set(list.length ? [list[0].id] : []); } }
 // one selection: its choices, each one tap to take (or a count / square feet where that's how it's priced)
+function photoGrid(q, L, lock){
+  const cs = choicesOf(q, L), brands = [...new Set(cs.map(c=>c.brand || ''))];
+  return brands.map(b=>`<div class="ph-group">${b ? `<div class="ph-brand">${esc(b)}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
+    const k = q.id + '#' + c.i, on = !!(L.answers[k] || {}).qty, name = c.brand ? c.t.slice(c.brand.length + 3) : c.t;
+    return `<div class="ph-tile ${on ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">
+      <button type="button" class="ph-pick" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''} aria-pressed="${on}" title="${on ? 'Chosen' : 'Choose'} ${esc(c.t)}">
+        ${c.img ? `<img src="${esc(c.img)}" alt="${esc(c.t)}" loading="lazy">` : '<span class="ph-none">Photo to come</span>'}
+        <span class="ph-name">${esc(name)}</span>${on ? '<span class="ph-check">&#10003;</span>' : ''}</button>
+      ${c.img ? `<button type="button" class="ph-zoom" data-photo-view="${esc(k)}" title="See it bigger" aria-label="See ${esc(c.t)} bigger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>` : ''}</div>`; }).join('')}</div></div>`).join('');
+}
 function prow(q, L, force){
   if(!asked(q, L)) return '';
   if(isLotPrem(q)){                               // not a choice: an amount for this lot
@@ -894,7 +943,7 @@ function prow(q, L, force){
   const changed = q.v1 && was !== null && was !== now ? `<span class="chip soon">changed since pricing${was ? ' · was ' + esc(was) : ' · added'}</span>` : '';
   const std = stdOf(q, L);
   const stdActive = std && (std.keep || !choicesOf(q, L).some(c=>c.i !== std.idx && !c.side && (L.answers[q.id + '#' + c.i] || {}).qty));
-  const rows = (std ? stdRow(q, L, std, stdActive, lock) : '') + (q.bt === '790' ? floorRows(q, L, lock) : choicesOf(q, L).filter(c=>!std || c.i !== std.idx).map(c=>{
+  const rows = q.photo ? photoGrid(q, L, lock) : (std ? stdRow(q, L, std, stdActive, lock) : '') + (q.bt === '790' ? floorRows(q, L, lock) : choicesOf(q, L).filter(c=>!std || c.i !== std.idx).map(c=>{
     const k = q.id + '#' + c.i, a = L.answers[k], n = a ? a.qty : 0, p = a ? a.price : c.p;
     const price = view === 'customer' ? '' : c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
     if(isAllow(q, c)){
@@ -1510,7 +1559,13 @@ function hasFeat(L, f){
   return featCount(L, f) > 0 || !!f.dflt;
 }
 // the sections of a meeting that have anything to ask for this home
-const sectionsFor = (L, list)=>list.filter(r=>r.qs.some(q=>asked(q, L)));
+/* THE SELECTIONS SIDE (owner, 2026-10-27): no lot premium (settled at pricing), and a pricing-sheet line left at standard isn't
+   asked again — only pricing lines with something picked come over (to finish the details). The answers aren't touched: this only
+   decides what the Selections tab walks through. */
+const pickedOn = (q, L)=>choicesOf(q, L).some(c=>{ const a = L.answers[q.id + '#' + c.i]; return a && (a.qty || (c.rate && a.price)); }) || L.custom.some(c=>c.q === q.id);
+const onSelSide = (q, L)=>!isLotPrem(q) && !(q.v1 && !pickedOn(q, L));
+const askedFor = (q, L, sel)=>asked(q, L) && (!sel || onSelSide(q, L));
+const sectionsFor = (L, list)=>list.filter(r=>r.qs.some(q=>askedFor(q, L, list === ROOMS)));
 
 /* ---------- one at a time, or the whole section ---------- */
 let gIdx = 0, followGuide = null;
@@ -1531,7 +1586,7 @@ function sheetView(L, kind){
   const ls = lines(L), lock = locked(L);
   const nav = list.map(x=>{ const n = ls.filter(l=>l.q.room.id === x.id && !l.typed).length + L.custom.filter(c=>c.room === x.id).length;
     return `<button type="button" class="${r.id===x.id?'on':''}" data-room="${x.id}"><div class="rn"><span>${esc(x.name)}</span>${n ? `<span class="done" style="font-size:12px">${n}</span>` : ''}</div></button>`; }).join('');
-  const qs = r.qs.filter(q=>asked(q, L));
+  const qs = r.qs.filter(q=>askedFor(q, L, !pricing));
   const nk = noteKey(r), note = L.answers[nk];
   const guide = modeOf() === 'guide';
   const hasbar = PRESENT ? '' : `<div class="hasbar noprint"><span>This home has:</span>${FEATURES.map(f=>{ const on = hasFeat(L, f), n = featCount(L, f);
@@ -1966,7 +2021,7 @@ document.addEventListener('click', async e=>{
   }
   const gb = t.closest('[data-g]');
   if(gb && (tab === 'v1' || tab === 'full')){
-    const list = sectionsFor(L, tab === 'v1' ? PRICING : ROOMS), i = Math.max(0, list.findIndex(x=>x.id === roomId)), qs = list[i] ? list[i].qs.filter(q=>asked(q, L)) : [];
+    const list = sectionsFor(L, tab === 'v1' ? PRICING : ROOMS), i = Math.max(0, list.findIndex(x=>x.id === roomId)), qs = list[i] ? list[i].qs.filter(q=>askedFor(q, L, tab === 'full')) : [];
     const d = Number(gb.dataset.g);
     if(d > 0){
       if(gIdx < qs.length - 1) gIdx++;
@@ -1975,7 +2030,7 @@ document.addEventListener('click', async e=>{
       else { const fin = document.getElementById('toFull'); if(fin){ fin.scrollIntoView({ block:'center' }); return; } }
     } else {
       if(gIdx > 0) gIdx--;
-      else if(list[i - 1]){ roomId = list[i - 1].id; gIdx = list[i - 1].qs.filter(q=>asked(q, L)).length - 1; }
+      else if(list[i - 1]){ roomId = list[i - 1].id; gIdx = list[i - 1].qs.filter(q=>askedFor(q, L, tab === 'full')).length - 1; }
     }
     const y = window.scrollY; render(); window.scrollTo(0, y); return;   // stay where they're scrolled (owner, 2026-10-19)
   }
@@ -2061,6 +2116,7 @@ document.addEventListener('click', async e=>{
     a.qty = (a.qty || 0) + sq; L.answers[k] = a; markOwn(L, q); flashKey = k; touch(L);
     const y = window.scrollY; render(); window.scrollTo(0, y); flashKey = ''; return;
   }
+  const pv = t.closest('[data-photo-view]'); if(pv){ photoView(pv.dataset.photoView); return; }
   const tg = t.closest('[data-bt-tog]'), stp = t.closest('[data-bt-step]');
   if(tg || stp){
     const k = tg ? tg.dataset.btTog : stp.dataset.btStep, q = qOfKey(k), c = q && q.c[Number(k.split('#')[1])];
@@ -2446,6 +2502,36 @@ boot();
   const r0 = render; render = function(){ r0.apply(this, arguments); window.sqCalcSync(); };
   window.sqCalcSync();
 })();
+</script>
+<div id="photoView" role="dialog" aria-modal="true"><div class="pv-box"><img id="pvImg" alt=""><div class="pv-name" id="pvName"></div>
+  <div class="pv-row"><button type="button" class="pv-nav" id="pvPrev">&larr; Previous</button><button type="button" class="pv-choose" id="pvChoose"></button><button type="button" class="pv-nav" id="pvNext">Next &rarr;</button><button type="button" class="pv-close" id="pvClose">Close</button></div></div></div>
+<script>
+// the big view of one photo pick: Previous / Next through that selection's photos, "Choose this" picks it (same as tapping the tile)
+let pvKey = '';
+function photoView(k){
+  const q = qOfKey(k), L = lead(); if(!q || !L){ return; }
+  const c = q.c[Number(k.split('#')[1])]; if(!c || !c.img) return;
+  pvKey = k;
+  document.getElementById('pvImg').src = c.img; document.getElementById('pvImg').alt = c.t;
+  document.getElementById('pvName').textContent = c.t;
+  const on = !!(L.answers[k] || {}).qty, lock = locked(L);
+  const ch = document.getElementById('pvChoose'); ch.textContent = on ? '\u2713 Chosen' : 'Choose this'; ch.disabled = lock; ch.style.display = lock ? 'none' : '';
+  document.getElementById('photoView').classList.add('show');
+}
+function pvStep(d){
+  const q = qOfKey(pvKey); if(!q) return;
+  const ks = choicesOf(q, lead()).filter(c=>c.img).map(c=>q.id + '#' + c.i), i = ks.indexOf(pvKey);
+  if(ks.length) photoView(ks[(i + d + ks.length) % ks.length]);
+}
+document.getElementById('photoView').addEventListener('click', e=>{
+  if(e.target.id === 'photoView' || e.target.closest('#pvClose')){ document.getElementById('photoView').classList.remove('show'); return; }
+  if(e.target.closest('#pvPrev')){ pvStep(-1); return; }
+  if(e.target.closest('#pvNext')){ pvStep(1); return; }
+  if(e.target.closest('#pvChoose')){ const b = document.querySelector('[data-bt-tog="' + CSS.escape(pvKey) + '"]'); const L = lead();
+    if(b && !(L.answers[pvKey] || {}).qty) b.click(); setTimeout(()=>photoView(pvKey), 50); }
+});
+document.addEventListener('keydown', e=>{ if(!document.getElementById('photoView').classList.contains('show')) return;
+  if(e.key === 'Escape') document.getElementById('photoView').classList.remove('show'); if(e.key === 'ArrowRight') pvStep(1); if(e.key === 'ArrowLeft') pvStep(-1); });
 </script>
 </body>
 </html>
