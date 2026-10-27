@@ -611,7 +611,9 @@ const FIN_CODE = { 'Brushed nickel':'bn', 'Brushed brass':'brass', 'Black':'blac
 const FIN_LABEL = { ch:'Chrome', bn:'Brushed nickel', brass:'Brushed gold', orb:'Oil rubbed bronze', black:'Matte black' };
 const FAUCETS = [
   { name:'Gibson', fins:['ch','bn','black'], hw:'DN07', ring:'Towel ring', spa:'UT2921', spaParts:'T2902EP shower trim, UT2921 transfer valve trim, 3669EP handheld', lav:[['6150', '2-handle 4" faucet'], ['T6142', 'Widespread 8" faucet'], ['6145', 'Single-handle faucet']], shower:'T2902EP', tub:'T2903EP' },
-  { name:'Glyde', fins:['ch','bn','black'], hw:'YB23', ring:'Towel ring', spa:'UT2721', spaParts:'T2742 shower trim, UT2721 transfer valve trim, 3669EP handheld', lav:[['6172', '2-handle 4" faucet'], ['T6173', 'Widespread 8" faucet'], ['6170', 'Single-handle faucet']], shower:'T2742', tub:'T2743' },
+  { name:'Glyde', fins:['ch','bn','black'], hw:'YB23', ring:'Towel ring', spa:'UT2721', spaParts:'T2742 shower trim, UT2721 transfer valve trim, 3669EP handheld', lav:[['6172', '2-handle 4" faucet'], ['T6173', 'Widespread 8" faucet'], ['6170', 'Single-handle faucet']], shower:'T2742', tub:'T2743',
+    // no-charge option (owner, 2026-10-27, "Posi-temp T284EP"): the same Glyde trim with Moen's large round rain head — T2842EP / T2843EP
+    alt:[['T2842EP', 'Shower faucet, large round head'], ['T2843EP', 'Tub/shower faucet, large round head']] },
   { name:'Voss', fins:['ch','bn','brass','orb'], hw:'YB51', ring:'Towel ring', spa:'T2690', spaDisp:{ ch:'display-voss' }, spaParts:'T2690 transfer & volume trim, 3868EP handheld, S6340 shower head', lav:[['6901', '2-handle 4" faucet'], ['T6905', 'Widespread 8" faucet'], ['6903', 'Single-handle faucet']], shower:'T2692', tub:'T2693' },
   { name:'Align', fins:['ch','bn','brass','black'], hw:'YB04', ring:'Hand towel bar', spa:'T2190', spaDisp:{ ch:'display-align', black:'display-align-black' }, spaParts:'T2190 transfer & volume trim, 3887EP handheld, S176 shower head', lav:[['6190', 'Single-handle faucet']], shower:'T2192', tub:'T2193' },
   { name:'90 Degree', fins:['ch','bn'], hw:'YB88', ring:'Hand towel bar', spa:'TS2710', spaDisp:{ ch:'display-90-degree' }, spaParts:'TS2710 transfer & volume trim, S3880EP handheld, S6340 shower head', lav:[['S6700', 'Single-handle faucet'], ['TS6720', 'Widespread 8" faucet']], shower:'TS2712', tub:'TS2713' },
@@ -654,7 +656,8 @@ const faucetChoices = kind=>FAUCETS.flatMap(x=>{
   return null; }).filter(Boolean).concat(['spa', 'hwset', 'hwset-m', 'hwadd', 'hook'].includes(kind) ? [] : FAUCETS.flatMap(x=>kind === 'lav'
   ? x.lav.map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m, fins:x.fins }))
   : [{ t: x.name + ' - Shower faucet (' + x.shower + ')', p:0, unit:'', brand:x.name, img:moenImg(x.shower), model:x.shower, fins:x.fins },
-     { t: x.name + ' - Tub/shower faucet (' + x.tub + ')', p:0, unit:'', brand:x.name, img:moenImg(x.tub), model:x.tub, fins:x.fins }]));
+     { t: x.name + ' - Tub/shower faucet (' + x.tub + ')', p:0, unit:'', brand:x.name, img:moenImg(x.tub), model:x.tub, fins:x.fins },
+     ...(x.alt || []).map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m, fins:x.fins }))]));
 // the collection picked for a bathroom (its name), or ''
 const faucetCol = (L, rid)=>{ const q = ALL_QS.find(x=>x.id === 'col_' + rid); if(!q) return ''; const i = q.c.findIndex((c, j)=>(L.answers[q.id + '#' + j] || {}).qty); return i >= 0 ? q.c[i].t : ''; };
 const faucetOf = name=>FAUCETS.find(x=>x.name === name);
