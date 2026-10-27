@@ -284,7 +284,7 @@
   /* section heading + its total: light gray band so it stands out (owner, 2026-10-27); prints too */
   .doc h3{font-family:Georgia,serif;font-size:17px;color:var(--navy);margin:22px 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid #d9d6cc;padding:7px 10px 6px;background:#eeede8;border-radius:4px 4px 0 0;break-after:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   /* photo picks */
-  .ph-group{margin-top:10px;} .ph-brand{font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted,#777); margin:6px 0 6px;}
+  .ph-group{margin-top:10px;} .ph-note{text-transform:none; letter-spacing:0; font-weight:600;} .ph-brand{font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted,#777); margin:6px 0 6px;}
   .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px;}
   .ph-tile{position:relative;}
   .ph-pick{display:block; width:100%; padding:0; border:2px solid var(--line,#ddd); border-radius:10px; overflow:hidden; background:#fff; cursor:pointer; text-align:left; font-family:inherit; transition:box-shadow .15s, border-color .15s;}
@@ -669,15 +669,15 @@ function patioChoices(bt, list){
    charge. The question becomes one pick (q.one) shown as a grid of tiles (`photoGrid`), with a big view (#photoView). */
 const PHOTO_SETS = {
   '171': { dir: 'siding', groups: [
-    { brand: 'CT', names: ['Charcoal Gray', 'Colonial White', 'Cypress', 'Flagstone', 'Forest', 'Graystone', 'Natural Clay', 'Pacific Blue', 'Seagrass', 'Spruce'], photos: true },
-    { brand: 'EP', names: ['Almost Midnight', 'Aspen White', 'Bone', 'Canyon', 'Carbon', 'Clay', 'Country Beige', 'Cypress', 'Driftwood', 'Espresso', 'Graphite',
+    { brand: 'CertainTeed', code: 'ct', names: ['Charcoal Gray', 'Colonial White', 'Cypress', 'Flagstone', 'Forest', 'Graystone', 'Natural Clay', 'Pacific Blue', 'Seagrass', 'Spruce'], photos: true },
+    { brand: 'Exterior Portfolio', code: 'ep', note: 'colors shown from the Exterior Portfolio color chart', names: ['Almost Midnight', 'Aspen White', 'Bone', 'Canyon', 'Carbon', 'Clay', 'Country Beige', 'Cypress', 'Driftwood', 'Espresso', 'Graphite',
       'Greystone', 'Indigo', 'Lighthouse Red', 'Metropolitan Gray', 'Mocha', 'Nantucket', 'Oceanside', 'Pearl', 'Polaris', 'Regatta', 'Rye', 'Saddle', 'Slate',
-      'Smoky Ash', 'Spruce', 'Stone Harbor', 'Wheat'], photos: false },   // the zip's EP files were all one white photo — real ones to come
+      'Smoky Ash', 'Spruce', 'Stone Harbor', 'Wheat'], photos: true },   // the office's white EP photo tinted to each colour's code from westlakeroyalbuildingproducts.com (2026-10-27)
   ] },
 };
 const slugOf = t=>String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const photoChoices = bt=>{ const set = PHOTO_SETS[bt]; if(!set) return null;
-  return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, img: g.photos ? `selection-photos/${set.dir}/${slugOf(g.brand + ' ' + n)}.jpg` : '' }))); };
+  return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, note: g.note || '', img: g.photos ? `selection-photos/${set.dir}/${g.code}-${slugOf(n)}.jpg` : '' }))); };
 const splitChoices = (bt, list)=>photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
     ...list.filter(c=>!PANTRY_DROP.test(String(c.t).trim())).map(c=>/appliance/i.test(c.t) ? c : { ...c, t: /\/\s*lf/i.test(c.t) ? c.t : c.t + ' (per linear ft)', unit:'ft' })] :list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }));
 /* The master bath sets the other bathrooms (owner, 2026-10-14: people often make the bathrooms the same). A line in the main, third
@@ -744,7 +744,7 @@ function buildCatalog(cat){
     const std = STD_FIRST[s.bt] || [];
     sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt], v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -918,7 +918,7 @@ function openDefault(list){ const key = cur + '|' + tab + '|' + roomId; if(openF
 // one selection: its choices, each one tap to take (or a count / square feet where that's how it's priced)
 function photoGrid(q, L, lock){
   const cs = choicesOf(q, L), brands = [...new Set(cs.map(c=>c.brand || ''))];
-  return brands.map(b=>`<div class="ph-group">${b ? `<div class="ph-brand">${esc(b)}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
+  return brands.map(b=>`<div class="ph-group">${b ? `<div class="ph-brand">${esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
     const k = q.id + '#' + c.i, on = !!(L.answers[k] || {}).qty, name = c.brand ? c.t.slice(c.brand.length + 3) : c.t;
     return `<div class="ph-tile ${on ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">
       <button type="button" class="ph-pick" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''} aria-pressed="${on}" title="${on ? 'Chosen' : 'Choose'} ${esc(c.t)}">
