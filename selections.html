@@ -357,6 +357,9 @@
   .doc td{padding:5px 6px;border-bottom:1px solid #f0ede4}
   .doc tr{break-inside:avoid}
   .doc .dn{font-style:italic;color:var(--ink-soft)}
+  .doc table.withph td.dph{width:92px;padding:6px 8px 6px 0} .doc table.withph td:nth-child(2){width:40%}
+  .doc td.dph img{width:84px;height:84px;object-fit:contain;display:block;background:#fff;border:1px solid #ece9df;border-radius:6px}
+  .doc table.withph td{vertical-align:middle}
   .doc .dstd{color:var(--ink-soft)}
   .doc-total{margin-top:24px;border-top:3px solid var(--navy);padding-top:12px;break-inside:avoid}
   .doc-total div{display:flex;justify-content:space-between;gap:12px;padding:3px 6px}
@@ -1575,7 +1578,7 @@ function shareSheetCard(L){
 /* ---------- screens ---------- */
 function render(){
   if(QUOTE){ document.body.classList.add('quote'); cur = QUOTE; view = 'customer'; $('totalbar').style.display = 'none'; $('root').innerHTML = quoteScreen(); return; }
-  document.body.classList.toggle('printdoc', tab === 'quote');
+  document.body.classList.toggle('printdoc', tab === 'quote' || tab === 'summary');
   if(SHOW){ document.body.classList.add('show'); cur = SHOW; $('totalbar').style.display = 'none'; $('root').innerHTML = showScreen(); return; }
   document.querySelectorAll('#viewSw button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
   document.body.classList.toggle('present', !!PRESENT);
@@ -2022,35 +2025,49 @@ function customBlock(L, r, q, loose){
 const QUOTE = new URLSearchParams(location.search).get('quote');
 let docAll = false;                                   // also list the lines left at standard
 const quoteUrl = L=>pageUrl() + '?quote=' + encodeURIComponent(L.id) + '&k=' + encodeURIComponent(keyOf(L));
-function quoteDoc(L, forCustomer){
-  const office = !forCustomer && view === 'staff', staff = false;
+/* SELECTION SHEET (owner, 2026-10-27: "after selections are complete we need a summary page kind of like the pricing sheet… then an
+   extended sheet that has all the photos"): the Summary tab shows this same document titled "Selection Sheet" (every pick, both
+   meetings, section by section, with totals), and "With photos" adds each choice's picture — the photo in the finish this home picked
+   (`linePhoto`). Print / Download PDF work as for the pricing sheet. opts: { title, photos } */
+function linePhoto(l, L){
+  if(!l.key || !l.key.includes('#')) return '';
+  const q = l.q, i = Number(l.key.split('#')[1]), c = q && q.c ? q.c[i] : null; if(!c) return '';
+  const fin = q.room ? bathFin(L, q.room.id) : 'ch';
+  if(c.disp){ const d = c.disp[fin] || c.disp.ch; if(d) return 'selection-photos/faucets/' + d + '.jpg'; }
+  if(c.fins && c.model) return moenImg(c.model, c.fins.includes(fin) ? fin : 'ch');
+  return c.img || '';
+}
+function quoteDoc(L, forCustomer, opts){
+  opts = opts || {};
+  const office = !forCustomer && view === 'staff', staff = false, ph = !!opts.photos, title = opts.title || 'Pricing Sheet', selDoc = title !== 'Pricing Sheet';
+  const phCell = l=>ph ? `<td class="dph">${(u=>u ? `<img src="${esc(u)}" alt="">` : '')(l ? linePhoto(l, L) : '')}</td>` : '';
   const ls = lines(L);
   const dname = (DEVS.find(d=>d.code === L.dev) || {}).name || '';
   const phase = (L.answers.phase || {}).label || '';
   const stdRow = q=>{                                 // a line nobody touched, for the "every line" version
     const what = 'Standard';
-    return `<tr class="dstd"><td>${office && q.bt ? `<span class="mono" style="font-size:12px">${esc(q.bt)}</span> ` : ''}${esc(q.t)}</td><td>${esc(what)}</td><td class="num"></td></tr>`;
+    return `<tr class="dstd">${ph ? '<td class="dph"></td>' : ''}<td>${office && q.bt ? `<span class="mono" style="font-size:12px">${esc(q.bt)}</span> ` : ''}${esc(q.t)}</td><td>${esc(what)}</td><td class="num"></td></tr>`;
   };
   const secs = SECTIONS.map(r=>{
     const mine = ls.filter(l=>l.q.room.id === r.id), cu = L.custom.filter(c=>c.room === r.id);
     const rows = [];
     r.qs.forEach(q=>{ if(!asked(q, L)) return; const got = mine.filter(l=>l.q.id === q.id);
       if(got.length) got.forEach(l=>rows.push(l.typed
-        ? `<tr><td colspan="${staff ? 5 : 3}" class="dn">${/_n$/.test(l.q.id) || l.q.id === 'misc' ? 'Note: ' : esc(l.q.t) + ': '}${esc(l.label)}</td></tr>`
-        : `<tr><td>${office && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(l.label)}</td><td class="num">${l.tbd ? '<em>price to come</em>' : l.price ? plus(l.price) : 'no charge'}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
+        ? `<tr>${ph ? '<td class="dph"></td>' : ''}<td colspan="${staff ? 5 : 2}" class="dn">${/_n$/.test(l.q.id) || l.q.id === 'misc' ? 'Note: ' : esc(l.q.t) + ': '}${esc(l.label)}</td></tr>`
+        : `<tr>${phCell(l)}<td>${office && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(selDoc ? qTitle(l.q) : l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(l.label)}</td><td class="num">${l.tbd ? '<em>price to come</em>' : l.price ? plus(l.price) : 'no charge'}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
       else if(docAll && q.v1) rows.push(stdRow(q));
     });
-    mine.filter(l=>l.typed && !r.qs.includes(l.q)).forEach(l=>rows.push(`<tr><td colspan="3" class="dn">Note: ${esc(l.label)}</td></tr>`));
-    cu.forEach(c=>rows.push(`<tr><td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`));
+    mine.filter(l=>l.typed && !r.qs.includes(l.q)).forEach(l=>rows.push(`<tr>${ph ? '<td class="dph"></td>' : ''}<td colspan="2" class="dn">Note: ${esc(l.label)}</td></tr>`));
+    cu.forEach(c=>rows.push(`<tr>${ph ? '<td class="dph"></td>' : ''}<td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`));
     if(!rows.join('')) return '';
     const sub = mine.reduce((s,l)=>s+l.price,0) + cu.reduce((s,c)=>s+c.price,0);
-    return `<h3>${esc(r.name)}<span>${sub ? plus(sub) : ''}</span></h3><table><tbody>${rows.join('')}</tbody></table>`;
+    return `<h3>${esc(r.name)}<span>${sub ? plus(sub) : ''}</span></h3><table class="${ph ? 'withph' : ''}"><tbody>${rows.join('')}</tbody></table>`;
   }).join('');
   const up = upgrades(L), co = coTotal(L), wait = waiting(L).length;
   return `<div class="doc" id="quoteDoc">
     ${office ? '<div class="officecopy">OFFICE COPY — shows the BuilderTrend line numbers. Switch to Customer view for the copy that goes to the buyer.</div>' : ''}
     <div class="doc-head"><img src="icons/logo.png" alt="Alden Homes">
-      <div><h1>Pricing Sheet</h1><div class="sub">${L.quoteOk ? 'Confirmed ' + esc(nice(L.quoteOk)) : 'Draft · not yet confirmed'} · prices as of ${esc(nice(L.pricedOn))}</div></div></div>
+      <div><h1>${esc(title)}</h1><div class="sub">${selDoc ? (L.signedOn ? 'Signed ' + esc(nice(L.signedOn)) : 'Selections in progress · ' + esc(nice(iso(new Date())))) : (L.quoteOk ? 'Confirmed ' + esc(nice(L.quoteOk)) : 'Draft · not yet confirmed') + ' · prices as of ' + esc(nice(L.pricedOn))}</div></div></div>
     <div class="doc-facts">
       <div><span>Prepared for</span><b>${esc([L.name, L.name2].filter(Boolean).join(' & '))}</b></div>
       <div><span>Community</span><b>${esc(dname || 'To be decided')}</b></div>
@@ -2069,7 +2086,7 @@ function quoteDoc(L, forCustomer){
       <div class="grand"><span>Total</span><span>${money(total(L))}</span></div>
       ${wait ? `<div style="color:#8a5d14"><span>${wait} custom item${wait === 1 ? ' is' : 's are'} still being priced and ${wait === 1 ? 'is' : 'are'} not in this total.</span><span></span></div>` : ''}
     </div>
-    <div class="doc-fine">This is a pricing summary for discussion, not a contract. Prices are as of ${esc(nice(L.pricedOn))} and can change until selections are signed. Anything not listed here is built to the standard for this home style.<br>Alden Homes · Handcrafted Homes &amp; Communities</div>
+    <div class="doc-fine">${selDoc ? 'Your selections, room by room. Anything not listed is built to the standard for this home style. Photos show the item as chosen; colours on screen and in print can differ slightly from the real thing.<br>' : ''}${selDoc ? '' : 'This is a pricing summary for discussion, not a contract.'}${selDoc ? '' : ` Prices are as of ${esc(nice(L.pricedOn))} and can change until selections are signed. Anything not listed here is built to the standard for this home style.`}<br>Alden Homes · Handcrafted Homes &amp; Communities</div>
   </div>`;
 }
 function quoteTab(L){
@@ -2110,6 +2127,7 @@ async function docPdf(btn, name){
     const el = document.getElementById('quoteDoc').cloneNode(true); el.id = 'quoteDocPdf';
     el.style.cssText = 'box-shadow:none;max-width:none;margin:0;width:' + W + 'px;padding:8px 24px;border-radius:0';
     holder.appendChild(el); document.body.appendChild(holder);
+    await Promise.all([...el.querySelectorAll('img')].map(im=>im.complete ? 0 : new Promise(r=>{ im.onload = im.onerror = r; })));
     const topOf = x=>x.getBoundingClientRect().top - el.getBoundingClientRect().top, bottomOf = x=>x.getBoundingClientRect().bottom - el.getBoundingClientRect().top;
     for(const b of [...el.querySelectorAll('.doc-head, .doc-facts, h3, tr, .doc-total, .doc-fine')]){
       let top = topOf(b), bottom = bottomOf(b);
@@ -2154,7 +2172,18 @@ async function loadShared(id, done){
   render();
 }
 
+let sumPhotos = false;
 function summary(L){
+  const left = todo(L);
+  return `${left.length && !locked(L) ? `<div class="banner amber noprint"><p><strong>${left.length} still to choose</strong> before this can be signed.</p></div>` : ''}
+    <div class="docbar noprint">
+      <div class="modesw"><button type="button" class="${sumPhotos ? '' : 'on'}" data-sumph="0">Summary</button><button type="button" class="${sumPhotos ? 'on' : ''}" data-sumph="1">With photos</button></div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:14px;cursor:pointer"><input type="checkbox" id="docAll" ${docAll ? 'checked' : ''} style="width:18px;height:18px"> Show every line, including standard</label>
+      <div class="grow"></div>
+      <button type="button" class="btn" id="docPrint">Print</button><button type="button" class="btn" id="docPdf">Download PDF</button></div>
+    <div class="docwrap">${quoteDoc(L, false, { title:'Selection Sheet', photos:sumPhotos })}</div>`;
+}
+function summaryTableOld(L){
   const staff = false, ls = lines(L), left = todo(L);
   const rows = SECTIONS.map(r=>{
     const mine = ls.filter(l=>l.q.room.id === r.id), cu = L.custom.filter(c=>c.room === r.id);
@@ -2422,7 +2451,9 @@ document.addEventListener('click', async e=>{
   const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#printBtn')){ window.print(); return; }
   if(t.closest('#docPrint')){ window.print(); return; }
-  if(t.closest('#docPdf')){ const v = viewVer >= 0 && (L.versions || [])[viewVer]; docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + (v ? ' - ' + v.at.slice(0, 10) : '') + '.pdf'); return; }
+  if(t.closest('#docPdf')){ if(tab === 'summary'){ docPdf(t.closest('#docPdf'), 'Alden Homes selection sheet' + (sumPhotos ? ' with photos' : '') + ' - ' + L.name + '.pdf'); return; }
+    const v = viewVer >= 0 && (L.versions || [])[viewVer]; docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + (v ? ' - ' + v.at.slice(0, 10) : '') + '.pdf'); return; }
+  const sp = t.closest('[data-sumph]'); if(sp){ sumPhotos = sp.dataset.sumph === '1'; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   if(t.closest('#quoteConfirm')){
     // confirming also puts the sheet on the hub's server, so the customer's link works
     L.quoteOk = iso(new Date()); keepVersion(L, 'confirmed');
