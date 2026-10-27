@@ -784,9 +784,9 @@ const BM_COLORS = [['Hale Navy','HC-154','#434c56'],['Newburyport Blue','HC-155'
   ['Simply White','OC-117','#f2f1e6'],['Chantilly Lace','OC-65','#f5f5f0'],['White Dove','OC-17','#efece2'],['Swiss Coffee','OC-45','#ede9dc'],['Revere Pewter','HC-172','#c5bfb0'],['Edgecomb Gray','HC-173','#d5cfc3']];
 let DOOR_CFG = [];                                   // the office's own colours [{ name, num, hex }] from the server
 const doorChoices = ()=>DOORS.map(([m, d])=>({ t:'Therma-Tru Smooth-Star ' + m + ' - ' + d, p:0, unit:'', model:m, img:'selection-photos/doors/' + m.toLowerCase() + (DOOR_PNG.includes(m) ? '.png' : '.jpg') }));
-const paintChoices = ()=>[{ t:'Another Benjamin Moore color', p:0, unit:'', bmOther:true }]
-  .concat(BM_COLORS.map(([n, num, hex])=>({ t:'Benjamin Moore ' + n + ' ' + num, p:0, unit:'', hex, short:n, num })))
-  .concat(DOOR_CFG.map(x=>({ t:'Benjamin Moore ' + x.name + (x.num ? ' ' + x.num : ''), p:0, unit:'', hex:x.hex, short:x.name, num:x.num || '', office:true })));
+/* TYPED ONLY (owner, 2026-10-27, after talking to the team: "just have a spot they can type in the color code… dont have any color
+   options listed"): one choice, the colour code typed on the sheet ({ label }). BM_COLORS / DOOR_CFG are no longer shown anywhere. */
+const paintChoices = ()=>[{ t:'Front door color', p:0, unit:'', bmOther:true }];
 const bmLink = (name, num)=>num ? `https://www.benjaminmoore.com/en-us/paint-colors/color/${encodeURIComponent(String(num).toLowerCase())}/${slugOf(name)}` : 'https://www.benjaminmoore.com/en-us/paint-colors';
 const doorAt = {};                                   // which door is showing, per question (screen only)
 let doorAnim = '';
@@ -825,15 +825,18 @@ function doorView(L, door, paint, anim){
     <button type="button" class="ds-arrow" data-door-nav="fdstyle|1" aria-label="Next">&rsaquo;</button></div>`;
 }
 function doorStage(q, L, lock){
+  if(q.id === 'fdcolor'){ const ok = q.id + '#0', oa = L.answers[ok] || {};   // just a box for the colour code
+    return `<div class="ds-other ${oa.qty ? 'on' : ''}"><b>Benjamin Moore color code</b>
+      <input type="text" data-bm-name="${esc(ok)}" value="${esc(oa.label || '')}" placeholder="e.g. HC-154 Hale Navy" ${lock ? 'disabled' : ''}></div>`; }
   const anim = doorAnim === q.id; if(anim) doorAnim = '';
   const shown = doorShown(L); if(!shown) return '';
   const paint = paintNow(L), sq = qById('fdstyle'), sk = 'fdstyle#' + shown.i, on = !!(L.answers[sk] || {}).qty, name = shown.c.t.replace('Therma-Tru Smooth-Star ', '');
   const head = `${doorView(L, shown.c, paint, anim)}
-    <div class="ds-name"><b>${esc(name)}</b><small>${shown.i + 1} of ${sq.c.length} · ${paint ? `colour <span class="ds-dot" style="background:${esc(paint.hex)}"></span> <b>${esc(paint.name)}</b> · <a href="${esc(bmLink(paint.name.replace(/\s+\S+$/, ''), paint.num))}" target="_blank" rel="noopener">see the chip</a>` : 'colour not picked yet (under Front Door Color)'}</small></div>`;
+    <div class="ds-name"><b>${esc(name)}</b><small>${shown.i + 1} of ${sq.c.length}</small></div>`;
   if(q.id === 'fdstyle') return `<div class="ds">${head}
       <div class="ds-pick"><button type="button" class="btn ${on ? '' : 'primary'}" data-bt-tog="${esc(sk)}" ${lock ? 'disabled' : ''}>${on ? '&#10003; This is their door (tap to undo)' : 'Choose this door'}</button></div>
       <div class="ds-strip">${sq.c.map((c, i)=>`<button type="button" class="ds-thumb ${i === shown.i ? 'cur' : ''} ${(L.answers['fdstyle#' + i] || {}).qty ? 'on' : ''}" data-door-go="fdstyle|${i}" title="${esc(c.t)}"><img src="${esc(c.img)}" alt="" loading="lazy"><span>${esc(c.model)}</span></button>`).join('')}</div>
-      <div class="q-sub">Doors come white and are painted the colour picked under Front Door Color. <a href="https://www.thermatru.com/${/^S1[LR]?$/.test(shown.c.model) ? 'search?q=' : 'explore-products/door-style/'}${esc(shown.c.model)}" target="_blank" rel="noopener">This door on Therma-Tru's site</a>.</div></div>`;
+      <div class="q-sub">Doors come white and are painted; the colour code goes under Front Door Color. <a href="https://www.thermatru.com/${/^S1[LR]?$/.test(shown.c.model) ? 'search?q=' : 'explore-products/door-style/'}${esc(shown.c.model)}" target="_blank" rel="noopener">This door on Therma-Tru's site</a>.</div></div>`;
   const ok = q.id + '#0', oa = L.answers[ok] || {};
   return `<div class="ds">${head}
     <div class="ds-sw">${q.c.map((c, i)=>c.bmOther ? '' : `<button type="button" class="ds-chip ${(L.answers[q.id + '#' + i] || {}).qty ? 'on' : ''}" data-bt-tog="${esc(q.id + '#' + i)}" ${lock ? 'disabled' : ''}><span style="background:${c.hex}"></span><b>${esc(c.short)}</b><small>${esc(c.num)}${c.office ? ' · ours' : ''}</small></button>`).join('')}</div>
@@ -1524,7 +1527,7 @@ function stylesScreen(){
         <div class="tri"><button type="button" class="${st === 'show' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="show">Show</button><button type="button" class="incl ${st === 'incl' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="incl">Included</button><button type="button" class="hide ${st === 'hide' ? 'on' : ''}" data-sty="${esc(q.id)}" data-st="hide">Hide</button></div></div>`; }).join('')}</div>`; }).join('');
   return `<div style="margin-top:18px"><a href="#" id="styBack" class="muted" style="font-size:13px;text-decoration:none">&larr; All leads</a>
       <div class="eyebrow" style="margin-top:6px">Office setup</div><h1>Home style pricing sheets</h1>
-      <div class="viewsw noprint" style="display:inline-flex;margin-top:10px"><button type="button" data-styview="show" class="${styView === 'show' ? 'on' : ''}">What each style shows</button><button type="button" data-styview="prices" class="${styView === 'prices' ? 'on' : ''}">Every price</button><button type="button" data-styview="sizes" class="${styView === 'sizes' ? 'on' : ''}">Home style sizes</button><button type="button" data-styview="doors" class="${styView === 'doors' ? 'on' : ''}">Door colours</button></div>
+      <div class="viewsw noprint" style="display:inline-flex;margin-top:10px"><button type="button" data-styview="show" class="${styView === 'show' ? 'on' : ''}">What each style shows</button><button type="button" data-styview="prices" class="${styView === 'prices' ? 'on' : ''}">Every price</button><button type="button" data-styview="sizes" class="${styView === 'sizes' ? 'on' : ''}">Home style sizes</button></div>
       <p class="lede" style="display:${styView === 'sizes' || styView === 'doors' ? 'none' : ''}">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
     <div class="card" style="display:${styView !== 'show' ? 'none' : 'flex'};gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
       <div><label class="f">Home style</label><select id="styPick">${opts}</select></div>
@@ -1535,7 +1538,7 @@ function stylesScreen(){
       <div><label class="f">Same as another style?</label><div style="display:flex;gap:8px"><select id="styFrom"><option value="">Copy from…</option>${others}</select><button type="button" class="btn sm" id="styCopy">Copy</button></div></div>
       ${n.incl || n.hide ? '<button type="button" class="btn sm" id="styClear">Show everything</button>' : ''}
     </div>
-    ${styView === 'doors' ? doorsScreen() : styView === 'sizes' ? sizesScreen() : styView === 'prices' ? ceilCard() + pricesScreen() : allowCard() + ceilCard() + bathCard() + secs}`;
+    ${styView === 'sizes' ? sizesScreen() : styView === 'prices' ? ceilCard() + pricesScreen() : allowCard() + ceilCard() + bathCard() + secs}`;
 }
 function floorCard(){
   const lvls = [10, 20, 30, 40, 50, 60];
