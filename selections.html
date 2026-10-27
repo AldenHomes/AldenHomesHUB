@@ -284,6 +284,9 @@
   /* section heading + its total: light gray band so it stands out (owner, 2026-10-27); prints too */
   .doc h3{font-family:Georgia,serif;font-size:17px;color:var(--navy);margin:22px 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid #d9d6cc;padding:7px 10px 6px;background:#eeede8;border-radius:4px 4px 0 0;break-after:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   /* photo picks */
+  .ph-product .ph-pick img{object-fit:contain; aspect-ratio:1/1; background:#fff; padding:6px; box-sizing:border-box;}
+  .ph-sub{display:block; font-weight:600; font-size:12px; color:var(--muted,#777); margin-top:2px;}
+  .ph-warn{display:block; font-weight:700; font-size:12px; color:#b3261e; margin-top:2px;}
   .ph-group{margin-top:10px;} .ph-note{text-transform:none; letter-spacing:0; font-weight:600;} .ph-brand{font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted,#777); margin:6px 0 6px;}
   .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px;}
   .ph-tile{position:relative;}
@@ -569,7 +572,34 @@ const OPT_BASE = {};                                    // no prices in this fil
 const optPrice = k=>OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k]
   : /-m$/.test(k) ? optPrice(k.slice(0, -2)) : null;   // a master bath finish price not set yet = the other baths' price
 const DOOR_CHOICES = [{ t:'Framed shower door', k:'door-framed' }, { t:'Frameless shower door', k:'door-frameless' }, { t:'Semi-frameless shower door', k:'door-semi' }];
-const FIN_CHOICES = [{ t:'Brushed nickel', k:'fin-bn' }, { t:'Brushed brass', k:'fin-brass' }, { t:'Black', k:'fin-black' }];
+const FIN_CHOICES = [{ t:'Brushed nickel', k:'fin-bn' }, { t:'Brushed brass', k:'fin-brass' }, { t:'Black', k:'fin-black' }, { t:'Oil rubbed bronze', k:'fin-orb', baths:true }];
+/* FAUCET COLLECTIONS (owner, 2026-10-27: "go look at the faucet wall then go back and make the selection"; "make sure they match the list,
+   I don't want to offer something we don't offer"). The Moen collections on the supplier's "Alden Collection" sheets, each with its sink
+   (lav) faucets, shower-only and tub/shower trims, and the finishes it really comes in (N/A on the sheet = not offered). Photos are Moen's
+   own product pictures saved by model number in selection-photos/faucets/moen-<model>.jpg. The sheets' prices are old — nothing is
+   priced here yet (no charge until prices are set in Every price). In each bathroom: pick the collection first (`col_<room>`), then
+   the sink faucet and shower faucet show only that collection's models, and the finish question only its finishes. */
+const FIN_CODE = { 'Brushed nickel':'bn', 'Brushed brass':'brass', 'Black':'black', 'Oil rubbed bronze':'orb' };
+const FIN_LABEL = { ch:'Chrome', bn:'Brushed nickel', brass:'Brushed gold', orb:'Oil rubbed bronze', black:'Matte black' };
+const FAUCETS = [
+  { name:'Gibson', fins:['ch','bn','black'], lav:[['6150', '2-handle 4" faucet'], ['T6142', 'Widespread 8" faucet'], ['6145', 'Single-handle faucet']], shower:'T2902EP', tub:'T2903EP' },
+  { name:'Glyde', fins:['ch','bn','black'], lav:[['6172', '2-handle 4" faucet'], ['T6173', 'Widespread 8" faucet'], ['6170', 'Single-handle faucet']], shower:'T2742', tub:'T2743' },
+  { name:'Voss', fins:['ch','bn','brass','orb'], lav:[['6901', '2-handle 4" faucet'], ['T6905', 'Widespread 8" faucet'], ['6903', 'Single-handle faucet']], shower:'T2692', tub:'T2693' },
+  { name:'Align', fins:['ch','bn','brass','black'], lav:[['6190', 'Single-handle faucet']], shower:'T2192', tub:'T2193' },
+  { name:'90 Degree', fins:['ch','bn'], lav:[['S6700', 'Single-handle faucet'], ['TS6720', 'Widespread 8" faucet']], shower:'TS2712', tub:'TS2713' },
+  { name:'Doux', fins:['ch','bn','black'], lav:[['S6910', 'Single-handle faucet'], ['TS6925', 'Widespread 8" faucet']], shower:'TS2202', tub:'TS2203' },
+  { name:'Brantford', fins:['ch','bn','orb'], lav:[['6610', '2-handle 4" faucet'], ['T6620', 'Widespread 8" faucet'], ['6600', 'Single-handle faucet']], shower:'T2152', tub:'T2153' },
+  { name:'Eva', fins:['ch','bn','orb'], lav:[['6410', '2-handle 4" faucet'], ['T6420', 'Widespread 8" faucet'], ['6400', 'Single-handle faucet']], shower:'T2132', tub:'T2133' },
+];
+const FAUCET_LAV_BT = ['278', '318', '358', '384'], FAUCET_SHOWER_BT = ['270', '310', '350'];
+const moenImg = m=>`selection-photos/faucets/moen-${m.toLowerCase()}.jpg`;
+const faucetChoices = kind=>FAUCETS.flatMap(x=>kind === 'lav'
+  ? x.lav.map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m }))
+  : [{ t: x.name + ' - Shower faucet (' + x.shower + ')', p:0, unit:'', brand:x.name, img:moenImg(x.shower), model:x.shower },
+     { t: x.name + ' - Tub/shower faucet (' + x.tub + ')', p:0, unit:'', brand:x.name, img:moenImg(x.tub), model:x.tub }]);
+// the collection picked for a bathroom (its name), or ''
+const faucetCol = (L, rid)=>{ const q = ALL_QS.find(x=>x.id === 'col_' + rid); if(!q) return ''; const i = q.c.findIndex((c, j)=>(L.answers[q.id + '#' + j] || {}).qty); return i >= 0 ? q.c[i].t : ''; };
+const faucetOf = name=>FAUCETS.find(x=>x.name === name);
 /* Standard choices at no charge (owner, 2026-10-14): every toilet line starts with "Standard toilet" (what the home gets unless
    another is picked), and every shower options line starts with "Standard shower" and "Standard tub/shower". These lines are one
    choice per bathroom (q.one). */
@@ -681,7 +711,7 @@ const PHOTO_SETS = {
 const slugOf = t=>String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const photoChoices = bt=>{ const set = PHOTO_SETS[bt]; if(!set) return null;
   return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, note: g.note || '', img: g.photos ? `selection-photos/${set.dir}/${g.code}-${slugOf(n)}.jpg` : '' }))); };
-const splitChoices = (bt, list)=>photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
+const splitChoices = (bt, list)=>(FAUCET_LAV_BT.includes(bt) ? faucetChoices('lav') : FAUCET_SHOWER_BT.includes(bt) ? faucetChoices('shower') : null) || photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
     ...list.filter(c=>!PANTRY_DROP.test(String(c.t).trim())).map(c=>/appliance/i.test(c.t) ? c : { ...c, t: /\/\s*lf/i.test(c.t) ? c.t : c.t + ' (per linear ft)', unit:'ft' })] :list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }));
 /* The master bath sets the other bathrooms (owner, 2026-10-14: people often make the bathrooms the same). A line in the main, third
    or powder bath with the same name as a master bath line (`tw`) copies the master's choice, at its own price, marked auto. Touching
@@ -745,9 +775,9 @@ function buildCatalog(cat){
     const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
     const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
     const std = STD_FIRST[s.bt] || [];
-    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt], v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_LAV_BT.includes(s.bt) || FAUCET_SHOWER_BT.includes(s.bt) || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || FAUCET_LAV_BT.includes(s.bt) || FAUCET_SHOWER_BT.includes(s.bt), fauc: FAUCET_LAV_BT.includes(s.bt) || FAUCET_SHOWER_BT.includes(s.bt), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -762,11 +792,13 @@ function buildCatalog(cat){
      kitchen faucet, priced separately from the baths (keys 'fin-bn-k' etc., set in the back end; unset = price to come). */
   { const kit = SECTIONS.find(r=>r.id === 'kit'), at = kit ? kit.qs.findIndex(q=>q.bt === '520') : -1;
     if(at >= 0) kit.qs.splice(at, 0, { id:'fin_kit', bt:'', num:520, t:'Kitchen Faucet Finish', cc:50, line:'', room:kit, opt:1, type:'bt', v1:1, opts:true, fin:true,
-      c:FIN_CHOICES.map(x=>({ ...x, k:x.k + '-k', p:null, unit:'' })) }); }
+      c:FIN_CHOICES.filter(x=>!x.baths).map(({ baths, ...x })=>({ ...x, k:x.k + '-k', p:null, unit:'' })) }); }
   [['mbath', 256], ['bath2', 300], ['bath3', 340], ['powder', 379]].forEach(([rid, num])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec || !sec.qs.length) return;
     sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:72, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
       // the master bath's finishes have their own prices (owner, 2026-10-21: the master often has double fixtures): keys 'fin-bn-m' etc.
-      c:FIN_CHOICES.map(x=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) }); });
+      c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) });
+    sec.qs.unshift({ id:'col_' + rid, bt:'', num, t:'Faucet Collection - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, col:true, tw:'Faucet Collection',
+      c:FAUCETS.map(x=>({ t:x.name, p:0, p0:0, unit:'', img:moenImg(x.lav[0][0]), sub:x.fins.map(k=>FIN_LABEL[k]).join(' · ') })) }); });
   SECTIONS = SECTIONS.filter(r=>r.qs.length);
   ROOMS = SECTIONS;
   PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
@@ -876,7 +908,10 @@ const asked = (q, L)=>{
   return !f || hasFeat(L, f);
 };
 // the basement line lists every home style: show only this home's, when there is one
-const choicesOf = (q, L)=>{ if(q.opts) return q.c.map((c, i)=>({ ...c, i, p:optPrice(c.k) }));
+const choicesOf = (q, L)=>{ if(q.opts){ const all = q.c.map((c, i)=>({ ...c, i, p:optPrice(c.k) }));
+    if(q.fin && q.id !== 'fin_kit'){ const col = faucetOf(faucetCol(L, q.room.id)); if(col) return all.filter(c=>col.fins.includes(FIN_CODE[c.t]) || (L.answers[q.id + '#' + c.i] || {}).qty); }
+    return all; }
+  if(q.fauc){ const col = faucetCol(L, q.room.id), all = q.c.map((c, i)=>({ ...c, i })); return col ? all.filter(c=>c.brand === col || (L.answers[q.id + '#' + c.i] || {}).qty) : all; }
   if(q.ceil){ const std = ceilStd(L); return q.c.map((c, i)=>({ ...c, i, t:ceilLabel(std, c.h), p:ceilPrice(std, c.h) })).filter(c=>c.h !== std); }
   const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p:optPrice(c.k) } : {}) }));
   if(q.bt === '642'){ const cov = ALL_QS.find(x=>x.bt === '640'); const got = cov ? cov.c.map((c, i)=>(L.answers[cov.id + '#' + i] || {}).qty ? c.t : '').filter(Boolean).join(' ') : '';
@@ -921,13 +956,18 @@ let openSel = new Set(), openFor = '';
 function openDefault(list){ const key = cur + '|' + tab + '|' + roomId; if(openFor !== key){ openFor = key; openSel = new Set(list.length ? [list[0].id] : []); } }
 // one selection: its choices, each one tap to take (or a count / square feet where that's how it's priced)
 function photoGrid(q, L, lock){
+  if(q.col) return '<div class="q-sub">The Moen faucets on the showroom wall. Pick the look here; the sink and shower faucets below then show only this collection, and the finish only the colours it comes in.</div>' + photoGridInner(q, L, lock);
+  return photoGridInner(q, L, lock);
+}
+function photoGridInner(q, L, lock){
   const cs = choicesOf(q, L), brands = [...new Set(cs.map(c=>c.brand || ''))];
-  return brands.map(b=>`<div class="ph-group">${b ? `<div class="ph-brand">${esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
+  const fin = q.col ? (()=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + q.room.id); if(!fq) return ''; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : ''; })() : '';
+  return brands.map(b=>`<div class="ph-group ${q.fauc || q.col ? 'ph-product' : ''}">${b ? `<div class="ph-brand">${esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
     const k = q.id + '#' + c.i, on = !!(L.answers[k] || {}).qty, name = c.brand ? c.t.slice(c.brand.length + 3) : c.t;
     return `<div class="ph-tile ${on ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">
       <button type="button" class="ph-pick" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''} aria-pressed="${on}" title="${on ? 'Chosen' : 'Choose'} ${esc(c.t)}">
         ${c.img ? `<img src="${esc(c.img)}" alt="${esc(c.t)}" loading="lazy">` : '<span class="ph-none">Photo to come</span>'}
-        <span class="ph-name">${esc(name)}</span>${on ? '<span class="ph-check">&#10003;</span>' : ''}</button>
+        <span class="ph-name">${esc(name)}${c.sub ? `<small class="ph-sub">${esc(c.sub)}</small>` : ''}${q.col && fin && !(faucetOf(c.t) || { fins:[] }).fins.includes(fin) ? `<small class="ph-warn">Not made in ${esc(FIN_LABEL[fin])}</small>` : ''}</span>${on ? '<span class="ph-check">&#10003;</span>' : ''}</button>
       ${c.img ? `<button type="button" class="ph-zoom" data-photo-view="${esc(k)}" title="See it bigger" aria-label="See ${esc(c.t)} bigger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>` : ''}</div>`; }).join('')}</div></div>`).join('');
 }
 function prow(q, L, force){
@@ -1360,7 +1400,7 @@ function bathCard(){
     ${row('bsmt-rail', 'Basement railing', 'Basement section')}
     ${row('hosebib', 'Additional hose bib, each', 'Exterior section; 2 are standard')}
     ${row('walk-sf', 'Additional walkway, per sq ft', 'Front porch & entrance section')}
-    ${FIN_CHOICES.map(x=>row(x.k + '-k', 'Kitchen faucet: ' + x.t + ' finish', 'Kitchen section; chrome is standard')).join('')}
+    ${FIN_CHOICES.filter(x=>!x.baths).map(x=>row(x.k + '-k', 'Kitchen faucet: ' + x.t + ' finish', 'Kitchen section; chrome is standard')).join('')}
     ${row('ff-less-sf', 'Smaller first floor, credit per sq ft', 'A credit: type it as a minus number')}
 </div>${floorCard()}`;
 }
@@ -2132,6 +2172,7 @@ document.addEventListener('click', async e=>{
     if(c.grp && tg && !a.qty) q.c.forEach((x, j)=>{ if(x.grp === c.grp && q.id + '#' + j !== k) delete L.answers[q.id + '#' + j]; });
     a.qty = tg ? (a.qty ? 0 : 1) : Math.max(0, Math.min(99, a.qty + Number(stp.dataset.d)));
     if(a.qty) L.answers[k] = a; else delete L.answers[k];
+    if(q.col){ const col = faucetCol(L, q.room.id); ALL_QS.filter(x=>x.fauc && x.room.id === q.room.id).forEach(x=>x.c.forEach((c, j)=>{ if(col && c.brand !== col) delete L.answers[x.id + '#' + j]; })); }
     touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return;
   }
   const fav = t.closest('[data-fav]'); if(fav){ e.stopPropagation(); L.favs[fav.dataset.fav] = !L.favs[fav.dataset.fav]; if(!L.favs[fav.dataset.fav]) delete L.favs[fav.dataset.fav]; render(); return; }
