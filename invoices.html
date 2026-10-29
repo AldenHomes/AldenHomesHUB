@@ -231,6 +231,13 @@ html, body{max-width:100%; overflow-x:clip;}
   .linepick table{width:100%; border-collapse:collapse; font-size:12.5px;} .linepick td{padding:5px 4px; border-bottom:1px solid #f1ede3; vertical-align:middle;}
   .linepick .num{text-align:right; white-space:nowrap;}
   .scanhead td{background:#f3f1ea; font-size:12.5px; font-weight:700; color:var(--ink-soft); padding:6px 10px;}
+  .set-btn{display:inline-flex; align-items:center; gap:6px; background:transparent; border:1px solid var(--steel-line, #d4d2c8); color:var(--ink-soft, #6b6f72); height:30px; padding:0 10px; border-radius:var(--radius, 3px); cursor:pointer; font-size:11.5px; font-family:inherit;}
+  .set-btn:hover{background:#f3f1ea; color:var(--navy, #4B4F54);}
+  .setov{position:fixed; inset:0; z-index:140; background:rgba(30,32,34,.45); display:none; align-items:flex-start; justify-content:center; padding:8vh 14px 14px; overflow-y:auto;}
+  .setov.show{display:flex;}
+  .setbox{width:100%; max-width:620px; background:var(--paper, #f5f4ef); border-radius:10px; padding:16px; box-shadow:0 20px 60px rgba(0,0,0,.35);}
+  .setbox .card2{margin-top:12px;}
+  .sethead{display:flex; align-items:center; justify-content:space-between; gap:10px;}
   .linego{max-width:230px; font-size:12.5px; padding:4px 6px;} .linepick .ln{color:var(--ink-soft); font-size:11.5px;}
   .partbtns{display:inline-flex; gap:3px;} .partbtns button{min-width:30px; padding:4px 7px; border:1px solid var(--steel-line); background:#fff; border-radius:6px; font-weight:700; font-family:inherit; cursor:pointer; font-size:12px;}
   .partbtns button.on{background:var(--navy); border-color:var(--navy); color:#fff;}
@@ -271,6 +278,7 @@ html, body{max-width:100%; overflow-x:clip;}
       <div class="stat"><div class="n" id="statReady">0</div><div class="l">Ready</div></div>
     </div>
     <div class="titlebar-account">
+      <button type="button" class="set-btn" id="setBtn" title="Who reviews, and who enters them in QuickBooks"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Settings</span></button>
       <div class="sync-badge"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
       <span id="currentUserEmail" style="font-size:11.5px; color:var(--ink-soft);"></span>
       <button class="signout-btn" id="signOutBtn">Sign out</button>
@@ -298,6 +306,9 @@ html, body{max-width:100%; overflow-x:clip;}
       <div id="list"><p class="muted" style="margin-top:12px;">Loading…</p></div>
     </div>
 
+    <!-- SETTINGS (owner, 2026-10-29: "put that in a little setting button in that app so it's out of the way") -->
+    <div class="setov" id="setOv"><div class="setbox" role="dialog" aria-label="Invoice settings">
+      <div class="sethead"><h2 style="margin:0;">Invoice settings</h2><button type="button" class="btn2" id="setClose">Close</button></div>
     <div class="card2">
       <h2>Who reviews</h2>
       <p class="lede">These people get a notice on their bell (and an email) when a scan has invoices to review. Anyone can still be added on a single invoice.</p>
@@ -308,6 +319,8 @@ html, body{max-width:100%; overflow-x:clip;}
       <p class="lede">"Alert accountant for review" on the Ready tab sends these people a notice on their bell and an email.</p>
       <div class="who-chips" id="accountants" style="margin-top:10px;"></div>
     </div>
+    <p class="muted" style="font-size:12.5px; margin:4px 2px 0;">Ticks are saved as soon as you change them.</p>
+    </div></div>
     <footer>Invoices are kept for good, with their PDF, and can be found again here.</footer>
   </div>
 </div>
@@ -779,6 +792,10 @@ $('reviewers').addEventListener('change', async e=>{
   reviewers = c.checked ? [...new Set([...reviewers, c.dataset.rev])] : reviewers.filter(x=>x !== c.dataset.rev);
   try{ await api({ action:'settings', reviewers }); } catch(err){ console.error(err); alert('Couldn\'t save who reviews.'); }
 });
+$('setBtn').addEventListener('click', ()=>$('setOv').classList.add('show'));
+$('setClose').addEventListener('click', ()=>$('setOv').classList.remove('show'));
+$('setOv').addEventListener('click', e=>{ if(e.target.id === 'setOv') $('setOv').classList.remove('show'); });
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape') $('setOv').classList.remove('show'); });
 $('accountants').addEventListener('change', async e=>{
   const c = e.target.closest('[data-acct]'); if(!c) return;
   accountants = c.checked ? [...new Set([...accountants, c.dataset.acct])] : accountants.filter(x=>x !== c.dataset.acct);
@@ -787,7 +804,7 @@ $('accountants').addEventListener('change', async e=>{
 function acctNames(){ return accountants.map(u=>(staff.find(s=>s.uid === u) || {}).name).filter(Boolean).join(' and '); }
 $('bulk').addEventListener('click', async e=>{
   const b = e.target.closest('#alertAcct'); if(!b) return;
-  if(!accountants.length){ alert('First pick who enters them in QuickBooks (the box at the bottom of this page).'); $('accountants').scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+  if(!accountants.length){ alert('First pick who enters them in QuickBooks (Settings, top right).'); $('setOv').classList.add('show'); return; }
   const n = invoices.filter(x=>x.status === 'ready').length;
   const msg = prompt(`Send ${acctNames()} a notice and an email that ${n} invoice${n === 1 ? ' is' : 's are'} ready for QuickBooks?\n\nAdd a note if you like (or leave it blank), then press OK.`, '');
   if(msg === null) return;
