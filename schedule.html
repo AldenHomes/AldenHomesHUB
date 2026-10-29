@@ -1006,6 +1006,13 @@ function communityColor(c){
 function normKey(community, lot){
   return (community||'').trim().toUpperCase() + '::' + (lot||'').toString().trim();
 }
+/* Material orders follow the home (owner, 2026-10-29): an order is the home with the same development + lot, and the home
+   (this schedule, or the home's own page) is where the walk-through date lives — so the order screens show the home's date,
+   and changing it on an order changes it on the home. Name / address fall back to the home's when the order has none. */
+function orderJob(o){ if(!o || !o.lot) return null; const k = normKey(o.community, o.lot); return jobs.find(j=>j.lot && normKey(j.community, j.lot)===k) || null; }
+function orderWalk(o){ const j = orderJob(o); return (j && j.walk) || o.walkthru || ''; }
+function orderName(o){ const j = orderJob(o); return o.name || (j && j.client) || ''; }
+function orderAddr(o){ const j = orderJob(o); return o.address || (j && j.address) || ''; }
 
 /* State — declared up front so they're always safe to reference, even if
    the auth callback below fires synchronously (e.g. an already-persisted session). */
@@ -1216,7 +1223,8 @@ function attachListeners(){
 
 async function writeJob(id, data){
   setSyncStatus('saving');
-  try{ await jobsCol.doc(id).set(data); }
+  // merge (owner, 2026-10-29): other apps keep their own fields on the home — permits, selectionSheet, basement, sqft, btJobId…
+  try{ await jobsCol.doc(id).set(data, { merge: true }); }
   catch(e){ console.error(e); alert('Could not save — check your connection and try again.'); }
 }
 async function deleteJobDoc(id){
@@ -1358,6 +1366,9 @@ function buildJobRow(j, oKeys){
     <td data-label="Settle" class="mono settle-cell ${soonClass}">${fmtDate(j.settle)}</td>
     <td data-label="">
       <div class="row-actions">
+        <a class="btn-link home-btn" href="house.html?id=${encodeURIComponent(j.id)}" title="Open this home's page" style="text-decoration:none;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+          Home</a>
         ${jumpBtn}
         ${filesBtn}
         <button class="icon-btn edit-btn" title="Edit" data-id="${j.id}">
@@ -1790,9 +1801,9 @@ function buildOrderRow(o, jKeys, isCompleted){
   return `<tr data-id="${o.id}" data-key="${key}">
     <td data-label="Community"><span class="tag" style="background:${communityColor(o.community)}">${o.community||'—'}</span></td>
     <td data-label="Lot" class="mono">${o.lot||''}</td>
-    <td data-label="Name">${o.name||''}</td>
-    <td data-label="Address" class="muted">${o.address||''}</td>
-    <td data-label="Walk-Thru" class="mono muted">${fmtDate(o.walkthru)}</td>
+    <td data-label="Name">${orderName(o)}</td>
+    <td data-label="Address" class="muted">${orderAddr(o)}</td>
+    <td data-label="Walk-Thru" class="mono muted">${fmtDate(orderWalk(o))}</td>
     <td data-label="Items Ordered">
       <div class="progress-wrap">
         <div class="progress-bar"><div class="progress-fill ${fillClass}" style="width:${pct}%"></div></div>
@@ -1875,10 +1886,10 @@ function buildOrderGridRow(o, jKeys){
     <td class="c-comm"><span class="tag" style="background:${communityColor(o.community)}">${o.community||'—'}</span></td>
     <td class="c-lot mono">${o.lot||''}</td>
     <td class="c-name" title="${escHtml([o.name, o.address].filter(Boolean).join(' — '))}">
-      <div class="job-name">${o.name||''}</div>
-      ${o.address ? `<div class="job-addr">${o.address}</div>` : ''}
+      <div class="job-name">${orderName(o)}</div>
+      ${orderAddr(o) ? `<div class="job-addr">${orderAddr(o)}</div>` : ''}
     </td>
-    <td class="mono muted">${fmtDate(o.walkthru)}</td>
+    <td class="mono muted">${fmtDate(orderWalk(o))}</td>
     ${itemCells}
     <td>
       <div class="row-actions">
@@ -1932,7 +1943,7 @@ function renderOrders(){
   });
 
   rows.sort((a,b)=>{
-    let av = a[ordersSortKey]||'', bv = b[ordersSortKey]||'';
+    let av = ordersSortKey==='walkthru' ? orderWalk(a) : (a[ordersSortKey]||''), bv = ordersSortKey==='walkthru' ? orderWalk(b) : (b[ordersSortKey]||'');
     if(ordersSortKey==='lot'){ av = av===''?Infinity:Number(av); bv = bv===''?Infinity:Number(bv); }
     if(av<bv) return ordersSortDir==='asc'? -1: 1;
     if(av>bv) return ordersSortDir==='asc'? 1: -1;
@@ -2209,7 +2220,7 @@ function openOrderModal(id, prefill){
   document.getElementById('o_lot').value = lot||'';
   document.getElementById('o_name').value = name;
   document.getElementById('o_address').value = address;
-  document.getElementById('o_walkthru').value = order ? order.walkthru||'' : '';
+  document.getElementById('o_walkthru').value = order ? orderWalk(order) : '';
   document.getElementById('o_completed').checked = order ? !!order.completed : false;
   buildChecklist(order ? order.items : {});
 
@@ -2219,6 +2230,9 @@ function openOrderModal(id, prefill){
   const banner = document.getElementById('scheduleLinkBanner');
   const bannerFilesBtn = document.getElementById('bannerOpenFilesBtn');
   if(matchedJob){
+    if(!document.getElementById('o_name').value) document.getElementById('o_name').value = matchedJob.client || '';
+    if(!document.getElementById('o_address').value) document.getElementById('o_address').value = matchedJob.address || '';
+    if(!document.getElementById('o_walkthru').value) document.getElementById('o_walkthru').value = matchedJob.walk || '';
     document.getElementById('scheduleLinkText').textContent = `Matches schedule: ${matchedJob.client||matchedJob.model||'Lot '+matchedJob.lot} — Settle ${fmtDate(matchedJob.settle)}`;
     document.getElementById('jumpToScheduleBtn').dataset.key = key;
     if(matchedJob.filesUrl){
@@ -2242,6 +2256,15 @@ document.getElementById('ordersCancelBtn').addEventListener('click', closeOrderM
 ordersOverlay.addEventListener('click', e=>{ if(e.target===ordersOverlay) closeOrderModal(); });
 document.getElementById('o_community').addEventListener('change', e=>{
   document.getElementById('o_community_other').style.display = e.target.value==='__other' ? 'block' : 'none';
+});
+document.getElementById('o_lot').addEventListener('change', ()=>{
+  const sel = document.getElementById('o_community').value;
+  const community = sel==='__other' ? document.getElementById('o_community_other').value.trim().toUpperCase() : sel;
+  const j = orderJob({ community, lot: document.getElementById('o_lot').value.trim() });
+  if(!j) return;
+  if(!document.getElementById('o_name').value) document.getElementById('o_name').value = j.client || '';
+  if(!document.getElementById('o_address').value) document.getElementById('o_address').value = j.address || '';
+  if(!document.getElementById('o_walkthru').value) document.getElementById('o_walkthru').value = j.walk || '';
 });
 document.getElementById('jumpToScheduleBtn').addEventListener('click', e=>{
   const key = e.currentTarget.dataset.key;
@@ -2273,6 +2296,9 @@ document.getElementById('ordersSaveBtn').addEventListener('click', ()=>{
   const id = editingOrderId || ordersCol.doc().id;
   closeOrderModal();
   writeOrder(id, data);
+  // the walk-through date lives on the home: a change here goes onto the home too
+  const home = orderJob(data);
+  if(home && data.walkthru && data.walkthru !== (home.walk || '')) jobsCol.doc(home.id).set({ walk: data.walkthru }, { merge: true }).catch(err=>console.error('Could not update the home\'s walk-through date', err));
 });
 ordersDeleteBtn.addEventListener('click', ()=>{
   if(!editingOrderId) return;
@@ -2286,7 +2312,7 @@ ordersDeleteBtn.addEventListener('click', ()=>{
 document.getElementById('ordersExportBtn').addEventListener('click', ()=>{
   const headers = ['Community','Lot','Name','Address','Walk-Thru', ...CHECKLIST_ITEMS];
   const rows = orders.slice().sort((a,b)=> (a.walkthru||'').localeCompare(b.walkthru||'')).map(o=>[
-    o.community, o.lot, o.name, o.address, o.walkthru, ...CHECKLIST_ITEMS.map(k=>o.items && o.items[k] || '')
+    o.community, o.lot, orderName(o), orderAddr(o), orderWalk(o), ...CHECKLIST_ITEMS.map(k=>o.items && o.items[k] || '')
   ]);
   downloadCSV('material_orders.csv', headers, rows);
 });
