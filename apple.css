@@ -109,6 +109,16 @@ html.apple.phone .tile-icon svg{width:28px; height:28px;}
 html.apple.phone .tile-title{font-size:11.5px; font-weight:500; line-height:1.2;}
 html.apple.phone .tile-desc, html.apple.phone .tile-stats, html.apple.phone .tile-badge{display:none;}
 html.apple.phone .tile-grid.editing .tile::after{top:-6px; right:0; font-size:9px; padding:1px 5px;}
+/* phone hub order (owner, 2026-10-29: "I don't love how you have to scroll through everything at the top to get to the apps"):
+   greeting → apps → My work (weather, on site today) → Active homes → the rest */
+html.apple.phone.apple-hub .wrap{display:flex; flex-direction:column;}
+html.apple.phone.apple-hub .wrap > *{order:9;}
+html.apple.phone.apple-hub .wrap > .welcome{order:1; margin-bottom:14px;}
+html.apple.phone.apple-hub .wrap > .edit-note{order:2;}
+html.apple.phone.apple-hub .hub-cols{display:contents;}
+html.apple.phone.apple-hub .tile-grid{order:3; margin-bottom:18px;}
+html.apple.phone.apple-hub .wrap > .mywork{order:4;}
+html.apple.phone.apple-hub .homes-card{order:5;}
 
 .ab-bar{position:fixed; left:0; right:0; bottom:0; z-index:130; display:flex; justify-content:space-around; align-items:flex-start;
   padding:7px 4px calc(6px + env(safe-area-inset-bottom)); background:rgba(249,249,251,.94); border-top:0.5px solid #D1D1D6;
