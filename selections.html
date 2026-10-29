@@ -324,6 +324,7 @@
   .cho-spec{display:block;font-size:12.5px;font-weight:400;color:var(--ink-soft);margin-top:2px}
   .cho-img{flex:0 0 auto; width:64px; height:64px; padding:0; border:1px solid #e3e0d8; border-radius:8px; background:#fff; overflow:hidden; cursor:zoom-in; margin-right:4px;}
   .cho-img img{width:100%; height:100%; object-fit:cover; display:block;}
+  .ph-upg{margin:18px 0 2px;padding-top:12px;border-top:2px solid var(--line-soft,#ece9df);font-family:Georgia,serif;font-size:19px;color:var(--navy)}
   .ph-groups{display:flex; flex-wrap:wrap; gap:4px 18px; align-items:flex-start;}
   .ph-groups > .ph-group{flex:0 1 calc(var(--n, 1) * 224px); max-width:100%; min-width:min(210px, 100%);}
   .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;}
@@ -335,6 +336,8 @@
   .ph-name{display:block; padding:8px 10px; font-size:14px; font-weight:700; color:var(--ink,#222);}
   .ph-tile.on .ph-pick{border-color:var(--good,#2e6b34); box-shadow:0 0 0 2px var(--good,#2e6b34);}
   .ph-tile.on .ph-name{background:var(--good-soft,#eaf4ea); color:#1f4d2a;}
+  .ph-tile.stdon .ph-name::before{content:'\2713  Standard \00b7  no charge' !important;}
+  .ph-price{display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-top:3px} .ph-price.tbd{font-weight:400;color:#8a5d14}
   .ph-tile.on .ph-name::before{content:'\2713  Chosen'; display:block; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--good,#2e6b34); margin-bottom:2px; white-space:pre;}
   .ph-pick{transition:box-shadow .15s, border-color .15s, transform .15s;}
   .ph-pick:hover{transform:translateY(-2px);}
@@ -673,9 +676,15 @@ const TOILET_IMG = [[/^standard toilet$/i, 'toilet-grn31102', 'Gerber Banner GRN
   [/^toilet elongated vortens$/i, 'toilet-grn31212', 'Gerber Banner GRN31212 · standard height', 'Elongated toilet, standard height'],
   [/^toilet 18'' elongated vortens$/i, 'toilet-grn31218', 'Gerber Banner ErgoHeight GRN31218 · comfort height (ADA)', 'Elongated toilet, comfort height'],
   [/kohler persuade/i, 'toilet-k6355', 'Kohler K-6355-0 · comfort height, elongated, dual flush, white', 'Kohler Persuade Curv']];
-const CHOICE_IMG = { '273':TOILET_IMG, '313':TOILET_IMG, '353':TOILET_IMG, '379':TOILET_IMG, '156':[[/^laundry tub$/i, 'laundry-tub', 'Mustee 18W Utilatub laundry tub with Moen 74998 Chateau faucet (chrome)']], '518':[[/^wood pantry shelves/i, 'pantry-wood'], [/appliance shelf/i, 'pantry-wire-wood-appliance']],
-  '277':[[/rectangle mirror - black/i, 'mirror-black-rectangle'], [/rectangle mirror - gold/i, 'mirror-gold-rectangle'], [/rectangle mirror - silver/i, 'mirror-silver-rectangle'],
-    [/round mirror - gold/i, 'mirror-gold-round'], [/round mirror - silver/i, 'mirror-silver-round'], [/round mirror - black/i, 'mirror-black-round']] };
+const MIRROR_IMG = [[/^std\. mirror:?$/i, '', '', 'Standard mirror'], [/rectangle mirror - black/i, 'mirror-black-rectangle'], [/rectangle mirror - gold/i, 'mirror-gold-rectangle'], [/rectangle mirror - silver/i, 'mirror-silver-rectangle'],
+  [/round mirror - gold/i, 'mirror-gold-round'], [/round mirror - silver/i, 'mirror-silver-round'], [/round mirror - black/i, 'mirror-black-round']];
+/* SAME LOOK AS THE FAUCETS (owner, 2026-10-29: "make the toilets present like the faucets… the questions to all have the same feel"): these
+   lines are drawn as photo tiles (q.photo) instead of rows — tap a tile to choose, the product in small type under the name, the standard
+   shown as "✓ Standard" until something else is picked, prices on the tiles in Office view. */
+const TILE_BT = ['273', '313', '353', '379', '277', '317', '357', '383', '156'];
+const CHOICE_IMG = { '273':TOILET_IMG, '313':TOILET_IMG, '353':TOILET_IMG, '379':TOILET_IMG, '156':[[/^laundry tub$/i, 'laundry-tub', 'Mustee 18W Utilatub laundry tub with Moen 74998 Chateau faucet (chrome)'],
+    [/^rough in for laundry tub$/i, '', 'Water and drain lines only, ready for a tub later', 'Plumbing rough-in only', 'Pipes only'], [/^move the laundry tub/i, '', 'Put it in the laundry room instead of the garage', 'Move it to the laundry room', 'Laundry room']], '518':[[/^wood pantry shelves/i, 'pantry-wood'], [/appliance shelf/i, 'pantry-wire-wood-appliance']],
+  '277':MIRROR_IMG, '317':MIRROR_IMG, '357':MIRROR_IMG, '383':MIRROR_IMG };
 const TIMBERTECH = ['American Walnut', 'Boardwalk', 'Brownstone', 'Castle Gate', 'Coastline', 'Dark Hickory', 'English Walnut', 'French White Oak', 'Kona', 'Mahogany', 'Slate Gray', 'Weathered Teak'];
 const INT_DOORS = ['Cambrian', 'Camdale', 'Colburn', 'Conmivo', 'Connelly', 'Crayburn', 'Maddox', 'Montgomery', 'Rochele'];
 // Moen Designer Grab Bars by collection; finishes = what Moen makes each in
@@ -740,7 +749,7 @@ const faucetChoices = kind=>FAUCETS.flatMap(x=>{
      { t: x.name + ' - Tub/shower faucet (' + x.tub + ')', p:0, unit:'', brand:x.name, img:moenImg(x.tub), model:x.tub, fins:x.fins },
      ...(x.alt || []).map(([m, d])=>({ t: x.name + ' - ' + d + ' (' + m + ')', p:0, unit:'', brand:x.name, img:moenImg(m), model:m, fins:x.fins }))]))
   .concat(kind === 'shower' ? SHOWER_HEADS.map(h=>({ t:'Magnetix by Moen - ' + h.t + ' (' + h.model + ')', p:null, unit:'', brand:'Magnetix by Moen',
-    note:'upgrade — goes with any collection, added on top of the shower faucet', img:moenImg(h.model), model:h.model, fins:h.fins, kf:h.kf, side:true, up:true })) : []);
+    note:'goes with any collection, added on top of the shower faucet', img:moenImg(h.model), model:h.model, fins:h.fins, kf:h.kf, side:true, up:true })) : []);
 // the collection picked for a bathroom (its name), or ''
 const faucetCol = (L, rid)=>{ const q = ALL_QS.find(x=>x.id === 'col_' + rid); if(!q) return ''; const i = q.c.findIndex((c, j)=>(L.answers[q.id + '#' + j] || {}).qty); return i >= 0 ? q.c[i].t : ''; };
 const faucetOf = name=>FAUCETS.find(x=>x.name === name);
@@ -754,7 +763,8 @@ const STD_FIRST = { '273':['Standard toilet'], '313':['Standard toilet'], '353':
 /* Countertop allowance (owner, 2026-10-19): BuilderTrend's one "Countertop Allowance" on Kitchen/Bath Cabinetry (BT 500) becomes a
    Granite and a Quartz allowance. Both are typed allowances (named "…allowance", so isAllow picks them up and the back end's
    Allowance amounts sets their starting amounts); they share grp 'counter', so taking one takes the other off. */
-const SPLIT = { '277': { 'rectangle mirror - black/gold/silver': [{ t:'Rectangle Mirror - black' }, { t:'Rectangle Mirror - gold' }, { t:'Rectangle Mirror - silver' }] },
+const MIRROR_SPLIT = { 'rectangle mirror - black/gold/silver': [{ t:'Rectangle Mirror - black' }, { t:'Rectangle Mirror - gold' }, { t:'Rectangle Mirror - silver' }] };
+const SPLIT = { '277': MIRROR_SPLIT, '317': MIRROR_SPLIT, '357': MIRROR_SPLIT, '383': MIRROR_SPLIT,
   '500': { 'countertop allowance': [{ t:'Granite countertop allowance', grp:'counter' }, { t:'Quartz countertop allowance', grp:'counter' }] } };
 /* Pantry shelves (owner, 2026-10-19): 4 wire shelves are standard at no charge (shown as the standard, and they stay standard when
    shelves are added); added shelves are charged by the linear foot at the price set in the back end (OPT_PRICES['pantry-lf'], kept on
@@ -1021,10 +1031,10 @@ function buildCatalog(cat){
     const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
     const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
     const std = STD_FIRST[s.bt] || [];
-    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || !!KITCHEN_KIND[s.bt] || s.bt === '522' || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt] || s.bt === '522', want: !!WANT_FIRST[s.bt], fauc: !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], mix: ['hwset', 'hwset-m', 'hwadd', 'hook'].includes(FAUCET_KIND[s.bt]), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || !!KITCHEN_KIND[s.bt] || s.bt === '522' || TILE_BT.includes(s.bt) || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt] || s.bt === '522' || TILE_BT.includes(s.bt), want: !!WANT_FIRST[s.bt], fauc: !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], mix: ['hwset', 'hwset-m', 'hwadd', 'hook'].includes(FAUCET_KIND[s.bt]), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
       c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, up:c.up, kitm:c.kitm, kit:c.kit, gb:c.gb,
-        ...(!c.img && CHOICE_IMG[s.bt] ? (m=>m ? { img:MISC + m[1] + '.jpg', ...(m[2] ? { spec:m[2] } : {}), ...(m[3] ? { show:m[3] } : {}) } : {})(CHOICE_IMG[s.bt].find(([re])=>re.test(String(c.t).trim()))) : {}), unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+        ...(!c.img && CHOICE_IMG[s.bt] ? (m=>m ? { ...(m[1] ? { img:MISC + m[1] + '.jpg' } : {}), ...(m[2] ? { spec:m[2] } : {}), ...(m[3] ? { show:m[3] } : {}), ...(m[4] ? { noimg:m[4] } : {}) } : {})(CHOICE_IMG[s.bt].find(([re])=>re.test(String(c.t).trim()))) : {}), unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -1112,6 +1122,7 @@ const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.a
 const stdOf = (q, L)=>q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
   : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
   : q.one && /^shower faucet/i.test(q.t) ? { label:'Standard shower faucet', idx: q.c.findIndex(c=>c.t === 'Standard shower faucet') }
+  : ['277', '317', '357', '383'].includes(q.bt) ? { label:'Standard mirror', idx: q.c.findIndex(c=>/^std. mirror/i.test(c.t)) }
   : q.bt === '720' ? { label:'Standard carpet stairs', idx: q.c.findIndex(c=>c.t === 'Standard carpet stairs') }
   : q.bt === '518' ? { label:'4 wire shelves', keep:true }
   : q.bt === '526' ? { label:'Garbage disposal' }
@@ -1252,19 +1263,24 @@ function photoGrid(q, L, lock){
      a Shower Faucet line also draws the same bath's Vertical Spa tiles under its own. They ARE that question's tiles (same keys), so a pick
      here is the Vertical Spa pick there — one answer, one price (BuilderTrend's spa line). */
   if(q.fauc && FAUCET_KIND[q.bt] === 'shower'){ const sq = ALL_QS.find(x=>x.room.id === q.room.id && FAUCET_KIND[x.bt] === 'spa');
-    if(sq && asked(sq, L)) return photoGridInner(q, L, lock) + photoGridInner(sq, L, lock, 'Vertical spa · upgrade — the whole kit'); }
+    /* owner, 2026-10-29: one "Upgrades" block under the collection's faucets, for every collection — the Magnetix head and the vertical spa
+       kit (the separate Vertical Spa question is no longer walked through; its answers and price line are unchanged) */
+    return photoGridInner(q, L, lock, '', c=>!c.up) + `<div class="ph-upg">Upgrades</div>` + photoGridInner(q, L, lock, '', c=>c.up)
+      + (sq && asked(sq, L) ? photoGridInner(sq, L, lock, 'Vertical spa — the whole kit') : ''); }
   return photoGridInner(q, L, lock);
 }
-function photoGridInner(q, L, lock, head){
-  const cs = choicesOf(q, L), brands = [...new Set(cs.map(c=>c.brand || ''))];
+function photoGridInner(q, L, lock, head, only){
+  const std0 = stdOf(q, L), stdOn = std0 && !choicesOf(q, L).some(c=>!c.side && (L.answers[q.id + '#' + c.i] || {}).qty);
+  const cs = choicesOf(q, L).filter(only || (()=>true)), brands = [...new Set(cs.map(c=>c.brand || ''))];
   const fin = q.col ? (()=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + q.room.id); if(!fq) return ''; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : ''; })() : '';
   // groups sit side by side, each as wide as its tiles (owner, 2026-10-27: one-tile collections were "one large list")
   return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.fauc || q.col ? 'ph-product' : ''}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
-    const k = q.id + '#' + c.i, on = !!(L.answers[k] || {}).qty, name = c.brand ? c.t.slice(c.brand.length + 3) : c.t;
-    return `<div class="ph-tile ${on ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">
+    const k = q.id + '#' + c.i, isStd = !!(stdOn && (std0.idx != null && std0.idx >= 0 ? c.i === std0.idx : c.t === std0.label)), on = !!(L.answers[k] || {}).qty || isStd, name = c.show || (c.brand ? c.t.slice(c.brand.length + 3) : c.t);
+    const pr = view === 'customer' || isStd ? '' : c.p == null ? '<small class="ph-price tbd">price to come</small>' : c.p ? `<small class="ph-price">${c.p < 0 ? '− ' + money2(-c.p) + ' credit' : '+ ' + money2(c.p)}</small>` : '';
+    return `<div class="ph-tile ${on ? 'on' : ''} ${isStd ? 'stdon' : ''} ${flashKey === k ? 'flash' : ''}">
       <button type="button" class="ph-pick" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''} aria-pressed="${on}" title="${on ? 'Chosen' : 'Choose'} ${esc(c.t)}">
-        ${c.img ? `<img src="${esc(tileImg(q, c, L))}" alt="${esc(c.t)}" loading="lazy">` : '<span class="ph-none">Photo to come</span>'}
-        <span class="ph-name">${esc(name)}${c.sub ? `<small class="ph-sub">${esc(c.sub)}</small>` : ''}${q.col && fin && !(faucetOf(c.t) || { fins:[] }).fins.includes(fin) ? `<small class="ph-warn">Not made in ${esc(FIN_LABEL[fin])}</small>` : ''}</span>${on ? '<span class="ph-check">&#10003;</span>' : ''}</button>
+        ${c.img ? `<img src="${esc(tileImg(q, c, L))}" alt="${esc(c.t)}" loading="lazy">` : `<span class="ph-none">${std0 && std0.idx === c.i ? 'Comes with the home' : c.noimg || 'Photo to come'}</span>`}
+        <span class="ph-name">${esc(name)}${c.sub || c.spec ? `<small class="ph-sub">${esc(c.sub || c.spec)}</small>` : ''}${pr}${q.col && fin && !(faucetOf(c.t) || { fins:[] }).fins.includes(fin) ? `<small class="ph-warn">Not made in ${esc(FIN_LABEL[fin])}</small>` : ''}</span>${on ? '<span class="ph-check">&#10003;</span>' : ''}</button>
       ${c.fins && c.model && c.fins.length > 1 ? `<div class="ph-fins">${c.fins.map(fk=>`<button type="button" class="ph-fin ${tileFinOf(q, c, L) === fk ? 'on' : ''}" data-fin-view="${esc(k)}|${fk}" title="See it in ${esc(FIN_LABEL[fk])}" aria-label="See it in ${esc(FIN_LABEL[fk])}" style="background:${FIN_DOT[fk]}"></button>`).join('')}</div>` : ''}
       ${c.img ? `<button type="button" class="ph-zoom" data-photo-view="${esc(k)}" title="See it bigger" aria-label="See ${esc(c.t)} bigger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>` : ''}</div>`; }).join('')}</div></div>`).join('') + '</div>';
 }
@@ -1911,7 +1927,7 @@ const pickedOn = (q, L)=>choicesOf(q, L).some(c=>{ const a = L.answers[q.id + '#
 // the Moen faucet / shower / spa / hardware picks are made at the selections meeting, so they always come over (owner, 2026-10-27:
 // the shower photos were hidden because those lines are on the pricing sheet too and were left at standard there)
 const onSelSide = (q, L)=>!isLotPrem(q) && !(q.v1 && !q.fauc && !q.sh && !pickedOn(q, L));
-const askedFor = (q, L, sel)=>asked(q, L) && (!sel || onSelSide(q, L));
+const askedFor = (q, L, sel)=>FAUCET_KIND[q.bt] !== 'spa' && asked(q, L) && (!sel || onSelSide(q, L));
 /* THE WALK-THROUGH (owner, 2026-10-27: "feel so clear and easy for the customer and the person going over it with them… look nice"):
    Customer view hides the office-only parts (lot premium, notes, custom-item adding, the "this home has" switches and view switch, the
    sheet's status chip) — Office view shows everything. Question titles drop the repeated room name (`qTitle`); the section list shows
