@@ -72,7 +72,7 @@ html.apple.desk:not(.apple-hub) body{padding-left:68px;}
 .ab-rail .ab-app.here{background:#fff; box-shadow:0 0 0 0.5px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.08);}
 .ab-rail .ab-app > span:not(.ab-badge){width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:#fff;}
 .ab-rail .ab-home{margin-bottom:8px;}
-.ab-rail .ab-home img{width:38px; height:auto; display:block;}
+.ab-rail .ab-home img{width:40px; height:40px; display:block; border-radius:10px; background:#fff; box-shadow:0 0 0 0.5px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.08);}
 .ab-rail .ab-grow{flex:1; min-height:8px;}
 .ab-badge{position:absolute; top:3px; right:2px; min-width:16px; box-sizing:border-box; background:#FF3B30; color:#fff; font-size:10px; font-weight:700;
   border-radius:8px; padding:0 4px; line-height:16px; text-align:center;}
