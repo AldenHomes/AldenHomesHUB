@@ -133,6 +133,7 @@
   const J = ()=>window.PERMIT_JOB || (typeof job !== 'undefined' ? job : null);
   const hasJob = ()=>!!J();
   const P = ()=>(hasJob() && J().permits) || {};
+  const begun = j=>!!(j && (j.selectionSheet || (j.permits || {}).start));
 
   /* RED BANNER (owner, 2026-10-26): a home signed through Selections (jobs.selectionSheet) shows a red bar at the top of its page
      while a permit step is waiting on us (next step not submitted yet). It goes away while the borough has it, and when all are done. */
@@ -145,7 +146,7 @@
       home.insertBefore(b, home.firstChild); }
     if(!b) return;
     const nowIdx = steps.findIndex(s=>!(p[s.id] || {}).ok), st = nowIdx < 0 ? null : steps[nowIdx];
-    const due = J().selectionSheet && st && !(p[st.id] || {}).sent;
+    const due = begun(J()) && st && !(p[st.id] || {}).sent;
     b.style.display = due ? 'block' : 'none';
     if(due) b.innerHTML = `&#9888; Permits need to be sent out${dev ? ': ' + esc(st.t.toLowerCase()) : ''}${st.form && dev ? ' — fill out the form' + (st.form === 'ws' ? 's' : '') + ', check the pages, then send' : ''}. <span style="font-weight:400; text-decoration:underline;">Open Permits</span>`;
   }
@@ -246,12 +247,15 @@
     const tg = $('permitsToggle');
     if(tg){
       c.classList.toggle('open', pOpen); tg.setAttribute('aria-expanded', String(pOpen));
-      $('permitsHint').innerHTML = pOpen ? 'Hide' : `<span style="color:${nowIdx >= 0 && !(p[STEPS[nowIdx].id] || {}).sent && job.selectionSheet ? '#b3261e' : 'inherit'}">${esc(next)}</span>`;
+      $('permitsHint').innerHTML = pOpen ? 'Hide' : `<span style="color:${nowIdx >= 0 && !(p[STEPS[nowIdx].id] || {}).sent && begun(job) ? '#b3261e' : 'inherit'}">${esc(next)}</span>`;
       $('permitsBody').style.display = pOpen ? 'block' : 'none';
       // opened from a bell link: the card is drawn after the page loads, so scroll to it once
       if(pOpen && location.hash === '#permitsCard' && !card.scrolled){ card.scrolled = true; setTimeout(()=>c.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400); }
     }
+    const nothingYet = !begun(J()) && !STEPS.some(s=>p[s.id] && (p[s.id].sent || p[s.id].ok));
     $('permitsBody').innerHTML = `<div class="pm-next"><b>${esc(next)}</b> <span style="color:#777">${doneIdx} of ${STEPS.length} approved${dev ? ' · ' + esc(dev.borough) : ''}</span></div>
+      ${nothingYet ? `<div style="margin:8px 0 4px; padding:10px 12px; background:#f6f5f0; border-radius:8px; font-size:13px;">Not signed through Selections yet. Applying for permits early? <button type="button" class="pm-btn primary" data-pmstart="1" style="margin-left:6px;">Start permits for this home</button></div>`
+        : p.start && !J().selectionSheet ? `<div style="margin:6px 0 2px; font-size:12.5px; color:#777;">Permits started ${esc(nice(p.start))} (before Selections). <a href="#" data-pmstop="1" style="color:#777;">Undo</a></div>` : ''}
       ${STEPS.map((s, i)=>{ const st = p[s.id] || {};
         return `<div class="pm-step ${st.ok ? 'ok' : i === nowIdx ? 'now' : ''}"><div class="pm-n">${st.ok ? '&#10003;' : i + 1}</div>
           <div><div class="pm-t">${esc(s.t)}</div><div class="pm-h">${esc(s.hint)}</div></div>
@@ -273,6 +277,8 @@
   }
   function onCardClick(e){
     if(e.target.closest('#permitsToggle')){ setOpen(!pOpen); return; }
+    if(e.target.closest('[data-pmstart]')){ const d = new Date(); save({ start: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }); return; }
+    if(e.target.closest('[data-pmstop]')){ e.preventDefault(); save({ start: '' }); return; }
     const b = e.target.closest('[data-fill]'); if(!b) return;
     const dev = PERMIT_DEVS[J().community];
     ed = { step: b.dataset.fill, form: dev.forms[b.dataset.fill] };
@@ -535,7 +541,7 @@
       const sent = (p[st.id] || {}).sent;
       // nothing recorded on a home that wasn't signed through Selections: probably handled before the hub — grey, not counted as to send
       const nothing = i === 0 && !steps.some(s=>p[s.id] && (p[s.id].sent || p[s.id].ok));
-      if(nothing && !job.selectionSheet) return { state: 'new', label: 'Nothing recorded yet', step: st, done: 0, of: steps.length };
+      if(nothing && !job.selectionSheet && !p.start) return { state: 'new', label: 'Nothing recorded yet', step: st, done: 0, of: steps.length };
       return { state: sent ? 'waiting' : 'todo', label: sent ? 'Waiting on ' + st.t.toLowerCase() : 'Send the ' + st.t.toLowerCase(), step: st, done: i, of: steps.length, since: sent };
     },
     settings: ()=>settings,

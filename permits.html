@@ -297,9 +297,20 @@ html, body{max-width:100%; overflow-x:clip;}
           <select id="fDev"><option value="">Every development</option></select>
           <select id="fState"><option value="open">Still to do</option><option value="todo">To send</option><option value="new">Nothing recorded yet</option><option value="waiting">With the borough</option><option value="done">All approved</option><option value="all">Every home</option></select>
           <input type="text" id="fFind" placeholder="Find a lot, buyer or street…" style="flex:1 1 200px;">
+          <button type="button" class="btn2 primary" id="startBtn">+ Start permits for a home</button>
+        </div>
+        <div id="startBox" style="display:none; margin-top:12px; padding:12px 14px; background:#f6f5f0; border-radius:8px;">
+          <div style="font-weight:700; margin-bottom:6px;">Start permits before Selections</div>
+          <div class="muted" style="font-size:12.5px; margin-bottom:8px;">Pick the lot from the build schedule. It moves to "To send" and its forms fill from what the hub knows.</div>
+          <div class="pm-filters" style="margin-top:0;">
+            <select id="sDev"></select>
+            <select id="sHome" style="flex:1 1 260px;"></select>
+            <button type="button" class="btn2 primary" id="sGo">Start and open</button>
+            <button type="button" class="btn2" id="sCancel">Cancel</button>
+          </div>
         </div>
         <div id="list" style="overflow-x:auto;"><p class="muted" style="margin-top:12px;">Loading…</p></div>
-        <p class="muted" style="font-size:12.5px; margin-top:10px;">Homes still being built (no settlement date yet, or one still to come). A home signed through Selections and not yet sent shows first. Pick a home to fill out its forms and record the dates.</p>
+        <p class="muted" style="font-size:12.5px; margin-top:10px;">Homes still being built (no settlement date yet, or one still to come). A home signed through Selections (or started here) and not yet sent shows first. Applying before Selections? Use <b>+ Start permits for a home</b> and pick the lot. Pick a home to fill out its forms and record the dates.</p>
       </div>
     </div>
 
@@ -389,7 +400,7 @@ function renderList(){
     .sort((a, b)=>({ todo:0, waiting:1, new:2, done:3 }[a.s.state] - { todo:0, waiting:1, new:2, done:3 }[b.s.state]) || ((b.j.selectionSheet ? 1 : 0) - (a.j.selectionSheet ? 1 : 0))
       || String(a.j.community).localeCompare(String(b.j.community)) || String(a.j.lot).localeCompare(String(b.j.lot), undefined, { numeric:true }));
   $('list').innerHTML = shown.length ? `<table class="iv"><thead><tr><th>Home</th><th>Address</th><th>Style</th><th>Permits</th><th>Step</th><th>Since</th></tr></thead><tbody>
-    ${shown.map(({ j, s })=>`<tr class="row" data-open="${esc(j.id)}"><td><span class="devtag">${esc(j.community || '?')}</span>${esc(label(j))}${j.selectionSheet && s.state === 'todo' ? ' <span class="chip-todo" title="Signed through Selections">signed</span>' : ''}</td>
+    ${shown.map(({ j, s })=>`<tr class="row" data-open="${esc(j.id)}"><td><span class="devtag">${esc(j.community || '?')}</span>${esc(label(j))}${j.selectionSheet && s.state === 'todo' ? ' <span class="chip-todo" title="Signed through Selections">signed</span>' : (j.permits || {}).start && !j.selectionSheet && s.state === 'todo' ? ' <span class="chip-todo" title="Permits started before Selections">started early</span>' : ''}</td>
       <td>${esc(j.address || '')}</td><td>${esc(j.model || '')}</td>
       <td><span class="${s.state === 'todo' ? 'chip-todo' : s.state === 'waiting' ? 'chip-wait' : s.state === 'new' ? 'chip-new' : 'chip-done'}">${esc(s.label)}</span></td>
       <td>${s.done} of ${s.of} approved</td><td>${s.since ? esc(nice(s.since)) : ''}</td></tr>`).join('')}</tbody></table>`
@@ -405,6 +416,29 @@ function openHome(id){
   renderPermits();
 }
 function closeHome(){ $('ov').classList.remove('show'); openId = ''; window.PERMIT_JOB = null; }
+/* START PERMITS BEFORE SELECTIONS (owner, 2026-10-29): pick a lot from the build schedule (jobs) → jobs.permits.start = today */
+const notStarted = j=>active(j) && Permits.status(j).state === 'new';
+function fillStart(){
+  const homes = jobs.filter(notStarted);
+  const devs = [...new Set(homes.map(j=>j.community).filter(Boolean))].sort();
+  const sd = $('sDev'), keep = sd.value;
+  sd.innerHTML = '<option value="">Every development</option>' + devs.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
+  sd.value = devs.includes(keep) ? keep : (devs.length === 1 ? devs[0] : '');
+  const list = homes.filter(j=>!sd.value || j.community === sd.value)
+    .sort((a, b)=>String(a.community).localeCompare(String(b.community)) || String(a.lot).localeCompare(String(b.lot), undefined, { numeric:true }));
+  $('sHome').innerHTML = list.length ? '<option value="">Pick a lot…</option>' + list.map(j=>`<option value="${esc(j.id)}">${esc((j.community || '?') + ' ' + label(j) + (j.address ? ' — ' + j.address : ''))}</option>`).join('')
+    : '<option value="">Every home in the schedule already has permits started</option>';
+}
+$('startBtn').addEventListener('click', ()=>{ const b = $('startBox'); b.style.display = b.style.display === 'none' ? '' : 'none'; if(b.style.display === '') fillStart(); });
+$('sDev').addEventListener('change', fillStart);
+$('sCancel').addEventListener('click', ()=>{ $('startBox').style.display = 'none'; });
+$('sGo').addEventListener('click', async ()=>{
+  const id = $('sHome').value; if(!id){ alert('Pick a lot first.'); return; }
+  try{ await db.collection('jobs').doc(id).set({ permits: { start: todayStr() } }, { merge: true }); }
+  catch(err){ console.error(err); alert('Could not save — check your connection.'); return; }
+  $('startBox').style.display = 'none';
+  openHome(id);
+});
 $('list').addEventListener('click', e=>{ const r = e.target.closest('[data-open]'); if(r) openHome(r.dataset.open); });
 $('pmClose').addEventListener('click', closeHome);
 $('ov').addEventListener('click', e=>{ if(e.target.id === 'ov') closeHome(); });
@@ -500,7 +534,7 @@ firebase.auth().onAuthStateChanged(user=>{
     if(started) return; started = true;
     db.collection('jobs').onSnapshot(s=>{
       jobs = s.docs.map(d=>({ id:d.id, ...d.data() }));
-      renderList(); if(tab === 'settings') renderSettings();
+      renderList(); if(tab === 'settings') renderSettings(); if($('startBox').style.display === '') fillStart();
       if(openId){ const j = jobs.find(x=>x.id === openId); if(j){ window.PERMIT_JOB = j; renderPermits(); } }
       const want = new URLSearchParams(location.search).get('home');
       if(want && !openHome.done && jobs.some(x=>x.id === want)){ openHome.done = true; openHome(want); }
@@ -511,7 +545,7 @@ firebase.auth().onAuthStateChanged(user=>{
   } else showLoginGate();
 });
 </script>
-<script src="permits.js?v=6"></script>
+<script src="permits.js?v=7"></script>
 <script src="moneyfmt.js"></script>
 <script src="sorttables.js"></script>
 <script src="hubsearch.js"></script>
