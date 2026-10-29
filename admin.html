@@ -119,6 +119,8 @@ html, body{max-width:100%; overflow-x:clip;}
     .switch-row{flex-wrap:wrap;}
   }
 </style>
+<link rel="stylesheet" href="apple.css?v=1">
+<script src="apple.js?v=1"></script>
 </head>
 <body>
 
@@ -161,6 +163,16 @@ html, body{max-width:100%; overflow-x:clip;}
 
   <div class="wrap">
     <a class="back-link" href="index.html">&larr; Back to the hub</a>
+
+    <!-- ===================== THE NEW LOOK (owner, 2026-10-29) ===================== -->
+    <div class="section" id="look">
+      <h2>The new look</h2>
+      <p class="lead">A cleaner, Apple-style look for the hub. Phones always use it. On a computer you can try it here — it only changes it for you, and you can switch back any time.</p>
+      <label style="display:flex; align-items:center; gap:10px; font-size:15px; text-transform:none; letter-spacing:0; font-weight:600; color:var(--ink); cursor:pointer; margin-top:10px;">
+        <input type="checkbox" id="lookOn" style="width:20px; height:20px; accent-color:var(--navy);"> Use the new look on my computer
+      </label>
+      <div class="note" id="lookNote" style="margin-top:8px;"></div>
+    </div>
 
     <!-- ===================== MY NOTIFICATIONS ===================== -->
     <div class="section" id="mine">
@@ -304,6 +316,23 @@ $('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+/* The new look: saved on this device straight away (apple.js) and for the person in settings/hub-prefs[uid].theme */
+(function(){
+  const box = document.getElementById('lookOn'), note = document.getElementById('lookNote');
+  const show = ()=>{
+    box.checked = !!(window.hubTheme && hubTheme.get() === 'apple');
+    note.textContent = window.hubTheme && hubTheme.phone() ? 'You are on a phone, so the new look is on. The switch is for when you use a computer.' : '';
+  };
+  show();
+  box.addEventListener('change', ()=>{
+    const v = box.checked ? 'apple' : '';
+    if(window.hubTheme) hubTheme.set(v);
+    const user = firebase.auth().currentUser;
+    if(user) db.collection('settings').doc('hub-prefs').set({ [user.uid]: { theme: v } }, { merge: true })
+      .catch(err=>console.error('Could not save the look for this person (kept on this device)', err));
+    show();
+  });
+})();
 const ref = db.collection('settings').doc('notifications');
 let listening = false;
 

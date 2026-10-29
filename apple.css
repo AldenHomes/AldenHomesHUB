@@ -1,0 +1,122 @@
+/* The hub's "new look" (apple.js turns it on: always on phones, on computers when switched on in Admin Settings).
+   Everything is under html.apple so the classic look is untouched when it's off. */
+@media screen {
+html.apple{
+  --paper:#F2F2F7; --paper-2:#FFFFFF; --radius:10px;
+  --shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);
+  --steel-line:#D1D1D6;
+}
+html.apple body{background:#F2F2F7; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Helvetica Neue",Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+
+/* ---- header ---- */
+html.apple .titlebar{background:rgba(249,249,251,.94); border-bottom:0.5px solid #D1D1D6; box-shadow:none;}
+html.apple .titlebar h1{letter-spacing:-0.4px;}
+html.apple .titlebar .subtitle{text-transform:none; letter-spacing:0; font-size:13px;}
+html.apple .tabbar{border-top:none; gap:6px; padding-bottom:10px;}
+html.apple .tab-btn{border-bottom:none !important; border-radius:9px; padding:7px 14px; color:#3C3C43;}
+html.apple .tab-btn:hover{background:rgba(0,0,0,.05);}
+html.apple .tab-btn.active{background:#fff; color:#1C1C1E; box-shadow:0 1px 3px rgba(0,0,0,.12);}
+html.apple .tab-badge{border-radius:9px;}
+
+/* ---- cards: white, rounded, no coloured top line ---- */
+html.apple .card, html.apple .card2, html.apple .section, html.apple .tile, html.apple .homes-card,
+html.apple .mywork, html.apple .auth-card{
+  background:#fff; border-radius:14px; border-top:none !important; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);
+}
+html.apple .tile:hover{transform:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.08), 0 6px 18px rgba(0,0,0,.08);}
+
+/* ---- in-page tabs: one grey switch with the picked part in white ---- */
+html.apple .tabs3, html.apple .tabs2{display:inline-flex; flex-wrap:wrap; gap:0; background:#E3E3E8; border:none; border-radius:9px; padding:2px;}
+html.apple .tabs3 button, html.apple .tabs2 button{border:none; background:transparent; border-radius:7px; color:#1C1C1E; font-weight:500; padding:6px 14px;}
+html.apple .tabs3 button.on, html.apple .tabs2 button.on{background:#fff; color:#1C1C1E; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.12);}
+html.apple .tabs3 button.on .n{background:rgba(0,0,0,.08);}
+
+/* ---- buttons and boxes ---- */
+html.apple .signout-btn, html.apple .btn2, html.apple .set-btn{border-radius:9px;}
+html.apple input[type=text], html.apple input[type=search], html.apple input[type=email], html.apple input[type=password],
+html.apple input[type=number], html.apple input[type=date], html.apple select, html.apple textarea{border-radius:9px;}
+html.apple .back-link{color:#4B4F54;}
+
+/* ---- the hub home ---- */
+html.apple .welcome h2{font-size:30px; font-weight:700; letter-spacing:-0.6px; color:#1C1C1E;}
+html.apple .ab-date{font-size:13px; font-weight:600; color:#8E8E93; text-transform:uppercase; letter-spacing:.2px; margin-bottom:2px;}
+html.apple .tile-icon{width:46px; height:46px; border-radius:12px; color:#fff; background:#8E8E93;}
+html.apple .tile-icon svg{stroke:#fff;}
+html.apple #scheduleTile .tile-icon{background:#4B4F54;}
+html.apple #constructionTile .tile-icon{background:#FF9500;}
+html.apple #punchTile .tile-icon{background:#34C759;}
+html.apple #serviceTile .tile-icon{background:#32ADE6;}
+html.apple #selectionsTile .tile-icon{background:#AF52DE;}
+html.apple #invoicesTile .tile-icon{background:#FF3B30;}
+html.apple #permitsTile .tile-icon{background:#8C9470;}
+html.apple #jobcostTile .tile-icon{background:#30B0C7;}
+html.apple #historyTile .tile-icon{background:#5856D6;}
+html.apple #packetsTile .tile-icon{background:#D99A00;}
+html.apple .tile-title{color:#1C1C1E; letter-spacing:-0.2px;}
+html.apple .tile-stats{font-family:inherit; border-top:none; padding-top:0;}
+html.apple .tile-stat .n{font-size:22px; letter-spacing:-0.4px; color:#1C1C1E;}
+html.apple .tile-stat .l{font-size:11.5px; text-transform:none; letter-spacing:0; color:#6C6C70;}
+html.apple.desk .tile{padding:18px; gap:12px; display:grid; grid-template-columns:auto 1fr; align-items:center; column-gap:12px;}
+html.apple.desk .tile > .tile-icon{grid-row:1;}
+html.apple.desk .tile > :not(.tile-icon){grid-column:1 / -1;}
+html.apple.desk .tile > div:has(> .tile-title){grid-column:2; grid-row:1;}
+html.apple.desk .tile-desc{display:none;}
+
+/* ---- computers: slim app bar on the left inside apps ---- */
+html.apple.desk:not(.apple-hub) body{padding-left:68px;}
+.ab-rail{position:fixed; left:0; top:0; bottom:0; width:68px; z-index:120; box-sizing:border-box; background:#E9E9EE; border-right:0.5px solid #D1D1D6;
+  display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 0; overflow-y:auto; scrollbar-width:none;}
+.ab-rail .ab-app{width:46px; height:46px; flex:none; border-radius:12px; display:flex; align-items:center; justify-content:center; position:relative;
+  text-decoration:none; color:#4B4F54; background:none; border:none; cursor:pointer; padding:0;}
+.ab-rail .ab-app:hover{background:rgba(0,0,0,.06);}
+.ab-rail .ab-app.here{background:#fff; box-shadow:0 0 0 0.5px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.08);}
+.ab-rail .ab-app > span:not(.ab-badge){width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:#fff;}
+.ab-rail .ab-home{margin-bottom:8px;}
+.ab-rail .ab-home img{width:38px; height:auto; display:block;}
+.ab-rail .ab-grow{flex:1; min-height:8px;}
+.ab-badge{position:absolute; top:3px; right:2px; min-width:16px; box-sizing:border-box; background:#FF3B30; color:#fff; font-size:10px; font-weight:700;
+  border-radius:8px; padding:0 4px; line-height:16px; text-align:center;}
+.ab-badge[hidden]{display:none;}
+
+/* ---- phones ---- */
+html.apple.phone body{padding-bottom:calc(84px + env(safe-area-inset-bottom));}
+html.apple.phone .titlebar{background:#F2F2F7; border-bottom:none; padding-top:14px; padding-bottom:6px;}
+html.apple.phone .titlebar .brand-mark{height:30px;}
+html.apple.phone .titlebar .brand-mark img{height:30px; width:auto;}
+html.apple.phone .titlebar h1{font-size:28px; font-weight:700;}
+html.apple.phone .titlebar .subtitle, html.apple.phone .titlebar-stats, html.apple.phone .titlebar .sync-badge,
+html.apple.phone .titlebar #currentUserEmail{display:none !important;}
+html.apple.phone:not(.pg-admin) .titlebar #signOutBtn, html.apple.phone .titlebar a.signout-btn[href="admin.html"]{display:none !important;}
+html.apple.phone .titlebar .brand{padding-right:0;}
+html.apple.phone .back-link{display:none;}
+html.apple.phone .titlebar .hub-chat-btn{display:none !important;}   /* Chat is on the bottom bar */
+html.apple.phone .hub-cols{grid-template-columns:minmax(0,1fr);}
+html.apple.phone .hub-cols > *{min-width:0;}
+html.apple.phone .ai-fab{bottom:calc(96px + env(safe-area-inset-bottom));}
+html.apple.phone .ai-panel{bottom:calc(92px + env(safe-area-inset-bottom)); max-height:calc(100vh - 120px);}
+html.apple.phone .tabbar{padding:0 12px 8px;}
+html.apple.phone .tab-btn{padding:6px 11px;}
+
+/* the hub home on a phone: apps as a grid of icons, like an iPhone home screen */
+html.apple.phone .welcome h2{font-size:32px;}
+html.apple.phone #welcomeLine{display:none;}
+html.apple.phone .tile-grid{grid-template-columns:repeat(4, minmax(0,1fr)); gap:16px 4px; background:#fff; border-radius:18px; padding:18px 8px 14px;
+  box-shadow:0 0 0 0.5px rgba(0,0,0,.05);}
+html.apple.phone .tile{background:none; box-shadow:none; padding:0; gap:6px; align-items:center; text-align:center; border-radius:0;}
+html.apple.phone .tile:hover{box-shadow:none;}
+html.apple.phone .tile-icon{width:58px; height:58px; border-radius:14px; box-shadow:0 1px 2px rgba(0,0,0,.12);}
+html.apple.phone .tile-icon svg{width:28px; height:28px;}
+html.apple.phone .tile-title{font-size:11.5px; font-weight:500; line-height:1.2;}
+html.apple.phone .tile-desc, html.apple.phone .tile-stats, html.apple.phone .tile-badge{display:none;}
+html.apple.phone .tile-grid.editing .tile::after{top:-6px; right:0; font-size:9px; padding:1px 5px;}
+
+.ab-bar{position:fixed; left:0; right:0; bottom:0; z-index:130; display:flex; justify-content:space-around; align-items:flex-start;
+  padding:7px 4px calc(6px + env(safe-area-inset-bottom)); background:rgba(249,249,251,.94); border-top:0.5px solid #D1D1D6;
+  -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px);}
+.ab-bar .ab-tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; min-height:48px; position:relative;
+  font:500 10px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#8E8E93; text-decoration:none; background:none; border:none; padding:0; cursor:pointer;}
+.ab-bar .ab-tab.here{color:#4B4F54;}
+.ab-bar .ab-tab.here svg{stroke-width:2.4;}
+.ab-bar .ab-badge{top:-3px; right:calc(50% - 22px);}
+}
+@media print { .ab-bar, .ab-rail{display:none !important;} html.apple.desk:not(.apple-hub) body{padding-left:0;} }

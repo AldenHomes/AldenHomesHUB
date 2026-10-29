@@ -292,6 +292,8 @@ html, body{max-width:100%; overflow-x:clip;}
     .titlebar-account > #currentUserEmail{grid-column:1 / -1; grid-row:3;}
   }
 </style>
+<link rel="stylesheet" href="apple.css?v=1">
+<script src="apple.js?v=1"></script>
 </head>
 <body>
 
@@ -809,6 +811,8 @@ const HUB_DEFAULTS = { tilesHidden: [], strip: { punch: true, notes: true, remin
 let hubPrefs = JSON.parse(JSON.stringify(HUB_DEFAULTS));
 function applyHubPrefs(raw){
   const p = raw && typeof raw === 'object' ? raw : {};
+  // the new look on computers follows the person (Admin Settings → "The new look"); phones always have it
+  if(typeof p.theme === 'string' && window.hubTheme && hubTheme.get() !== p.theme) hubTheme.set(p.theme);
   hubPrefs = {
     tilesHidden: Array.isArray(p.tilesHidden) ? p.tilesHidden.filter(x=>typeof x === 'string') : [],
     strip: { ...HUB_DEFAULTS.strip, ...(p.strip && typeof p.strip === 'object' ? p.strip : {}) },
