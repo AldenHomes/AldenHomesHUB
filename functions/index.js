@@ -1991,11 +1991,12 @@ function invCheck(inv, jobsById){
   return [...new Set(why)];
 }
 // item lines (owner, 2026-10-26: track what recurring items cost, e.g. a jump in an exterior door model's price)
-const INV_LINES_SCHEMA = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['item', 'sku', 'qty', 'unit', 'unitPrice', 'amount'],
-  properties: { item: { type: 'string' }, sku: { type: 'string' }, qty: { type: 'number' }, unit: { type: 'string' }, unitPrice: { type: 'number' }, amount: { type: 'number' } } } };
+const INV_LINES_SCHEMA = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['item', 'sku', 'date', 'qty', 'unit', 'unitPrice', 'amount'],
+  properties: { item: { type: 'string' }, date: { type: 'string' }, sku: { type: 'string' }, qty: { type: 'number' }, unit: { type: 'string' }, unitPrice: { type: 'number' }, amount: { type: 'number' } } } };
 const INV_LINES_RULE = `- lines: every product or service line as printed, in order (NOT tax, freight/delivery/fuel, subtotal or total lines, and not
   deposits/payments). item = the description as printed (fix obvious scan errors only); sku = the item / model / part number column
-  ('' if none); qty; unit (EA, LF, PC, SQ, BF, HR… as printed, '' if none); unitPrice = price per unit before tax; amount = the line's
+  ('' if none); date = the line's own date as YYYY-MM-DD when the line has one (service / equipment bills often do), else '';
+  qty; unit (EA, LF, PC, SQ, BF, HR… as printed, '' if none); unitPrice = price per unit before tax; amount = the line's
   extended amount. A subcontractor bill with one lump sum is one line. A handwritten bill: read what you can.`;
 const INV_SCHEMA = {
   type: 'object', additionalProperties: false, required: ['invoices'],
@@ -2033,7 +2034,7 @@ ${INV_LINES_RULE}
 Use the vendor habits list when it applies, but the invoice itself wins.`;
 // keep a line list tidy for storing
 const invLines = ls=>(Array.isArray(ls) ? ls : []).slice(0, 200).map(l=>{ const n = v=>Math.round((Number(v) || 0) * 10000) / 10000;
-  return { item: String(l.item || '').slice(0, 200), sku: String(l.sku || '').slice(0, 60), qty: n(l.qty), unit: String(l.unit || '').slice(0, 12),
+  return { item: String(l.item || '').slice(0, 200), sku: String(l.sku || '').slice(0, 60), ...(/^\d{4}-\d{2}-\d{2}$/.test(l.date || '') ? { date: l.date } : {}), qty: n(l.qty), unit: String(l.unit || '').slice(0, 12),
     unitPrice: n(l.unitPrice), amount: Math.round((Number(l.amount) || 0) * 100) / 100 }; }).filter(l=>l.item || l.sku);
 // an older invoice read before lines were kept: read just its lines from its own PDF
 async function invReadLines(inv){
