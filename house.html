@@ -2109,8 +2109,23 @@ function staffName(){
 }
 
 /* ---- uploading plans and photos ---- */
-function shrinkPhoto(file){
-  // phone photos are huge; 1600px is plenty to see the work and keeps storage small
+async function shrinkPhoto(file){
+  // phone photos are huge; 1600px is plenty to see the work and keeps storage small.
+  // Fast path (2026-10-29, "uploading from the phone is slow"): createImageBitmap decodes off the page's main thread
+  // and honours the photo's rotation; the older Image way below is kept for browsers without it.
+  if(window.createImageBitmap){
+    try{
+      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bmp.width * scale);
+      canvas.height = Math.round(bmp.height * scale);
+      canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      if(bmp.close) bmp.close();
+      const b = await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.82));
+      if(b) return b;
+    } catch(err){ /* fall back below */ }
+  }
   return new Promise((resolve, reject)=>{
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -2149,9 +2164,12 @@ async function uploadFiles(list, kind, folderOf){
     try{ await db.collection('house-files').add({ houseId, kind:'folder', name, uploadedAt: new Date().toISOString(), by: { type:'staff', id: user ? user.uid : '', name: staffName() } }); }
     catch(err){ console.error(err); }
   }
-  for(let i = 0; i < picked.length; i++){
-    const file = picked[i];
-    $('uploadNote').textContent = `Uploading ${kind === 'plan' ? 'file' : 'photo'} ${i+1} of ${picked.length}…`;
+  // three at a time instead of one after another (owner, 2026-10-29: phone uploads felt slow)
+  let next = 0, done = 0;
+  const what = kind === 'plan' ? 'file' : 'photo';
+  const note = ()=>{ $('uploadNote').textContent = `Uploading ${picked.length > 1 ? what + 's' : what}… ${done} of ${picked.length} done`; };
+  note();
+  const one = async file=>{
     try{
       const ref = db.collection('house-files').doc();
       const isPhoto = kind === 'photo';
@@ -2170,7 +2188,9 @@ async function uploadFiles(list, kind, folderOf){
         uploadedAt: new Date().toISOString(),
       });
     } catch(err){ console.error(err); failed++; }
-  }
+    done++; note();
+  };
+  await Promise.all([0, 1, 2].map(async ()=>{ while(next < picked.length) await one(picked[next++]); }));
   $('uploadNote').textContent = failed
     ? `${failed} of ${picked.length} didn't upload. If this keeps happening, the storage security rules may not allow it yet.`
     : '';
