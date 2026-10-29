@@ -1906,7 +1906,11 @@ const INV_PAGES_PER_CALL = 10;      // pages per Claude request (10 since item l
 const INV_CODES = { 5: 'Engineering', 10: 'Permits', 12: 'Excavation', 14: 'Footers/Found.', 16: 'Concrete', 30: 'Lumber', 32: 'Windows & Doors',
   34: 'Framing', 36: 'Shingles', 38: 'Insulation', 40: 'Siding/Fascia', 41: 'Railing', 42: 'Brick', 44: 'Spouting', 50: 'Plumbing', 51: 'Sprinklers',
   52: 'Heating', 54: 'Electrical', 55: 'Energy Star', 56: 'Drywall', 57: 'Special Stairs', 58: 'Trim', 59: 'Shelving/Mirrors', 60: 'Paint',
-  70: 'Kitchen/Vanities', 71: 'Fireplace', 72: 'Flooring', 74: 'Appliances', 76: 'Driveway', 78: 'Landscape', 80: 'Utilities', 90: 'Miscellaneous', 91: 'Warranty' };
+  70: 'Kitchen/Vanities', 71: 'Fireplace', 72: 'Flooring', 74: 'Appliances', 76: 'Driveway', 78: 'Landscape', 80: 'Utilities', 90: 'Miscellaneous', 91: 'Warranty',
+  99: 'Personal' };
+/* PERSONAL (owner, 2026-10-29: "add a cost code just called personal"): kept as 99 inside, shown and stamped as just "Personal";
+   it doesn't need a home. A home NOT in the hub yet can be typed (houseId '' + houseLabel = the typed text). */
+const INV_PERSONAL = 99;
 const invKey = v=>String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\b(inc|llc|co|company|corp|the)\b/g, '').trim();
 const invHomeLabel = j=>[j.community, j.lot ? 'Lot ' + j.lot : '', j.client].filter(Boolean).join(' · ') || 'A home';
 /* RED STAMP (owner, 2026-10-26: "lot number and cost code written in red pretty big across the top of the invoice"): once an invoice
@@ -1916,7 +1920,9 @@ const invShortHome = j=>j ? [j.community, j.lot].filter(Boolean).join(' ') || in
 function invStampLines(inv, jobsById){
   const sp = inv.splits || [];
   return sp.map(s=>{
-    const t = `${invShortHome(jobsById[s.houseId])} - ${s.code || '?'} ${INV_CODES[s.code] || ''}${s.labor ? ' LABOR' : ''}`;
+    const j = jobsById[s.houseId], home = j ? invShortHome(j) : String(s.houseLabel || '').trim();
+    const t = s.code === INV_PERSONAL ? (home ? home + ' - ' : '') + 'PERSONAL'
+      : `${home || '?'} - ${s.code || '?'} ${INV_CODES[s.code] || ''}${s.labor ? ' LABOR' : ''}`;
     return (sp.length > 1 ? t + '  $' + Number(s.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : t)
       .replace(/[^\x20-\x7e]/g, ' ').replace(/\s+/g, ' ').trim();
   });
@@ -1946,17 +1952,40 @@ async function invStamp(id, inv, jobsById){
     const tw = font.widthOfTextAtSize(t, size), p = map((W - tw) / 2, top - 7 - (i + 1) * lh + size * 0.25);
     page.drawText(t, { x: p.x, y: p.y, size, font, color: rgb(0.8, 0.07, 0.07), rotate: degrees(rot) });
   });
+  // the invoice's note (owner, 2026-10-29): red text in a red-outlined box just under the stamp
+  const note = invNoteText(inv.note);
+  if(note){
+    const nf = await doc.embedFont(StandardFonts.Helvetica), ns = 11, nlh = ns * 1.25;
+    const nW = Math.min(W - 40, Math.max(boxW, 320)), inner = nW - 20, out = [];
+    ('NOTE: ' + note).split('\n').forEach(para=>{ let cur = '';
+      para.split(' ').forEach(w=>{ const t = cur ? cur + ' ' + w : w; if(nf.widthOfTextAtSize(t, ns) > inner && cur){ out.push(cur); cur = w; } else cur = t; });
+      out.push(cur); });
+    const shown = out.slice(0, 10); if(out.length > 10) shown[9] = shown[9].replace(/.{0,3}$/, '...');
+    const nH = shown.length * nlh + 12, nx = (W - nW) / 2, ny = top - boxH - 6 - nH, nc = map(nx, ny);
+    page.drawRectangle({ x: nc.x, y: nc.y, width: nW, height: nH, rotate: degrees(rot), color: rgb(1, 1, 1), opacity: 0.9,
+      borderColor: rgb(0.8, 0.07, 0.07), borderWidth: 1.5 });
+    const red = rgb(0.8, 0.07, 0.07), bw = font.widthOfTextAtSize('NOTE: ', ns);
+    shown.forEach((t, i)=>{ const y = ny + nH - 6 - (i + 1) * nlh + ns * 0.3;
+      if(i === 0){ const p = map(nx + 10, y); page.drawText('NOTE:', { x: p.x, y: p.y, size: ns, font, color: red, rotate: degrees(rot) }); t = t.slice(6); }
+      const p = map(nx + 10 + (i === 0 ? bw : 0), y);
+      page.drawText(t, { x: p.x, y: p.y, size: ns, font: nf, color: red, rotate: degrees(rot) }); });
+  }
   const stampPath = `invoices/${id}-stamped.pdf`, token = crypto.randomUUID();
   await bucket.file(stampPath).save(Buffer.from(await doc.save()), { resumable: false, metadata: { contentType: 'application/pdf', metadata: { firebaseStorageDownloadTokens: token } } });
-  return { stampPath, stampUrl: fileUrl(stampPath, token), stampText: lines.join(' / ') };
+  return { stampPath, stampUrl: fileUrl(stampPath, token), stampText: invStampKey(inv, jobsById) };
 }
+// plain characters only (the PDF font has no curly quotes etc.)
+const invNoteText = v=>String(v || '').replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/[\u2013\u2014]/g, '-')
+  .replace(/\r/g, '').replace(/[^\x20-\x7e\n]/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+// what's on the stamp (a change re-stamps the PDF)
+const invStampKey = (inv, jobsById)=>invStampLines(inv, jobsById).join(' / ') + (invNoteText(inv.note) ? ' | NOTE: ' + invNoteText(inv.note) : '');
 async function invSettings(){ const d = await db.collection('settings').doc('invoices').get(); return d.exists ? d.data() : {}; }
 // is an invoice complete enough to go straight to the accountant?
 function invCheck(inv, jobsById){
   const why = [];
   const splits = inv.splits || [];
   if(!splits.length) why.push('No home or cost code yet');
-  splits.forEach(s=>{ if(!s.houseId || !jobsById[s.houseId]) why.push('Which home?'); if(!INV_CODES[s.code]) why.push('Which cost code?'); });
+  splits.forEach(s=>{ if(!(s.houseId && jobsById[s.houseId]) && !String(s.houseLabel || '').trim() && s.code !== INV_PERSONAL) why.push('Which home?'); if(!INV_CODES[s.code]) why.push('Which cost code?'); });
   const sum = splits.reduce((t, s)=>t + (Number(s.amount) || 0), 0);
   if(splits.length && Math.abs(sum - (Number(inv.total) || 0)) > 0.99) why.push('The split amounts don\'t add up to the total');
   return [...new Set(why)];
@@ -2168,7 +2197,7 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       ['vendor', 'number', 'poJob', 'note'].forEach(f=>{ if(b[f] !== undefined) up[f] = cut(b[f], f === 'note' ? 600 : 160); });
       if(b.date !== undefined) up.date = /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : '';
       if(b.total !== undefined) up.total = num(b.total);
-      if(Array.isArray(b.splits)) up.splits = b.splits.slice(0, 20).map(s=>({ houseId: jobs[s.houseId] ? s.houseId : '', houseLabel: jobs[s.houseId] ? invHomeLabel(jobs[s.houseId]) : '',
+      if(Array.isArray(b.splits)) up.splits = b.splits.slice(0, 20).map(s=>({ houseId: jobs[s.houseId] ? s.houseId : '', houseLabel: jobs[s.houseId] ? invHomeLabel(jobs[s.houseId]) : cut(String(s.houseLabel || '').trim(), 80),
         code: INV_CODES[s.code] ? Number(s.code) : 0, labor: !!s.labor, amount: num(s.amount), why: cut(s.why, 200),
         // which item lines this part was split by (indexes into the invoice's lines), when split by lines
         lines: Array.isArray(s.lines) ? s.lines.filter(n=>Number.isInteger(n) && n >= 0 && n < 200).slice(0, 200) : [] }));
@@ -2190,7 +2219,7 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       // ready (or changed while ready / entered): put the red lot + cost code on a fresh copy of the PDF
       const after = { ...merged, ...up };
       if(after.status === 'ready' || after.status === 'entered'){
-        const text = invStampLines(after, jobs).join(' / ');
+        const text = invStampKey(after, jobs);
         if(text !== old.stampText || !old.stampUrl) Object.assign(up, await invStamp(ref.id, after, jobs).catch(err=>{ logger.warn('Invoice stamp failed', { error: String(err) }); return {}; }));
       }
       await ref.update(up);

@@ -206,9 +206,15 @@ html, body{max-width:100%; overflow-x:clip;}
   .pdfwrap{position:relative; min-height:0;}
   /* the lot + cost code in big red over the invoice while it's being reviewed (the saved copy gets the same stamp once ready) */
   .stampv{position:absolute; top:52px; left:50%; transform:translateX(-50%); max-width:92%; pointer-events:none; text-align:center;
-    color:#c41212; font-weight:800; font-size:clamp(17px,2.2vw,28px); line-height:1.2; background:rgba(255,255,255,.88); border:2px solid #c41212;
+    display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .sv-main{color:#c41212; font-weight:800; font-size:clamp(17px,2.2vw,28px); line-height:1.2; background:rgba(255,255,255,.88); border:2px solid #c41212;
     border-radius:6px; padding:6px 14px; box-shadow:0 2px 8px rgba(0,0,0,.15);}
-  .stampv.none{color:#8a8f94; border-color:#c9ccd0; font-size:15px; font-weight:700;}
+  .sv-main.none{color:#8a8f94; border-color:#c9ccd0; font-size:15px; font-weight:700;}
+  /* the note, as it's printed on the stamped PDF */
+  .sv-note{color:#c41212; font-size:13px; line-height:1.35; text-align:left; white-space:pre-wrap; background:rgba(255,255,255,.92);
+    border:1.5px solid #c41212; padding:6px 10px; max-width:440px; min-width:260px; box-shadow:0 2px 8px rgba(0,0,0,.12);}
+  .sv-note b{font-weight:800;}
+  .typedhome{font-size:12px; color:#8a5d14; margin:3px 0 0 2px;}
   .navbtns{display:flex; gap:6px; align-items:center; font-size:13px; color:var(--ink-soft); white-space:nowrap;}
   .ovside input.bad{border-color:var(--danger); background:#fdf3f0;}
   .ovside{overflow:auto; padding:16px 18px;}
@@ -396,7 +402,8 @@ function itemsView(q){
             + '</tbody></table></td></tr>' : ''); }).join('') + '</tbody></table>'
       : `<p class="muted" style="margin-top:12px;">${all.length ? 'No items bought more than once yet. Prices show up here as the same items come in again.' : 'No item lines yet.'}</p>`);
 }
-const codeName = c=>c && codes[c] ? c + ' ' + codes[c] : '';
+const PERSONAL = 99;   // the "Personal" cost code: shown without its number, needs no home
+const codeName = c=>Number(c) === PERSONAL ? 'Personal' : c && codes[c] ? c + ' ' + codes[c] : '';
 async function load(){
   try{
     const d = await api({ action:'list' });
@@ -474,26 +481,29 @@ function linesToAmounts(x){
 }
 function splitEvenly(){
   const n = draft.splits.length, total = Number(draft.total) || 0, each = Math.floor(total / n * 100) / 100;
-  draft.splits.forEach((s, p)=>{ s.amount = p === n - 1 ? r2(total - each * (n - 1)) : each; s.lines = []; });
+  // owner, 2026-10-29: the cost code carries down to the parts that don't have one yet
+  const first = draft.splits.find(s=>s.code);
+  draft.splits.forEach((s, p)=>{ s.amount = p === n - 1 ? r2(total - each * (n - 1)) : each; s.lines = []; if(first && !s.code){ s.code = first.code; s.labor = !!first.labor; } });
   draft.lineMap = null; byLines = false;
 }
 function partName(p){ const s = draft.splits[p], j = jobs.find(h=>h.id === s.houseId);
-  return 'Part ' + (p + 1) + (j ? ' · ' + ([j.community, j.lot].filter(Boolean).join(' ') || homeLabel(j)) : '') + (s.code ? ' · ' + s.code + ' ' + (codes[s.code] || '') : ''); }
+  return 'Part ' + (p + 1) + (j ? ' · ' + ([j.community, j.lot].filter(Boolean).join(' ') || homeLabel(j)) : s.houseLabel ? ' · ' + s.houseLabel : '') + (s.code ? ' · ' + codeName(s.code) : ''); }
 const pdfOf = x=>x.stampUrl && x.status !== 'review' ? x.stampUrl : x.url;
 function showPdf(x){ const u = pdfOf(x); if($('pdf').dataset.u !== u){ $('pdf').src = u; $('pdf').dataset.u = u; } }
 // "CL 98 - 40 Siding/Fascia", one per part (same wording as the stamp the server puts on the PDF)
 function stampText(s, many){
   const j = jobs.find(h=>h.id === s.houseId);
-  const home = j ? [j.community, j.lot].filter(Boolean).join(' ') || homeLabel(j) : '?';
-  return home + ' - ' + (s.code ? s.code + ' ' + (codes[s.code] || '') : '?') + (s.labor ? ' LABOR' : '') + (many ? '  ' + money2(s.amount) : '');
+  const home = j ? [j.community, j.lot].filter(Boolean).join(' ') || homeLabel(j) : (s.houseLabel || '').trim();
+  if(Number(s.code) === PERSONAL) return (home ? home + ' - ' : '') + 'PERSONAL' + (many ? '  ' + money2(s.amount) : '');
+  return (home || '?') + ' - ' + (s.code ? s.code + ' ' + (codes[s.code] || '') : '?') + (s.labor ? ' LABOR' : '') + (many ? '  ' + money2(s.amount) : '');
 }
 function renderStamp(x){
   const el = $('stampv');
   if(pdfOf(x) === x.stampUrl){ el.style.display = 'none'; return; }   // the PDF itself carries it
-  const known = draft.splits.some(s=>s.houseId || s.code);
+  const known = draft.splits.some(s=>s.houseId || s.houseLabel || s.code), note = String(draft.note || '').trim();
   el.style.display = '';
-  el.className = 'stampv' + (known ? '' : ' none');
-  el.innerHTML = known ? draft.splits.map(s=>'<div style="white-space:nowrap">' + esc(stampText(s, draft.splits.length > 1)) + '</div>').join('') : 'No lot or cost code yet';
+  el.innerHTML = '<div class="sv-main' + (known ? '' : ' none') + '">' + (known ? draft.splits.map(s=>'<div style="white-space:nowrap">' + esc(stampText(s, draft.splits.length > 1)) + '</div>').join('') : 'No lot or cost code yet') + '</div>'
+    + (note ? '<div class="sv-note"><b>NOTE:</b> ' + esc(note) + '</div>' : '');
 }
 // go to the next invoice in the list (after one is done, or with the Next button)
 function step(dir, leaving){
@@ -510,14 +520,14 @@ function toast(msg){
   document.body.appendChild(t); setTimeout(()=>t.remove(), 2600);
 }
 const homeText = j=>homeLabel(j) + (j.address ? ' — ' + j.address : '');
-const codeText = c=>c && codes[c] ? c + ' ' + codes[c] : '';
+const codeText = c=>Number(c) === PERSONAL ? 'Personal' : c && codes[c] ? c + ' ' + codes[c] : '';
 function renderSide(){
   const x = invoices.find(i=>i.id === openId); if(!x){ closeInvoice(); return; }
   showPdf(x); renderStamp(x);
   const active = jobs.filter(j=>!j.settle || j.settle >= new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)).sort((a, b)=>homeLabel(a).localeCompare(homeLabel(b), undefined, { numeric:true }));
   $('homeDL').innerHTML = active.map(j=>`<option value="${esc(homeText(j))}"></option>`).join('');
   $('codeDL').innerHTML = Object.keys(codes).map(k=>`<option value="${esc(codeText(k))}"></option>`).join('');
-  const homeVal = h=>{ const j = jobs.find(z=>z.id === h); return j ? homeText(j) : ''; };
+  const homeVal = s=>{ const j = jobs.find(z=>z.id === s.houseId); return j ? homeText(j) : s.houseLabel || ''; };
   const idx = navIds.indexOf(openId);
   const sum = draft.splits.reduce((t, s)=>t + (Number(s.amount) || 0), 0), off = Math.abs(sum - (Number(draft.total) || 0)) > 0.99;
   const ro = x.status === 'entered';
@@ -532,11 +542,12 @@ function renderSide(){
       <div><label class="f2">Total</label><input type="text" data-money data-d="total" value="${draft.total}" ${ro ? 'disabled' : ''}></div></div>
     ${x.poJob || x.shipTo ? `<div class="muted" style="font-size:12.5px; margin-top:8px;">${x.poJob ? 'PO / job: <b>' + esc(x.poJob) + '</b>' : ''}${x.poJob && x.shipTo ? ' · ' : ''}${x.shipTo ? 'Ship to: ' + esc(x.shipTo) : ''}</div>` : ''}
     <label class="f2">What it's for</label>
-    ${draft.splits.map((s, i)=>`<div class="split">${draft.splits.length > 1 ? `<span class="pn">PART ${i + 1}</span>` : ''}<div class="r"><input type="text" list="homeDL" data-s="${i}" data-k="home" value="${esc(homeVal(s.houseId))}" placeholder="Which home? Type a lot, name or street" class="${s.houseId ? '' : 'bad'}" autocomplete="off" ${ro ? 'disabled' : ''}>
+    ${draft.splits.map((s, i)=>`<div class="split">${draft.splits.length > 1 ? `<span class="pn">PART ${i + 1}</span>` : ''}<div class="r"><input type="text" list="homeDL" data-s="${i}" data-k="home" value="${esc(homeVal(s))}" placeholder="Which home? Pick one, or type the lot if it's not in the hub" class="${s.houseId || s.houseLabel || Number(s.code) === PERSONAL ? '' : 'bad'}" autocomplete="off" ${ro ? 'disabled' : ''}>
         <input type="text" data-money data-s="${i}" data-k="amount" value="${s.amount}" title="Amount" ${ro ? 'disabled' : ''}></div>
       <div class="r2"><input type="text" list="codeDL" data-s="${i}" data-k="codeT" value="${esc(codeText(s.code))}" placeholder="Cost code: type a number or name" class="${s.code ? '' : 'bad'}" style="flex:1" autocomplete="off" ${ro ? 'disabled' : ''}>
         <label style="display:inline-flex; gap:5px; align-items:center;"><input type="checkbox" data-s="${i}" data-k="labor" ${s.labor ? 'checked' : ''} ${ro ? 'disabled' : ''}> Labor</label>
         ${!ro && draft.splits.length > 1 ? `<button type="button" class="btn2" data-unsplit="${i}" title="Remove this part">&times;</button>` : ''}</div>
+      ${!s.houseId && s.houseLabel ? `<div class="typedhome">Not a home in the hub yet — "${esc(s.houseLabel)}" will be used as typed.</div>` : ''}
       ${s.why ? `<div class="why">${esc(s.why)}</div>` : ''}</div>`).join('')}
     ${ro ? '' : '<div style="margin-top:8px;"><button type="button" class="btn2" id="addSplit">+ Split it (another home or cost code)</button></div>'}
     ${!ro && draft.splits.length > 1 ? `<div class="splitby"><span class="muted">Set the amounts:</span><button type="button" class="btn2" id="splitEven">Split evenly</button>${(x.lines || []).length ? `<button type="button" class="btn2 ${byLines ? 'primary' : ''}" id="splitLines">${byLines ? 'Hide the lines' : 'Split by item lines'}</button>` : ''}</div>` : ''}
@@ -578,7 +589,7 @@ async function saveInvoice(status, extra){
 }
 $('side').addEventListener('input', e=>{
   const el = e.target;
-  if(el.dataset.d){ draft[el.dataset.d] = el.dataset.d === 'total' ? Number(el.value) || 0 : el.value; return; }
+  if(el.dataset.d){ draft[el.dataset.d] = el.dataset.d === 'total' ? Number(el.value) || 0 : el.value; if(el.dataset.d === 'note') renderStamp(invoices.find(i=>i.id === openId)); return; }
   if(el.dataset.s != null && el.dataset.k === 'amount'){ draft.splits[Number(el.dataset.s)].amount = Number(el.value) || 0; }
   if(el.dataset.k === 'home' || el.dataset.k === 'codeT'){ if(pickFrom(el, false)) renderSide(); else renderStamp(invoices.find(i=>i.id === openId)); }
 });
@@ -589,9 +600,10 @@ function pickFrom(el, loose){
     const act = jobs.filter(j=>[...$('homeDL').options].some(o=>o.value === homeText(j)));
     let hit = act.filter(j=>homeText(j).toLowerCase() === v);
     if(!hit.length && loose && v) hit = act.filter(j=>homeText(j).toLowerCase().includes(v));
-    if(hit.length === 1){ s.houseId = hit[0].id; return true; }
-    if(loose){ s.houseId = ''; return true; }
-    return false;
+    if(hit.length === 1){ s.houseId = hit[0].id; s.houseLabel = homeLabel(hit[0]); return true; }
+    // not a home in the hub: keep what was typed (owner, 2026-10-29: not every home is in the system yet)
+    s.houseId = ''; s.houseLabel = el.value.trim();
+    return loose;
   }
   const num = (v.match(/^(\d+)\b/) || [])[1];
   let k = num && codes[num] ? num : Object.keys(codes).find(c=>codeText(c).toLowerCase() === v);
@@ -613,7 +625,8 @@ $('side').addEventListener('click', async e=>{
   const t = e.target;
   if(t.closest('#closeInv')){ closeInvoice(); render(); return; }
   if(t.closest('#addSplit')){ const left = Math.round(((Number(draft.total) || 0) - draft.splits.reduce((a, s)=>a + (Number(s.amount) || 0), 0)) * 100) / 100;
-    draft.splits.push({ houseId: draft.splits[0] ? draft.splits[0].houseId : '', code:0, labor:false, amount: Math.max(0, left), why:'' });
+    const f0 = draft.splits[0] || {};
+    draft.splits.push({ houseId: f0.houseId || '', houseLabel: f0.houseLabel || '', code: f0.code || 0, labor: !!f0.labor, amount: Math.max(0, left), why:'' });
     if(draft.lineMap) linesToAmounts(invoices.find(i=>i.id === openId));
     renderSide(); return; }
   const un = t.closest('[data-unsplit]'); if(un){ const k = Number(un.dataset.unsplit); draft.splits.splice(k, 1);
