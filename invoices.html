@@ -586,7 +586,7 @@ function renderSide(){
   const ro = x.status === 'entered';
   $('side').innerHTML = `<div style="display:flex; gap:10px; align-items:flex-start;"><div style="flex:1"><h2>${esc(x.vendor || 'Invoice')}</h2>
       <div class="muted" style="font-size:13px; margin-top:3px;">${esc(STATUS[x.status] || '')}${x.checkedBy ? ' · checked by ' + esc(x.checkedBy) : ''}${x.enteredBy ? ' · entered by ' + esc(x.enteredBy) + ' ' + esc(niceDate(x.enteredAt)) : ''} · pages ${x.pages ? x.pages.join('–') : ''} of the scan</div></div>
-      <div class="navbtns">${navIds.length > 1 ? `<button type="button" class="btn2" id="navPrev" ${idx > 0 ? '' : 'disabled'} title="Previous invoice">&#8249; Prev</button><span>${idx + 1} of ${navIds.length}</span><button type="button" class="btn2" id="navNext" ${idx < navIds.length - 1 ? '' : 'disabled'} title="Next invoice">Next &#8250;</button>` : ''}
+      <div class="navbtns">${navIds.length > 1 ? `<button type="button" class="btn2" id="navPrev" ${idx > 0 ? '' : 'disabled'} title="Previous invoice (← key)">&#8249; Prev</button><span>${idx + 1} of ${navIds.length}</span><button type="button" class="btn2" id="navNext" ${idx < navIds.length - 1 ? '' : 'disabled'} title="Next invoice (→ key)">Next &#8250;</button>` : ''}
       <button type="button" class="btn2" id="closeInv">Close</button></div></div>
     ${x.status === 'review' && (x.reasons || []).length ? `<div style="margin-top:10px;">${x.reasons.map(r=>`<span class="chipq">${esc(r)}</span>`).join('')}</div>` : ''}
     <div class="grid2x"><div><label class="f2">Vendor</label><input type="text" data-d="vendor" value="${esc(draft.vendor)}" ${ro ? 'disabled' : ''}></div>
@@ -713,6 +713,13 @@ $('side').addEventListener('click', async e=>{
     try{ await api({ action:'remove', id:openId }); const gone = openId; invoices = invoices.filter(x=>x.id !== gone); step(1, true); } catch(err){ console.error(err); alert('Couldn\'t remove it.'); } return; }
 });
 document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && openId){ closeInvoice(); render(); } });
+// owner, 2026-10-29: ← / → step through the open invoices (not while typing in a box)
+document.addEventListener('keydown', e=>{
+  if(!openId || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if(e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+  const b = $(e.key === 'ArrowRight' ? 'navNext' : 'navPrev'); if(!b || b.disabled) return;
+  e.preventDefault(); b.click();
+});
 
 /* ---- the list, tabs, scans, reviewers ---- */
 $('tabs').addEventListener('click', e=>{ const b = e.target.closest('[data-tab]'); if(b){ tab = b.dataset.tab; render(); } });
