@@ -230,6 +230,7 @@ html, body{max-width:100%; overflow-x:clip;}
   .linepick{margin-top:8px; border:1px solid var(--steel-line); border-radius:var(--radius); padding:8px 10px; background:#fff;}
   .linepick table{width:100%; border-collapse:collapse; font-size:12.5px;} .linepick td{padding:5px 4px; border-bottom:1px solid #f1ede3; vertical-align:middle;}
   .linepick .num{text-align:right; white-space:nowrap;}
+  .scanhead td{background:#f3f1ea; font-size:12.5px; font-weight:700; color:var(--ink-soft); padding:6px 10px;}
   .linego{max-width:230px; font-size:12.5px; padding:4px 6px;} .linepick .ln{color:var(--ink-soft); font-size:11.5px;}
   .partbtns{display:inline-flex; gap:3px;} .partbtns button{min-width:30px; padding:4px 7px; border:1px solid var(--steel-line); background:#fff; border-radius:6px; font-weight:700; font-family:inherit; cursor:pointer; font-size:12px;}
   .partbtns button.on{background:var(--navy); border-color:var(--navy); color:#fff;}
@@ -435,11 +436,13 @@ function render(){
   if(tab === 'items'){ $('bulk').innerHTML = ''; $('list').innerHTML = itemsView(q); }
   else {
   const rows = invoices.filter(x=>(tab === 'all' || x.status === tab) && (!q || [x.vendor, x.number, x.poJob, x.shipTo, ...(x.splits || []).map(s=>s.houseLabel)].join(' ').toLowerCase().includes(q)))
-    .sort((a, b)=>String(b.date || b.createdAt).localeCompare(String(a.date || a.createdAt)));
+    .sort(scanOrder);
   $('bulk').innerHTML = tab === 'ready' && rows.length ? `<button type="button" class="btn2" id="bulkPrint" disabled>Print ticked</button> <button type="button" class="btn2 good" id="bulkEntered" disabled>Mark ticked as entered</button>` : '';
-  $('list').innerHTML = rows.length ? `<table class="iv"><thead><tr>${tab === 'ready' ? '<th data-nosort><input type="checkbox" id="tickAll" title="Tick all"></th>' : ''}<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Home</th><th>Cost code</th><th class="num">Total</th><th>${tab === 'review' ? 'Needs' : 'Status'}</th></tr></thead><tbody>
-    ${rows.map(x=>{ const sp = x.splits || [];
-      return `<tr class="row" data-open="${esc(x.id)}">${tab === 'ready' ? `<td><input type="checkbox" class="tick" data-tick="${esc(x.id)}"></td>` : ''}<td>${esc(niceDate(x.date) || '—')}</td><td>${esc(x.vendor || '?')}</td><td>${esc(x.number || '')}</td>
+  $('list').innerHTML = rows.length ? `<table class="iv"><thead><tr>${tab === 'ready' ? '<th data-nosort><input type="checkbox" id="tickAll" title="Tick all"></th>' : ''}<th title="Where it is in the scanned PDF">Scan</th><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Home</th><th>Cost code</th><th class="num">Total</th><th>${tab === 'review' ? 'Needs' : 'Status'}</th></tr></thead><tbody>
+    ${rows.map((x, ri)=>{ const sp = x.splits || [], k = x.batchId || x.id, many = new Set(rows.map(r=>r.batchId || r.id)).size > 1;
+      const b = batches.find(z=>z.id === x.batchId), head = many && (!ri || (rows[ri - 1].batchId || rows[ri - 1].id) !== k)
+        ? `<tr class="scanhead"><td colspan="${tab === 'ready' ? 9 : 8}">Scan${b && b.name ? ' “' + esc(b.name) + '”' : ''} · uploaded ${esc(niceDate(b ? b.at : x.createdAt))}</td></tr>` : '';
+      return head + `<tr class="row" data-open="${esc(x.id)}">${tab === 'ready' ? `<td><input type="checkbox" class="tick" data-tick="${esc(x.id)}"></td>` : ''}<td class="muted" style="white-space:nowrap" data-sort-value="${esc((x.createdAt || '') + String((x.pages || [0])[0]).padStart(4, '0'))}">${esc(pageText(x))}</td><td>${esc(niceDate(x.date) || '—')}</td><td>${esc(x.vendor || '?')}</td><td>${esc(x.number || '')}</td>
         <td>${sp.length ? sp.map(s=>esc(s.houseLabel || '?')).join('<br>') : '<span class="muted">?</span>'}</td><td>${sp.length ? sp.map(s=>esc(codeName(s.code) || '?') + (s.labor ? ' <span class="muted">labor</span>' : '')).join('<br>') : '<span class="muted">?</span>'}</td>
         <td class="num">${money2(x.total)}</td>
         <td>${x.status === 'review' ? (x.reasons || []).slice(0, 3).map(r=>`<span class="chipq">${esc(r)}</span>`).join('') : x.status === 'entered' ? `<span class="chipok">Entered${x.enteredBy ? ' by ' + esc(x.enteredBy) : ''}</span>` : '<span class="chipok">Ready</span>'}</td></tr>`; }).join('')}</tbody></table>`
@@ -449,6 +452,14 @@ function render(){
 }
 
 /* ---- one invoice: the PDF on the left, what it's for on the right ---- */
+/* SCAN ORDER (owner, 2026-10-29: the person entering them keeps the scanned PDF printed, in order): newest scan first, and inside a
+   scan the invoices in page order — the same order as the paper. */
+function scanOrder(a, b){
+  const at = {}; invoices.forEach(x=>{ const k = x.batchId || x.id, t = String(x.createdAt || ''); if(!at[k] || t < at[k]) at[k] = t; });
+  const ka = a.batchId || a.id, kb = b.batchId || b.id;
+  return ka === kb ? ((a.pages || [0])[0] - (b.pages || [0])[0]) : String(at[kb]).localeCompare(String(at[ka])) || ka.localeCompare(kb);
+}
+const pageText = x=>x.pages && x.pages.length ? 'p. ' + (x.pages[0] === x.pages[x.pages.length - 1] ? x.pages[0] : x.pages[0] + '–' + x.pages[x.pages.length - 1]) : '';
 function openInvoice(id){
   const x = invoices.find(i=>i.id === id); if(!x) return;
   openId = id;
