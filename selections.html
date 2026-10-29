@@ -14,7 +14,7 @@
     --navy:#4B4F54; --navy-2:#33363a; --line:#d4d2c8; --line-soft:#ece8dd; --paper:#f5f4ef; --paper-2:#ffffff;
     --ink:#33363a; --ink-soft:#6b6f72; --sage:#A3AA83; --sage-2:#6B7355; --sage-soft:#eef0e8; --amber:#c98a2b; --amber-soft:#fdf3e2;
     --red:#a94438; --red-soft:#fbeae4; --good:#3f7a4e; --good-soft:#eaf1ec; --staff:#4a6b8a; --staff-soft:#e9eff5;
-    --shadow:0 1px 2px rgba(30,32,34,.08),0 4px 14px rgba(30,32,34,.06); --radius:8px;
+    --shadow:0 1px 2px rgba(30,32,34,.08),0 4px 14px rgba(30,32,34,.06); --radius:3px;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;font-size:16px;padding-bottom:96px}
@@ -26,7 +26,7 @@
   .wrap{max-width:1500px;margin:0 auto;padding:0 clamp(12px,3vw,28px)}   /* wider (owner, 2026-10-27: "widen to take up more of the screen") */
 
   .top{background:var(--paper-2);border-bottom:4px solid var(--sage);position:sticky;top:0;z-index:50}
-  .top-in{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 0}
+  .top-in{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:20px 0}
   .logo{font-weight:800;letter-spacing:.5px;color:var(--navy)}
   .logo span{color:var(--sage-2)}
   .top a{color:var(--ink-soft);text-decoration:none;font-size:13px;font-weight:600}
@@ -50,9 +50,9 @@
   .linkbtn{background:none;border:none;padding:0;color:var(--sage-2);font-weight:700;font-size:12.5px;text-decoration:underline;cursor:pointer}
   /* the same title bar as the hub's other apps: logo (back to the hub), app name */
   .top .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
-  .top .brand img{height:36px;width:auto;display:block}
-  .brand-t{font-size:clamp(18px,2.2vw,22px);font-weight:700;color:var(--navy)}
-  .brand-s{font-size:11px;color:var(--ink-soft);letter-spacing:.6px;text-transform:uppercase;margin-top:2px}
+  .top .brand img{height:40px;width:auto;display:block}
+  .brand-t{font-size:clamp(20px,2.4vw,24px);font-weight:700;color:var(--navy);letter-spacing:.2px}
+  .brand-s{font-size:12px;color:var(--ink-soft);letter-spacing:.6px;text-transform:uppercase;margin-top:2px}
   body.public .top .brand{pointer-events:none}
   body.public .brand-s{display:none}
   body.public .staffonly, body.signedout .staffonly, body.signedout #viewSw{display:none!important}

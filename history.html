@@ -184,9 +184,9 @@ html, body{max-width:100%; overflow-x:clip;}
   .scroll table.jc td:first-child:not(:has(+ .stick2)), .scroll table.jc th:first-child:not(:has(+ .stick2)){box-shadow:inset -1px 0 0 var(--steel-line);}
   .muted{color:var(--ink-soft);}
   /* Alden stats */
-  .tabs2{display:inline-flex; border:1px solid var(--steel-line); border-radius:22px; overflow:hidden; background:#fff; margin-top:14px;}
-  .tabs2 button{border:none; background:none; padding:9px 18px; font-size:14px; font-weight:700; color:var(--ink-soft); font-family:inherit; cursor:pointer;}
-  .tabs2 button.on{background:var(--navy); color:#fff;}
+  .tabs2{display:flex; gap:6px; flex-wrap:wrap; margin-top:14px;}
+  .tabs2 button{border:1px solid var(--steel-line); background:#fff; border-radius:20px; padding:8px 14px; font-size:14px; font-weight:700; color:var(--ink-soft); font-family:inherit; cursor:pointer;}
+  .tabs2 button.on{background:var(--navy); border-color:var(--navy); color:#fff;}
   .kpi .s{font-size:12px; color:var(--ink-soft); margin-top:3px;}
   .hbars{display:grid; grid-template-columns:minmax(110px, 190px) minmax(0, 1fr) auto; gap:7px 12px; align-items:center; margin-top:12px; font-size:13.5px;}
   .hbars .n{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}

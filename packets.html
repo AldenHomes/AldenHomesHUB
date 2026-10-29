@@ -45,8 +45,8 @@
   .btn-ghost:hover{background:#e9e5da;}
   .btn-primary{background:var(--navy); color:#fff;}
   .btn-primary:hover{background:var(--navy-2);}
-  .btn-link{background:#eaf0fa; color:#2f5fa8; border:1px solid #c3d6f2; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;}
-  .btn-link:hover{background:#dbe8f8;}
+  .btn-link{background:#fff; color:var(--navy); border:1px solid var(--steel-line); padding:6px 12px; border-radius:var(--radius); font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;}
+  .btn-link:hover{background:#f3f1ea;}
 
   .bundle-card{
     background:var(--paper-2); border-radius:var(--radius); box-shadow:var(--shadow); border-top:4px solid var(--rust);
@@ -114,6 +114,8 @@
     .titlebar .sync-badge{position:absolute; top:16px; right:14px;}
     .titlebar .brand{padding-right:74px;}
   }
+  .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
+  .back-link:hover{color:var(--navy);}
 </style>
 </head>
 <body>
@@ -168,6 +170,7 @@
   </div>
 
   <div class="wrap">
+    <a class="back-link" href="index.html">&larr; Back to the hub</a>
     <div class="bundle-card">
       <div>
         <h3>Share all developments at once</h3>
