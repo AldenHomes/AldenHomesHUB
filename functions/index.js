@@ -1096,6 +1096,32 @@ exports.hubApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, async (r
       res.json({ overhead: await getOverhead() });
       return;
     }
+    /* SCANNED INVOICES ON A HOME (owner, 2026-10-29): an invoice from the Invoices app shows on a home only once QuickBooks has it —
+       a QuickBooks line on this home (job-costs lines) with the same invoice number (Num) from the same vendor. Worked out each time the
+       home is opened, so a scan read after the QuickBooks import still matches. */
+    if(body.action === 'costsInvoices'){
+      const id = typeof body.houseId === 'string' ? body.houseId : '';
+      if(!id){ res.status(400).json({ error: 'house' }); return; }
+      const costDoc = await db.collection('job-costs').doc(id).get();
+      const lines = costDoc.exists ? (costDoc.data().lines || []).filter(l=>l.num) : [];
+      if(!lines.length){ res.json({ invoices: [], qb: costDoc.exists }); return; }
+      const normNum = v=>String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^0+/, '');
+      const words = v=>new Set(invKey(v).split(' ').filter(w=>w.length > 2));
+      const sameVendor = (a, b)=>{ const A = words(a), B = words(b); if(!A.size || !B.size) return true; for(const w of A) if(B.has(w)) return true; return false; };
+      const byNum = {};
+      (await db.collection('invoices').get()).docs.forEach(d=>{ const x = d.data(), k = normNum(x.number); if(k) (byNum[k] = byNum[k] || []).push({ id: d.id, ...x }); });
+      const found = {};
+      lines.forEach(l=>{
+        const hit = (byNum[normNum(l.num)] || []).find(x=>sameVendor(l.vendor, x.vendor));
+        if(!hit) return;
+        const f = found[hit.id] = found[hit.id] || { id: hit.id, vendor: hit.vendor || l.vendor || '', number: hit.number || l.num, date: hit.date || l.date || '', total: hit.total || 0,
+          url: hit.stampUrl || hit.url || '', status: hit.status || '', amount: 0, codes: [] };
+        f.amount = Math.round((f.amount + (Number(l.amount) || 0)) * 100) / 100;
+        if(l.code && !f.codes.includes(l.code)) f.codes.push(l.code);
+      });
+      res.json({ qb: true, invoices: Object.values(found).sort((a, b)=>String(b.date).localeCompare(String(a.date))) });
+      return;
+    }
     if(body.action === 'costsGet'){
       const id = typeof body.houseId === 'string' ? body.houseId : '';
       if(!id){ res.status(400).json({ error: 'house' }); return; }

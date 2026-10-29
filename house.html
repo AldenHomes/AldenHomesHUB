@@ -219,6 +219,13 @@
   .tl-arrow{font-size:11px; color:var(--ink-soft); transition:transform .15s;}
   #timelineCard.open .tl-arrow{transform:rotate(90deg);}
   #timelineCard{min-height:0;}
+  #invCard{min-height:0;} #invCard.open .tl-arrow{transform:rotate(90deg);}
+  .inv-row{display:flex; gap:12px; align-items:center; padding:10px 0; border-top:1px solid #f1ede3; font-size:14px;}
+  .inv-row:first-child{border-top:none;}
+  .inv-row .im{flex:1; min-width:0;} .inv-row .it{font-weight:600; color:var(--navy);} .inv-row .imeta{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+  .inv-row .ia{font-weight:700; white-space:nowrap;}
+  .inv-row a.btn-pdf{border:1px solid var(--steel-line); border-radius:20px; padding:5px 11px; font-size:12.5px; font-weight:600; color:var(--navy); text-decoration:none; white-space:nowrap;}
+  .inv-row a.btn-pdf:hover{background:#e9e5da;}
   .tl-day{font-size:11.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--ink-soft); margin:16px 0 2px;}
   .tl-day:first-child{margin-top:4px;}
   .tl-row{display:flex; gap:12px; align-items:flex-start; padding:9px 0; border-top:1px solid #f1ede3;}
@@ -541,6 +548,17 @@ html, body{max-width:100%; overflow-x:clip;}
             <div class="pick-bar" id="pickBar"></div>
             <div class="photo-grid" id="photoGrid"></div>
           </div>
+        </div>
+
+        <!-- Invoices: scanned invoices that QuickBooks has on this home (owner, 2026-10-29). Closed until someone wants it. -->
+        <div class="card wide" id="invCard">
+          <button type="button" class="tl-toggle" id="invToggle" aria-expanded="false">
+            <span class="card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
+            <span class="tl-title">Invoices <span class="muted" id="invCount" style="font-size:12px; font-weight:400;"></span></span>
+            <span class="tl-hint" id="invHint">Show the invoices</span>
+            <span class="tl-arrow">&#9654;</span>
+          </button>
+          <div class="card-body" id="invBody" style="display:none;"></div>
         </div>
 
         <!-- Timeline: everything that has happened on this home, newest first. Closed until someone wants it. -->
@@ -1032,8 +1050,34 @@ async function costsApi(body){
   if(!res.ok) throw new Error('hubApi ' + res.status);
   return res.json();
 }
+/* ---- Invoices card: scanned invoices matched to this home's QuickBooks lines (hubApi costsInvoices) ---- */
+let invInfo = null, invOpen = false;
+async function loadInvoices(){
+  try{ invInfo = await costsApi({ action:'costsInvoices', houseId }); } catch(err){ console.error('Could not load invoices', err); invInfo = { error: true, invoices: [] }; }
+  renderInvoices();
+}
+function renderInvoices(){
+  const list = (invInfo && invInfo.invoices) || [];
+  $('invCount').textContent = list.length ? '(' + list.length + ')' : '';
+  $('invCard').classList.toggle('open', invOpen);
+  $('invToggle').setAttribute('aria-expanded', String(invOpen));
+  $('invHint').textContent = invOpen ? 'Hide' : list.length ? 'Show the invoices' : 'None yet';
+  $('invBody').style.display = invOpen ? 'block' : 'none';
+  if(!invOpen) return;
+  const m2 = n=>'$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const day = d=>{ const x = new Date((d || '') + 'T12:00:00'); return isNaN(x) ? '' : x.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); };
+  $('invBody').innerHTML = !invInfo ? '<span class="muted">Loading…</span>' : invInfo.error ? '<span class="muted">Invoices couldn\'t be loaded right now.</span>'
+    : !list.length ? `<span class="muted">${invInfo.qb ? 'No scanned invoice matches this home\'s QuickBooks costs yet.' : 'No QuickBooks costs have been imported for this home yet.'} An invoice shows here once it has been scanned in the Invoices app AND QuickBooks has it on this home (same vendor and invoice number).</span>`
+    : list.map(x=>`<div class="inv-row"><div class="im"><div class="it">${esc(x.vendor)}${x.number ? ' · #' + esc(x.number) : ''}</div>
+        <div class="imeta">${esc([day(x.date), x.codes.length ? 'code ' + x.codes.join(', ') : '', x.total && Math.abs(x.total - x.amount) > 0.99 ? 'invoice total ' + m2(x.total) : ''].filter(Boolean).join(' · '))}</div></div>
+        <span class="ia">${m2(x.amount)}</span>
+        ${x.url ? `<a class="btn-pdf" href="${esc(x.url)}" target="_blank" rel="noopener">PDF</a>` : ''}<a class="btn-pdf" href="invoices.html?open=${encodeURIComponent(x.id)}">Open</a></div>`).join('')
+      + '<div class="muted" style="font-size:12px; margin-top:8px;">Amounts are what QuickBooks puts on this home. Only invoices QuickBooks has are listed.</div>';
+}
+document.getElementById('invCard').addEventListener('click', e=>{ if(e.target.closest('#invToggle')){ invOpen = !invOpen; renderInvoices(); } });
 async function loadCosts(){
   if(costsLoaded) return; costsLoaded = true;
+  loadInvoices();
   try{ costInfo = await costsApi({ action:'costsGet', houseId }); }
   catch(err){ console.error('Could not load job costs', err); $('costsBody').innerHTML = '<span class="muted">Job costs couldn\'t be loaded right now.</span>'; return; }
   renderCosts();
