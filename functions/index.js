@@ -2163,7 +2163,7 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       const [inv, bat, settings] = await Promise.all([db.collection('invoices').orderBy('createdAt', 'desc').limit(1500).get(),
         db.collection('invoice-batches').orderBy('at', 'desc').limit(15).get(), invSettings()]);
       res.json({ invoices: inv.docs.map(d=>({ id: d.id, ...d.data() })), batches: bat.docs.map(d=>({ id: d.id, ...d.data() })),
-        reviewers: settings.reviewers || [], codes: INV_CODES, reading: ASSISTANT_ON });
+        reviewers: settings.reviewers || [], accountants: settings.accountants || [], lastAlert: settings.lastAlert || null, codes: INV_CODES, reading: ASSISTANT_ON });
       return;
     }
     if(b.action === 'upload'){
@@ -2283,9 +2283,26 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       return;
     }
     if(b.action === 'settings'){
-      const reviewers = (Array.isArray(b.reviewers) ? b.reviewers : []).filter(x=>typeof x === 'string').slice(0, 10);
-      await db.collection('settings').doc('invoices').set({ reviewers }, { merge: true });
-      res.json({ reviewers });
+      const list = v=>(Array.isArray(v) ? v : []).filter(x=>typeof x === 'string').slice(0, 10), up = {};
+      if(b.reviewers !== undefined) up.reviewers = list(b.reviewers);
+      if(b.accountants !== undefined) up.accountants = list(b.accountants);
+      await db.collection('settings').doc('invoices').set(up, { merge: true });
+      res.json(up);
+      return;
+    }
+    /* ALERT THE ACCOUNTANT (owner, 2026-10-29): the reviewer (Chase) presses "Alert accountant for review" on the Ready tab when he's
+       done → bell + email (note kind invReady) to the people in settings/invoices.accountants. */
+    if(b.action === 'alertAccountant'){
+      const settings = await invSettings(), to = (settings.accountants || []).filter(Boolean);
+      if(!to.length){ res.status(409).json({ error: 'no-accountant' }); return; }
+      const ready = await db.collection('invoices').where('status', '==', 'ready').get();
+      const n = ready.size, sum = ready.docs.reduce((t, d)=>t + (Number(d.data().total) || 0), 0);
+      const msg = String(b.message || '').trim().slice(0, 600);
+      const text = `${by} has finished reviewing invoices. ${n} ${n === 1 ? 'is' : 'are'} ready to enter in QuickBooks${n ? ' ($' + sum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')' : ''}.${msg ? '\n\n' + msg : ''}`;
+      await db.collection('notes').add({ houseId: '', houseLabel: 'Invoices', kind: 'invReady', count: n, text, by: { uid: who.uid, name: by }, mentions: to, at: now, readBy: {} });
+      const lastAlert = { by, at: now, n };
+      await db.collection('settings').doc('invoices').set({ lastAlert }, { merge: true });
+      res.json({ ok: true, n, lastAlert });
       return;
     }
     res.status(400).json({ error: 'action' });
@@ -2318,6 +2335,7 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
   const fromSub = ['subDeclined', 'subNote', 'subWaiting'].includes(note.kind);
   // a punch list item (a note with todo: true) given to someone opens the punch list
   const link = note.kind === 'invReview' ? `${site}invoices.html${note.invoiceId ? '?open=' + encodeURIComponent(note.invoiceId) : ''}`
+    : note.kind === 'invReady' ? `${site}invoices.html?tab=ready`
     : note.kind === 'selPrice' ? `${site}selections.html?open=${encodeURIComponent(note.sheetId || '')}`
     : note.kind === 'permitsNeeded' ? `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#permitsCard`
     : note.todo ? `${site}punch.html`
@@ -2332,6 +2350,7 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
     subNote: { heading: 'Note from a sub', subject: `Note from ${who} on ${house}`, lead: `<strong>${esc(who)}</strong> sent a note about <strong>${esc(house)}</strong>:`, plain: `${who} sent a note about ${house}:`, button: 'Open this job' },
     permitsNeeded: { heading: 'Permits needed', subject: `Permits needed: ${house}`, lead: `<strong>${esc(house)}</strong> is signed and ready to go:`, plain: `${house} is signed and ready to go:`, button: 'Open the home' },
     invReview: { heading: 'Invoices to review', subject: 'Invoices to review', lead: `<strong>${esc(who)}</strong>:`, plain: `${who}:`, button: 'Open Invoices' },
+    invReady: { heading: 'Invoices ready for QuickBooks', subject: `Invoices ready for QuickBooks${note.count ? ' (' + note.count + ')' : ''}`, lead: 'From the Invoices app:', plain: 'From the Invoices app:', button: 'Open the Ready list' },
     selPrice: { heading: 'A price is needed', subject: `Price needed: ${house}`, lead: `<strong>${esc(who)}</strong> needs a price from you on a selection sheet (<strong>${esc(house)}</strong>):`, plain: `${who} needs a price from you on a selection sheet (${house}):`, button: 'Open the selection sheet' },
     subWaiting: { heading: 'Still waiting on a sub', subject: `Still waiting on an answer — ${house}`, lead: `A job on <strong>${esc(house)}</strong> has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, plain: `A job on ${house} has been waiting on an answer for more than ${WAITING_DAYS / 7} weeks:`, button: 'Open this job' },
   }[note.kind] || { heading: 'New note for you', subject: `New note for you on ${house}`, lead: `<strong>${esc(who)}</strong> mentioned you in a note on <strong>${esc(house)}</strong>:`, plain: `${who} mentioned you in a note on ${house}:`, button: 'Open this home' };

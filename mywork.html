@@ -379,7 +379,7 @@ function punchRow(t){
       <div class="m">${t.priority === 'high' ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${esc(whereOf(t))}</div></div>
   </div>`;
 }
-function noteLink(n){ return n.kind === 'selPrice' ? `selections.html?open=${encodeURIComponent(n.sheetId || '')}` : n.kind === 'permitsNeeded' ? `house.html?id=${encodeURIComponent(n.houseId || '')}#permitsCard` : n.kind === 'invReview' ? (n.invoiceId ? `invoices.html?open=${encodeURIComponent(n.invoiceId)}` : 'invoices.html') : n.houseId ? `house.html?id=${encodeURIComponent(n.houseId)}#notes` : 'punch.html'; }
+function noteLink(n){ return n.kind === 'selPrice' ? `selections.html?open=${encodeURIComponent(n.sheetId || '')}` : n.kind === 'permitsNeeded' ? `house.html?id=${encodeURIComponent(n.houseId || '')}#permitsCard` : n.kind === 'invReady' ? 'invoices.html?tab=ready' : n.kind === 'invReview' ? (n.invoiceId ? `invoices.html?open=${encodeURIComponent(n.invoiceId)}` : 'invoices.html') : n.houseId ? `house.html?id=${encodeURIComponent(n.houseId)}#notes` : 'punch.html'; }
 function subLink(n){ return `construction.html?house=${encodeURIComponent(n.houseId || '')}&task=${encodeURIComponent(n.taskId || '')}`; }
 function noteRow(n){
   const last = (n.replies || [])[(n.replies || []).length - 1];

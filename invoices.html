@@ -303,6 +303,11 @@ html, body{max-width:100%; overflow-x:clip;}
       <p class="lede">These people get a notice on their bell (and an email) when a scan has invoices to review. Anyone can still be added on a single invoice.</p>
       <div class="who-chips" id="reviewers" style="margin-top:10px;"></div>
     </div>
+    <div class="card2">
+      <h2>Who enters them in QuickBooks</h2>
+      <p class="lede">"Alert accountant for review" on the Ready tab sends these people a notice on their bell and an email.</p>
+      <div class="who-chips" id="accountants" style="margin-top:10px;"></div>
+    </div>
     <footer>Invoices are kept for good, with their PDF, and can be found again here.</footer>
   </div>
 </div>
@@ -347,6 +352,7 @@ async function api(body, url){
   if(!res.ok){ const e = new Error('invoicesApi ' + res.status); e.status = res.status; try{ e.body = await res.json(); } catch(x){} throw e; }
   return res.json();
 }
+let accountants = [], lastAlert = null;
 let invoices = [], batches = [], codes = {}, reviewers = [], staff = [], jobs = [], tab = 'review', openId = '', draft = null;
 const STATUS = { review:'To review', ready:'Ready for QuickBooks', entered:'Entered in QuickBooks', all:'All', items:'Item prices' };
 /* ITEM PRICES (owner, 2026-10-26: "see if there would be a big increase on an exterior door model or something").
@@ -409,13 +415,15 @@ const codeName = c=>Number(c) === PERSONAL ? 'Personal' : c && codes[c] ? c + ' 
 async function load(){
   try{
     const d = await api({ action:'list' });
-    invoices = d.invoices || []; batches = d.batches || []; codes = d.codes || {}; reviewers = d.reviewers || [];
+    invoices = d.invoices || []; batches = d.batches || []; codes = d.codes || {}; reviewers = d.reviewers || []; accountants = d.accountants || []; lastAlert = d.lastAlert || null;
     $('blockedNotice').classList.remove('show');
   } catch(err){ console.error(err); $('blockedNotice').classList.add('show'); }
   render();
   // still reading a scan: look again shortly
   clearTimeout(load.t);
   if(batches.some(b=>b.status === 'waiting' || b.status === 'reading')) load.t = setTimeout(load, 6000);
+  const wantTab = new URLSearchParams(location.search).get('tab');
+  if(wantTab && !load.tabbed){ load.tabbed = true; tab = wantTab; render(); }
   const want = new URLSearchParams(location.search).get('open');
   if(want && !load.opened && invoices.some(x=>x.id === want)){ load.opened = true; openInvoice(want); }
 }
@@ -437,7 +445,8 @@ function render(){
   else {
   const rows = invoices.filter(x=>(tab === 'all' || x.status === tab) && (!q || [x.vendor, x.number, x.poJob, x.shipTo, ...(x.splits || []).map(s=>s.houseLabel)].join(' ').toLowerCase().includes(q)))
     .sort(scanOrder);
-  $('bulk').innerHTML = tab === 'ready' && rows.length ? `<button type="button" class="btn2" id="bulkPrint" disabled>Print ticked</button> <button type="button" class="btn2 good" id="bulkEntered" disabled>Mark ticked as entered</button>` : '';
+  $('bulk').innerHTML = tab === 'ready' ? `<button type="button" class="btn2 primary" id="alertAcct" title="Bell notice + email to ${esc(acctNames() || 'the accountant')}">Alert accountant for review</button>${lastAlert ? ` <span class="muted" style="font-size:12.5px;">last sent by ${esc(lastAlert.by)} ${esc(niceDate(lastAlert.at))}</span>` : ''} ` : '';
+  if(tab === 'ready' && rows.length) $('bulk').innerHTML += `<button type="button" class="btn2" id="bulkPrint" disabled>Print ticked</button> <button type="button" class="btn2 good" id="bulkEntered" disabled>Mark ticked as entered</button>`;
   $('list').innerHTML = rows.length ? `<table class="iv"><thead><tr>${tab === 'ready' ? '<th data-nosort><input type="checkbox" id="tickAll" title="Tick all"></th>' : ''}<th title="Where it is in the scanned PDF">Scan</th><th>Date</th><th>Vendor</th><th>Invoice #</th><th>Home</th><th>Cost code</th><th class="num">Total</th><th>${tab === 'review' ? 'Needs' : 'Status'}</th></tr></thead><tbody>
     ${rows.map((x, ri)=>{ const sp = x.splits || [], k = x.batchId || x.id, many = new Set(rows.map(r=>r.batchId || r.id)).size > 1;
       const b = batches.find(z=>z.id === x.batchId), head = many && (!ri || (rows[ri - 1].batchId || rows[ri - 1].id) !== k)
@@ -448,6 +457,7 @@ function render(){
         <td>${x.status === 'review' ? (x.reasons || []).slice(0, 3).map(r=>`<span class="chipq">${esc(r)}</span>`).join('') : x.status === 'entered' ? `<span class="chipok">Entered${x.enteredBy ? ' by ' + esc(x.enteredBy) : ''}</span>` : '<span class="chipok">Ready</span>'}</td></tr>`; }).join('')}</tbody></table>`
     : `<p class="muted" style="margin-top:12px;">${invoices.length ? 'Nothing here.' : 'No invoices yet. Upload a scan above.'}</p>`;
   }
+  $('accountants').innerHTML = staff.length ? staff.map(s=>`<label><input type="checkbox" data-acct="${esc(s.uid)}" ${accountants.includes(s.uid) ? 'checked' : ''}> ${esc(s.name)}</label>`).join('') : '<span class="muted">Loading the team…</span>';
   $('reviewers').innerHTML = staff.length ? staff.map(s=>`<label><input type="checkbox" data-rev="${esc(s.uid)}" ${reviewers.includes(s.uid) ? 'checked' : ''}> ${esc(s.name)}</label>`).join('') : '<span class="muted">Loading the team…</span>';
 }
 
@@ -761,6 +771,22 @@ $('reviewers').addEventListener('change', async e=>{
   const c = e.target.closest('[data-rev]'); if(!c) return;
   reviewers = c.checked ? [...new Set([...reviewers, c.dataset.rev])] : reviewers.filter(x=>x !== c.dataset.rev);
   try{ await api({ action:'settings', reviewers }); } catch(err){ console.error(err); alert('Couldn\'t save who reviews.'); }
+});
+$('accountants').addEventListener('change', async e=>{
+  const c = e.target.closest('[data-acct]'); if(!c) return;
+  accountants = c.checked ? [...new Set([...accountants, c.dataset.acct])] : accountants.filter(x=>x !== c.dataset.acct);
+  try{ await api({ action:'settings', accountants }); render(); } catch(err){ console.error(err); alert('Couldn\'t save who enters them.'); }
+});
+function acctNames(){ return accountants.map(u=>(staff.find(s=>s.uid === u) || {}).name).filter(Boolean).join(' and '); }
+$('bulk').addEventListener('click', async e=>{
+  const b = e.target.closest('#alertAcct'); if(!b) return;
+  if(!accountants.length){ alert('First pick who enters them in QuickBooks (the box at the bottom of this page).'); $('accountants').scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+  const n = invoices.filter(x=>x.status === 'ready').length;
+  const msg = prompt(`Send ${acctNames()} a notice and an email that ${n} invoice${n === 1 ? ' is' : 's are'} ready for QuickBooks?\n\nAdd a note if you like (or leave it blank), then press OK.`, '');
+  if(msg === null) return;
+  b.disabled = true;
+  try{ const r = await api({ action:'alertAccountant', message: msg }); lastAlert = r.lastAlert; render(); toast('Sent to ' + acctNames() + '.'); }
+  catch(err){ console.error(err); b.disabled = false; alert('Couldn\'t send it. Check your connection and try again.'); }
 });
 // upload: read the file in the browser and send it (a scan up to about 20 MB)
 $('scanFile').addEventListener('change', async e=>{
