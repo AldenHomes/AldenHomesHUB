@@ -1181,6 +1181,60 @@ const ASSISTANT_TOOLS = [
     description: 'Propose checking an item off the punch list. Find the item id with list_punch_items or get_home first. Shown to the user to confirm.',
     input_schema: { type: 'object', properties: { item_id: { ...str, description: 'The id of the punch list item.' } }, required: ['item_id'], additionalProperties: false } },
 ];
+/* ALL OF THE HUB, READ ONLY (owner, 2026-10-29: "find old invoices and pull them up… access to everything in the hub so you can ask it to
+   generate statistics"). find_invoices looks invoices up directly; show_links puts buttons under the answer (an invoice, a home);
+   hub_data hands a whole collection to Claude's own Python (code execution, programmatic tool calling) so totals, averages and
+   counts are worked out by code, not guessed. Private chats are never readable; link codes / tokens / signatures are stripped. */
+const HUB_DATA_GUIDE = {
+  'jobs': 'homes: community (AP, CL, MM…), lot, client (buyer), address, model, settle (settlement date; past = finished), fndn, walk, move, sqft, basement',
+  'build-schedules': 'doc id = home id: tasks [{ title, start, end, done, subIds, confirm{subId: confirmed|declined} }], sentAt, history',
+  'subs': 'vendors: name, trade, email, phone',
+  'notes': 'notes on homes and punch list items (todo:true, done, due, priority), houseId, houseLabel, text, by{name}, at, kind',
+  'service-requests': 'homeowner service requests: name, address, lot, houseId, description, status (sent = complete), submittedAt, completedAt, vendorName, items',
+  'change-orders': 'change orders: houseId, title, items/prices, status, decided dates',
+  'invoices': 'vendor invoices read from scans: vendor, number, date, total, status (review | ready | entered), splits [{ houseId, houseLabel, code, labor, amount }], lines [{ item, sku, date, qty, unit, unitPrice, amount }], note, poJob, shipTo, batchId, pages, createdAt, checkedBy, enteredBy/At',
+  'invoice-batches': 'uploaded scans: name, at, by, pages, status',
+  'job-costs': 'doc id = home id: QuickBooks costs — byCode { code: { name, material, labor, total } }, lines [{ vendor, date, num, code, amount, memo }], lotCost, importedAt',
+  'job-sales': 'doc id = home id: sale price, lines, source',
+  'cost-history': 'finished builds: comm, lot, model, sqft, year/settle, total, byCode costs, gp (gross profit %), sale, bsmt',
+  'orders': 'material orders on the production schedule',
+  'open-slots': 'open start dates', 'available-lots': 'lots for sale',
+  'selection-sheets': 'buyers\' selection/pricing sheets: name, stage, houseId, sheet (JSON text with answers and prices)',
+  'schedule-templates': 'schedule templates', 'schedule-tasks': 'master list of schedule jobs',
+  'house-files': 'plans and photos on homes: houseId, kind (plan | photo), name, folder, at', 'sales-packets': 'sales packets',
+};
+const HUB_HIDE = /token|linkkey|^key$|signature|password|secret|^k$/i;
+function hubClean(v, depth){
+  if(typeof v === 'string') return v.length > 4000 && /^data:|^[A-Za-z0-9+/=]{4000}/.test(v) ? '[file data]' : v;
+  if(Array.isArray(v)) return v.map(x=>hubClean(x, depth + 1));
+  if(v && typeof v === 'object'){
+    if(typeof v.toDate === 'function') return v.toDate().toISOString();
+    const o = {}; for(const [k, x] of Object.entries(v)) if(!HUB_HIDE.test(k)) o[k] = hubClean(x, depth + 1); return o;
+  }
+  return v;
+}
+ASSISTANT_TOOLS.push(
+  { name: 'find_invoices', strict: true,
+    description: 'Find vendor invoices (from the Invoices app), old or new. Every filter is optional: use an empty string / 0 for "any". Returns up to 40 newest matches with their id, vendor, invoice number, date, total, homes, cost codes, status and where they are in the scan. To let the person open one, call show_links with its id.',
+    input_schema: { type: 'object', properties: {
+      text: { ...str, description: 'Words to look for in the vendor, invoice number, home, PO / job, ship-to, note or item lines ("" = any).' },
+      home_id: { ...str, description: 'Only invoices with a part for this home id ("" = any).' },
+      from: { ...str, description: 'Invoice date on or after, YYYY-MM-DD ("" = any).' },
+      to: { ...str, description: 'Invoice date on or before, YYYY-MM-DD ("" = any).' },
+      status: { type: 'string', enum: ['any', 'review', 'ready', 'entered'] },
+      min_total: { type: 'number', description: '0 = any' }, max_total: { type: 'number', description: '0 = any' },
+    }, required: ['text', 'home_id', 'from', 'to', 'status', 'min_total', 'max_total'], additionalProperties: false } },
+  { name: 'show_links', strict: true,
+    description: 'Put buttons under your answer that open things in the hub: an invoice (with its PDF) or a home\'s page. Use it whenever you mention specific invoices or homes the person may want to open. Up to 12.',
+    input_schema: { type: 'object', properties: { links: { type: 'array', items: { type: 'object', properties: {
+      kind: { type: 'string', enum: ['invoice', 'home'] }, id: str, label: { ...str, description: 'Short button text, e.g. "Furnace Hills #1943 · $19,953.87" or "AP Lot 423".' },
+    }, required: ['kind', 'id', 'label'], additionalProperties: false } } }, required: ['links'], additionalProperties: false } },
+  { name: 'hub_data',
+    description: 'Read a whole collection of the hub\'s records, as a JSON list of objects (each with its "id"), FOR USE FROM YOUR PYTHON CODE: call it inside code execution, e.g. rows = json.loads(await hub_data({"collection": "invoices"})), then filter, total, average and count in Python and print only the result. Use it for statistics, totals, comparisons and any question the other tools can\'t answer. Collections: ' + Object.entries(HUB_DATA_GUIDE).map(([k, v])=>k + ' (' + v + ')').join('; ') + '. Dates are text YYYY-MM-DD or ISO times. Money is in dollars.',
+    input_schema: { type: 'object', properties: { collection: { type: 'string', enum: Object.keys(HUB_DATA_GUIDE) } }, required: ['collection'], additionalProperties: false },
+    allowed_callers: ['code_execution_20260120'] },
+  { type: 'code_execution_20260120', name: 'code_execution' },
+);
 const ASSISTANT_WRITES = ['add_note', 'add_punch_item', 'complete_punch_item'];
 
 const ASSISTANT_RULES = `You are the assistant built into the Alden Homes Hub, the internal tool the office staff of a home builder use to run their jobs. People press a button and speak, so what you receive is speech turned into text. Expect slips: lot numbers and names can come through slightly wrong ("a p forty", "AP40", "lot fourty"), and a first name may be spelled differently from the team list.
@@ -1198,6 +1252,8 @@ Questions: answer from the lists below, or look the home up with get_home when t
 How to answer: the reader is office staff reading on a phone, not a technical person. Keep it to a sentence or two in plain words, no formatting symbols, with dates written like "Tue, Oct 20". Refer to homes the way the staff do ("AP Lot 40, Smith"), never by id.
 
 Walk-throughs: sometimes the message is the transcript of someone walking through a home with their phone camera, talking about what they see. It arrives cut into short numbered clips of a few seconds each ("[1] ...", "[2] ..."), and the hub kept pictures from the camera all the way through with the time of each, so a clip number tells it which moment to take the picture from. Turn it into punch list items: one add_punch_item call for each separate thing that needs doing, worded as a short clear instruction that would make sense to someone who was not there (say which room or spot if they did). Set photo_clip to the clip in which they name or describe the thing itself, because that is when the camera is on it. That is often a clip or two after they start leading up to it ("okay, next, over here...") and before they move on, so pick the clip with the telling words ("this outlet cover", "the paint by the door"), not the lead-in. Leave out chatter and anything that is only a remark, and never add an item they did not ask for. If they named who should do something, assign it; otherwise leave it unassigned. Make all the calls in one go, then say in one sentence how many items are waiting to be confirmed. If the transcript does not make clear which home it is and none is open on their screen, ask which home before proposing anything.
+
+Records and statistics: you can read everything in the hub. find_invoices finds invoices (then show_links so they can open them — always offer the buttons for invoices or homes you name). For numbers — totals, averages, counts, "how much did we spend with X this year", "average cost of a Percy", "which vendor declines most" — write Python in code execution that calls hub_data for the collections it needs and computes the answer; never add up figures in your head. Give the answer in plain words with the key numbers; a short list is fine when there are several items.
 
 If they ask for something you have no way to do — moving schedule dates, emailing a sub, changing a service request — say you can't do that from here yet, and mention where in the hub it's done if you know (Construction Schedules, Service Center, Punch List, Admin Settings).`;
 
@@ -1256,6 +1312,34 @@ async function assistantLookup(name, input, ctx){
       service_requests: reqSnap.docs.map(d=>d.data()).filter(r=>{ const h = homeForRequest(r, ctx.jobs); return h && h.id === job.id; })
         .map(r=>({ submitted: (r.submittedAt || '').slice(0, 10), status: r.status === 'sent' ? 'complete' : (r.status || 'new'), assigned_to: r.vendorName || '', description: r.description || '' })),
     });
+  }
+  if(name === 'hub_data'){
+    const c = String(input.collection || '');
+    if(!HUB_DATA_GUIDE[c]) return 'Unknown collection. Use one of: ' + Object.keys(HUB_DATA_GUIDE).join(', ');
+    const snap = await db.collection(c).get();
+    return JSON.stringify(snap.docs.map(d=>({ id: d.id, ...hubClean(d.data(), 0) })));
+  }
+  if(name === 'find_invoices'){
+    const snap = await db.collection('invoices').get(), q = String(input.text || '').trim().toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+    const rows = snap.docs.map(d=>({ id: d.id, ...d.data() })).filter(x=>{
+      if(input.status && input.status !== 'any' && x.status !== input.status) return false;
+      if(input.home_id && !(x.splits || []).some(s=>s.houseId === input.home_id)) return false;
+      if(input.from && (x.date || '') < input.from) return false;
+      if(input.to && (!x.date || x.date > input.to)) return false;
+      if(input.min_total && (Number(x.total) || 0) < input.min_total) return false;
+      if(input.max_total && (Number(x.total) || 0) > input.max_total) return false;
+      if(!words.length) return true;
+      const hay = [x.vendor, x.number, x.poJob, x.shipTo, x.note, ...(x.splits || []).map(s=>s.houseLabel + ' ' + s.code + ' ' + (INV_CODES[s.code] || '')), ...(x.lines || []).map(l=>l.item + ' ' + l.sku)].join(' ').toLowerCase();
+      return words.every(w=>hay.includes(w));
+    }).sort((a, b)=>String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')));
+    return JSON.stringify({ found: rows.length, showing: Math.min(rows.length, 40), invoices: rows.slice(0, 40).map(x=>({ id: x.id, vendor: x.vendor || '', number: x.number || '', date: x.date || '', total: x.total || 0,
+      status: x.status, parts: (x.splits || []).map(s=>({ home: s.houseLabel || '', code: s.code ? s.code + ' ' + (INV_CODES[s.code] || '') : '', amount: s.amount })), note: x.note || '', scan_pages: x.pages || [] })) });
+  }
+  if(name === 'show_links'){
+    const links = (Array.isArray(input.links) ? input.links : []).slice(0, 12).map(l=>({ kind: l.kind === 'home' ? 'home' : 'invoice', id: String(l.id || '').slice(0, 60), label: cleanText(l.label, 80) || 'Open' })).filter(l=>/^[\w-]+$/.test(l.id));
+    ctx.links = [...(ctx.links || []), ...links].slice(0, 12);
+    return 'The buttons are on the person\'s screen under your answer.';
   }
   if(name === 'list_punch_items'){
     const snap = await db.collection('notes').where('todo', '==', true).get();
@@ -1357,7 +1441,7 @@ async function assistantRun(action, ctx){
   return 'That is not something the assistant can do.';
 }
 
-if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 5, timeoutSeconds: 120, secrets: [ANTHROPIC_API_KEY] }, async (req, res)=>{
+if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 5, timeoutSeconds: 300, memory: '1GiB', secrets: [ANTHROPIC_API_KEY] }, async (req, res)=>{
   if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
   try{
     const who = await staffFromRequest(req);
@@ -1406,24 +1490,25 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
     };
     // If Claude's safety checks ever decline a request, let the service retry it on its fallback
     // model instead of failing. If this account can't use that option, carry on without it.
-    let useFallbacks = true;
+    let useFallbacks = true, container = '';
     const callClaude = async ()=>{
       if(useFallbacks){
         try{
-          return await client.beta.messages.create({ ...request, messages, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+          return await client.beta.messages.create({ ...request, messages, ...(container ? { container } : {}), betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
         } catch(err){
           if(!(err instanceof Anthropic.BadRequestError)) throw err;
           logger.warn('Assistant: fallback option not accepted, continuing without it', { message: err.message });
           useFallbacks = false;
         }
       }
-      return client.messages.create({ ...request, messages });
+      return client.messages.create({ ...request, messages, ...(container ? { container } : {}) });
     };
 
     const proposed = [];
     let reply = '', tokensIn = 0, tokensOut = 0;
-    for(let turn = 0; turn < 6; turn++){
+    for(let turn = 0; turn < 14; turn++){
       const response = await callClaude();
+      if(response.container && response.container.id) container = response.container.id;
       tokensIn += (response.usage.input_tokens || 0) + (response.usage.cache_read_input_tokens || 0) + (response.usage.cache_creation_input_tokens || 0);
       tokensOut += response.usage.output_tokens || 0;
       reply = response.content.filter(b=>b.type === 'text').map(b=>b.text).join('\n').trim() || reply;
@@ -1455,7 +1540,7 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
       messages.push({ role: 'user', content: results });
     }
     logger.info('Assistant request', { by: ctx.me.name, tokensIn, tokensOut, proposed: proposed.map(p=>p.type), ...(walk ? { walk: true, clips: proposed.map(p=>p.clip || 0) } : {}) });
-    res.json({ reply: reply || (proposed.length ? 'Here is what I\'ll do once you confirm.' : 'Sorry, I didn\'t catch that. Could you say it another way?'), actions: proposed });
+    res.json({ reply: reply || (proposed.length ? 'Here is what I\'ll do once you confirm.' : 'Sorry, I didn\'t catch that. Could you say it another way?'), actions: proposed, links: ctx.links || [] });
   } catch(err){
     logger.error('hubAssistant failed', { error: String(err), status: err && err.status });
     // a status here means Claude's service answered with an error (bad key, out of credit, busy)

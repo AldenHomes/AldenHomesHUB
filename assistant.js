@@ -26,6 +26,9 @@
   .ai-msg{max-width:88%; padding:9px 12px; border-radius:12px; font-size:14.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word;}
   .ai-msg.user{align-self:flex-end; background:var(--navy, #4B4F54); color:#fff; border-bottom-right-radius:3px;}
   .ai-msg.bot{align-self:flex-start; background:#f3f5ee; color:var(--ink, #33363a); border-bottom-left-radius:3px;}
+  .ai-links{align-self:flex-start; display:flex; flex-wrap:wrap; gap:6px; margin:-2px 0 4px;}
+  .ai-link{display:inline-block; background:#fff; border:1px solid var(--navy, #4B4F54); color:var(--navy, #4B4F54); border-radius:16px; padding:5px 11px; font-size:12.5px; text-decoration:none; font-weight:600;}
+  .ai-link:hover{background:var(--navy, #4B4F54); color:#fff;}
   .ai-msg.hint{align-self:stretch; max-width:none; background:none; color:var(--ink-soft, #6b6f72); font-size:13px; padding:0;}
   .ai-msg.hint em{display:block; font-style:normal; margin-top:6px; padding:7px 10px; background:#faf8f2; border:1px solid #ece8dd; border-radius:8px; color:var(--ink, #33363a);}
   .ai-card{align-self:stretch; border:2px solid var(--amber, #c98a2b); background:#fffaf1; border-radius:10px; padding:12px;}
@@ -229,6 +232,13 @@
     card.querySelector('[data-ai-pic="1"]').disabled = a._fi >= a._tape.frames.length - 1;
   }
 
+  // buttons under an answer: an invoice opens in the Invoices app, a home opens its page (owner, 2026-10-29)
+  function showLinks(after, links){
+    if(!Array.isArray(links) || !links.length) return;
+    const div = document.createElement('div'); div.className = 'ai-links';
+    div.innerHTML = links.map(l=>`<a class="ai-link" href="${l.kind === 'home' ? 'house.html?id=' : 'invoices.html?open='}${encodeURIComponent(l.id)}">${escHtml(l.label)}</a>`).join('');
+    after.after(div);
+  }
   async function send(){
     const text = el('aiText').value.trim();
     if(!text || busy) return;
@@ -240,6 +250,7 @@
     try{
       const data = await call({ action:'ask', text, history, context: pageContext() });
       waiting.textContent = data.reply || '';
+      showLinks(waiting, data.links);
       history.push({ role:'user', text }, { role:'assistant', text: data.reply || '' });
       history = history.slice(-6);
       showActions(data.actions || []);
