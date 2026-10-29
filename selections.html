@@ -2792,7 +2792,7 @@ async function bootOffice(){
   if(want && leads.some(l=>l.id === want)){ cur = want; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; }
   start();
   // the hub's search button and voice assistant, as on every staff page
-  ['hubsearch.js', 'assistant.js'].forEach(f=>{ const sc = document.createElement('script'); sc.src = f; document.body.appendChild(sc); });
+  ['hubsearch.js', 'chat.js', 'assistant.js'].forEach(f=>{ const sc = document.createElement('script'); sc.src = f; document.body.appendChild(sc); });
 }
 async function boot(){
   const linkId = PRESENT || SHOW || QUOTE;

@@ -647,6 +647,8 @@ function attachScheduleStatsListener(db){
 
 /* ---- Notification bell: notes on a home where someone @mentioned you ---- */
 let bellNotes = [];
+let bellChats = [];   // unread chats (chat.js tells us), shown at the top of the bell
+window.addEventListener('hubchat', e=>{ bellChats = e.detail.chats || []; if(bellDb) renderBell(); });
 let bellUid = '';
 let bellDb = null;
 function attachBell(db, user){
@@ -679,12 +681,12 @@ function bellTime(iso){
   return d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
 }
 function renderBell(){
-  const unread = bellNotes.filter(bellUnread).length;
+  const unread = bellNotes.filter(bellUnread).length + bellChats.length;
   const count = document.getElementById('bellCount');
   count.textContent = unread > 9 ? '9+' : unread;
   count.style.display = unread ? '' : 'none';
   document.getElementById('bellBtn').classList.toggle('has', unread > 0);
-  document.getElementById('bellClear').style.display = unread ? '' : 'none';
+  document.getElementById('bellClear').style.display = bellNotes.some(bellUnread) ? '' : 'none';
   // Something from a sub (declined, sent a note, hasn't answered) opens that job on the schedule,
   // where another vendor can be picked. A staff note opens the home's notes.
   const BELL_KINDS = { subDeclined:'Declined', subNote:'Sub note', subWaiting:'No answer', costOver:'Over usual', selPrice:'Price needed', invReview:'Invoices', invReady:'Invoices ready', permitsNeeded:'Permits' };
@@ -698,11 +700,12 @@ function renderBell(){
     : `house.html?id=${encodeURIComponent(n.houseId || '')}#notes`;
   // if the newest thing on a note is a comment, that's what the bell shows
   const lastReply = n=>{ const r = (n.replies || [])[(n.replies || []).length - 1]; return r && (r.at || '') >= (n.lastAt || '') ? r : null; };
-  document.getElementById('bellList').innerHTML = bellNotes.length ? bellNotes.map(n=>`
+  const chatItems = bellChats.map(c=>`<a class="bell-item unread" data-chat="${escHtml(c.id)}" href="#chat=${escHtml(c.id)}"><div class="who"><span class="dot"></span><span class="kind invReady">Chat</span>${escHtml(c.title)}<span class="when" style="float:right;">${escHtml(bellTime(c.lastAt))}</span></div><div class="txt">${escHtml((c.lastByName ? c.lastByName.split(' ')[0] + ': ' : '') + c.lastText)}</div></a>`).join('');
+  document.getElementById('bellList').innerHTML = chatItems + (bellNotes.length ? bellNotes.map(n=>`
     <a class="bell-item${bellUnread(n) ? ' unread' : ''}" data-note="${escHtml(n.id)}" href="${bellLink(n)}">
       <div class="who">${bellUnread(n) ? '<span class="dot"></span>' : ''}${BELL_KINDS[n.kind] ? `<span class="kind ${escHtml(n.kind)}">${BELL_KINDS[n.kind]}</span>` : ''}${n.todo ? `<span class="kind subWaiting">${n.done ? 'Done' : 'To do'}</span>` : ''}${!lastReply(n) && n.reminded && n.reminded[bellUid] ? '<span class="kind subWaiting">Reminder</span>' : ''}<strong>${escHtml(((lastReply(n) || n).by || {}).name || 'Someone')}</strong> ${lastReply(n) ? 'commented' : ''} on ${escHtml(n.houseLabel || 'a home')} · ${escHtml(bellTime((lastReply(n) || n).at))}</div>
       <div class="txt">${escHtml((lastReply(n) || n).text || '')}</div>
-    </a>`).join('') : '<div class="bell-empty">Nothing yet. Notes that @mention you show up here, along with subs who decline a job or send a note.</div>';
+    </a>`).join('') : chatItems ? '' : '<div class="bell-empty">Nothing yet. Notes that @mention you show up here, along with subs who decline a job or send a note.</div>');
 }
 function markBellRead(ids){
   if(!bellDb || !ids.length) return Promise.resolve();
@@ -716,6 +719,8 @@ document.getElementById('bellBtn').addEventListener('click', e=>{
 });
 document.getElementById('bellClear').addEventListener('click', ()=>markBellRead(bellNotes.filter(bellUnread).map(n=>n.id)));
 document.getElementById('bellList').addEventListener('click', e=>{
+  const ch = e.target.closest('[data-chat]');
+  if(ch){ e.preventDefault(); document.getElementById('bellPanel').classList.remove('show'); if(window.hubChat) window.hubChat.open(ch.dataset.chat); return; }
   const item = e.target.closest('.bell-item');
   if(item) markBellRead([item.dataset.note]); // opening a note counts as reading it
 });
@@ -1173,6 +1178,7 @@ window.addEventListener('appinstalled', ()=>{
 });
 </script>
 <script src="hubsearch.js"></script>
+<script src="chat.js"></script>
 <script src="assistant.js"></script>
 </body>
 </html>
