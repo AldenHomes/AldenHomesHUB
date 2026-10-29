@@ -321,6 +321,7 @@
   .ds-chip.on{border-color:#1f3550; background:#eef3f8;}
   .ds-other{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:10px; padding:10px; border:2px dashed #d6d1c4; border-radius:10px;}
   .ds-other.on{border-style:solid; border-color:#1f3550; background:#eef3f8;} .ds-other input[type=text]{flex:1; min-width:220px;}
+  .cho-spec{display:block;font-size:12.5px;font-weight:400;color:var(--ink-soft);margin-top:2px}
   .cho-img{flex:0 0 auto; width:64px; height:64px; padding:0; border:1px solid #e3e0d8; border-radius:8px; background:#fff; overflow:hidden; cursor:zoom-in; margin-right:4px;}
   .cho-img img{width:100%; height:100%; object-fit:cover; display:block;}
   .ph-groups{display:flex; flex-wrap:wrap; gap:4px 18px; align-items:flex-start;}
@@ -668,7 +669,7 @@ const KITCHEN = [
    questions on the Selections side that are only asked once their line is picked ("they would only need to choose a style if they
    choose they want one"). WANT_FIRST lines ask "Add one?" before showing the styles. */
 const MISC = 'selection-photos/misc/';
-const CHOICE_IMG = { '156':[[/^laundry tub$/i, 'laundry-tub']], '518':[[/^wood pantry shelves/i, 'pantry-wood'], [/appliance shelf/i, 'pantry-wire-wood-appliance']],
+const CHOICE_IMG = { '156':[[/^laundry tub$/i, 'laundry-tub', 'Mustee 18W Utilatub laundry tub with Moen 74998 Chateau faucet (chrome)']], '518':[[/^wood pantry shelves/i, 'pantry-wood'], [/appliance shelf/i, 'pantry-wire-wood-appliance']],
   '277':[[/rectangle mirror - black/i, 'mirror-black-rectangle'], [/rectangle mirror - gold/i, 'mirror-gold-rectangle'], [/rectangle mirror - silver/i, 'mirror-silver-rectangle'],
     [/round mirror - gold/i, 'mirror-gold-round'], [/round mirror - silver/i, 'mirror-silver-round'], [/round mirror - black/i, 'mirror-black-round']] };
 const TIMBERTECH = ['American Walnut', 'Boardwalk', 'Brownstone', 'Castle Gate', 'Coastline', 'Dark Hickory', 'English Walnut', 'French White Oak', 'Kona', 'Mahogany', 'Slate Gray', 'Weathered Teak'];
@@ -1019,7 +1020,7 @@ function buildCatalog(cat){
     sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || !!KITCHEN_KIND[s.bt] || s.bt === '522' || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt] || s.bt === '522', want: !!WANT_FIRST[s.bt], fauc: !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], mix: ['hwset', 'hwset-m', 'hwadd', 'hook'].includes(FAUCET_KIND[s.bt]), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
       c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, up:c.up, kitm:c.kitm, kit:c.kit, gb:c.gb,
-        ...(!c.img && CHOICE_IMG[s.bt] ? (m=>m ? { img:MISC + m[1] + '.jpg' } : {})(CHOICE_IMG[s.bt].find(([re])=>re.test(String(c.t).trim()))) : {}), unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
+        ...(!c.img && CHOICE_IMG[s.bt] ? (m=>m ? { img:MISC + m[1] + '.jpg', ...(m[2] ? { spec:m[2] } : {}) } : {})(CHOICE_IMG[s.bt].find(([re])=>re.test(String(c.t).trim()))) : {}), unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
      price — both priced in the back end (OPT_PRICES 'bsmt-open', 'bsmt-rail', on the server). The railing is a side add (c.side): it
@@ -1207,7 +1208,7 @@ function lines(L){
     r.qs.forEach(q=>{ if(!asked(q, L)) return;
       q.c.forEach((c, i)=>{
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
-      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : (q.fauc || q.sh || c.gb) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.p == null });
+      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : (q.fauc || q.sh || c.gb) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.spec ? c.t + ' — ' + c.spec : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.p == null });
       });
       if(q.want && (L.answers['want:' + q.id] || {}).label && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty))
         out.push({ key:'want:' + q.id, q, where:'', label:'Wanted — style still to pick', price:0, cost:0, std:false, typed:true });
@@ -1298,7 +1299,7 @@ function prow(q, L, force){
       ? `<input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.unit}</span>${n && view !== 'customer' ? `<span class="cp">= ${plus(p * n)}</span>` : ''}`
       : (n && !(q.one || q.opts || q.ceil || q.nostep || c.side || c.grp) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
         + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
-    return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">${c.img ? `<button type="button" class="cho-img" data-photo-view="${esc(k)}" title="See it bigger"><img src="${esc(c.img)}" alt="${esc(c.t)}" loading="lazy"></button>` : ''}<span class="ct">${esc(c.t)}</span>${price}${ctl}</div>`;
+    return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">${c.img ? `<button type="button" class="cho-img" data-photo-view="${esc(k)}" title="See it bigger"><img src="${esc(c.img)}" alt="${esc(c.t)}" loading="lazy"></button>` : ''}<span class="ct">${esc(c.t)}${c.spec ? `<small class="cho-spec">${esc(c.spec)}</small>` : ''}</span>${price}${ctl}</div>`;
   }).join(''));
   const isOpen = force || openSel.has(q.id), shown = choicesOf(q, L);
   const stdNote = q.fin && q.id !== 'fin_kit' ? '<div class="q-sub">The finish covers the shower door, faucets and hardware in this bathroom.</div>' : '';
