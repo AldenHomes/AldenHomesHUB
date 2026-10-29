@@ -186,6 +186,13 @@ html, body{max-width:100%; overflow-x:clip;}
   .alldone{background:#eaf1ec; border:1px solid #c5dccb; color:#27573a; border-radius:var(--radius); padding:10px 12px; margin-top:10px; font-size:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
   .back-link{display:inline-block; margin:0 0 14px; color:var(--ink-soft); font-size:13px; font-weight:600; text-decoration:none;}
   .back-link:hover{color:var(--navy);}
+  /* home suggestions on Add Request (owner, 2026-10-29) */
+  .ar-sugg{position:absolute; left:0; right:0; top:100%; z-index:20; background:#fff; border:1px solid var(--steel-line); border-radius:var(--radius);
+    box-shadow:0 8px 24px rgba(0,0,0,.14); max-height:300px; overflow-y:auto; margin-top:2px;}
+  .ar-sugg button{display:block; width:100%; text-align:left; border:none; background:none; padding:9px 12px; font-family:inherit; font-size:14px; cursor:pointer; border-top:1px solid #f1ede3; color:var(--ink);}
+  .ar-sugg button:first-child{border-top:none;}
+  .ar-sugg button:hover, .ar-sugg button.on{background:#f3f1ea;}
+  .ar-sugg .sub{display:block; font-size:12px; color:var(--ink-soft); margin-top:1px;}
 </style>
 <link rel="stylesheet" href="apple.css?v=2">
 <script src="apple.js?v=2"></script>
@@ -385,6 +392,12 @@ html, body{max-width:100%; overflow-x:clip;}
       <button class="modal-close" id="addRequestClose">&times;</button>
     </div>
     <div class="modal-body">
+      <div class="field" style="position:relative;">
+        <label for="ar_find">Home <span style="text-transform:none; font-weight:400;">(start typing a lot number, street or name)</span></label>
+        <input type="text" id="ar_find" autocomplete="off" placeholder="e.g. 423, Mosaic, Fulloon">
+        <div class="ar-sugg" id="ar_sugg" role="listbox" style="display:none;"></div>
+        <div id="ar_picked" style="font-size:12px; color:var(--ink-soft); margin-top:5px;"></div>
+      </div>
       <div class="field">
         <label for="ar_name">Name</label>
         <input type="text" id="ar_name">
@@ -726,8 +739,10 @@ function shrinkPhoto(file){
 const addRequestOverlay = document.getElementById('addRequestOverlay');
 let arSelectedFiles = [];
 
+let arHouseId = '', arSuggList = [], arSuggAt = -1;
 function openAddRequestModal(){
-  ['ar_name','ar_phone','ar_email','ar_address','ar_lot','ar_description'].forEach(id=>{
+  arHouseId = ''; document.getElementById('ar_picked').textContent = ''; document.getElementById('ar_sugg').style.display = 'none';
+  ['ar_find','ar_name','ar_phone','ar_email','ar_address','ar_lot','ar_description'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   document.getElementById('ar_status').value = 'new';
@@ -736,8 +751,53 @@ function openAddRequestModal(){
   document.getElementById('addRequestError').classList.remove('show');
   arSelectedFiles = [];
   addRequestOverlay.classList.add('show');
+  setTimeout(()=>document.getElementById('ar_find').focus(), 50);
 }
 function closeAddRequestModal(){ addRequestOverlay.classList.remove('show'); }
+
+/* Type a lot number, street or buyer name → the matching homes (finished ones too — most requests come after settlement).
+   Picking one fills the name, phone, email, address and lot from the home, and ties the request to it (houseId). */
+function arMatches(q){
+  q = q.trim().toLowerCase(); if(!q) return [];
+  const words = q.replace(/[#,.]/g, ' ').split(/\s+/).filter(Boolean);
+  const scored = [];
+  jobs.forEach(j=>{
+    const hay = [j.community, 'lot ' + (j.lot || ''), j.lot, j.client, j.address].filter(Boolean).join(' ').toLowerCase();
+    if(!words.every(w=>hay.includes(w))) return;
+    let score = 0;
+    if(words.some(w=>String(j.lot || '').toLowerCase() === w.replace(/^lot/, ''))) score += 10;      // exact lot number first
+    if(String(j.lot || '').toLowerCase().startsWith(words[0])) score += 4;
+    if(!j.settle || j.settle >= new Date().toISOString().slice(0, 10)) score -= 1;                 // finished homes a little ahead
+    scored.push({ j, score });
+  });
+  return scored.sort((a, b)=>b.score - a.score || String(a.j.lot).localeCompare(String(b.j.lot), undefined, { numeric: true })).slice(0, 8).map(x=>x.j);
+}
+function arDrawSugg(){
+  const box = document.getElementById('ar_sugg');
+  arSuggList = arMatches(document.getElementById('ar_find').value);
+  if(!arSuggList.length){ box.style.display = 'none'; return; }
+  box.innerHTML = arSuggList.map((j, i)=>`<button type="button" data-ar-pick="${i}" class="${i === arSuggAt ? 'on' : ''}">${esc(homeLabel(j))}<span class="sub">${esc([j.address, j.phone, j.settle ? (j.settle < new Date().toISOString().slice(0, 10) ? 'settled ' : 'settles ') + j.settle : ''].filter(Boolean).join(' · ') || 'no address on file')}</span></button>`).join('');
+  box.style.display = 'block';
+}
+function arPick(j){
+  arHouseId = j.id;
+  const set = (id, v)=>{ const el = document.getElementById(id); if(v && !el.value.trim()) el.value = v; };
+  ['ar_name','ar_phone','ar_email','ar_address','ar_lot'].forEach(id=>{ document.getElementById(id).value = ''; });
+  set('ar_name', j.client); set('ar_phone', j.phone); set('ar_email', j.email); set('ar_address', j.address); set('ar_lot', j.lot);
+  document.getElementById('ar_find').value = homeLabel(j);
+  document.getElementById('ar_picked').textContent = '✓ Filled in from ' + homeLabel(j) + ' — change anything that\'s different.';
+  document.getElementById('ar_sugg').style.display = 'none';
+  document.getElementById('ar_description').focus();
+}
+document.getElementById('ar_find').addEventListener('input', ()=>{ arHouseId = ''; document.getElementById('ar_picked').textContent = ''; arSuggAt = -1; arDrawSugg(); });
+document.getElementById('ar_find').addEventListener('keydown', e=>{
+  if(document.getElementById('ar_sugg').style.display === 'none') return;
+  if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); arSuggAt = Math.max(0, Math.min(arSuggList.length - 1, arSuggAt + (e.key === 'ArrowDown' ? 1 : -1))); arDrawSugg(); }
+  else if(e.key === 'Enter'){ e.preventDefault(); const j = arSuggList[arSuggAt < 0 ? 0 : arSuggAt]; if(j) arPick(j); }
+  else if(e.key === 'Escape'){ e.stopPropagation(); document.getElementById('ar_sugg').style.display = 'none'; }
+});
+document.getElementById('ar_sugg').addEventListener('mousedown', e=>{ const b = e.target.closest('[data-ar-pick]'); if(!b) return; e.preventDefault(); arPick(arSuggList[+b.dataset.arPick]); });
+document.getElementById('ar_find').addEventListener('blur', ()=>setTimeout(()=>{ document.getElementById('ar_sugg').style.display = 'none'; }, 150));
 document.getElementById('addRequestBtn').addEventListener('click', openAddRequestModal);
 document.getElementById('addRequestClose').addEventListener('click', closeAddRequestModal);
 document.getElementById('addRequestCancel').addEventListener('click', closeAddRequestModal);
@@ -790,7 +850,7 @@ document.getElementById('addRequestSave').addEventListener('click', async ()=>{
     btn.textContent = 'Saving…';
     await requestsCol.doc(requestId).set({
       name, phone, email, address, lot, description,
-      photoUrls, status,
+      photoUrls, status, ...(arHouseId ? { houseId: arHouseId } : {}),
       submittedAt: new Date().toISOString(),
       ...(status === 'sent' ? { completedAt: new Date().toISOString() } : {}),
     });

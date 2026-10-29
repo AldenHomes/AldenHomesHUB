@@ -1203,6 +1203,15 @@ const ASSISTANT_TOOLS = [
       high_priority: { type: 'boolean', description: 'True only if they said it is high priority, urgent, or similar.' },
       photo_clip: { type: 'integer', description: 'Only for a walk-through: the number of the clip in which they were talking about this item, so the picture from that moment is attached. 0 for anything that is not from a walk-through.' },
     }, required: ['text', 'home_id', 'assign_user_ids', 'due_date', 'high_priority', 'photo_clip'], additionalProperties: false } },
+  { name: 'add_service_request', strict: true,
+    description: 'Propose adding a homeowner service request (a warranty / repair request) to the Service Center, for example when someone says a buyer called about a problem. Pick the home from the list (finished homes are usually the ones with service requests); the buyer\'s name, phone, email and address are filled in from that home. Shown to the user to confirm.',
+    input_schema: { type: 'object', properties: {
+      home_id: { ...str, description: 'The id of the home the request is for, or an empty string if the home is not in the hub.' },
+      description: { ...str, description: 'What is wrong, in plain words, as the homeowner would put it. Several problems can go on separate lines.' },
+      name: { ...str, description: 'Who is asking, only if it is NOT the buyer on file for that home (or the home is not in the hub). Otherwise an empty string.' },
+      phone: { ...str, description: 'A phone number they gave, only if it differs from the one on file. Otherwise an empty string.' },
+      address: { ...str, description: 'Only when the home is not in the hub: the street address they gave. Otherwise an empty string.' },
+    }, required: ['home_id', 'description', 'name', 'phone', 'address'], additionalProperties: false } },
   { name: 'complete_punch_item', strict: true,
     description: 'Propose checking an item off the punch list. Find the item id with list_punch_items or get_home first. Shown to the user to confirm.',
     input_schema: { type: 'object', properties: { item_id: { ...str, description: 'The id of the punch list item.' } }, required: ['item_id'], additionalProperties: false } },
@@ -1261,7 +1270,7 @@ ASSISTANT_TOOLS.push(
     allowed_callers: ['code_execution_20260120'] },
   { type: 'code_execution_20260120', name: 'code_execution' },
 );
-const ASSISTANT_WRITES = ['add_note', 'add_punch_item', 'complete_punch_item'];
+const ASSISTANT_WRITES = ['add_note', 'add_punch_item', 'complete_punch_item', 'add_service_request'];
 
 const ASSISTANT_RULES = `You are the assistant built into the Alden Homes Hub, the internal tool the office staff of a home builder use to run their jobs. People press a button and speak, so what you receive is speech turned into text. Expect slips: lot numbers and names can come through slightly wrong ("a p forty", "AP40", "lot fourty"), and a first name may be spelled differently from the team list.
 
@@ -1269,7 +1278,7 @@ Finding the home: match what was said against the list of homes below by communi
 
 Finding the person: match first names against the team list. If a name could be two people, ask.
 
-Changing things: you cannot save anything yourself. Calling add_note, add_punch_item or complete_punch_item puts the action on the person's screen with Confirm and Cancel buttons, and it only happens if they press Confirm. So when the request is clear, call the tool straight away rather than asking "shall I?" first, then tell them in one short sentence what is waiting for them to confirm. Never say something was saved or done.
+Changing things: you cannot save anything yourself. Calling add_note, add_punch_item, complete_punch_item or add_service_request puts the action on the person's screen with Confirm and Cancel buttons, and it only happens if they press Confirm. So when the request is clear, call the tool straight away rather than asking "shall I?" first, then tell them in one short sentence what is waiting for them to confirm. Never say something was saved or done.
 
 Wording: for a note or a punch list item, write what the person said as a clean sentence — capital letter, full stop, obvious speech-to-text slips fixed — without adding anything they didn't say. Leave the people out of the text; they go in the list of ids and the hub adds the tags.
 
@@ -1412,6 +1421,20 @@ async function assistantCheck(name, input, ctx){
       summary: { title: `Add to the punch list${job ? ' for ' + jobLabel(job) : ''}`, text,
         people: [who.length ? 'For ' + who.map(s=>s.name).join(', ') : '', due ? 'Needed by ' + niceDate(due) : '', high ? 'High priority' : ''].filter(Boolean).join(' · ') } };
   }
+  if(name === 'add_service_request'){
+    const job = input.home_id ? ctx.jobs.find(j=>j.id === input.home_id) : null;
+    if(input.home_id && !job) return { error: 'There is no home with that id. Use an empty string if the home is not in the hub.' };
+    const description = cleanText(input.description, 3000);
+    if(!description) return { error: 'The request needs a description of the problem.' };
+    const name = cleanText(input.name, 120) || (job && job.client) || '';
+    const phone = cleanText(input.phone, 40) || (job && job.phone) || '';
+    const address = (job && job.address) || cleanText(input.address, 200);
+    if(!name) return { error: 'Ask who the request is from (no buyer is on file for that home).' };
+    if(!address) return { error: 'Ask for the address (the home is not in the hub, or has no address on file).' };
+    return { action: { type: 'add_service_request', homeId: job ? job.id : '', description, name, phone, address },
+      summary: { title: `New service request${job ? ' for ' + jobLabel(job) : ''}`, text: description,
+        people: [name, phone, job ? '' : address].filter(Boolean).join(' · ') } };
+  }
   if(name === 'complete_punch_item'){
     const doc = typeof input.item_id === 'string' && input.item_id ? await db.collection('notes').doc(input.item_id).get() : null;
     if(!doc || !doc.exists || !doc.data().todo) return { error: 'There is no punch list item with that id.' };
@@ -1456,6 +1479,18 @@ async function assistantRun(action, ctx){
     // told back to the hub, so the card can say whether its picture was kept
     action.photosSent = Array.isArray(action.photos) ? action.photos.length : 0;
     action.photosSaved = pics.length;
+    return '';
+  }
+  if(action.type === 'add_service_request'){
+    const job0 = action.homeId ? ctx.jobs.find(j=>j.id === action.homeId) : null;
+    const ok = await assistantCheck('add_service_request', { home_id: action.homeId || '', description: action.description,
+      name: job0 && action.name === job0.client ? '' : action.name, phone: job0 && action.phone === job0.phone ? '' : action.phone, address: action.address }, ctx);
+    if(ok.error) return ok.error;
+    const a = ok.action, job = a.homeId ? ctx.jobs.find(j=>j.id === a.homeId) : null;
+    await db.collection('service-requests').add({
+      name: a.name, phone: a.phone, email: (job && job.email) || '', address: a.address, lot: (job && job.lot) || '', description: a.description,
+      photoUrls: [], status: 'new', submittedAt: now, ...(job ? { houseId: job.id } : {}), addedBy: by,
+    });
     return '';
   }
   if(action.type === 'complete_punch_item'){
