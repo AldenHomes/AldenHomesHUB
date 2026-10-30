@@ -20,7 +20,7 @@ html.apple .tab-badge{border-radius:9px;}
 
 /* ---- cards: white, rounded, no coloured top line ---- */
 html.apple .card, html.apple .card2, html.apple .section, html.apple .tile, html.apple .homes-card,
-html.apple .mywork, html.apple .auth-card{
+html.apple .mywork, html.apple .auth-card, html.apple #home .hero{
   background:#fff; border-radius:14px; border-top:none !important; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);
 }
 html.apple .tile:hover{transform:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.08), 0 6px 18px rgba(0,0,0,.08);}
@@ -61,6 +61,18 @@ html.apple.desk .tile > .tile-icon{grid-row:1;}
 html.apple.desk .tile > :not(.tile-icon){grid-column:1 / -1;}
 html.apple.desk .tile > div:has(> .tile-title){grid-column:2; grid-row:1;}
 html.apple.desk .tile-desc{display:none;}
+
+/* ---- a home's page: one section at a time (apple.js houseSections) ---- */
+html.apple .ab-seg{display:flex; background:#E3E3E8; border-radius:9px; padding:2px; margin:0 0 16px; position:sticky; top:8px; z-index:40;
+  box-shadow:0 0 0 6px #F2F2F7;}
+html.apple .ab-seg button{flex:1; border:none; background:transparent; border-radius:7px; padding:7px 4px; font:500 14px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#1C1C1E; cursor:pointer;}
+html.apple .ab-seg button.on{background:#fff; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.12);}
+html.apple.desk .ab-seg{max-width:560px;}
+html.apple #home .cards[data-show] > .card[data-sec]{display:none;}
+html.apple #home .cards[data-show="overview"] > .card[data-sec="overview"],
+html.apple #home .cards[data-show="schedule"] > .card[data-sec="schedule"],
+html.apple #home .cards[data-show="photos"] > .card[data-sec="photos"],
+html.apple #home .cards[data-show="costs"] > .card[data-sec="costs"]{display:flex;}
 
 /* ---- computers: slim app bar on the left inside apps ---- */
 html.apple.desk:not(.apple-hub) body{padding-left:68px;}

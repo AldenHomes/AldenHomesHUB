@@ -89,6 +89,43 @@
     if(location.hash === '#homes' && aside) setTimeout(()=>aside.scrollIntoView({ behavior:'smooth', block:'start' }), 300);
   }
 
+  /* A home's page in the new look (owner, 2026-10-29): one section at a time — Overview / Schedule / Photos / Costs — instead of one
+     long page. Cards are tagged by what they hold; a card added later (Permits) is tagged as it appears. A link to a card
+     (#costs, #permitsCard, #coCard, #photosCard…) opens the section that card is in. */
+  const SECS = [['overview', 'Overview'], ['schedule', 'Schedule'], ['photos', 'Photos'], ['costs', 'Costs']];
+  const secOf = card=>{
+    const id = card.id || '';
+    if(id === 'photosCard' || id === 'plansCard') return 'photos';
+    if(id === 'costs' || id === 'invCard') return 'costs';
+    if(card.querySelector('#schedBody, #ordersBody')) return 'schedule';
+    return 'overview';
+  };
+  let homeSec = 'overview';
+  function houseSections(){
+    if(page !== 'house.html') return;
+    const cards = document.querySelector('#home .cards');
+    if(!cards) return;
+    let bar = document.querySelector('.ab-seg');
+    if(!root.classList.contains('apple')){ if(bar) bar.remove(); cards.removeAttribute('data-show'); return; }
+    [...cards.children].forEach(c=>{ if(c.classList.contains('card') && !c.dataset.sec) c.dataset.sec = secOf(c); });
+    if(!bar){
+      bar = document.createElement('div'); bar.className = 'ab-seg'; bar.setAttribute('role', 'tablist'); bar.setAttribute('aria-label', 'Sections');
+      bar.innerHTML = SECS.map(([k, t])=>`<button type="button" role="tab" data-sec-btn="${k}">${t}</button>`).join('');
+      cards.parentNode.insertBefore(bar, cards);
+      bar.addEventListener('click', e=>{ const b = e.target.closest('[data-sec-btn]'); if(b){ homeSec = b.dataset.secBtn; showSec(); } });
+      new MutationObserver(()=>houseSections()).observe(cards, { childList: true });
+      // links into a section: the hash names a card
+      const fromHash = ()=>{ const t = location.hash && document.getElementById(location.hash.slice(1)); const c = t && t.closest('#home .cards > .card'); if(c){ homeSec = c.dataset.sec || secOf(c); showSec(); } };
+      window.addEventListener('hashchange', fromHash); setTimeout(fromHash, 600);
+    }
+    showSec();
+  }
+  function showSec(){
+    const cards = document.querySelector('#home .cards'); if(!cards) return;
+    cards.dataset.show = homeSec;
+    document.querySelectorAll('[data-sec-btn]').forEach(b=>{ const on = b.dataset.secBtn === homeSec; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+  }
+
   document.addEventListener('click', e=>{
     if(!e.target.closest('[data-ab-chat]')) return;
     if(window.hubChat && hubChat.show) hubChat.show();
@@ -98,7 +135,7 @@
     document.querySelectorAll('[data-ab-unread]').forEach(b=>{ b.textContent = unread || ''; b.hidden = !unread; });
   });
   window.addEventListener('hashchange', ()=>{ build(); hubTouches(); });
-  const ready = ()=>{ build(); hubTouches(); };
+  const ready = ()=>{ build(); hubTouches(); houseSections(); };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   (phoneMQ.addEventListener ? phoneMQ.addEventListener('change', ready) : phoneMQ.addListener(ready));
 
