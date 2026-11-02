@@ -62,11 +62,12 @@
         + chatBtn('ab-tab', 24)
         + tab('admin.html', 'gear', 'Settings', page === 'admin.html');
       document.body.appendChild(bar);
-    } else if(!isHub){
+    } else {
+      // on the hub home the live tiles are the way into the apps, so its bar has only My work / Chat / Settings (owner, 2026-11-02)
       const rail = document.createElement('nav');
-      rail.className = 'ab-rail'; rail.setAttribute('aria-label', 'Apps');
+      rail.className = 'ab-rail'; rail.setAttribute('aria-label', isHub ? 'Shortcuts' : 'Apps');
       rail.innerHTML = `<a class="ab-app ab-home" href="index.html" title="Hub" aria-label="Hub"><img src="icons/icon-192.png" alt=""></a>`
-        + APPS.map(([href, name, color, p])=>`<a class="ab-app${page === href ? ' here' : ''}" href="${href}" title="${name}" aria-label="${name}"><span style="background:${color}">${svg(p, 17)}</span></a>`).join('')
+        + (isHub ? [] : APPS).map(([href, name, color, p])=>`<a class="ab-app${page === href ? ' here' : ''}" href="${href}" title="${name}" aria-label="${name}"><span style="background:${color}">${svg(p, 17)}</span></a>`).join('')
         + '<span class="ab-grow"></span>'
         + `<a class="ab-app ab-plain${page === 'mywork.html' ? ' here' : ''}" href="mywork.html" title="My work" aria-label="My work">${svg(ICON.work, 21)}</a>`
         + chatBtn('ab-app ab-plain', 21)

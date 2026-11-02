@@ -118,7 +118,7 @@ html.apple.pg-mywork .allclear{border-radius:14px;}
 html.apple.phone.pg-mywork .counts{grid-template-columns:repeat(2, minmax(0,1fr));}
 
 /* ---- computers: slim app bar on the left inside apps ---- */
-html.apple.desk:not(.apple-hub) body{padding-left:68px;}
+html.apple.desk body{padding-left:68px;}
 .ab-rail{position:fixed; left:0; top:0; bottom:0; width:68px; z-index:120; box-sizing:border-box; background:#E9E9EE; border-right:0.5px solid #D1D1D6;
   display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 0; overflow-y:auto; scrollbar-width:none;}
 .ab-rail .ab-app{width:46px; height:46px; flex:none; border-radius:12px; display:flex; align-items:center; justify-content:center; position:relative;
@@ -184,4 +184,4 @@ html.apple.phone.apple-hub .homes-card{order:5;}
 .ab-bar .ab-tab.here svg{stroke-width:2.4;}
 .ab-bar .ab-badge{top:-3px; right:calc(50% - 22px);}
 }
-@media print { .ab-bar, .ab-rail{display:none !important;} html.apple.desk:not(.apple-hub) body{padding-left:0;} }
+@media print { .ab-bar, .ab-rail{display:none !important;} html.apple.desk body{padding-left:0;} }
