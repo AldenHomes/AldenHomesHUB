@@ -192,6 +192,41 @@ html.apple .mw-more{color:#4B4F54;}
 html.apple .homes-card .homes-count, html.apple .homes-card .home-date, html.apple .homes-card .home-date *{font-family:inherit;}
 html.apple .homes-card .homes-count{border-radius:10px;}
 
+/* ---- Construction Schedules (owner, 2026-11-02) ---- */
+html.apple.pg-construction .mono, html.apple.pg-construction .titlebar-stats, html.apple.pg-construction .fact .v,
+html.apple.pg-construction .end-cell, html.apple.pg-construction .task-table .num, html.apple.pg-construction .tab-badge{font-family:inherit;}
+html.apple.pg-construction .table-wrap, html.apple.pg-construction .cal{background:#fff; border-radius:14px; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
+html.apple.pg-construction thead th{background:#F7F7FA; color:#6C6C70; text-transform:none; letter-spacing:0; font-size:12.5px; border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-construction tbody td{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-construction .clickable tbody tr:hover, html.apple.pg-construction .task-table tbody tr:hover{background:#FAFAFC;}
+html.apple.pg-construction .house-head{border-top:none; border-radius:14px;}
+html.apple.pg-construction .house-head h2{color:#1C1C1E; font-size:22px; letter-spacing:-0.3px;}
+html.apple.pg-construction .fact label{text-transform:none; letter-spacing:0; font-size:12px; color:#8E8E93; font-weight:600;}
+html.apple.pg-construction .fact .v{color:#1C1C1E;}
+html.apple.pg-construction .send-bar{border-radius:12px;}
+html.apple.pg-construction .notice{border-radius:12px;}
+html.apple.pg-construction .view-toggle{background:#E3E3E8; border:none; border-radius:9px; padding:2px;}
+html.apple.pg-construction .view-toggle button{border:none !important; border-radius:7px; color:#1C1C1E; font-weight:500; padding:6px 14px;}
+html.apple.pg-construction .view-toggle button.active{background:#fff; color:#1C1C1E; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.12);}
+html.apple.pg-construction .cal-dow{background:#F7F7FA; color:#8E8E93; border-bottom:0.5px solid #E3E3E8; text-transform:none;}
+html.apple.pg-construction .cal-week{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-construction .cal-day{border-left:0.5px solid #EFEFF4;}
+html.apple.pg-construction .cal-day.weekend{background:#FAFAFC;}
+html.apple.pg-construction .cal-day.today .n{background:#FF3B30; color:#fff;}
+html.apple.pg-construction .cal-month{color:#1C1C1E; font-size:17px;}
+html.apple.pg-construction .cal-bar{border-radius:6px;}
+html.apple.pg-construction .bar-track{background:#EFEFF4;}
+html.apple.pg-construction .confirm-btns{background:#E3E3E8; border:none; border-radius:9px; padding:2px;}
+html.apple.pg-construction .confirm-btns button{border:none !important; border-radius:7px; background:transparent;}
+html.apple.pg-construction .confirm-btns button.on-confirmed, html.apple.pg-construction .confirm-btns button.on-declined,
+html.apple.pg-construction .confirm-btns button.on-pending{box-shadow:0 1px 3px rgba(0,0,0,.12);}
+html.apple.pg-construction .confirm-row{border-top:0.5px solid #E3E3E8;}
+html.apple.pg-construction .modal{border-radius:16px; border-top:none; overflow:hidden;}
+html.apple.pg-construction .modal-head{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-construction .import-preview, html.apple.pg-construction .radio, html.apple.pg-construction .decline-box{border-radius:12px;}
+html.apple.pg-construction .search input{background:#E3E3E8; border:none; border-radius:10px;}
+html.apple.pg-construction .chip{border-radius:10px;}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
