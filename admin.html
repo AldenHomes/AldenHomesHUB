@@ -60,6 +60,33 @@
   .switch.small.off::after{left:3px;}
   .switch:disabled{opacity:.55; cursor:default;}
   #myNotices .setting:first-of-type{margin-top:0; border-top:none; padding-top:0;}
+  /* My notifications: one row per thing, a switch for the bell and one for the phone */
+  .nt-head{display:grid; grid-template-columns:1fr 92px 92px; gap:10px; font-size:11.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.4px; padding:4px 0 6px;}
+  .nt-head span{text-align:center;}
+  .nt-group{font-size:13px; font-weight:700; color:var(--ink); margin:16px 0 2px; padding-top:12px; border-top:2px solid #ece8dd;}
+  .nt-row{display:grid; grid-template-columns:1fr 92px 92px; gap:10px; align-items:center; padding:12px 0; border-top:1px solid #ece8dd;}
+  .nt-group + .nt-row{border-top:none;}
+  .nt-row .name{font-size:14.5px; font-weight:600; color:var(--ink);}
+  .nt-row .what{font-size:12.5px; color:var(--ink-soft); margin-top:3px; line-height:1.45;}
+  .nt-sw{display:flex; flex-direction:column; align-items:center; gap:4px;}
+  .nt-lab{display:none; font-size:11px; color:var(--ink-soft);}
+  @media (max-width:560px){
+    .nt-head{display:none;}
+    .nt-row{grid-template-columns:1fr 1fr;}
+    .nt-row .txt{grid-column:1 / -1;}
+    .nt-sw{flex-direction:row; justify-content:flex-start; gap:10px;}
+    .nt-lab{display:block; min-width:78px;}
+  }
+  .push-device{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 16px; border-radius:12px; margin:4px 0 16px; border:1px solid #e3dfd3; background:#f7f5ef;}
+  .push-device.on{border-color:#c5dccb; background:#eaf1ec;}
+  .push-device .pd-txt{flex:1 1 260px;}
+  .push-device .pd-title{font-size:15.5px; font-weight:700; color:var(--ink);}
+  .push-device.on .pd-title{color:var(--good);}
+  .push-device .pd-what{font-size:13px; color:var(--ink-soft); margin-top:3px; line-height:1.5;}
+  .push-device .pd-msg{font-size:13px; font-weight:600; color:var(--ink); margin-top:6px;}
+  .push-device .pd-btns{display:flex; gap:8px; flex-wrap:wrap;}
+  .pd-main{background:var(--navy); color:#fff;}
+  .pd-ghost{background:#fff; color:var(--ink); border-color:#d6d2c6;}
   .always{font-size:12px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.4px;}
 
   .setting{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 0; border-top:1px solid #ece8dd;}
@@ -177,7 +204,8 @@ html, body{max-width:100%; overflow-x:clip;}
     <!-- ===================== MY NOTIFICATIONS ===================== -->
     <div class="section" id="mine">
       <h2>My notifications</h2>
-      <p class="lead">What the hub tells <strong>you</strong> about — on the bell and by email to the address you sign in with. These switches only change it for you; everyone sets their own. The ones about subs start off — switch on the ones you want. You're never told when a sub simply approves a job.</p>
+      <p class="lead">What the hub tells <strong>you</strong> about. <strong>In the hub</strong> = the bell (and an email to the address you sign in with). <strong>On my phone</strong> = a notification that pops up on your phone or computer, even with the hub closed. These switches only change it for you; everyone sets their own.</p>
+      <div id="pushDevice" class="push-device"><div class="note">Checking this device…</div></div>
       <div id="myNotices"><div class="note">Loading…</div></div>
     </div>
 
@@ -354,6 +382,7 @@ firebase.auth().onAuthStateChanged(user=>{
       }, err=>{ console.error('notification choices listener error', err); $('myNotices').innerHTML = '<div class="note">Couldn\'t load your choices just now. Check your connection and reload the page.</div>'; });
       loadTeam();
       loadOverhead();
+      renderDevice();
     }
   } else {
     showLoginGate();
@@ -368,35 +397,46 @@ window.addEventListener('offline', ()=>setSyncStatus('offline'));
    Everything except @mentions is off until switched on. The server reads it each time
    something happens, so a change takes effect straight away.
    ============================================================ */
+/* Each row: what happens; "In the hub" = the bell (and an email for most); "On my phone" = a push notification
+   (owner, 2026-11-02). Rows marked hub:'always' are things picked out for you, so they're always on the bell.
+   Phone choices are kept as settings/staff-notify[uid].push = { key: false } — missing means on. */
 const NOTICES = [
-  { key: 'mention', name: 'Someone @mentions me in a note', what: 'A teammate typed @ and your name in a note on a home.', locked: true },
-  { key: 'subDeclined', name: 'A sub declines a job', what: 'Includes their reason if they gave one. Opens the job so you can choose another vendor.' },
-  { key: 'subNote', name: 'A sub sends a note', what: 'A question, or asking to move the dates, sent from their link.' },
-  { key: 'subWaiting', name: 'A job has had no answer for 3 weeks', what: 'A sub was asked and still hasn\'t approved or declined after 21 days.' },
-  { key: 'permitsNeeded', name: 'A home is signed and needs permits', what: 'A buyer\'s selection sheet was signed, so the home is ready to go and its permit applications need to be filled out and sent. Opens the home\'s Permits card.' },
-  { key: 'costOver', name: 'A cost code goes over the last build', what: 'After a QuickBooks import, a home\'s cost code (say plumbing) has cost more than 10% over what the last home of that style built spent on it. Bell only, once per code per home.' },
+  { group: 'For you', key: 'mention', hub: 'always', name: 'Someone @mentions me in a note', what: 'A teammate typed @ and your name in a note on a home.' },
+  { group: 'For you', key: 'punch', hub: 'always', name: 'A punch item is given to me', what: 'Someone adds a punch list item for you (high priority ones say so).' },
+  { group: 'For you', key: 'reply', hub: 'always', name: 'A comment on a note I\'m part of', what: 'Someone replies on a note you wrote, were tagged in, or commented on.' },
+  { group: 'For you', key: 'reminder', hub: 'always', name: 'A reminder I set comes due', what: 'The bell icon on a note: you picked a day to be reminded.' },
+  { group: 'For you', key: 'chat', hub: 'always', name: 'A chat message for me', what: 'A new message in one of your chats. (Chats are never emailed.)' },
+  { group: 'For you', key: 'selPrice', hub: 'always', name: 'Someone needs a price from me', what: 'A custom item on a selection sheet is waiting for you to price it.' },
+  { group: 'For you', key: 'invoices', hub: 'always', name: 'Invoices for me', what: 'Invoices to review, or ready to enter in QuickBooks — if you\'re picked for that in the Invoices app.' },
+  { group: 'Things to watch — off unless you switch them on', key: 'subDeclined', name: 'A sub declines a job', what: 'Includes their reason if they gave one. Opens the job so you can choose another vendor.' },
+  { group: 'Things to watch — off unless you switch them on', key: 'subNote', name: 'A sub sends a note', what: 'A question, or asking to move the dates, sent from their link.' },
+  { group: 'Things to watch — off unless you switch them on', key: 'subWaiting', name: 'A job has had no answer for 3 weeks', what: 'A sub was asked and still hasn\'t approved or declined after 21 days.' },
+  { group: 'Things to watch — off unless you switch them on', key: 'permitsNeeded', name: 'A home is signed and needs permits', what: 'A buyer\'s selection sheet was signed, so the home\'s permit applications need to go out. Opens the home\'s Permits card.' },
+  { group: 'Things to watch — off unless you switch them on', key: 'costOver', name: 'A cost code goes over the last build', what: 'After a QuickBooks import, a cost code has run more than 10% over the last home of that style. Bell only, no email.' },
 ];
 const noticeRef = db.collection('settings').doc('staff-notify');
 let myNotices = null;   // null until loaded
+const hubOn = n=>n.hub === 'always' || myNotices[n.key] === true;
+const phoneOn = n=>hubOn(n) && ((myNotices.push || {})[n.key] !== false);
 function renderNotices(){
   if(!myNotices) return;
-  $('myNotices').innerHTML = NOTICES.map(n=>{
-    const on = n.locked || myNotices[n.key] === true;
-    return `<div class="setting">
-      <div class="txt"><div class="name">${n.name}</div><div class="what">${n.what}</div></div>
-      ${n.locked ? '<span class="always">Always on</span>' : ''}
-      <button type="button" class="switch small${on ? '' : ' off'}" role="switch" aria-checked="${on}" aria-label="${n.name}" data-notice="${n.key}"${n.locked ? ' disabled' : ''}></button>
+  let last = '';
+  $('myNotices').innerHTML = `<div class="nt-head"><span></span><span>In the hub</span><span>On my phone</span></div>` + NOTICES.map(n=>{
+    const head = n.group !== last ? `<div class="nt-group">${esc(n.group)}</div>` : ''; last = n.group;
+    const h = hubOn(n), p = phoneOn(n);
+    return head + `<div class="nt-row">
+      <div class="txt"><div class="name">${esc(n.name)}</div><div class="what">${esc(n.what)}</div></div>
+      <div class="nt-sw"><span class="nt-lab">In the hub</span>${n.hub === 'always' ? '<span class="always">Always</span>'
+        : `<button type="button" class="switch small${h ? '' : ' off'}" role="switch" aria-checked="${h}" aria-label="${esc(n.name)} — in the hub" data-notice="${n.key}"></button>`}</div>
+      <div class="nt-sw"><span class="nt-lab">On my phone</span><button type="button" class="switch small${p ? '' : ' off'}" role="switch" aria-checked="${p}" aria-label="${esc(n.name)} — on my phone" data-push="${n.key}"${h ? '' : ' disabled title="Switch it on in the hub first"'}></button></div>
     </div>`;
   }).join('');
 }
-$('myNotices').addEventListener('click', async e=>{
-  const btn = e.target.closest('button[data-notice]');
-  const user = firebase.auth().currentUser;
-  if(!btn || btn.disabled || !myNotices || !user) return;
-  const turnOn = myNotices[btn.dataset.notice] !== true;
+async function saveNotice(patch){
+  const user = firebase.auth().currentUser; if(!user) return;
   setSyncStatus('saving');
   try{
-    await noticeRef.set({ [user.uid]: { [btn.dataset.notice]: turnOn } }, { merge: true });
+    await noticeRef.set({ [user.uid]: patch }, { merge: true });
     $('savedNote').classList.add('show');
     clearTimeout(savedTimer);
     savedTimer = setTimeout(()=>$('savedNote').classList.remove('show'), 1800);
@@ -405,6 +445,74 @@ $('myNotices').addEventListener('click', async e=>{
     alert('Could not save — check your connection and try again.');
   }
   setSyncStatus('idle');
+}
+$('myNotices').addEventListener('click', e=>{
+  if(!myNotices) return;
+  const hb = e.target.closest('button[data-notice]');
+  if(hb && !hb.disabled){ saveNotice({ [hb.dataset.notice]: myNotices[hb.dataset.notice] !== true }); return; }
+  const pb = e.target.closest('button[data-push]');
+  if(pb && !pb.disabled){ const k = pb.dataset.push; saveNotice({ push: { [k]: (myNotices.push || {})[k] === false } }); }
+});
+
+/* ---- this phone / computer: switch push notifications on or off ----
+   iPhone / iPad: only once the hub is added to the Home Screen and opened from there (Apple's rule).
+   Android and computers: right here in Chrome / Edge / Firefox. */
+const VAPID_PUBLIC = 'BNqgxCeJTsbjjZ75dczr2xKhqarfcxVDAvrq3zrxaTskgAc4JsEOWJHUjqdUACuI2JikZz1SKa5dDvfpHEluFmc';
+const PUSH_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/pushApi';
+async function pushApi(body){
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(PUSH_API, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify(body) });
+  if(!res.ok) throw new Error('push server ' + res.status);
+  return res.json();
+}
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const keyBytes = b64=>{ const p = '='.repeat((4 - b64.length % 4) % 4), s = atob((b64 + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...s].map(c=>c.charCodeAt(0))); };
+async function deviceSub(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  const reg = await navigator.serviceWorker.getRegistration(); if(!reg) return null;
+  return reg.pushManager.getSubscription();
+}
+async function renderDevice(msg){
+  const box = $('pushDevice'); if(!box) return;
+  const say = (cls, title, text, buttons)=>{ box.className = 'push-device ' + cls; box.innerHTML = `<div class="pd-txt"><div class="pd-title">${title}</div><div class="pd-what">${text}</div>${msg ? `<div class="pd-msg">${esc(msg)}</div>` : ''}</div><div class="pd-btns">${buttons || ''}</div>`; };
+  if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
+    if(isIOS && !standalone) return say('off', 'Add the hub to your Home Screen first',
+      'iPhones only show notifications for apps on the Home Screen. In Safari tap the Share button (the square with the arrow), then <b>Add to Home Screen</b>. Open the hub from that new icon, come back to Settings and press <b>Turn on notifications</b> here.');
+    return say('off', 'This browser can\'t show notifications', 'Try Chrome or Edge on this computer or phone.');
+  }
+  if(Notification.permission === 'denied') return say('off', 'Notifications are blocked on this device',
+    isIOS ? 'Open the iPhone\'s Settings → Notifications → Alden Hub and switch on Allow Notifications, then come back here.'
+          : 'Click the lock or settings icon beside the web address, set Notifications to Allow, then reload this page.');
+  let sub = null; try{ sub = await deviceSub(); } catch(e){}
+  if(sub && Notification.permission === 'granted'){
+    // keep the phone tied to whoever is signed in now
+    pushApi({ action:'save', sub: sub.toJSON(), ua: navigator.userAgent }).catch(()=>{});
+    return say('on', '✓ Notifications are on for this device', 'Pick below what buzzes it. Every phone or computer you use is switched on separately.',
+      '<button type="button" class="btn pd-main" id="pushTest">Send a test</button><button type="button" class="btn pd-ghost" id="pushOff">Turn off here</button>');
+  }
+  say('off', 'Notifications are off on this device', 'Get a notification on this phone (or computer) when something on the list below happens — even with the hub closed.',
+    '<button type="button" class="btn pd-main" id="pushOn">Turn on notifications</button>');
+}
+document.addEventListener('click', async e=>{
+  if(e.target.closest('#pushOn')){
+    try{
+      const perm = await Notification.requestPermission();
+      if(perm !== 'granted'){ renderDevice(); return; }
+      const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC) });
+      await pushApi({ action:'save', sub: sub.toJSON(), ua: navigator.userAgent });
+      renderDevice('Done. Press "Send a test" to see one.');
+    } catch(err){ console.error(err); renderDevice('Could not switch it on just now — check your connection and try again.'); }
+  }
+  if(e.target.closest('#pushOff')){
+    try{ const sub = await deviceSub(); if(sub){ await pushApi({ action:'remove', endpoint: sub.endpoint }).catch(()=>{}); await sub.unsubscribe(); } } catch(err){ console.error(err); }
+    renderDevice('Switched off on this device.');
+  }
+  if(e.target.closest('#pushTest')){
+    try{ const r = await pushApi({ action:'test' }); renderDevice(r.sent ? 'Test sent — it should pop up in a few seconds.' : 'Nothing was sent — try Turn off here, then Turn on notifications again.'); }
+    catch(err){ console.error(err); renderDevice('Could not send a test just now.'); }
+  }
 });
 
 /* ---- render + save ---- */

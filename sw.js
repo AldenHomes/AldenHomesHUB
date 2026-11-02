@@ -16,7 +16,7 @@
    - Everything else (Firestore, Storage, sign-in, QR images) is
      left completely alone.
    ============================================================ */
-const CACHE = 'alden-hub-v12';
+const CACHE = 'alden-hub-v13';
 
 const SHELL = [
   'index.html',
@@ -123,4 +123,26 @@ self.addEventListener('fetch', event=>{
   } else if(isPinnedCdn(url)){
     event.respondWith(cacheFirst(request));
   }
+});
+
+/* ---- push notifications (owner, 2026-11-02) ----
+   The hub's server sends { title, body, url, tag }; tapping the notification opens that page in the hub
+   (an open hub window is reused). */
+self.addEventListener('push', event=>{
+  let d = {};
+  try{ d = event.data ? event.data.json() : {}; } catch(e){ d = { body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.registration.showNotification(d.title || 'Alden Homes Hub', {
+    body: d.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
+    tag: d.tag || undefined, renotify: !!d.tag, data: { url: d.url || 'index.html' }
+  }));
+});
+self.addEventListener('notificationclick', event=>{
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || 'index.html';
+  event.waitUntil((async ()=>{
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const mine = wins.find(w=>w.url.startsWith(self.registration.scope));
+    if(mine){ try{ await mine.navigate(url); return mine.focus(); } catch(e){ /* fall through */ } }
+    return self.clients.openWindow(url);
+  })());
 });

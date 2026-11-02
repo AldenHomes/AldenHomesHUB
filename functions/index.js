@@ -2875,3 +2875,136 @@ if(EMAIL_ON) exports.dailyFollowUp = onSchedule({ schedule: 'every day 07:00', t
   await recordAsked([...a.asked, ...b.asked]);
   logger.info('Daily follow-up finished', { changes: a.emailed.length, reminders: b.emailed.length, skipped: [...a.skipped, ...b.skipped], failed: [...a.failed, ...b.failed] });
 });
+
+/* ============================================================
+   PUSH NOTIFICATIONS (owner, 2026-11-02: "I like push notifications… what about Android… in the hub settings a clear easy
+   way to choose what notifications you get").
+   Anything that lands on someone's bell can also buzz their phone (iPhone: hub added to the Home Screen; Android / computers:
+   Chrome, Edge, Firefox). Standard web push (VAPID keys): the public key is below and in admin.html, the private key is the
+   secret VAPID_PRIVATE_KEY. Phones that switched it on are kept in `push-subs/{hash of the phone's address}` = { uid, sub, ua, at }
+   — written only here, so no security rule. Each person's choices: settings/staff-notify[uid].push = { kind: false } (missing = on).
+   Separate from the email functions on purpose: nothing about the emails changes.
+   ============================================================ */
+const VAPID_PUBLIC = 'BNqgxCeJTsbjjZ75dczr2xKhqarfcxVDAvrq3zrxaTskgAc4JsEOWJHUjqdUACuI2JikZz1SKa5dDvfpHEluFmc';
+const PUSH_ON = process.env.ENABLE_PUSH === '1';
+const VAPID_PRIVATE_KEY = PUSH_ON ? defineSecret('VAPID_PRIVATE_KEY') : null;
+const PUSH_SITE = 'https://aldenhomes.github.io/AldenHomesHUB/';
+// the kinds a person can switch on/off for their phone (the invoice notices share one switch)
+const pushKey = kind=>['invReview', 'invReady'].includes(kind) ? 'invoices' : kind;
+const noteKindOf = note=>note.kind || (note.todo ? 'punch' : 'mention');
+
+async function pushTo(uids, kind, msg){
+  uids = [...new Set((uids || []).filter(Boolean))];
+  if(!uids.length) return 0;
+  const prefs = (await db.collection('settings').doc('staff-notify').get()).data() || {};
+  const want = uids.filter(u=>(((prefs[u] || {}).push) || {})[pushKey(kind)] !== false);
+  if(!want.length) return 0;
+  const webpush = require('web-push');
+  webpush.setVapidDetails('mailto:aldenhomesserver@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE_KEY.value());
+  const payload = JSON.stringify({ title: String(msg.title || 'Alden Homes Hub').slice(0, 120), body: String(msg.body || '').slice(0, 300),
+    url: PUSH_SITE + (msg.url || 'index.html'), tag: msg.tag || '' });
+  let sent = 0;
+  for(let i = 0; i < want.length; i += 10){
+    const snap = await db.collection('push-subs').where('uid', 'in', want.slice(i, i + 10)).get();
+    await Promise.all(snap.docs.map(async d=>{
+      try{ await webpush.sendNotification(d.data().sub, payload, { TTL: 60 * 60 * 24 }); sent++; }
+      catch(err){
+        // the phone switched notifications off, or the hub was removed from it: forget it
+        if(err.statusCode === 404 || err.statusCode === 410) await d.ref.delete().catch(()=>{});
+        else logger.warn('Push failed', { uid: d.data().uid, status: err.statusCode, error: String(err.body || err) });
+      }
+    }));
+  }
+  return sent;
+}
+
+// what a bell item says on the phone, and where tapping it goes (same places as the emails)
+function notePush(note){
+  const kind = noteKindOf(note), who = (note.by && note.by.name) || 'Someone', house = note.houseLabel || '';
+  const at = house ? ' · ' + house : '', text = String(note.text || '').replace(/\s+/g, ' ').trim();
+  const fromSub = ['subDeclined', 'subNote', 'subWaiting'].includes(kind);
+  const url = kind === 'invReview' ? 'invoices.html' + (note.invoiceId ? '?open=' + encodeURIComponent(note.invoiceId) : '')
+    : kind === 'invReady' ? 'invoices.html?tab=ready'
+    : kind === 'selPrice' ? 'selections.html?open=' + encodeURIComponent(note.sheetId || '')
+    : kind === 'permitsNeeded' ? 'house.html?id=' + encodeURIComponent(note.houseId || '') + '#permitsCard'
+    : kind === 'costOver' ? 'house.html?id=' + encodeURIComponent(note.houseId || '') + '#costs'
+    : kind === 'punch' ? 'punch.html'
+    : fromSub ? 'construction.html?house=' + encodeURIComponent(note.houseId || '') + '&task=' + encodeURIComponent(note.taskId || '')
+    : 'house.html?id=' + encodeURIComponent(note.houseId || '') + '#notes';
+  const title = {
+    punch: (note.priority === 'high' ? 'High priority punch item' : 'Punch item for you') + at,
+    subDeclined: who + ' declined a job' + at,
+    subNote: 'Note from ' + who + at,
+    subWaiting: 'Still waiting on a sub' + at,
+    permitsNeeded: 'Permits needed' + at,
+    costOver: 'Cost code over the last build' + at,
+    selPrice: 'A price is needed' + at,
+    invReview: 'Invoices to review',
+    invReady: 'Invoices ready for QuickBooks',
+  }[kind] || who + ' mentioned you' + at;
+  return { kind, msg: { title, body: text, url, tag: 'note-' + (note.id || '') } };
+}
+
+if(PUSH_ON) exports.pushNoteCreated = onDocumentCreated({ document: 'notes/{noteId}', secrets: [VAPID_PRIVATE_KEY] }, async event=>{
+  const note = { ...event.data.data(), id: event.params.noteId };
+  const author = (note.by && note.by.uid) || '';
+  const uids = (Array.isArray(note.mentions) ? note.mentions : []).filter(u=>u !== author);
+  const { kind, msg } = notePush(note);
+  const n = await pushTo(uids, kind, msg);
+  if(n) logger.info('Pushed a note', { kind, sent: n });
+});
+
+// a new comment → everyone it notifies; a reminder coming due (dailyFollowUp sets reminded.<uid> = today) → that person
+if(PUSH_ON) exports.pushNoteUpdated = onDocumentUpdated({ document: 'notes/{noteId}', secrets: [VAPID_PRIVATE_KEY] }, async event=>{
+  const before = event.data.before.data() || {}, note = { ...(event.data.after.data() || {}), id: event.params.noteId };
+  const house = note.houseLabel || (note.houseId ? 'a home' : 'the punch list'), text = String(note.text || '').replace(/\s+/g, ' ').trim();
+  const url = note.houseId ? 'house.html?id=' + encodeURIComponent(note.houseId) + '#notes' : 'punch.html';
+  const had = new Set((before.replies || []).map(r=>r.id));
+  const fresh = (note.replies || []).filter(r=>r && r.id && !had.has(r.id));
+  if(fresh.length === 1 && (note.replies || []).length > (before.replies || []).length){
+    const reply = fresh[0], author = (reply.by && reply.by.uid) || '';
+    await pushTo((Array.isArray(reply.notify) ? reply.notify : []).filter(u=>u !== author), 'reply',
+      { title: ((reply.by && reply.by.name) || 'Someone') + ' commented · ' + house, body: String(reply.text || ''), url, tag: 'note-' + note.id });
+  }
+  const was = before.reminded || {}, now = note.reminded || {};
+  const due = Object.keys(now).filter(u=>now[u] && now[u] !== was[u]);
+  if(due.length) await pushTo(due, 'reminder', { title: 'Reminder · ' + house, body: text, url, tag: 'note-' + note.id });
+});
+
+if(PUSH_ON) exports.pushChatMessage = onDocumentCreated({ document: 'chats/{chatId}/messages/{msgId}', secrets: [VAPID_PRIVATE_KEY] }, async event=>{
+  const m = event.data.data() || {};
+  const chat = (await db.collection('chats').doc(event.params.chatId).get()).data() || {};
+  const to = (chat.members || []).filter(u=>u !== m.by);
+  const title = chat.group ? (chat.title || 'Group chat') + ' · ' + (m.byName || 'Someone') : (m.byName || 'Someone');
+  await pushTo(to, 'chat', { title, body: String(m.text || ''), url: 'index.html#chat=' + encodeURIComponent(event.params.chatId), tag: 'chat-' + event.params.chatId });
+});
+
+// the Settings page: switch this phone on / off, and send a test
+if(PUSH_ON) exports.pushApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 5, secrets: [VAPID_PRIVATE_KEY] }, async (req, res)=>{
+  if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
+  try{
+    const who = await staffFromRequest(req);
+    if(!who){ res.status(401).json({ error: 'sign-in' }); return; }
+    const b = req.body || {};
+    const idOf = endpoint=>require('crypto').createHash('sha256').update(String(endpoint)).digest('hex').slice(0, 40);
+    if(b.action === 'save'){
+      const sub = b.sub || {};
+      if(typeof sub.endpoint !== 'string' || !/^https:\/\//.test(sub.endpoint) || !sub.keys || !sub.keys.p256dh || !sub.keys.auth){ res.status(400).json({ error: 'sub' }); return; }
+      await db.collection('push-subs').doc(idOf(sub.endpoint)).set({ uid: who.uid, sub: { endpoint: sub.endpoint, keys: { p256dh: String(sub.keys.p256dh), auth: String(sub.keys.auth) } },
+        ua: String(b.ua || '').slice(0, 200), at: new Date().toISOString() });
+      res.json({ ok: true }); return;
+    }
+    if(b.action === 'remove'){
+      if(typeof b.endpoint === 'string') await db.collection('push-subs').doc(idOf(b.endpoint)).delete();
+      res.json({ ok: true }); return;
+    }
+    if(b.action === 'test'){
+      const sent = await pushTo([who.uid], 'test', { title: 'Alden Homes Hub', body: 'Notifications are working on this device.', url: 'admin.html#mine', tag: 'test' });
+      res.json({ sent }); return;
+    }
+    res.status(400).json({ error: 'action' });
+  } catch(err){
+    logger.error('pushApi', { error: String(err) });
+    res.status(500).json({ error: 'server' });
+  }
+});
