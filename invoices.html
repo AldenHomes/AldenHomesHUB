@@ -846,6 +846,7 @@ $('loginSubmitBtn').addEventListener('click', doLogin);
 $('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 $('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
 firebase.initializeApp(firebaseConfig);
+  if(firebase.firestore) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
 const db = firebase.firestore();
 let started = false;
 firebase.auth().onAuthStateChanged(user=>{

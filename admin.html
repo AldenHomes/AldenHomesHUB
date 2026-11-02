@@ -315,6 +315,7 @@ $('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); 
 $('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
 
 firebase.initializeApp(firebaseConfig);
+  if(firebase.firestore) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
 const db = firebase.firestore();
 /* The new look: saved on this device straight away (apple.js) and for the person in settings/hub-prefs[uid].theme */
 (function(){

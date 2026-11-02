@@ -606,6 +606,7 @@ document.addEventListener('mousemove', showTip);
 document.addEventListener('click', e=>{ if(e.target.closest('[data-tip]')) showTip(e); else $('tip').style.display = 'none'; });
 
 firebase.initializeApp(firebaseConfig);
+  if(firebase.firestore) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
 const db = firebase.firestore();
 let started = false;
 firebase.auth().onAuthStateChanged(user=>{

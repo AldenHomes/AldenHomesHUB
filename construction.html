@@ -1018,6 +1018,7 @@ $('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); 
 $('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
 
 firebase.initializeApp(firebaseConfig);
+  if(firebase.firestore) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
 db = firebase.firestore();
 jobsCol = db.collection('jobs');
 schedCol = db.collection('build-schedules');
@@ -1051,7 +1052,7 @@ function listenerError(label){
 
 async function seedIfEmpty(){
   try{
-    const snap = await subsCol.limit(1).get();
+    const snap = await subsCol.limit(1).get({ source: "server" });
     if(snap.empty){
       const batch = db.batch();
       Object.values(SUB).forEach(name=>{
@@ -1061,7 +1062,7 @@ async function seedIfEmpty(){
     }
   } catch(e){ console.error('Subs seed failed', e); }
   try{
-    const snap = await tasksCol.limit(1).get();
+    const snap = await tasksCol.limit(1).get({ source: "server" });
     if(snap.empty){
       const batch = db.batch();
       TEMPLATE_SEED.tasks.forEach(([title, phase, duration, ...subKeys], i)=>{
@@ -1071,7 +1072,7 @@ async function seedIfEmpty(){
     }
   } catch(e){ console.error('Task list seed failed', e); }
   try{
-    const snap = await templatesCol.limit(1).get();
+    const snap = await templatesCol.limit(1).get({ source: "server" });
     if(snap.empty){
       await templatesCol.doc(TEMPLATE_SEED.id).set({
         name: TEMPLATE_SEED.name,

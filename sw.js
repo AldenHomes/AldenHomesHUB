@@ -3,15 +3,20 @@
    Makes the hub installable and lets the app shell open when
    the connection is slow or down.
 
-   - Our own pages: always try the network first, so a freshly
-     uploaded file shows up right away. The cached copy is only
-     used when the network can't be reached.
+   - Our own pages (.html): network first, so a fresh upload shows
+     right away — but if the network hasn't answered in 2.5 s and a
+     saved copy exists, the saved copy opens (slow cell signal) and
+     the fresh one is saved for next time.
+   - Our own files with ?v= in the link (apple.css?v=30 …): saved
+     copy first — a new version always gets a new link.
+   - Our other files (scripts, pictures, maps, forms): saved copy
+     first for speed, refreshed in the background for next time.
    - Firebase / PDF libraries from the CDNs: cached after first
      use (their URLs are version-pinned, so they never change).
    - Everything else (Firestore, Storage, sign-in, QR images) is
      left completely alone.
    ============================================================ */
-const CACHE = 'alden-hub-v11';
+const CACHE = 'alden-hub-v12';
 
 const SHELL = [
   'index.html',
@@ -76,6 +81,24 @@ async function networkFirst(request){
   }
 }
 
+// a page: network first, the saved copy after 2.5 s (or when offline)
+async function pageFirst(request, event){
+  const cache = await caches.open(CACHE);
+  const fresh = fetch(request, { cache: 'no-cache' }).then(r=>{ if(r.ok) cache.put(request, r.clone()); return r; });
+  event.waitUntil(fresh.catch(()=>{}));
+  const cached = await cache.match(request, { ignoreSearch: true });
+  if(!cached) return fresh.catch(()=>networkFirst(request));
+  const slow = new Promise(res=>setTimeout(()=>res(cached), 2500));
+  return Promise.race([fresh.catch(()=>cached), slow]);
+}
+// saved copy now, fresh copy saved in the background for next time
+async function savedThenRefresh(request, event){
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request);
+  const fresh = fetch(request, { cache: 'no-cache' }).then(r=>{ if(r.ok) cache.put(request, r.clone()); return r; });
+  if(cached){ event.waitUntil(fresh.catch(()=>{})); return cached; }
+  return fresh;
+}
 async function cacheFirst(request){
   const cache = await caches.open(CACHE);
   const cached = await cache.match(request);
@@ -92,7 +115,11 @@ self.addEventListener('fetch', event=>{
   const url = new URL(request.url);
 
   if(url.origin === self.location.origin){
-    event.respondWith(networkFirst(request));
+    const isPage = request.mode === 'navigate' || /\.html?$/.test(url.pathname) || url.pathname.endsWith('/');
+    if(isPage) event.respondWith(pageFirst(request, event));
+    else if(url.searchParams.has('v')) event.respondWith(cacheFirst(request));
+    else if(/\.webmanifest$/.test(url.pathname) || url.pathname.endsWith('sw.js')) event.respondWith(networkFirst(request));
+    else event.respondWith(savedThenRefresh(request, event));
   } else if(isPinnedCdn(url)){
     event.respondWith(cacheFirst(request));
   }

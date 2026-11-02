@@ -2945,6 +2945,7 @@ async function boot(){
     return;
   }
   firebase.initializeApp(firebaseConfig);
+  if(firebase.firestore) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
   let started = false;
   firebase.auth().onAuthStateChanged(user=>{
     if(user && !user.isAnonymous){
