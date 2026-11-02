@@ -2197,6 +2197,7 @@ async function docPdf(btn, name){
     window.scrollTo(0, 0);
     const holder = document.createElement('div'); holder.style.cssText = 'position:absolute;left:-12000px;top:0;width:' + W + 'px;background:#fff';
     const el = document.getElementById('quoteDoc').cloneNode(true); el.id = 'quoteDocPdf';
+    el.querySelectorAll('.noprint').forEach(x=>x.remove());   // no + / × photo buttons (or other screen-only bits) in the PDF
     el.style.cssText = 'box-shadow:none;max-width:none;margin:0;width:' + W + 'px;padding:8px 24px;border-radius:0';
     holder.appendChild(el); document.body.appendChild(holder);
     await Promise.all([...el.querySelectorAll('img')].map(im=>im.complete ? 0 : new Promise(r=>{ im.onload = im.onerror = r; })));
