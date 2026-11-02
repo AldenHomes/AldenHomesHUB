@@ -279,6 +279,24 @@ html.apple.pg-schedule .progress-bar{background:#EFEFF4;}
   html.apple.pg-schedule tr[data-id] td:nth-child(12){order:6; flex:1 1 100%; margin-top:6px;}
 }
 
+/* ---- Job Costing + Cost History (owner, 2026-11-02): same tables (table.jc) ---- */
+html.apple.pg-jobcost table.jc th, html.apple.pg-history table.jc th{text-transform:none; letter-spacing:0; font-size:12.5px; color:#6C6C70; border-bottom:0.5px solid #D1D1D6;}
+html.apple.pg-jobcost table.jc td, html.apple.pg-history table.jc td{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-jobcost table.jc tr.tot td, html.apple.pg-history table.jc tr.tot td{border-top:0.5px solid #C7C7CC;}
+html.apple.pg-jobcost table.jc .num, html.apple.pg-history table.jc .num, html.apple.pg-jobcost .home-h .amt, html.apple.pg-history .kpi .v,
+html.apple.pg-history .hbars .a, html.apple.pg-jobcost .titlebar-stats .n, html.apple.pg-history .titlebar-stats .n{font-family:inherit; font-variant-numeric:tabular-nums;}
+html.apple.pg-jobcost .home-h .amt, html.apple.pg-jobcost .home-h b, html.apple.pg-history .kpi .v{color:#1C1C1E;}
+html.apple.pg-history table.jc td.avg, html.apple.pg-history table.jc th.avg{background:#F2F2F7;}
+html.apple.pg-history .kpi{background:#F2F2F7; border-radius:12px;}
+html.apple.pg-history .kpi .l{text-transform:none; letter-spacing:0; font-size:12.5px; color:#6C6C70; font-weight:600;}
+html.apple.pg-history .scroll table.jc thead th{background:#fff;}
+html.apple.pg-jobcost .home{border-top:0.5px solid #E3E3E8;}
+html.apple.pg-jobcost .bar, html.apple.pg-history .bar{background:#EFEFF4;}
+html.apple.pg-jobcost .imp-warn, html.apple.pg-jobcost .imp-ok, html.apple.pg-history .imp-warn, html.apple.pg-history .imp-ok{border-radius:12px;}
+html.apple.pg-jobcost table.jc select, html.apple.pg-history select{border-radius:9px;}
+/* a home's Job Costs card on house.html uses the same idea */
+html.apple.pg-house #costs .num, html.apple.pg-house #costs .mono{font-family:inherit; font-variant-numeric:tabular-nums;}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
