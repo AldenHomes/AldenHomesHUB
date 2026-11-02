@@ -297,6 +297,39 @@ html.apple.pg-jobcost table.jc select, html.apple.pg-history select{border-radiu
 /* a home's Job Costs card on house.html uses the same idea */
 html.apple.pg-house #costs .num, html.apple.pg-house #costs .mono{font-family:inherit; font-variant-numeric:tabular-nums;}
 
+/* ---- Permits (owner, 2026-11-02) ---- */
+html.apple.pg-permits table.iv th{text-transform:none; letter-spacing:0; font-size:12.5px; color:#6C6C70; border-bottom:0.5px solid #D1D1D6;}
+html.apple.pg-permits table.iv td{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-permits table.iv tr.row:hover td{background:#FAFAFC;}
+html.apple.pg-permits .ovbox{border-radius:16px;}
+html.apple .pm-btn{border-radius:10px; border-color:#D1D1D6;}
+html.apple .pm-step{border-top:0.5px solid #E3E3E8;}
+html.apple .pf-box{border-radius:16px;}
+html.apple .pf-head{border-bottom:0.5px solid #E3E3E8;}
+html.apple .pf-sec{text-transform:none; letter-spacing:0; font-size:14px; color:#1C1C1E;}
+html.apple .pf-f input, html.apple .pf-f select{border-radius:9px;}
+@media (max-width:760px){
+  html.apple.pg-permits table.iv, html.apple.pg-permits table.iv tbody{display:block; width:100%;}
+  html.apple.pg-permits table.iv thead{display:none;}
+  html.apple.pg-permits table.iv tr.row{display:flex; flex-wrap:wrap; align-items:center; gap:3px 8px; padding:12px 4px; border-bottom:0.5px solid #E3E3E8;}
+  html.apple.pg-permits table.iv tr.row td{display:block; padding:0; border:none; background:none !important; font-size:13.5px; color:#6C6C70;}
+  html.apple.pg-permits table.iv tr.row td:nth-child(1){order:1; flex:1 1 55%; min-width:0; font-size:16px; font-weight:600; color:#1C1C1E;}
+  html.apple.pg-permits table.iv tr.row td:nth-child(4){order:2;}
+  html.apple.pg-permits table.iv tr.row td:nth-child(2){order:3; flex:1 1 100%; color:#3C3C43;}
+  html.apple.pg-permits table.iv tr.row td:nth-child(3), html.apple.pg-permits table.iv tr.row td:nth-child(5), html.apple.pg-permits table.iv tr.row td:nth-child(6){order:4;}
+}
+
+/* ---- Sales Packets (owner, 2026-11-02) ---- */
+html.apple.pg-packets .bundle-card, html.apple.pg-packets .packet-card{border-top:none; border-radius:14px; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
+html.apple.pg-packets .bundle-card h3, html.apple.pg-packets .packet-card h3{color:#1C1C1E;}
+html.apple.pg-packets .packet-icon{border-radius:10px; background:#FFF4CC; color:#B07D00;}
+html.apple.pg-packets .packet-actions{border-top:0.5px solid #E3E3E8;}
+html.apple.pg-packets .modal{border-radius:16px; border-top:none; overflow:hidden;}
+html.apple.pg-packets .modal-head{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-packets .file-input-btn{border-radius:12px;}
+html.apple.pg-packets .link-row input{border-radius:9px; background:#F2F2F7;}
+html.apple.pg-packets .qr-box img{border-radius:12px;}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
