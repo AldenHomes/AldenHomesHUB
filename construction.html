@@ -301,7 +301,7 @@ html, body{max-width:100%; overflow-x:clip;}
   }
 </style>
 <link rel="stylesheet" href="apple.css?v=30">
-<script src="apple.js?v=10"></script>
+<script src="apple.js?v=11"></script>
 </head>
 <body>
 
@@ -1018,7 +1018,7 @@ $('loginEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); 
 $('signOutBtn').addEventListener('click', ()=>{ firebase.auth().signOut(); });
 
 firebase.initializeApp(firebaseConfig);
-  if(firebase.firestore) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
+  if(firebase.firestore && !window.hubNoPersist) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
 db = firebase.firestore();
 jobsCol = db.collection('jobs');
 schedCol = db.collection('build-schedules');

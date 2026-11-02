@@ -471,7 +471,7 @@
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
 <link rel="stylesheet" href="apple.css?v=30">
-<script src="apple.js?v=10"></script>
+<script src="apple.js?v=11"></script>
 </head>
 <body>
 
@@ -2935,10 +2935,16 @@ async function bootOffice(){
   TEAM = data.team || [];
   (data.sheets || []).forEach(x=>{ KEYS[x.id] = x.key; REMOTE[x.id] = { rev:x.rev, sheet:clone(x.sheet) }; });
   leads = (data.sheets || []).map(x=>norm(clone(x.sheet)));
+  // homes + lots are extras: never let a slow answer keep the sheets from showing (Safari on Mac stalled here, 2026-11-02)
+  const extras = (async ()=>{
   try{ const homes = leads.filter(l=>l.houseId).map(l=>l.houseId);
     for(let i = 0; i < homes.length; i += 10){ const snap = await firebase.firestore().collection('jobs').where(firebase.firestore.FieldPath.documentId(), 'in', homes.slice(i, i + 10)).get(); snap.docs.forEach(d=>{ JOBS[d.id] = d.data(); }); } }
   catch(err){ console.warn('homes', err); }
   await loadLots();
+  })();
+  const timedOut = await Promise.race([extras.then(()=>false), new Promise(r=>setTimeout(()=>r(true), 4000))]);
+  // only when they arrived late: draw once more so lot addresses / home details show (not while someone is typing)
+  if(timedOut) extras.then(()=>{ const a = document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; const y = window.scrollY; render(); window.scrollTo(0, y); }).catch(()=>{});
   const want = new URLSearchParams(location.search).get('open');
   if(want && leads.some(l=>l.id === want)){ cur = want; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; }
   start();
@@ -2956,7 +2962,7 @@ async function boot(){
     return;
   }
   firebase.initializeApp(firebaseConfig);
-  if(firebase.firestore) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
+  if(firebase.firestore && !window.hubNoPersist) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
   let started = false;
   firebase.auth().onAuthStateChanged(user=>{
     if(user && !user.isAnonymous){

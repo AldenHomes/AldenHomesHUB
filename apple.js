@@ -4,6 +4,14 @@
    The styles live in apple.css, all under html.apple, so the classic look is untouched when it's off.
    Phones get a bottom bar (Hub · Homes · My work · Chat · Settings); computers get a slim app bar on the left inside apps
    (not on the hub home, where the live tiles are the way in). Customer screens (?present / ?quote / ?show) are left alone. */
+/* Safari on Mac (and every iPhone / iPad browser — they all run on Apple's engine) stalls on Firestore's saved copy of the data
+   ("enablePersistence"): pages sat blank until something forced a redraw (owner, 2026-11-02). Pages only turn it on when this is false. */
+window.hubNoPersist = (function(){
+  const ua = navigator.userAgent || '';
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const safari = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua);
+  return ios || safari;
+})();
 // every staff page keeps saved copies of its files on the device (sw.js) — Selections, Invoices and Permits never switched it on
 if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });

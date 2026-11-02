@@ -118,7 +118,7 @@
   .back-link:hover{color:var(--navy);}
 </style>
 <link rel="stylesheet" href="apple.css?v=30">
-<script src="apple.js?v=10"></script>
+<script src="apple.js?v=11"></script>
 </head>
 <body>
 
@@ -391,7 +391,7 @@ if(!FIREBASE_CONFIGURED){
   showSetupGate();
 } else {
   firebase.initializeApp(firebaseConfig);
-  if(firebase.firestore) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
+  if(firebase.firestore && !window.hubNoPersist) firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(()=>{});   // a saved copy of the data on this device: lists show at once, then update
   db = firebase.firestore();
   storage = firebase.storage();
   packetsCol = db.collection('sales-packets');
