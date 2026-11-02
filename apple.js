@@ -78,6 +78,11 @@
   }
   function crumbs(){
     const back = document.querySelector('a.back-link');
+    // phones, a home's page: "‹ Homes" back to the homes list (the hub's back link is hidden on phones)
+    if(page === 'house.html' && back && !document.querySelector('.ab-back')){
+      const b = document.createElement('a'); b.className = 'ab-back'; b.href = 'index.html#homes'; b.textContent = '‹ Homes';
+      back.parentNode.insertBefore(b, back);
+    }
     if(!back || !root.classList.contains('desk') || isHub){ document.querySelectorAll('.ab-crumbs').forEach(c=>{ c.remove(); }); if(back) back.style.display = ''; return; }
     let c = document.querySelector('.ab-crumbs');
     if(!c){ c = document.createElement('nav'); c.className = 'ab-crumbs'; c.setAttribute('aria-label', 'You are here'); back.parentNode.insertBefore(c, back); }

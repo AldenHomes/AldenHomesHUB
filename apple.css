@@ -302,6 +302,24 @@ html.apple.pg-jobcost .bar, html.apple.pg-history .bar{background:#EFEFF4;}
 html.apple.pg-jobcost .imp-warn, html.apple.pg-jobcost .imp-ok, html.apple.pg-history .imp-warn, html.apple.pg-history .imp-ok{border-radius:12px;}
 html.apple.pg-jobcost table.jc select, html.apple.pg-history select{border-radius:9px;}
 html.apple.pg-house #hDates, html.apple.pg-house #hDates *{font-family:inherit; font-variant-numeric:tabular-nums;}
+/* a home's page (owner, 2026-11-02) */
+html.apple.pg-house .date .v, html.apple.pg-house .big, html.apple.pg-house .line .d, html.apple.pg-house .jc-stat .v, html.apple.pg-house .jc-prog .t b,
+html.apple.pg-house .jc-codes .a, html.apple.pg-house .jc-codes .bsub, html.apple.pg-house .co-num, html.apple.pg-house .co-amt,
+html.apple.pg-house .co-item .price, html.apple.pg-house .co-total strong, html.apple.pg-house .owner-login .code,
+html.apple.pg-house .plan-folder .n, html.apple.pg-house .fchip .n{font-family:inherit; font-variant-numeric:tabular-nums;}
+html.apple.pg-house .date .l{text-transform:none; letter-spacing:0; font-size:12.5px; font-weight:600; color:#8E8E93;}
+html.apple.pg-house .date .v{color:#1C1C1E;}
+html.apple.pg-house .dates{border-top:0.5px solid #E3E3E8;}
+html.apple.pg-house .card-icon{background:#F2F2F7; color:#4B4F54; border-radius:10px;}
+html.apple.pg-house .owner-login .code{background:#F2F2F7;}
+html.apple.pg-house .note-compose textarea{border-radius:12px;}
+html.apple.pg-house .note-actions{flex-wrap:wrap; gap:8px;}
+html.apple.phone.pg-house #noteAddBtn{flex:1 1 100%; min-height:44px; border-radius:12px;}
+html.apple.phone.pg-house .note-actions #noteHint{flex:1 1 100%;}
+/* phones: the page is about the home — "‹ Homes" at the top instead of the hub's name */
+html.apple.phone.pg-house .titlebar h1{display:none;}
+.ab-back{display:none;}
+html.apple.phone .ab-back{display:inline-flex; align-items:center; gap:4px; margin:0 0 10px; color:#4B4F54; font-size:17px; text-decoration:none;}
 /* a home's Job Costs card on house.html uses the same idea */
 html.apple.pg-house #costs .num, html.apple.pg-house #costs .mono{font-family:inherit; font-variant-numeric:tabular-nums;}
 
