@@ -43,15 +43,15 @@ html.apple .ab-date{font-size:13px; font-weight:600; color:#8E8E93; text-transfo
 html.apple .tile-icon{width:46px; height:46px; border-radius:12px; color:#fff; background:#8E8E93;}
 html.apple .tile-icon svg{stroke:#fff;}
 html.apple #scheduleTile .tile-icon{background:#4B4F54;}
-html.apple #constructionTile .tile-icon{background:#FF9500;}
-html.apple #punchTile .tile-icon{background:#34C759;}
-html.apple #serviceTile .tile-icon{background:#32ADE6;}
-html.apple #selectionsTile .tile-icon{background:#AF52DE;}
-html.apple #invoicesTile .tile-icon{background:#FF3B30;}
+html.apple #constructionTile .tile-icon{background:#A0715A;}
+html.apple #punchTile .tile-icon{background:#6B7355;}
+html.apple #serviceTile .tile-icon{background:#5B7083;}
+html.apple #selectionsTile .tile-icon{background:#7A6A80;}
+html.apple #invoicesTile .tile-icon{background:#9C5B4A;}
 html.apple #permitsTile .tile-icon{background:#8C9470;}
-html.apple #jobcostTile .tile-icon{background:#30B0C7;}
-html.apple #historyTile .tile-icon{background:#5856D6;}
-html.apple #packetsTile .tile-icon{background:#D99A00;}
+html.apple #jobcostTile .tile-icon{background:#4F7A7A;}
+html.apple #historyTile .tile-icon{background:#6E7C8C;}
+html.apple #packetsTile .tile-icon{background:#B88A3E;}
 html.apple .tile-title{color:#1C1C1E; letter-spacing:-0.2px;}
 html.apple .tile-stats{font-family:inherit; border-top:none; padding-top:0;}
 html.apple .tile-stat .n{font-size:22px; letter-spacing:-0.4px; color:#1C1C1E;}
@@ -79,8 +79,8 @@ html.apple.pg-punch .group-head{background:#fff; border-bottom:0.5px solid #E3E3
 html.apple.pg-punch .group-head .n, html.apple.pg-punch .done-toggle .n{font-family:inherit; background:#EFEFF4; border-radius:10px; padding:1px 8px; font-size:12.5px; color:#6C6C70;}
 html.apple.pg-punch .item{padding:12px 16px; gap:12px; border-top:0.5px solid #E3E3E8;}
 html.apple.pg-punch .check{width:24px; height:24px; border-radius:50%; border:1.5px solid #C7C7CC; font-size:14px; margin-top:2px;}
-html.apple.pg-punch .check:hover{border-color:#34C759;}
-html.apple.pg-punch .check.on{background:#34C759; border-color:#34C759;}
+html.apple.pg-punch .check:hover{border-color:#3f7a4e;}
+html.apple.pg-punch .check.on{background:#3f7a4e; border-color:#3f7a4e;}
 html.apple.pg-punch .item-text{font-size:16px; line-height:1.4; color:#1C1C1E;}
 html.apple.pg-punch .item-meta{font-size:13px; color:#8E8E93; margin-top:4px;}
 html.apple.pg-punch .who{background:#EFEFF4; color:#3C3C43; font-weight:600;}
@@ -94,10 +94,9 @@ html.apple.phone.pg-punch .add{position:relative;}
 .ab-fold-done{position:absolute; top:8px; right:10px; border:none; background:none; color:#4B4F54; font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; padding:6px; cursor:pointer;}
 html.apple.phone.pg-punch .add:not(.ab-fold){padding-top:38px;}
 html:not(.phone) .ab-fold-done{display:none;}
-.ab-new{position:fixed; left:16px; bottom:calc(96px + env(safe-area-inset-bottom)); z-index:125; display:flex; align-items:center; gap:6px;
-  border:none; background:#34C759; color:#fff; border-radius:24px; height:46px; padding:0 18px; font:600 16px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  box-shadow:0 4px 14px rgba(0,0,0,.18); cursor:pointer;}
-.ab-new span{font-size:22px; font-weight:500; margin-top:-2px;}
+.ab-new{display:flex; align-items:center; justify-content:center; gap:6px; width:100%; margin:0 0 12px;
+  border:none; background:#4B4F54; color:#fff; border-radius:10px; height:42px; padding:0 16px; font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; cursor:pointer;}
+.ab-new span{font-size:19px; font-weight:500; margin-top:-2px;}
 .ab-new[hidden]{display:none;}
 
 /* ---- Service Center (owner, 2026-11-02) ---- */
@@ -134,7 +133,7 @@ html.apple.pg-invoices table.iv th{color:#6C6C70; text-transform:none; letter-sp
 html.apple.pg-invoices table.iv td{border-bottom:0.5px solid #E3E3E8;}
 html.apple.pg-invoices table.iv tr.row:hover td{background:#FAFAFC;}
 html.apple.pg-invoices table.iv .num{font-family:inherit; font-weight:600;}
-html.apple.pg-invoices .chipq{border-radius:6px; background:#FDECEA; color:#B3261E;}
+html.apple.pg-invoices .chipq{border-radius:6px; background:#F6E6E1; color:#b3452f;}
 html.apple.pg-invoices .chipok{border-radius:6px;}
 html.apple.pg-invoices .ovbox{border-radius:16px;}
 html.apple.pg-invoices .split{border-radius:12px; border-color:#E3E3E8; background:#F7F7FA;}
@@ -174,17 +173,17 @@ html.apple.phone.pg-selections .top #signOutBtn{display:none !important;}
 html.apple .mywork{border-left:none;}
 html.apple .mw-title{color:#1C1C1E; font-size:16px;}
 html.apple .mw-chip{background:#EFEFF4; color:#3C3C43; border-radius:10px;}
-html.apple .mw-chip.red{background:#FDECEA; color:#B3261E;}
-html.apple .mw-chip.amber{background:#FFF1DE; color:#9A5B00;}
+html.apple .mw-chip.red{background:#F6E6E1; color:#b3452f;}
+html.apple .mw-chip.amber{background:#F8EEDD; color:#96661a;}
 html.apple .mw-day{background:#F2F2F7; border-radius:12px; padding:9px 12px;}
 html.apple .mw-day strong{color:#1C1C1E;}
-html.apple .mw-day .wet{color:#007AFF;}
+html.apple .mw-day .wet{color:#2f7d8c;}
 html.apple .mw-sites-h{color:#8E8E93; text-transform:uppercase; letter-spacing:.4px;}
 html.apple .mw-site{background:#fff; border:0.5px solid #E3E3E8; border-left-width:3px; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04);}
 html.apple .mw-site > a{color:#1C1C1E;}
 html.apple .mw-site .job + .todo, html.apple .mw-site .more + .todo{border-top:0.5px solid #E3E3E8;}
 html.apple .mw-check{border-radius:50%; border:1.5px solid #C7C7CC;}
-html.apple .mw-check:hover{border-color:#34C759;}
+html.apple .mw-check:hover{border-color:#3f7a4e;}
 html.apple .mw-row, html.apple .mw-two, html.apple .mw-two .mw-row{border-top-color:#E3E3E8;}
 html.apple .mw-settings{background:#F7F7FA; border-top:0.5px solid #E3E3E8;}
 html.apple .mw-go{border-radius:16px; color:#4B4F54;}
@@ -212,7 +211,7 @@ html.apple.pg-construction .cal-dow{background:#F7F7FA; color:#8E8E93; border-bo
 html.apple.pg-construction .cal-week{border-bottom:0.5px solid #E3E3E8;}
 html.apple.pg-construction .cal-day{border-left:0.5px solid #EFEFF4;}
 html.apple.pg-construction .cal-day.weekend{background:#FAFAFC;}
-html.apple.pg-construction .cal-day.today .n{background:#FF3B30; color:#fff;}
+html.apple.pg-construction .cal-day.today .n{background:#4B4F54; color:#fff;}
 html.apple.pg-construction .cal-month{color:#1C1C1E; font-size:17px;}
 html.apple.pg-construction .cal-bar{border-radius:6px;}
 html.apple.pg-construction .bar-track{background:#EFEFF4;}
@@ -241,7 +240,7 @@ html.apple.pg-schedule .order-grid .c-name{border-right:0.5px solid #E3E3E8;}
 html.apple.pg-schedule tbody td, html.apple.pg-schedule .order-grid tbody td{border-bottom:0.5px solid #E3E3E8;}
 html.apple.pg-schedule .order-grid td.item-cell{border-left:0.5px solid #EFEFF4;}
 html.apple.pg-schedule tbody tr:hover, html.apple.pg-schedule .order-grid tbody tr:hover td{background:#FAFAFC;}
-html.apple.pg-schedule .item-cell.done .item-toggle{background:#E6F6EA; color:#1F7A35;}
+html.apple.pg-schedule .item-cell.done .item-toggle{background:#EAF1EC; color:#3f7a4e;}
 html.apple.pg-schedule .item-toggle:hover{background:#F2F2F7;}
 html.apple.pg-schedule .settle-cell{color:#1C1C1E;}
 html.apple.pg-schedule .year-group-bar{background:#F7F7FA; color:#1C1C1E;}
@@ -294,6 +293,7 @@ html.apple.pg-jobcost .home{border-top:0.5px solid #E3E3E8;}
 html.apple.pg-jobcost .bar, html.apple.pg-history .bar{background:#EFEFF4;}
 html.apple.pg-jobcost .imp-warn, html.apple.pg-jobcost .imp-ok, html.apple.pg-history .imp-warn, html.apple.pg-history .imp-ok{border-radius:12px;}
 html.apple.pg-jobcost table.jc select, html.apple.pg-history select{border-radius:9px;}
+html.apple.pg-house #hDates, html.apple.pg-house #hDates *{font-family:inherit; font-variant-numeric:tabular-nums;}
 /* a home's Job Costs card on house.html uses the same idea */
 html.apple.pg-house #costs .num, html.apple.pg-house #costs .mono{font-family:inherit; font-variant-numeric:tabular-nums;}
 
@@ -343,14 +343,11 @@ html.apple.pg-packets .qr-box img{border-radius:12px;}
   html.apple.pg-service .overlay .modal{padding-bottom:calc(84px + env(safe-area-inset-bottom));}
   html.apple.pg-service .detail-item label{text-transform:none; letter-spacing:0; font-size:13px; color:#8E8E93; font-weight:500;}
   html.apple.pg-service .search input{padding-left:34px;}
-  html.apple.pg-service .overlay .modal-close{font-size:0; color:#007AFF; padding:6px 4px; min-width:58px; text-align:left;}
+  html.apple.pg-service .overlay .modal-close{font-size:0; color:#4B4F54; padding:6px 4px; min-width:58px; text-align:left;}
   html.apple.pg-service .overlay .modal-close::before{content:"‹ Back"; font-size:17px; font-weight:400;}
   html.apple.pg-service .overlay .modal-body{background:#fff; margin:14px; border-radius:14px;}
   html.apple.pg-service .overlay .modal-foot{padding:4px 14px calc(30px + env(safe-area-inset-bottom));}
   html.apple.pg-service .overlay .modal-foot .btn{min-height:46px; border-radius:12px; font-size:16px;}
-  html.apple.pg-service #addRequestBtn{position:fixed; left:16px; bottom:calc(96px + env(safe-area-inset-bottom)); z-index:125; height:46px; padding:0 18px;
-    border-radius:24px; background:#32ADE6; color:#fff; font-size:16px; box-shadow:0 4px 14px rgba(0,0,0,.18);}
-  html.apple.pg-service .overlay.show ~ * #addRequestBtn, html.apple.pg-service body:has(.overlay.show) #addRequestBtn{display:none;}
 }
 
 /* ---- Punch List on phones: swipe actions + tap for options (apple.js punchSwipe) ---- */
@@ -361,8 +358,8 @@ html.apple.pg-packets .qr-box img{border-radius:12px;}
   html.apple.pg-punch .ab-sw{position:absolute; top:0; right:0; bottom:0; width:0; display:flex; overflow:hidden; transition:width .2s ease;}
   html.apple.pg-punch .item.ab-dragging .ab-sw{transition:none;}
   html.apple.pg-punch .ab-sw button{flex:1 0 78px; border:none; color:#fff; font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-  html.apple.pg-punch .ab-sw-done{background:#34C759;} html.apple.pg-punch .item.done .ab-sw-done{background:#8E8E93;}
-  html.apple.pg-punch .ab-sw-del{background:#FF3B30;}
+  html.apple.pg-punch .ab-sw-done{background:#3f7a4e;} html.apple.pg-punch .item.done .ab-sw-done{background:#8E8E93;}
+  html.apple.pg-punch .ab-sw-del{background:#b3452f;}
   html.apple.pg-punch .x-btn{display:none;}
   html.apple.pg-punch .item .item-tools{display:none;}
   html.apple.pg-punch .item.ab-tools .item-tools{display:flex;}
@@ -382,7 +379,7 @@ html.apple.pg-mywork .row .t{font-size:16px; color:#1C1C1E;}
 html.apple.pg-mywork .row .m{font-size:13px; color:#8E8E93;}
 html.apple.pg-mywork .row .go{border-radius:16px; border-color:#D1D1D6;}
 html.apple.pg-mywork .check{width:24px; height:24px; border-radius:50%; border:1.5px solid #C7C7CC;}
-html.apple.pg-mywork .check:hover{border-color:#34C759;}
+html.apple.pg-mywork .check:hover{border-color:#3f7a4e;}
 html.apple.pg-mywork .allclear{border-radius:14px;}
 html.apple.phone.pg-mywork .counts{grid-template-columns:repeat(2, minmax(0,1fr));}
 
@@ -404,9 +401,17 @@ html.apple.desk body{padding-left:68px;}
 .ab-rail .ab-home{margin-bottom:8px;}
 .ab-rail .ab-home img{width:40px; height:40px; display:block; border-radius:10px; background:#fff; box-shadow:0 0 0 0.5px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.08);}
 .ab-rail .ab-grow{flex:1; min-height:8px;}
-.ab-badge{position:absolute; top:3px; right:2px; min-width:16px; box-sizing:border-box; background:#FF3B30; color:#fff; font-size:10px; font-weight:700;
+.ab-badge{position:absolute; top:3px; right:2px; min-width:16px; box-sizing:border-box; background:#b3452f; color:#fff; font-size:10px; font-weight:700;
   border-radius:8px; padding:0 4px; line-height:16px; text-align:center;}
 .ab-badge[hidden]{display:none;}
+.ab-rail .ab-app:hover::after{content:attr(aria-label); position:absolute; left:54px; top:50%; transform:translateY(-50%); white-space:nowrap;
+  background:#4B4F54; color:#fff; font:600 12.5px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; padding:7px 10px; border-radius:8px;
+  box-shadow:0 4px 12px rgba(0,0,0,.18); pointer-events:none; z-index:5;}
+.ab-rail{overflow:visible;}
+html.apple.desk .ab-crumbs{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:0 0 14px; font-size:13.5px; color:#8E8E93;}
+html.apple.desk .ab-crumbs a{color:#4B4F54; text-decoration:none; font-weight:600;}
+html.apple.desk .ab-crumbs a:hover{text-decoration:underline;}
+html.apple.desk .ab-crumbs b{color:#1C1C1E; font-weight:600;}
 
 /* ---- phones ---- */
 html.apple.phone body{padding-bottom:calc(84px + env(safe-area-inset-bottom));}

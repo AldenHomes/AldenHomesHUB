@@ -17,15 +17,15 @@
 
   const APPS = [
     ['schedule.html', 'Production Schedule', '#4B4F54', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
-    ['construction.html', 'Construction', '#FF9500', '<path d="M3 21h18M5 21V10l7-6 7 6v11"/><path d="M10 21v-6h4v6"/>'],
-    ['punch.html', 'Punch List', '#34C759', '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>'],
-    ['service.html', 'Service Center', '#32ADE6', '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>'],
-    ['selections.html', 'Selections', '#AF52DE', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3"/><circle cx="8" cy="13" r="1.3"/><circle cx="16" cy="13" r="1.3"/>'],
-    ['invoices.html', 'Invoices', '#FF3B30', '<path d="M7 3h8l4 4v14H7z"/><path d="M10 12h6M10 16h4"/>'],
+    ['construction.html', 'Construction', '#A0715A', '<path d="M3 21h18M5 21V10l7-6 7 6v11"/><path d="M10 21v-6h4v6"/>'],
+    ['punch.html', 'Punch List', '#6B7355', '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>'],
+    ['service.html', 'Service Center', '#5B7083', '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>'],
+    ['selections.html', 'Selections', '#7A6A80', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3"/><circle cx="8" cy="13" r="1.3"/><circle cx="16" cy="13" r="1.3"/>'],
+    ['invoices.html', 'Invoices', '#9C5B4A', '<path d="M7 3h8l4 4v14H7z"/><path d="M10 12h6M10 16h4"/>'],
     ['permits.html', 'Permits', '#8C9470', '<path d="M6 3h9l3 3v15H6z"/><path d="M9 13l2 2 4-4"/>'],
-    ['jobcost.html', 'Job Costing', '#30B0C7', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
-    ['history.html', 'Cost History', '#5856D6', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
-    ['packets.html', 'Sales Packets', '#D99A00', '<path d="M4 7h16v13H4z"/><path d="M9 7V4h6v3"/>'],
+    ['jobcost.html', 'Job Costing', '#4F7A7A', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
+    ['history.html', 'Cost History', '#6E7C8C', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+    ['packets.html', 'Sales Packets', '#B88A3E', '<path d="M4 7h16v13H4z"/><path d="M9 7V4h6v3"/>'],
   ];
   const svg = (p, w)=>`<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
   const ICON = {
@@ -74,6 +74,23 @@
         + chatBtn('ab-app ab-plain', 21)
         + `<a class="ab-app ab-plain${page === 'admin.html' ? ' here' : ''}" href="admin.html" title="Settings" aria-label="Settings">${svg(ICON.gear, 21)}</a>`;
       document.body.appendChild(rail);
+    }
+  }
+  function crumbs(){
+    const back = document.querySelector('a.back-link');
+    if(!back || !root.classList.contains('desk') || isHub){ document.querySelectorAll('.ab-crumbs').forEach(c=>{ c.remove(); }); if(back) back.style.display = ''; return; }
+    let c = document.querySelector('.ab-crumbs');
+    if(!c){ c = document.createElement('nav'); c.className = 'ab-crumbs'; c.setAttribute('aria-label', 'You are here'); back.parentNode.insertBefore(c, back); }
+    back.style.display = 'none';
+    const app = APPS.find(a=>a[0] === page);
+    const name = app ? app[1] : page === 'mywork.html' ? 'My work' : page === 'admin.html' ? 'Settings' : (document.querySelector('.titlebar h1') || {}).textContent || '';
+    if(page === 'house.html'){
+      const t = (document.getElementById('hTitle') || {}).textContent || 'Home';
+      c.innerHTML = `<a href="index.html">Hub</a><span>›</span><a href="index.html#homes">Homes</a><span>›</span><b></b>`;
+      c.querySelector('b').textContent = t;
+    } else {
+      c.innerHTML = '<a href="index.html">Hub</a><span>›</span><b></b>';
+      c.querySelector('b').textContent = name;
     }
   }
   function hubTouches(){
@@ -145,7 +162,8 @@
         add.scrollIntoView({ behavior: 'smooth', block: 'start' });
         const t = document.getElementById('newText'); if(t) setTimeout(()=>t.focus(), 250);
       });
-      document.body.appendChild(pill);
+      const at = document.querySelector('.filters') || document.getElementById('openList');
+      at.parentNode.insertBefore(pill, at);
     }
     pill.hidden = !add.classList.contains('ab-fold');
   }
@@ -221,7 +239,9 @@
     document.querySelectorAll('[data-ab-unread]').forEach(b=>{ b.textContent = unread || ''; b.hidden = !unread; });
   });
   window.addEventListener('hashchange', ()=>{ build(); hubTouches(); });
-  const ready = ()=>{ build(); hubTouches(); houseSections(); punchNewItem(); punchSwipe(); };
+  const ready = ()=>{ build(); hubTouches(); houseSections(); punchNewItem(); punchSwipe(); crumbs(); };
+  // a home's name arrives after the page loads: keep its crumb current
+  if(page === 'house.html') document.addEventListener('DOMContentLoaded', ()=>{ const h = document.getElementById('hTitle'); if(h) new MutationObserver(crumbs).observe(h, { childList: true, characterData: true, subtree: true }); });
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   (phoneMQ.addEventListener ? phoneMQ.addEventListener('change', ready) : phoneMQ.addListener(ready));
 
