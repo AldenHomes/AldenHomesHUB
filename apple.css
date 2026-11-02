@@ -330,6 +330,45 @@ html.apple.pg-packets .file-input-btn{border-radius:12px;}
 html.apple.pg-packets .link-row input{border-radius:9px; background:#F2F2F7;}
 html.apple.pg-packets .qr-box img{border-radius:12px;}
 
+/* ---- Service Center on phones: a request opens as its own full screen with "‹ Back"; "+ New request" floats at the bottom ---- */
+@media (max-width:760px){
+  html.apple.pg-service .overlay{padding:0; align-items:stretch; background:#F2F2F7;}
+  html.apple.pg-service .overlay .modal{max-width:none; width:100%; min-height:100%; border-radius:0; box-shadow:none; background:#F2F2F7;}
+  html.apple.pg-service .overlay .modal-head{position:sticky; top:0; z-index:5; background:rgba(249,249,251,.96); border-bottom:0.5px solid #D1D1D6;
+    gap:6px; padding:12px 14px; -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);}
+  html.apple.pg-service .overlay .modal-head .head-actions{display:contents;}
+  html.apple.pg-service .overlay .modal-head .modal-close{order:0;}
+  html.apple.pg-service .overlay .modal-head h2{order:1; font-size:17px; flex:1; text-align:center; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  html.apple.pg-service .overlay .modal-head > :not(h2):not(.modal-close), html.apple.pg-service .overlay .modal-head .head-actions > :not(.modal-close){order:2;}
+  html.apple.pg-service .overlay .modal{padding-bottom:calc(84px + env(safe-area-inset-bottom));}
+  html.apple.pg-service .detail-item label{text-transform:none; letter-spacing:0; font-size:13px; color:#8E8E93; font-weight:500;}
+  html.apple.pg-service .search input{padding-left:34px;}
+  html.apple.pg-service .overlay .modal-close{font-size:0; color:#007AFF; padding:6px 4px; min-width:58px; text-align:left;}
+  html.apple.pg-service .overlay .modal-close::before{content:"‹ Back"; font-size:17px; font-weight:400;}
+  html.apple.pg-service .overlay .modal-body{background:#fff; margin:14px; border-radius:14px;}
+  html.apple.pg-service .overlay .modal-foot{padding:4px 14px calc(30px + env(safe-area-inset-bottom));}
+  html.apple.pg-service .overlay .modal-foot .btn{min-height:46px; border-radius:12px; font-size:16px;}
+  html.apple.pg-service #addRequestBtn{position:fixed; left:16px; bottom:calc(96px + env(safe-area-inset-bottom)); z-index:125; height:46px; padding:0 18px;
+    border-radius:24px; background:#32ADE6; color:#fff; font-size:16px; box-shadow:0 4px 14px rgba(0,0,0,.18);}
+  html.apple.pg-service .overlay.show ~ * #addRequestBtn, html.apple.pg-service body:has(.overlay.show) #addRequestBtn{display:none;}
+}
+
+/* ---- Punch List on phones: swipe actions + tap for options (apple.js punchSwipe) ---- */
+@media (max-width:760px){
+  html.apple.pg-punch .item:not(.item-edit){position:relative; overflow:hidden; --sx:0px;}
+  html.apple.pg-punch .item:not(.item-edit) > :not(.ab-sw){transform:translateX(var(--sx)); transition:transform .2s ease;}
+  html.apple.pg-punch .item.ab-dragging > :not(.ab-sw){transition:none;}
+  html.apple.pg-punch .ab-sw{position:absolute; top:0; right:0; bottom:0; width:0; display:flex; overflow:hidden; transition:width .2s ease;}
+  html.apple.pg-punch .item.ab-dragging .ab-sw{transition:none;}
+  html.apple.pg-punch .ab-sw button{flex:1 0 78px; border:none; color:#fff; font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  html.apple.pg-punch .ab-sw-done{background:#34C759;} html.apple.pg-punch .item.done .ab-sw-done{background:#8E8E93;}
+  html.apple.pg-punch .ab-sw-del{background:#FF3B30;}
+  html.apple.pg-punch .x-btn{display:none;}
+  html.apple.pg-punch .item .item-tools{display:none;}
+  html.apple.pg-punch .item.ab-tools .item-tools{display:flex;}
+  html.apple.pg-punch .item:not(.item-edit) .item-main{cursor:pointer;}
+}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}

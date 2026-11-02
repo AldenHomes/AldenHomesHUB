@@ -150,6 +150,62 @@
     pill.hidden = !add.classList.contains('ab-fold');
   }
 
+  /* Punch List on an iPhone (owner, 2026-11-02: "the workers here all have iPhones… feel natural"):
+     swipe an item left → Done (green) + Delete (red), a long swipe checks it off; tap an item → its options (Edit, date, photo,
+     priority) show, otherwise they're hidden. The buttons press the item's own check / delete buttons, so the page's rules apply. */
+  let swipeOn = false;
+  function punchSwipe(){
+    if(page !== 'punch.html' || swipeOn) return;
+    swipeOn = true;
+    let it = null, x0 = 0, y0 = 0, dx = 0, dragging = false, decided = false;
+    const W = 156;                         // two 78px buttons
+    const usable = ()=>root.classList.contains('apple') && phoneMQ.matches;
+    const close = el=>{ if(!el) return; el.style.setProperty('--sx', '0px'); el.classList.remove('ab-swiped'); const a = el.querySelector('.ab-sw'); if(a) a.style.width = '0px'; };
+    const actions = el=>{
+      let a = el.querySelector('.ab-sw');
+      if(!a){
+        const done = el.classList.contains('done');
+        a = document.createElement('div'); a.className = 'ab-sw';
+        a.innerHTML = `<button type="button" class="ab-sw-done">${done ? 'Undo' : 'Done'}</button><button type="button" class="ab-sw-del">Delete</button>`;
+        el.appendChild(a);
+      }
+      return a;
+    };
+    document.addEventListener('touchstart', e=>{
+      if(!usable()) return;
+      const el = e.target.closest('#openList .item:not(.item-edit), #doneList .item:not(.item-edit)');
+      document.querySelectorAll('.item.ab-swiped').forEach(o=>{ if(o !== el) close(o); });
+      if(!el || e.target.closest('.ab-sw, input, textarea, select, a')) { it = null; return; }
+      it = el; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; dragging = false; decided = false;
+    }, { passive: true });
+    document.addEventListener('touchmove', e=>{
+      if(!it) return;
+      const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
+      if(!decided){ if(Math.abs(mx) < 8 && Math.abs(my) < 8) return; decided = true; dragging = Math.abs(mx) > Math.abs(my) * 1.2; if(!dragging){ it = null; return; } }
+      const start = it.classList.contains('ab-swiped') ? -W : 0;
+      dx = Math.min(0, start + mx);
+      it.style.setProperty('--sx', dx + 'px');
+      actions(it).style.width = (-dx) + 'px';
+      it.classList.add('ab-dragging');
+    }, { passive: true });
+    document.addEventListener('touchend', ()=>{
+      if(!it || !dragging){ it = null; return; }
+      const el = it; it = null; el.classList.remove('ab-dragging');
+      if(-dx > el.offsetWidth * 0.6){ close(el); const c = el.querySelector('.check'); if(c) c.click(); return; }   // long swipe = done
+      if(-dx > W / 2){ el.style.setProperty('--sx', -W + 'px'); actions(el).style.width = W + 'px'; el.classList.add('ab-swiped'); }
+      else close(el);
+    });
+    document.addEventListener('click', e=>{
+      if(!usable()) return;
+      const sw = e.target.closest('.ab-sw button');
+      if(sw){ const el = sw.closest('.item'); close(el); const b = el.querySelector(sw.classList.contains('ab-sw-done') ? '.check' : '.x-btn'); if(b) b.click(); return; }
+      const el = e.target.closest('#openList .item:not(.item-edit), #doneList .item:not(.item-edit)');
+      if(!el || e.target.closest('button, a, input, textarea, select')) return;
+      if(el.classList.contains('ab-swiped')){ close(el); return; }
+      el.classList.toggle('ab-tools');            // tap = show / hide its options
+    });
+  }
+
   function showSec(){
     const cards = document.querySelector('#home .cards'); if(!cards) return;
     cards.dataset.show = homeSec;
@@ -165,7 +221,7 @@
     document.querySelectorAll('[data-ab-unread]').forEach(b=>{ b.textContent = unread || ''; b.hidden = !unread; });
   });
   window.addEventListener('hashchange', ()=>{ build(); hubTouches(); });
-  const ready = ()=>{ build(); hubTouches(); houseSections(); punchNewItem(); };
+  const ready = ()=>{ build(); hubTouches(); houseSections(); punchNewItem(); punchSwipe(); };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   (phoneMQ.addEventListener ? phoneMQ.addEventListener('change', ready) : phoneMQ.addListener(ready));
 
