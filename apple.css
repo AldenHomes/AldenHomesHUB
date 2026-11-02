@@ -129,6 +129,35 @@ html.apple.pg-service .done-toggle .n{font-family:inherit; background:#EFEFF4; b
   html.apple.pg-service tbody td:nth-child(5) .muted{display:none;}
 }
 
+/* ---- Invoices (owner, 2026-11-02) ---- */
+html.apple.pg-invoices table.iv th{color:#6C6C70; text-transform:none; letter-spacing:0; font-size:12.5px; border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-invoices table.iv td{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-invoices table.iv tr.row:hover td{background:#FAFAFC;}
+html.apple.pg-invoices table.iv .num{font-family:inherit; font-weight:600;}
+html.apple.pg-invoices .chipq{border-radius:6px; background:#FDECEA; color:#B3261E;}
+html.apple.pg-invoices .chipok{border-radius:6px;}
+html.apple.pg-invoices .ovbox{border-radius:16px;}
+html.apple.pg-invoices .split{border-radius:12px; border-color:#E3E3E8; background:#F7F7FA;}
+/* phones: one row per invoice like the mock-up — vendor + total, home / code tags, # · date · scan page, what needs checking.
+   Columns are picked from the END of the row (the Ready tab has an extra tick box at the start). */
+@media (max-width:760px){
+  html.apple.pg-invoices table.iv, html.apple.pg-invoices table.iv tbody{display:block; width:100%;}
+  html.apple.pg-invoices table.iv thead{display:none;}
+  html.apple.pg-invoices table.iv tr.row{display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; padding:12px 4px; border-bottom:0.5px solid #E3E3E8;}
+  html.apple.pg-invoices table.iv tr.row td{display:block; padding:0; border:none; background:none !important;}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(9){order:0;}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(6){order:1; flex:1 1 0; min-width:0; font-size:16.5px; font-weight:600; color:#1C1C1E;}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(2){order:2; font-size:16.5px;}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(4){order:3; flex:1 1 100%; font-size:14px; color:#3C3C43;}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(3){order:3; flex:1 1 100%; font-size:13px; color:#6C6C70;}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(5){order:4; color:#8E8E93; font-size:13px;}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(5):not(:empty)::before{content:"#";}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(7), html.apple.pg-invoices table.iv tr.row td:nth-last-child(8){order:5; color:#8E8E93; font-size:13px;}
+  html.apple.pg-invoices table.iv tr.row td:nth-last-child(1){order:6; flex:1 1 100%;}
+  html.apple.pg-invoices table.iv tr.scanhead{display:block;}
+  html.apple.pg-invoices table.iv tr.scanhead td{display:block; padding:12px 4px 4px; border:none;}
+}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
