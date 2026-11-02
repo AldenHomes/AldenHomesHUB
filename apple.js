@@ -120,6 +120,34 @@
     }
     showSec();
   }
+  /* Punch List on a phone (owner, 2026-11-02): the add box is folded away, like Reminders — a "+ New item" button at the bottom
+     opens it (and puts the cursor in it); "Done" folds it away again. Computers keep the box open. */
+  function punchNewItem(){
+    if(page !== 'punch.html') return;
+    const add = document.querySelector('.add');
+    let pill = document.querySelector('.ab-new');
+    const phoneOn = root.classList.contains('apple') && phoneMQ.matches;
+    if(!add){ return; }
+    if(!phoneOn){ add.classList.remove('ab-fold'); if(pill) pill.remove(); return; }
+    if(!add.dataset.abFold){
+      add.dataset.abFold = '1'; add.classList.add('ab-fold');
+      const done = document.createElement('button'); done.type = 'button'; done.className = 'ab-fold-done'; done.textContent = 'Done';
+      done.addEventListener('click', ()=>{ add.classList.add('ab-fold'); punchNewItem(); });
+      add.insertBefore(done, add.firstChild);
+    }
+    if(!pill){
+      pill = document.createElement('button'); pill.type = 'button'; pill.className = 'ab-new';
+      pill.innerHTML = '<span aria-hidden="true">+</span> New item';
+      pill.addEventListener('click', ()=>{
+        add.classList.remove('ab-fold'); punchNewItem();
+        add.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const t = document.getElementById('newText'); if(t) setTimeout(()=>t.focus(), 250);
+      });
+      document.body.appendChild(pill);
+    }
+    pill.hidden = !add.classList.contains('ab-fold');
+  }
+
   function showSec(){
     const cards = document.querySelector('#home .cards'); if(!cards) return;
     cards.dataset.show = homeSec;
@@ -135,7 +163,7 @@
     document.querySelectorAll('[data-ab-unread]').forEach(b=>{ b.textContent = unread || ''; b.hidden = !unread; });
   });
   window.addEventListener('hashchange', ()=>{ build(); hubTouches(); });
-  const ready = ()=>{ build(); hubTouches(); houseSections(); };
+  const ready = ()=>{ build(); hubTouches(); houseSections(); punchNewItem(); };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   (phoneMQ.addEventListener ? phoneMQ.addEventListener('change', ready) : phoneMQ.addListener(ready));
 

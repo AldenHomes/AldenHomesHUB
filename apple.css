@@ -88,6 +88,18 @@ html.apple.pg-punch .item-tools button{color:#4B4F54; font-weight:600;}
 html.apple.pg-punch .item-photos a{border-radius:10px; border:none;}
 html.apple.pg-punch .done-toggle{background:#fff; border:none; border-radius:12px; box-shadow:0 0 0 0.5px rgba(0,0,0,.05); color:#1C1C1E;}
 
+/* phones: the add box folds away behind a "+ New item" button (apple.js punchNewItem) */
+html.apple.phone.pg-punch .add.ab-fold{display:none;}
+html.apple.phone.pg-punch .add{position:relative;}
+.ab-fold-done{position:absolute; top:8px; right:10px; border:none; background:none; color:#4B4F54; font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; padding:6px; cursor:pointer;}
+html.apple.phone.pg-punch .add:not(.ab-fold){padding-top:38px;}
+html:not(.phone) .ab-fold-done{display:none;}
+.ab-new{position:fixed; left:16px; bottom:calc(96px + env(safe-area-inset-bottom)); z-index:125; display:flex; align-items:center; gap:6px;
+  border:none; background:#34C759; color:#fff; border-radius:24px; height:46px; padding:0 18px; font:600 16px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  box-shadow:0 4px 14px rgba(0,0,0,.18); cursor:pointer;}
+.ab-new span{font-size:22px; font-weight:500; margin-top:-2px;}
+.ab-new[hidden]{display:none;}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
