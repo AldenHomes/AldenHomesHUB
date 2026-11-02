@@ -100,6 +100,35 @@ html:not(.phone) .ab-fold-done{display:none;}
 .ab-new span{font-size:22px; font-weight:500; margin-top:-2px;}
 .ab-new[hidden]{display:none;}
 
+/* ---- Service Center (owner, 2026-11-02) ---- */
+html.apple.pg-service .search input{background:#E3E3E8; border:none; border-radius:10px;}
+html.apple.pg-service table{background:#fff; border-radius:14px; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
+html.apple.pg-service thead th{background:#F7F7FA; color:#6C6C70; text-transform:none; letter-spacing:0; font-size:12.5px; border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-service tbody td{border-bottom:0.5px solid #E3E3E8; font-size:14.5px;}
+html.apple.pg-service tbody tr:hover{background:#FAFAFC;}
+html.apple.pg-service .mono{font-family:inherit;}
+html.apple.pg-service .status-badge{text-transform:none; letter-spacing:0; font-size:12px; font-weight:600; border-radius:10px;}
+html.apple.pg-service .modal{border-radius:16px; border-top:none; overflow:hidden;}
+html.apple.pg-service .modal-head{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-service .desc-box, html.apple.pg-service .it{border-radius:12px; border-color:#E3E3E8;}
+html.apple.pg-service .photo-gallery a{border-radius:10px; border:none;}
+html.apple.pg-service .done-toggle{background:#fff; border:none; border-radius:12px; box-shadow:0 0 0 0.5px rgba(0,0,0,.05);}
+html.apple.pg-service .done-toggle .n{font-family:inherit; background:#EFEFF4; border-radius:10px; padding:1px 8px;}
+/* phones: each request is one row like Mail — name + status, then address, then phone · date */
+@media (max-width:760px){
+  html.apple.pg-service tbody tr{display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; border-bottom:0.5px solid #E3E3E8; padding:12px 16px;}
+  html.apple.pg-service tbody tr:last-child{border-bottom:none;}
+  html.apple.pg-service tbody td{display:block; width:auto; padding:0; border:none; font-size:14px;}
+  html.apple.pg-service tbody td::before{content:none;}
+  html.apple.pg-service tbody td:nth-child(2){order:1; flex:1 1 0; min-width:0; font-size:16.5px; font-weight:600; color:#1C1C1E;}
+  html.apple.pg-service tbody td:nth-child(2) .sub-line{font-weight:400; font-size:13px;}
+  html.apple.pg-service tbody td:nth-child(1){order:2; flex:none;}
+  html.apple.pg-service tbody td:nth-child(3){order:3; flex:1 1 100%; color:#3C3C43;}
+  html.apple.pg-service tbody td:nth-child(4), html.apple.pg-service tbody td:nth-child(6){order:4; color:#8E8E93; font-size:13px;}
+  html.apple.pg-service tbody td:nth-child(5){order:5; color:#8E8E93; font-size:13px; margin-left:auto;}
+  html.apple.pg-service tbody td:nth-child(5) .muted{display:none;}
+}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
