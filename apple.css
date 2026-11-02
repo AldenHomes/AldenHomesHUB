@@ -227,6 +227,58 @@ html.apple.pg-construction .import-preview, html.apple.pg-construction .radio, h
 html.apple.pg-construction .search input{background:#E3E3E8; border:none; border-radius:10px;}
 html.apple.pg-construction .chip{border-radius:10px;}
 
+/* ---- Production Schedule (owner, 2026-11-02) ---- */
+html.apple.pg-schedule .mono, html.apple.pg-schedule .titlebar-stats, html.apple.pg-schedule .progress-label,
+html.apple.pg-schedule .order-count, html.apple.pg-schedule .item-note, html.apple.pg-schedule .tab-badge{font-family:inherit;}
+html.apple.pg-schedule table, html.apple.pg-schedule .order-grid-wrap{background:#fff; border-radius:14px; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
+html.apple.pg-schedule .order-grid{box-shadow:none; border-radius:0;}
+html.apple.pg-schedule thead th{background:#F7F7FA; color:#6C6C70; text-transform:none; letter-spacing:0; font-size:12.5px; border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-schedule thead th:hover, html.apple.pg-schedule .order-grid th.item-col:hover{background:#EFEFF4;}
+html.apple.pg-schedule thead th.sorted::after, html.apple.pg-schedule thead th.sorted.asc::after{color:#8E8E93;}
+html.apple.pg-schedule .order-grid th.item-col{font-size:10px;}
+html.apple.pg-schedule .order-grid thead .c-name{border-right-color:#E3E3E8;}
+html.apple.pg-schedule .order-grid .c-name{border-right:0.5px solid #E3E3E8;}
+html.apple.pg-schedule tbody td, html.apple.pg-schedule .order-grid tbody td{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-schedule .order-grid td.item-cell{border-left:0.5px solid #EFEFF4;}
+html.apple.pg-schedule tbody tr:hover, html.apple.pg-schedule .order-grid tbody tr:hover td{background:#FAFAFC;}
+html.apple.pg-schedule .item-cell.done .item-toggle{background:#E6F6EA; color:#1F7A35;}
+html.apple.pg-schedule .item-toggle:hover{background:#F2F2F7;}
+html.apple.pg-schedule .settle-cell{color:#1C1C1E;}
+html.apple.pg-schedule .year-group-bar{background:#F7F7FA; color:#1C1C1E;}
+html.apple.pg-schedule tr.year-group-header:hover .year-group-bar{background:#EFEFF4;}
+html.apple.pg-schedule .completed-toggle{background:#fff; border:none; border-radius:12px; box-shadow:0 0 0 0.5px rgba(0,0,0,.05); color:#1C1C1E;}
+html.apple.pg-schedule .schedule-link-banner{border-radius:12px;}
+html.apple.pg-schedule .search input{background:#E3E3E8; border:none; border-radius:10px;}
+html.apple.pg-schedule .modal{border-radius:16px; border-top:none; overflow:hidden;}
+html.apple.pg-schedule .modal-head{border-bottom:0.5px solid #E3E3E8;}
+html.apple.pg-schedule .progress-bar{background:#EFEFF4;}
+@media (max-width:760px){
+  html.apple.pg-schedule tbody td::before{text-transform:none; font-weight:600; color:#8E8E93; font-size:12.5px;}
+  html.apple.pg-schedule tbody tr{border-bottom:0.5px solid #E3E3E8;}
+  /* the homes list: one Mail-style row per home */
+  html.apple.pg-schedule #tableBody tr[data-id], html.apple.pg-schedule #completedTableBody tr[data-id]{display:flex; flex-wrap:wrap; align-items:center; gap:3px 8px; padding:12px 14px;}
+  html.apple.pg-schedule #tableBody tr[data-id] td, html.apple.pg-schedule #completedTableBody tr[data-id] td{display:block; width:auto; padding:0; font-size:13.5px; color:#6C6C70;}
+  html.apple.pg-schedule tr[data-id] td::before{content:none;}
+  html.apple.pg-schedule #tableBody tr[data-id] td, html.apple.pg-schedule #completedTableBody tr[data-id] td{border:none;}
+  html.apple.pg-schedule #tableBody tr[data-id] td:nth-child(1), html.apple.pg-schedule #tableBody tr[data-id] td:nth-child(7),
+  html.apple.pg-schedule #completedTableBody tr[data-id] td:nth-child(1), html.apple.pg-schedule #completedTableBody tr[data-id] td:nth-child(7){display:none;}
+  html.apple.pg-schedule tr.year-group-header td{display:block; padding:0;}
+  html.apple.pg-schedule tr.year-group-header td::before{content:none;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(5){order:1; flex:1 1 55%; min-width:0; font-size:16.5px; font-weight:600; color:#1C1C1E;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(11){order:2; font-size:14px;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(11)::before{content:"Settles "; font-weight:400; color:#8E8E93;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(2){order:3;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(3){order:3;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(3):not(:empty)::before{content:"Lot ";}
+  html.apple.pg-schedule tr[data-id] td:nth-child(4){order:3;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(6){order:4; flex:1 1 100%; color:#3C3C43;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(8){order:5;} html.apple.pg-schedule tr[data-id] td:nth-child(8)::before{content:"Fndn ";}
+  html.apple.pg-schedule tr[data-id] td:nth-child(9){order:5;} html.apple.pg-schedule tr[data-id] td:nth-child(9)::before{content:"Walk ";}
+  html.apple.pg-schedule tr[data-id] td:nth-child(10){order:5;} html.apple.pg-schedule tr[data-id] td:nth-child(10)::before{content:"Move ";}
+  html.apple.pg-schedule tr[data-id] td:nth-child(1), html.apple.pg-schedule tr[data-id] td:nth-child(7){display:none;}
+  html.apple.pg-schedule tr[data-id] td:nth-child(12){order:6; flex:1 1 100%; margin-top:6px;}
+}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
