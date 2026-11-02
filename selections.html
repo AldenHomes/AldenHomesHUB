@@ -230,6 +230,9 @@
   /* office notes + follow-up on a lead (never shown to the customer) */
   .office{background:var(--staff-soft);border:1px solid #c9d8e6;border-radius:var(--radius);padding:16px 18px;margin-top:16px}
   .office h2{color:var(--staff);font-size:16px}
+  .office-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px}
+  .office-open{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:none;background:none;padding:4px 0;font:inherit;color:var(--staff);cursor:pointer;text-align:left}
+  .office-open b{font-size:14.5px}
   .office-cols{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:12px}
   .office textarea{min-height:64px;resize:vertical}
   .note{background:#fff;border-radius:6px;padding:9px 11px;margin-top:8px;font-size:14.5px;line-height:1.45;white-space:pre-wrap;display:flex;gap:8px}
@@ -1343,9 +1346,24 @@ function followInfo(L){
     when: days < 0 ? 'Follow-up overdue by ' + (-days) + (days === -1 ? ' day' : ' days') : days === 0 ? 'Follow up today' : days === 1 ? 'Follow up tomorrow' : 'Follow up ' + nice(f.date), what: f.what || '' };
 }
 const noteList = L=>Array.isArray(L.notes) ? L.notes : [];
+/* Folded by default (owner, 2026-11-02: "we don't always want the follow up thing opened at the top… less clutter"): one slim line
+   with the follow-up (red when due), the note count and "+ Follow-up" / "+ Note"; the full card opens on a tap. `officeOpen` = the
+   lead id whose card is open (closes when another lead is opened). */
+let officeOpen = '';
 function officeCard(L){
   const f = followInfo(L);
-  return `<div class="office noprint"><h2>Office notes &amp; follow-up <span style="font-weight:400;font-size:12.5px">· only the office sees this</span></h2>
+  if(officeOpen !== L.id){
+    const n = noteList(L).length;
+    return `<div class="office office-bar noprint">
+      <button type="button" class="office-open" data-office-open="1"><b>Office notes &amp; follow-up</b>
+        ${f ? `<span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? ` <span class="muted" style="font-size:13px">${esc(f.what)}</span>` : ''}` : ''}
+        <span class="muted" style="font-size:13px">${n ? n + ' note' + (n === 1 ? '' : 's') : 'no notes'}</span></button>
+      <span class="grow"></span>
+      <button type="button" class="btn sm" data-office-open="follow">+ Follow-up</button>
+      <button type="button" class="btn sm" data-office-open="note">+ Note</button>
+    </div>`;
+  }
+  return `<div class="office noprint"><h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Office notes &amp; follow-up <span style="font-weight:400;font-size:12.5px">· only the office sees this</span><span class="grow"></span><button type="button" class="btn sm" data-office-close="1">Close</button></h2>
     <div class="office-cols">
       <div><label class="f">Follow-up reminder</label>
         ${f ? `<div><span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? `<div style="margin-top:6px;font-size:14.5px">${esc(f.what)}</div>` : ''}
@@ -2480,6 +2498,9 @@ document.addEventListener('click', async e=>{
     return;
   }
   if(t.closest('#makeHome')){ makeHome(L); return; }
+  const oo = t.closest('[data-office-open]');
+  if(oo && L){ officeOpen = L.id; render(); const f = oo.dataset.officeOpen === 'note' ? $('noteText') : oo.dataset.officeOpen === 'follow' ? $('followWhat') : null; if(f) f.focus(); return; }
+  if(t.closest('[data-office-close]')){ officeOpen = ''; render(); return; }
   if(t.closest('#infoEdit')){ infoEdit = true; render(); const b = $('eName'); if(b) b.focus(); return; }
   if(t.closest('#infoCancel')){ infoEdit = false; render(); return; }
   if(t.closest('#infoSave') && L){
