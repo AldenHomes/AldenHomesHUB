@@ -447,8 +447,10 @@ function render(){
   const n = s=>invoices.filter(x=>x.status === s).length;
   $('statReview').textContent = n('review'); $('statReady').textContent = n('ready');
   $('tabs').innerHTML = ['review', 'ready', 'entered', 'all', 'items'].map(k=>`<button type="button" data-tab="${k}" class="${tab === k ? 'on' : ''}">${STATUS[k]}${k === 'items' ? '' : `<span class="n">${k === 'all' ? invoices.length : n(k)}</span>`}</button>`).join('');
-  // the scans: being read, done, or failed
-  $('batches').innerHTML = batches.filter(b=>b.status !== 'retried').slice(0, 6).map(b=>{
+  // the scans: being read, done, or failed. A scan drops off once every invoice in it is entered in QuickBooks (owner, 2026-11-02);
+  // the invoices and the scanned PDF are still kept.
+  const allEntered = b=>{ const its = invoices.filter(x=>x.batchId === b.id); return its.length > 0 && its.every(x=>x.status === 'entered'); };
+  $('batches').innerHTML = batches.filter(b=>b.status !== 'retried' && !allEntered(b)).slice(0, 6).map(b=>{
     const pct = b.pages ? Math.round((b.progress || 0) / b.pages * 100) : 0;
     return `<div class="batch"><b>${esc(b.name)}</b><span class="muted">${esc(niceDate(b.at))}${b.by ? ' · ' + esc(b.by) : ''}</span>
       ${b.status === 'done' ? `<span class="chipok">&#10003; ${b.invoices} invoice${b.invoices === 1 ? '' : 's'} read${b.review ? ' · ' + b.review + ' to review' : ''}</span>`

@@ -1818,7 +1818,8 @@ function leadScreen(L){
   return `
     <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
-        <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</h1>
+        <h1>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}${staff && !PRESENT && !infoEdit ? ' <button type="button" class="btn sm noprint" id="infoEdit" style="vertical-align:middle;font-size:13px;padding:3px 10px">Edit details</button>' : ''}</h1>
+        ${staff && !PRESENT && infoEdit ? infoForm(L) : ''}
         <div class="muted" style="margin-top:4px">${esc(homeLabel(L))} · base ${baseEdit && staff && !PRESENT && !locked(L)
           ? `<span class="noprint" style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;vertical-align:middle">house $<input type="number" id="baseIn" min="0" step="100" value="${houseOf(L) || ''}" style="width:120px;padding:6px 8px"> + lot $<input type="number" id="lotIn" min="0" step="100" value="${Number(L.lotPrice) || ''}" style="width:110px;padding:6px 8px"><button type="button" class="btn sm primary" id="baseSave">Save</button><button type="button" class="btn sm" id="baseCancel">Cancel</button></span>`
           : money(base(L)) + (staff && !PRESENT ? ` <span class="staffline" style="display:inline">(house ${money(houseOf(L))} + lot ${money(Number(L.lotPrice) || 0)})</span>` : '') + (staff && !PRESENT && !locked(L) ? ' <button type="button" class="btn sm noprint" id="baseChange" style="padding:2px 9px;margin-left:4px">Change</button>' : '')}</div>
@@ -2355,6 +2356,26 @@ function totalBar(L){
 
 /* ---------- doing things ---------- */
 function touch(L){ syncBaths(L); L.updated = iso(new Date()); if(L.quoteOk && !locked(L)) L.quoteOk = null; }
+/* EDIT A LEAD'S DETAILS (owner, 2026-11-02: "say you entered their name wrong originally"): names, phone, email, development, lot,
+   address. Saved like any other change to the sheet (the sync sends it), but it is NOT a pricing change, so confirmed pricing stays
+   confirmed. Home style / collection / prices are not here (they change what's asked and priced). */
+let infoEdit = false;
+function infoForm(L){
+  const devs = DEVS.some(d=>d.code === L.dev) || !L.dev ? DEVS : [...DEVS, { code: L.dev, name: L.dev }];
+  return `<div class="card noprint" style="margin-top:12px">
+    <div class="grid">
+      <div><label class="f">Buyer's name</label><input type="text" id="eName" value="${esc(L.name || '')}"></div>
+      <div><label class="f">Second buyer (optional)</label><input type="text" id="eName2" value="${esc(L.name2 || '')}"></div>
+      <div><label class="f">Phone</label><input type="tel" id="ePhone" value="${esc(L.phone || '')}"></div>
+      <div><label class="f">Email</label><input type="email" id="eEmail" value="${esc(L.email || '')}"></div>
+      <div><label class="f">Development</label><select id="eDev"><option value="">Not sure yet</option>${devs.map(d=>`<option value="${esc(d.code)}" ${d.code === L.dev ? 'selected' : ''}>${esc(d.code)} — ${esc(d.name)}</option>`).join('')}</select></div>
+      <div><label class="f">Lot</label><input type="text" id="eLot" value="${esc(L.lot || '')}" placeholder="Lot number"></div>
+      <div style="grid-column:1/-1"><label class="f">Street address</label><input type="text" id="eAddr" value="${esc(L.address || '')}"></div>
+    </div>
+    ${locked(L) ? '<p class="muted" style="font-size:13px;margin:10px 0 0">This sheet is signed. The home itself keeps its own details — change them in Home details on the Signed copy tab (or on the home\'s page) too.</p>' : ''}
+    <div style="margin-top:12px;display:flex;gap:8px"><button type="button" class="btn good" id="infoSave">Save details</button><button type="button" class="btn" id="infoCancel">Cancel</button></div>
+  </div>`;
+}
 document.addEventListener('click', async e=>{
   const t = e.target, L = lead();
   const sw = t.closest('#viewSw button'); if(sw){ view = sw.dataset.view; if(view !== 'staff' && ['vendors','codes'].includes(tab)) tab = 'summary'; render(); return; }
@@ -2399,7 +2420,7 @@ document.addEventListener('click', async e=>{
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
     leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
-  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); baseEdit = false; viewVer = -1; cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
+  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); baseEdit = false; infoEdit = false; viewVer = -1; cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
   if(!PRESENT){
     const setFollow = date=>{ L.follow = { date, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(date)); };
@@ -2459,6 +2480,15 @@ document.addEventListener('click', async e=>{
     return;
   }
   if(t.closest('#makeHome')){ makeHome(L); return; }
+  if(t.closest('#infoEdit')){ infoEdit = true; render(); const b = $('eName'); if(b) b.focus(); return; }
+  if(t.closest('#infoCancel')){ infoEdit = false; render(); return; }
+  if(t.closest('#infoSave') && L){
+    const name = $('eName').value.trim(); if(!name){ toast('The buyer\'s name can\'t be empty'); return; }
+    L.name = name; L.name2 = $('eName2').value.trim(); L.phone = $('ePhone').value.trim(); L.email = $('eEmail').value.trim();
+    L.dev = $('eDev').value; L.lot = $('eLot').value.trim(); L.address = $('eAddr').value.trim();
+    L.updated = iso(new Date());   // saved by the sync like any change; pricing stays confirmed
+    infoEdit = false; render(); toast('Details saved'); return;
+  }
   if(t.closest('#baseChange')){ baseEdit = true; render(); const b = $('baseIn'); if(b){ b.focus(); b.select(); } return; }
   if(t.closest('#baseCancel')){ baseEdit = false; render(); return; }
   if(t.closest('#baseSave')){
