@@ -2418,7 +2418,7 @@ function infoForm(L){
       <div><label class="f">Email</label><input type="email" id="eEmail" value="${esc(L.email || '')}"></div>
       <div><label class="f">Development</label><select id="eDev"><option value="">Not sure yet</option>${devs.map(d=>`<option value="${esc(d.code)}" ${d.code === L.dev ? 'selected' : ''}>${esc(d.code)} — ${esc(d.name)}</option>`).join('')}</select></div>
       <div><label class="f">Lot</label><input type="text" id="eLot" value="${esc(L.lot || '')}" placeholder="Lot number"></div>
-      <div style="grid-column:1/-1"><label class="f">Street address</label><input type="text" id="eAddr" value="${esc(L.address || '')}"></div>
+      <div style="grid-column:1/-1"><label class="f">Street address</label><input type="text" id="eAddr" value="${esc(L.address || '')}" data-auto="${esc(L.address && addrFor(L.dev, L.lot) === L.address ? L.address : '')}"></div>
     </div>
     ${locked(L) ? '<p class="muted" style="font-size:13px;margin:10px 0 0">This sheet is signed. The home itself keeps its own details — change them in Home details on the Signed copy tab (or on the home\'s page) too.</p>' : ''}
     <div style="margin-top:12px;display:flex;gap:8px"><button type="button" class="btn good" id="infoSave">Save details</button><button type="button" class="btn" id="infoCancel">Cancel</button></div>
@@ -2731,7 +2731,7 @@ document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && (e.target.id =
 // the new lead form says what the base price will be
 function baseSum(){ const el = $('nBaseSum'); if(!el) return; const h = Number($('nBase').value) || 0, l = Number($('nLotPrice').value) || 0;
   el.textContent = h || l ? 'Base price the customer sees: ' + money(h + l) + ' (house ' + money(h) + ' + lot ' + money(l) + ')' : ''; }
-document.addEventListener('input', e=>{ if(e.target.id === 'nBase' || e.target.id === 'nLotPrice') baseSum(); });
+document.addEventListener('input', e=>{ if(e.target.id === 'nBase' || e.target.id === 'nLotPrice') baseSum(); if(e.target.id === 'eLot') fillAddr($('eAddr'), ($('eDev') || {}).value, e.target.value); });
 document.addEventListener('input', e=>{
   if(e.target.id !== 'priceFind') return;
   const w = e.target.value.trim().toLowerCase();
@@ -2849,8 +2849,9 @@ document.addEventListener('change', e=>{
   if(e.target.id === 'nDev'){ const d = e.target.value; $('nLot').innerHTML = '<option value="">Not chosen yet</option>' + LOTS.filter(l=>l.dev === d).map(l=>`<option value="${esc(l.lot)}" data-addr="${esc(l.addr)}">Lot ${esc(l.lot)}${l.addr ? ' — ' + esc(l.addr) : ''}</option>`).join('') + '<option value="__type">Another lot (type it)</option>'; }
   if(e.target.id === 'nLot'){
     if(e.target.value === '__type'){ const v = (prompt('Lot number') || '').trim(); if(v){ const o = document.createElement('option'); o.value = v; o.textContent = 'Lot ' + v; e.target.insertBefore(o, e.target.lastChild); e.target.value = v; } else e.target.value = ''; }
-    const op = e.target.selectedOptions[0]; if(op && op.dataset.addr && $('nAddr') && !$('nAddr').value) $('nAddr').value = op.dataset.addr;
+    fillAddr($('nAddr'), $('nDev').value, e.target.value === '__type' ? '' : e.target.value);
   }
+  if(e.target.id === 'eDev') fillAddr($('eAddr'), e.target.value, ($('eLot') || {}).value);
 });
 
 /* ---------- start ----------
@@ -2890,6 +2891,29 @@ async function loadLots(){
       .sort((a, b)=>a.dev.localeCompare(b.dev) || String(a.lot).localeCompare(String(b.lot), undefined, { numeric:true }));
     LOTS.forEach(l=>{ if(l.dev && !DEVS.some(d=>d.code === l.dev)) DEVS.push({ code:l.dev, name:l.dev }); });
   } catch(err){ console.warn('lots', err); }
+  try{
+    const snap = await firebase.firestore().collection('jobs').get();
+    HOME_ADDR = snap.docs.map(d=>d.data()).filter(j=>j.lot && j.address).map(j=>({ dev:String(j.community || '').toUpperCase(), lot:String(j.lot), addr:j.address, settled: !!(j.settle && j.settle < new Date().toISOString().slice(0, 10)) }));
+    LOTS.forEach(l=>{ if(!l.addr) l.addr = addrFor(l.dev, l.lot); });
+  } catch(err){ console.warn('home addresses', err); }
+}
+/* the street address for a development + lot (owner, 2026-11-02: typing the lot fills the address): the Available Lots list first,
+   then a home already in the hub (one not yet settled wins); with no development, only when one place has that lot number */
+let HOME_ADDR = [];
+const lotKey = v=>String(v || '').toLowerCase().replace(/^\s*(lot|#)\s*/, '').replace(/^#/, '').replace(/^0+(?=\d)/, '').trim();
+function addrFor(dev, lot){
+  const k = lotKey(lot); if(!k) return '';
+  dev = String(dev || '').toUpperCase();
+  const hit = list=>{ const m = list.filter(x=>x.addr && lotKey(x.lot) === k && (!dev || x.dev === dev)); if(!m.length) return '';
+    if(!dev && new Set(m.map(x=>x.dev)).size > 1) return '';
+    return (m.find(x=>!x.settled) || m[0]).addr; };
+  return hit(LOTS) || hit(HOME_ADDR);
+}
+// fill an address box from the lot — only when it's empty or still holds the last address filled in this way
+function fillAddr(box, dev, lot){
+  if(!box) return; const a = addrFor(dev, lot);
+  if(box.value.trim() && box.value !== box.dataset.auto) return;
+  box.value = a; box.dataset.auto = a;
 }
 async function bootOffice(){
   $('root').innerHTML = '<div class="card" style="margin-top:60px;text-align:center"><h2>Opening…</h2></div>';
