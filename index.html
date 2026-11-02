@@ -179,7 +179,10 @@
   .homes-empty{padding:28px 18px; text-align:center; color:var(--ink-soft); font-size:13px;}
   .welcome{margin-bottom:22px; display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap;}
   /* choosing which apps show: tap a tile to show or hide it */
-  .tile-grid.editing .tile{cursor:pointer; position:relative;}
+  .tile-grid.editing .tile{cursor:grab; position:relative; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;}
+  .tile-grid.editing .tile.dragging{cursor:grabbing; z-index:5; box-shadow:0 10px 30px rgba(30,32,34,.25); transition:none; opacity:1;}
+  .tile-grid.editing .tile:not(.dragging){transition:transform .15s;}
+  .reset-order{display:inline; margin-left:6px; padding:0; border:none; background:none; color:var(--navy); font:inherit; font-weight:600; text-decoration:underline; cursor:pointer;}
   .tile-grid.editing .tile:hover{transform:none;}
   .tile-grid.editing .tile.off{opacity:.45;}
   .tile-grid.editing .tile::after{content:"Showing"; position:absolute; top:10px; right:10px; font-size:11px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; border-radius:20px; padding:3px 10px; background:#eaf1ec; color:var(--good);}
@@ -397,7 +400,7 @@ html, body{max-width:100%; overflow-x:clip;}
       <div class="mywork-body" id="myWorkBody" style="display:none;"></div>
     </div>
 
-    <div class="edit-note" id="editNote">Tap an app to show or hide it on <strong>your</strong> hub, then press Done. Nothing is removed — a hidden app can be turned back on here any time, and everyone else's hub stays as it is.</div>
+    <div class="edit-note" id="editNote"><strong>Drag</strong> an app to move it. <strong>Tap</strong> an app to show or hide it. Then press Done. This only changes <strong>your</strong> hub, on all your devices; nothing is removed, and everyone else's hub stays as it is. <button type="button" class="reset-order" id="resetOrder">Put them back in the usual order</button></div>
     <div class="hub-cols">
     <div class="tile-grid">
       <a class="tile" id="scheduleTile" href="schedule.html">
@@ -816,6 +819,7 @@ function applyHubPrefs(raw){
   if(typeof p.theme === 'string' && window.hubTheme && hubTheme.get() !== p.theme) hubTheme.set(p.theme);
   hubPrefs = {
     tilesHidden: Array.isArray(p.tilesHidden) ? p.tilesHidden.filter(x=>typeof x === 'string') : [],
+    tileOrder: Array.isArray(p.tileOrder) ? p.tileOrder.filter(x=>typeof x === 'string') : [],
     strip: { ...HUB_DEFAULTS.strip, ...(p.strip && typeof p.strip === 'object' ? p.strip : {}) },
   };
   if(!hubPrefs.strip.place || typeof hubPrefs.strip.place.lat !== 'number') hubPrefs.strip.place = HUB_DEFAULTS.strip.place;
@@ -828,10 +832,20 @@ function saveHubPrefs(){
   renderTiles(); renderMyWork(); loadWeather();
 }
 
-/* ---- which apps show ---- */
+/* ---- which apps show, and in what order (owner, 2026-11-02: "arrange your own grid") ----
+   hubPrefs.tileOrder = the person's order of tile ids; apps not in it (new ones) keep their usual place after the ones that are. */
 let editingHub = false;
+let dragTile = null, dragStart = null, dragMoved = false, justDragged = false;
+const DEFAULT_TILE_ORDER = [...document.querySelectorAll('.tile-grid > .tile')].map(t=>t.id);
+function orderTiles(){
+  const grid = document.querySelector('.tile-grid');
+  const want = (hubPrefs.tileOrder || []).filter(id=>DEFAULT_TILE_ORDER.includes(id));
+  const order = [...want, ...DEFAULT_TILE_ORDER.filter(id=>!want.includes(id))];
+  order.forEach(id=>{ const t = document.getElementById(id); if(t && t.parentNode === grid) grid.appendChild(t); });
+}
 function renderTiles(){
   const grid = document.querySelector('.tile-grid');
+  if(!dragTile) orderTiles();
   grid.classList.toggle('editing', editingHub);
   grid.querySelectorAll('.tile').forEach(tile=>{
     const off = hubPrefs.tilesHidden.includes(tile.id);
@@ -844,11 +858,56 @@ function renderTiles(){
   document.getElementById('welcomeLine').textContent = shown ? 'Pick a tool below to get started.' : 'All your apps are hidden. Press “Edit my hub” to bring some back.';
 }
 document.getElementById('editHubBtn').addEventListener('click', ()=>{ editingHub = !editingHub; renderTiles(); });
+/* while editing: drag a tile to move it (mouse or finger); a plain tap still shows / hides it */
+const tileGrid = document.querySelector('.tile-grid');
+tileGrid.addEventListener('dragstart', e=>{ if(editingHub) e.preventDefault(); });   // the browser's own link dragging
+tileGrid.addEventListener('pointerdown', e=>{
+  if(!editingHub || e.button > 0) return;
+  const tile = e.target.closest('.tile'); if(!tile) return;
+  dragTile = tile; dragStart = { x: e.clientX, y: e.clientY }; dragMoved = false;
+  tile.setPointerCapture(e.pointerId);
+});
+tileGrid.addEventListener('pointermove', e=>{
+  if(!dragTile) return;
+  const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+  if(!dragMoved && Math.hypot(dx, dy) < 8) return;
+  if(!dragMoved){ dragMoved = true; dragTile.classList.add('dragging'); }
+  dragTile.style.transform = `translate(${dx}px, ${dy}px)`;
+  // which tile is under the finger: move the dragged one before / after it
+  dragTile.style.pointerEvents = 'none';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  dragTile.style.pointerEvents = '';
+  const over = under && under.closest('.tile-grid > .tile');
+  if(over && over !== dragTile){
+    const r = over.getBoundingClientRect(), before = (e.clientY < r.top + r.height / 2 && e.clientX < r.right) || (e.clientX < r.left + r.width / 2 && e.clientY < r.bottom);
+    const old = dragTile.getBoundingClientRect();
+    tileGrid.insertBefore(dragTile, before ? over : over.nextSibling);
+    const now = dragTile.getBoundingClientRect();   // keep it under the finger after it changes place
+    dragStart.x += now.left - old.left; dragStart.y += now.top - old.top;
+    dragTile.style.transform = `translate(${e.clientX - dragStart.x}px, ${e.clientY - dragStart.y}px)`;
+  }
+});
+const endDrag = ()=>{
+  if(!dragTile) return;
+  const moved = dragMoved; dragTile.classList.remove('dragging'); dragTile.style.transform = ''; dragTile = null;
+  if(moved){
+    justDragged = true; setTimeout(()=>{ justDragged = false; }, 50);
+    hubPrefs.tileOrder = [...tileGrid.querySelectorAll(':scope > .tile')].map(t=>t.id);
+    saveHubPrefs();
+  }
+};
+tileGrid.addEventListener('pointerup', endDrag);
+tileGrid.addEventListener('pointercancel', endDrag);
+document.getElementById('editNote').addEventListener('click', e=>{
+  if(!e.target.closest('#resetOrder')) return;
+  hubPrefs.tileOrder = []; saveHubPrefs();
+});
 document.querySelector('.tile-grid').addEventListener('click', e=>{
   if(!editingHub) return;
   const tile = e.target.closest('.tile');
   if(!tile) return;
   e.preventDefault(); // while editing, a tap shows or hides the app instead of opening it
+  if(justDragged) return;   // the end of a drag isn't a tap
   hubPrefs.tilesHidden = hubPrefs.tilesHidden.includes(tile.id) ? hubPrefs.tilesHidden.filter(x=>x !== tile.id) : [...hubPrefs.tilesHidden, tile.id];
   saveHubPrefs();
 });
