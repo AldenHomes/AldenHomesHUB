@@ -120,7 +120,7 @@ html, body{max-width:100%; overflow-x:clip;}
   }
 </style>
 <link rel="stylesheet" href="apple.css?v=14">
-<script src="apple.js?v=5"></script>
+<script src="apple.js?v=6"></script>
 </head>
 <body>
 
@@ -167,7 +167,7 @@ html, body{max-width:100%; overflow-x:clip;}
     <!-- ===================== THE NEW LOOK (owner, 2026-10-29) ===================== -->
     <div class="section" id="look">
       <h2>The new look</h2>
-      <p class="lead">A cleaner, Apple-style look for the hub. Phones always use it. On a computer you can try it here — it only changes it for you, and you can switch back any time.</p>
+      <p class="lead">A cleaner, Apple-style look for the hub. Everyone has it now, and phones always use it. If you would rather have the classic look on your computer, untick the box — it only changes it for you, and you can switch back any time.</p>
       <label style="display:flex; align-items:center; gap:10px; font-size:15px; text-transform:none; letter-spacing:0; font-weight:600; color:var(--ink); cursor:pointer; margin-top:10px;">
         <input type="checkbox" id="lookOn" style="width:20px; height:20px; accent-color:var(--navy);"> Use the new look on my computer
       </label>
@@ -320,12 +320,12 @@ const db = firebase.firestore();
 (function(){
   const box = document.getElementById('lookOn'), note = document.getElementById('lookNote');
   const show = ()=>{
-    box.checked = !!(window.hubTheme && hubTheme.get() === 'apple');
+    box.checked = !(window.hubTheme && hubTheme.get() === 'classic');
     note.textContent = window.hubTheme && hubTheme.phone() ? 'You are on a phone, so the new look is on. The switch is for when you use a computer.' : '';
   };
   show();
   box.addEventListener('change', ()=>{
-    const v = box.checked ? 'apple' : '';
+    const v = box.checked ? 'apple' : 'classic';
     if(window.hubTheme) hubTheme.set(v);
     const user = firebase.auth().currentUser;
     if(user) db.collection('settings').doc('hub-prefs').set({ [user.uid]: { theme: v } }, { merge: true })

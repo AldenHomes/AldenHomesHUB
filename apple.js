@@ -1,5 +1,5 @@
 /* The hub's "new look" (owner, 2026-10-29): an Apple-style skin over every staff page.
-   Phones always get it. Computers get it when the person switches it on (Admin Settings → "The new look"), saved on this
+   Phones always get it. Computers get it too unless the person switches it off (owner, 2026-11-02: default for everyone) — saved on this
    device in localStorage 'hubTheme' and in settings/hub-prefs[uid].theme so it follows them (index.html copies it back).
    The styles live in apple.css, all under html.apple, so the classic look is untouched when it's off.
    Phones get a bottom bar (Hub · Homes · My work · Chat · Settings); computers get a slim app bar on the left inside apps
@@ -12,7 +12,8 @@
   const isHub = page === 'index.html' || page === '';
   root.classList.add('pg-' + page.replace('.html', '').replace(/[^a-z0-9-]/g, ''));
   const pref = ()=>{ try{ return localStorage.getItem('hubTheme') || ''; } catch(e){ return ''; } };
-  const on = ()=>phoneMQ.matches || pref() === 'apple';
+  // on for everyone by default (owner, 2026-11-02); 'classic' = this person switched it off on computers
+  const on = ()=>phoneMQ.matches || pref() !== 'classic';
 
   const APPS = [
     ['schedule.html', 'Production Schedule', '#4B4F54', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
