@@ -187,6 +187,12 @@ html.apple.pg-mywork .check:hover{border-color:#34C759;}
 html.apple.pg-mywork .allclear{border-radius:14px;}
 html.apple.phone.pg-mywork .counts{grid-template-columns:repeat(2, minmax(0,1fr));}
 
+/* ---- computers: the side bar has Chat / My work / Settings, so the top bar keeps only Search and the bell (owner, 2026-11-02).
+   Sign out stays on the Settings page (admin.html). ---- */
+html.apple.desk .titlebar .hub-chat-btn, html.apple.desk .titlebar .sync-badge, html.apple.desk .titlebar #currentUserEmail,
+html.apple.desk .titlebar a.signout-btn[href="admin.html"], html.apple.desk:not(.pg-admin) .titlebar #signOutBtn,
+html.apple.desk.pg-selections .top #currentUserEmail, html.apple.desk.pg-selections .top #signOutBtn{display:none !important;}
+
 /* ---- computers: slim app bar on the left inside apps ---- */
 html.apple.desk body{padding-left:68px;}
 .ab-rail{position:fixed; left:0; top:0; bottom:0; width:68px; z-index:120; box-sizing:border-box; background:#E9E9EE; border-right:0.5px solid #D1D1D6;
