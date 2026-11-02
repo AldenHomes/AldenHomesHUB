@@ -158,6 +158,18 @@ html.apple.pg-invoices .split{border-radius:12px; border-color:#E3E3E8; backgrou
   html.apple.pg-invoices table.iv tr.scanhead td{display:block; padding:12px 4px 4px; border:none;}
 }
 
+/* ---- Selections (owner, 2026-11-02): its own header (.top) gets the same treatment as the other apps' titlebar ---- */
+html.apple.pg-selections .top{background:rgba(249,249,251,.94); border-bottom:0.5px solid #D1D1D6;}
+html.apple.pg-selections .brand-s{text-transform:none; letter-spacing:0; font-size:13px;}
+html.apple.pg-selections [class*="amt"], html.apple.pg-selections .lead .muted{font-family:inherit;}
+html.apple.pg-selections .lead .amt{font-weight:700; letter-spacing:-0.3px;}
+html.apple.phone.pg-selections .top{background:#F2F2F7; border-bottom:none;}
+html.apple.phone.pg-selections .top-in{padding:14px 16px 6px;}
+html.apple.phone.pg-selections .top .brand img{height:30px;}
+html.apple.phone.pg-selections .brand-t{font-size:28px;}
+html.apple.phone.pg-selections .brand-s, html.apple.phone.pg-selections .top #currentUserEmail,
+html.apple.phone.pg-selections .top #signOutBtn{display:none !important;}
+
 /* ---- My work: rounded summary tiles and Apple-style rows ---- */
 html.apple.pg-mywork .hello{font-size:30px; letter-spacing:-0.6px; color:#1C1C1E;}
 html.apple.pg-mywork .count, html.apple.pg-mywork .section{background:#fff; border-radius:14px; border-top:none; box-shadow:0 0 0 0.5px rgba(0,0,0,.05), 0 1px 3px rgba(0,0,0,.05);}
