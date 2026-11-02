@@ -886,9 +886,9 @@ function patioChoices(bt, list){
 const PHOTO_SETS = {
   '171': { dir: 'siding', groups: [
     { brand: 'CertainTeed', code: 'ct', names: ['Charcoal Gray', 'Colonial White', 'Cypress', 'Flagstone', 'Forest', 'Graystone', 'Natural Clay', 'Pacific Blue', 'Seagrass', 'Spruce'], photos: true },
-    { brand: 'Exterior Portfolio', code: 'ep', note: 'colors shown from the Exterior Portfolio color chart', names: ['Almost Midnight', 'Aspen White', 'Bone', 'Canyon', 'Carbon', 'Clay', 'Country Beige', 'Cypress', 'Driftwood', 'Espresso', 'Graphite',
+    { brand: 'Exterior Portfolio', code: 'ep', note: 'Market Square lap siding, double 4" · colors from the Exterior Portfolio color chart', names: ['Almost Midnight', 'Aspen White', 'Bone', 'Canyon', 'Carbon', 'Clay', 'Country Beige', 'Cypress', 'Driftwood', 'Espresso', 'Graphite',
       'Greystone', 'Indigo', 'Lighthouse Red', 'Metropolitan Gray', 'Mocha', 'Nantucket', 'Oceanside', 'Pearl', 'Polaris', 'Regatta', 'Rye', 'Saddle', 'Slate',
-      'Smoky Ash', 'Spruce', 'Stone Harbor', 'Wheat'], photos: true },   // the office's white EP photo tinted to each colour's code from westlakeroyalbuildingproducts.com (2026-10-27)
+      'Smoky Ash', 'Spruce', 'Stone Harbor', 'Wheat'], photos: true, ver: 2 },   // Market Square lap, double 4" (owner, 2026-11-02): Westlake's own shading picture over each colour's code from westlakeroyalbuildingproducts.com; ver = new picture link so phones don't keep the old ones
   ] },
 };
 const slugOf = t=>String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -987,7 +987,7 @@ function doorsScreen(){
     <div class="eyebrow" style="margin-top:18px">Built in</div><div class="ds-sw" style="margin-top:6px">${BM_COLORS.map(([n, num, hex])=>`<div class="ds-chip" style="cursor:default"><span style="background:${hex}"></span><b>${esc(n)}</b><small>${esc(num)}</small></div>`).join('')}</div></div>`;
 }
 const photoChoices = bt=>{ const set = PHOTO_SETS[bt]; if(!set) return null;
-  return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, note: g.note || '', img: g.photos ? `selection-photos/${set.dir}/${g.code}-${slugOf(n)}.jpg` : '' }))); };
+  return set.groups.flatMap(g=>g.names.map(n=>({ t: g.brand + ' - ' + n, p: 0, unit: '', brand: g.brand, note: g.note || '', img: g.photos ? `selection-photos/${set.dir}/${g.code}-${slugOf(n)}.jpg${g.ver ? '?v=' + g.ver : ''}` : '' }))); };
 const splitChoices = (bt, list)=>(bt === '522' ? [{ t:'Stainless single bowl sink (AmeriSink AS130)', p:0, unit:'', img:MISC + 'sink-as130.jpg' }, { t:'Stainless double bowl sink (AmeriSink AS326)', p:0, unit:'', img:MISC + 'sink-as326.jpg' }] : null) || (KITCHEN_KIND[bt] ? kitchenChoices(KITCHEN_KIND[bt]) : null) || (FAUCET_KIND[bt] ? faucetChoices(FAUCET_KIND[bt]) : null) || photoChoices(bt) || patioChoices(bt, list) || (bt === '526' ? list.map(c=>/garbage disposal credit/i.test(c.t) ? { ...c, t:'No garbage disposal' } : c) : bt === '518' ? [{ t:'Added shelves (per linear ft)', k:'pantry-lf', p:null, unit:'ft' },
     ...list.filter(c=>!PANTRY_DROP.test(String(c.t).trim())).map(c=>/appliance/i.test(c.t) ? c : { ...c, t: /\/\s*lf/i.test(c.t) ? c.t : c.t + ' (per linear ft)', unit:'ft' })] :list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }));
 /* The master bath sets the other bathrooms (owner, 2026-10-14: people often make the bathrooms the same). A line in the main, third
