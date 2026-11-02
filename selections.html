@@ -2930,7 +2930,7 @@ async function bootOffice(){
   $('root').innerHTML = '<div class="card" style="margin-top:60px;text-align:center"><h2>Opening…</h2></div>';
   let data;
   try{ data = await selApi({ action:'boot' }); }
-  catch(err){ console.error(err); $('root').innerHTML = '<div class="card" style="margin-top:60px;text-align:center"><h2>The selections couldn\'t be loaded.</h2><p class="lede" style="margin:8px auto 0">Check the connection and reload the page.</p></div>'; return; }
+  catch(err){ console.error(err); $('root').innerHTML = '<div class="card" style="margin-top:60px;text-align:center"><h2>The selections couldn\'t be loaded.</h2><p class="lede" style="margin:8px auto 0">Check the connection and reload the page. If the internet is fine, <a href="fix.html">reset this device</a> and sign in again.</p><p style="margin:12px auto 0;font-size:12px;color:#8a8d91">What the browser said: ' + esc(String((err && (err.message || err.code)) || err)) + '</p></div>'; return; }
   applySetup(data);
   TEAM = data.team || [];
   (data.sheets || []).forEach(x=>{ KEYS[x.id] = x.key; REMOTE[x.id] = { rev:x.rev, sheet:clone(x.sheet) }; });

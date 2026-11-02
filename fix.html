@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alden Homes | Reset this device</title>
+<style>
+  body{margin:0; background:#f3f2ee; color:#2b2d30; font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:40px 16px;}
+  .card{max-width:520px; margin:0 auto; background:#fff; border:1px solid #dcd9d0; border-radius:14px; padding:26px 24px;}
+  h1{font-size:24px; margin:0 0 8px;}
+  p{margin:0 0 12px; color:#55585c;}
+  button, a.btn{display:inline-block; border:none; border-radius:10px; background:#4B4F54; color:#fff; font:600 16px inherit; padding:13px 20px; cursor:pointer; text-decoration:none;}
+  button:disabled{opacity:.6; cursor:default;}
+  #log{margin-top:16px; font-size:14px; color:#3f7a4e; white-space:pre-line;}
+  .small{font-size:13px; color:#8a8d91; margin-top:16px;}
+</style>
+</head>
+<body>
+<!-- Reset this device (owner, 2026-11-02: Safari on Mac showed blank pages / "check connection" after moving between pages).
+     Clears what the hub keeps on THIS device only: the background helper (service worker), saved page copies, and stored data
+     (including the sign-in, so you sign in again). Nothing in the hub itself is touched. -->
+<div class="card">
+  <h1>Reset this device</h1>
+  <p>Use this if the hub shows blank pages, empty lists, or "check the connection" on this computer or phone when the internet is fine.</p>
+  <p>It clears the hub's saved copies on <b>this device only</b> and signs you out here. Nothing in the hub is changed or deleted. Afterwards, sign in again.</p>
+  <button type="button" id="go">Reset this device</button>
+  <div id="log"></div>
+  <p class="small">Still having trouble afterwards? Take a screenshot of the page that goes blank and send it over.</p>
+</div>
+<script>
+const log = t=>{ document.getElementById('log').textContent += t + '\n'; };
+document.getElementById('go').addEventListener('click', async e=>{
+  e.target.disabled = true;
+  try{
+    if('serviceWorker' in navigator){ const regs = await navigator.serviceWorker.getRegistrations(); for(const r of regs) await r.unregister(); log('✓ Background helper switched off (' + regs.length + ')'); }
+  } catch(err){ log('• helper: ' + err.message); }
+  try{
+    if(window.caches){ const keys = await caches.keys(); for(const k of keys) await caches.delete(k); log('✓ Saved page copies cleared (' + keys.length + ')'); }
+  } catch(err){ log('• copies: ' + err.message); }
+  try{
+    let names = [];
+    if(indexedDB.databases) names = (await indexedDB.databases()).map(d=>d.name).filter(Boolean);
+    // the names Firebase uses, in case this browser can't list them
+    names = [...new Set([...names, 'firebaseLocalStorageDb', 'firebase-heartbeat-database', 'firebase-installations-database', 'firestore/[DEFAULT]/alden-homes-hub/main'])];
+    for(const n of names){ await new Promise(res=>{ const r = indexedDB.deleteDatabase(n); r.onsuccess = r.onerror = r.onblocked = ()=>res(); setTimeout(res, 3000); }); }
+    log('✓ Stored data cleared');
+  } catch(err){ log('• stored data: ' + err.message); }
+  try{ Object.keys(localStorage).filter(k=>/^firebase|hubPrefs|alden/i.test(k)).forEach(k=>localStorage.removeItem(k)); sessionStorage.clear(); } catch(err){}
+  log('\nDone. Opening the hub — sign in again.');
+  setTimeout(()=>{ location.href = 'index.html'; }, 1800);
+});
+</script>
+</body>
+</html>
