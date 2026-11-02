@@ -162,6 +162,14 @@ html.apple.pg-selections .top{background:rgba(249,249,251,.94); border-bottom:0.
 html.apple.pg-selections .brand-s{text-transform:none; letter-spacing:0; font-size:13px;}
 html.apple.pg-selections [class*="amt"], html.apple.pg-selections .lead .muted{font-family:inherit;}
 html.apple.pg-selections .lead .amt{font-weight:700; letter-spacing:-0.3px;}
+/* iPad / computer: the running-total bar sits beside the side bar, not under it; tabs don't wrap (owner, 2026-11-02) */
+html.apple.desk.pg-selections .totalbar{left:68px;}
+html.apple.pg-selections .tabs .tab{flex:none;}
+/* the assistant's mic button sits above the total bar instead of over Save; on phones the total bar sits above the bottom bar */
+html.apple.desk.pg-selections:has(#totalbar[style*="block"]) .ai-fab, html.apple.desk.pg-selections:has(#totalbar:not([style*="none"])) .ai-fab{bottom:92px;}
+html.apple.phone.pg-selections .totalbar{bottom:calc(62px + env(safe-area-inset-bottom));}
+html.apple.phone.pg-selections:has(#totalbar:not([style*="none"])) .ai-fab{bottom:calc(205px + env(safe-area-inset-bottom));}
+html.apple.phone.pg-selections .totalbar .in{padding:10px 16px;}
 html.apple.phone.pg-selections .top{background:#F2F2F7; border-bottom:none;}
 html.apple.phone.pg-selections .top-in{padding:14px 16px 6px;}
 html.apple.phone.pg-selections .top .brand img{height:30px;}

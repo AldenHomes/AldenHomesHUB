@@ -21,7 +21,7 @@
   h1,h2,h3,p{margin:0}
   button,input,select,textarea{font-family:inherit;font-size:inherit}
   button{cursor:pointer}
-  .mono{font-family:"Courier New",monospace}
+  .mono{font-family:inherit;font-variant-numeric:tabular-nums}
   .muted{color:var(--ink-soft)}
   .wrap{max-width:1500px;margin:0 auto;padding:0 clamp(12px,3vw,28px)}   /* wider (owner, 2026-10-27: "widen to take up more of the screen") */
 
@@ -87,11 +87,11 @@
   .lead:first-child{border-top:none}
   .lead .who{flex:1 1 240px;min-width:0}
   .lead .who strong{font-size:16px;color:var(--navy)}
-  .lead .amt{font-family:"Courier New",monospace;font-weight:700;color:var(--navy);min-width:110px;text-align:right}
+  .lead .amt{font-family:inherit;font-variant-numeric:tabular-nums;font-weight:700;color:var(--navy);min-width:110px;text-align:right}
 
   /* tabs */
-  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-top:16px;border-bottom:2px solid var(--line)}
-  .tab{border:none;background:none;padding:10px 14px;font-weight:700;font-size:14.5px;color:var(--ink-soft);border-bottom:3px solid transparent;margin-bottom:-2px}
+  .tabs{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-top:16px;border-bottom:2px solid var(--line)}
+  .tab{flex:none;white-space:nowrap;border:none;background:none;padding:10px 14px;font-weight:700;font-size:14.5px;color:var(--ink-soft);border-bottom:3px solid transparent;margin-bottom:-2px}
   .tab.on{color:var(--navy);border-bottom-color:var(--sage-2)}
   .tab.staff{color:var(--staff)}
   .tab.staff.on{border-bottom-color:var(--staff)}
@@ -129,7 +129,7 @@
   .opt .art svg{width:100%;height:100%}
   .opt .txt{padding:9px 11px 10px}
   .opt .nm{font-weight:700;font-size:14px;line-height:1.3}
-  .opt .pr{font-size:13px;margin-top:3px;font-family:"Courier New",monospace;font-weight:700;color:var(--navy)}
+  .opt .pr{font-size:13px;margin-top:3px;font-family:inherit;font-variant-numeric:tabular-nums;font-weight:700;color:var(--navy)}
   .opt .pr.inc{color:var(--good);font-family:inherit}
   .opt .std{position:absolute;top:6px;left:6px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;background:rgba(255,255,255,.92);color:var(--good);border-radius:4px;padding:2px 6px}
   .opt .tick{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--good);color:#fff;font-size:13px;display:none;align-items:center;justify-content:center}
@@ -151,7 +151,7 @@
   table{width:100%;border-collapse:collapse;font-size:14.5px}
   th{text-align:left;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);padding:8px 8px;border-bottom:2px solid var(--line)}
   td{padding:9px 8px;border-bottom:1px solid var(--line-soft);vertical-align:top}
-  .num{text-align:right;font-family:"Courier New",monospace;white-space:nowrap}
+  .num{text-align:right;font-family:inherit;font-variant-numeric:tabular-nums;white-space:nowrap}
   tr.tot td{font-weight:700;border-top:2px solid var(--line);border-bottom:none}
   tr.grp td{background:#faf8f2;font-weight:700;color:var(--navy);font-size:13px}
   td.st, th.st{color:var(--staff)}
@@ -164,7 +164,7 @@
 
   .totalbar{position:fixed;left:0;right:0;bottom:0;background:var(--paper-2);border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(30,32,34,.08);z-index:40}
   .totalbar .in{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 0}
-  .totalbar .big{font-family:"Courier New",monospace;font-size:24px;font-weight:700;color:var(--navy)}
+  .totalbar .big{font-family:inherit;font-variant-numeric:tabular-nums;font-size:24px;font-weight:700;color:var(--navy)}
   .totalbar .sub{font-size:12.5px;color:var(--ink-soft)}
   .toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:var(--navy-2);color:#fff;padding:10px 18px;border-radius:22px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:80}
   .toast.show{opacity:1}
@@ -252,7 +252,7 @@
   .prow.long .pc{flex:1 1 100%}
   .segs{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
   .seg{border:2px solid var(--line);background:#fff;border-radius:22px;padding:7px 13px;font-size:14px;font-weight:700;color:var(--ink);line-height:1.2;text-align:center}
-  .seg small{display:block;font-size:11.5px;font-weight:400;color:var(--ink-soft);font-family:"Courier New",monospace}
+  .seg small{display:block;font-size:11.5px;font-weight:400;color:var(--ink-soft);font-family:inherit;font-variant-numeric:tabular-nums}
   .seg:hover{border-color:var(--sage)}
   .seg.on{border-color:var(--good);background:var(--good-soft);color:#27573a}
   .seg.on.dflt{border-color:var(--line);background:#f3f2ec;color:var(--ink-soft)}
@@ -260,7 +260,7 @@
   .prow input[type=number]{width:104px;text-align:right}
   .prow input[type=text]{width:240px;max-width:100%}
   .prow textarea{width:100%;min-height:58px;resize:vertical}
-  .prow .tot{font-family:"Courier New",monospace;font-weight:700;color:var(--navy);white-space:nowrap}
+  .prow .tot{font-family:inherit;font-variant-numeric:tabular-nums;font-weight:700;color:var(--navy);white-space:nowrap}
   .prow .stepper button{width:38px;height:38px;font-size:20px}
   .prow .stepper span{min-width:40px;font-size:16px}
   body.present .prow .pt{font-size:18px}
@@ -327,7 +327,7 @@
   .cho-spec{display:block;font-size:12.5px;font-weight:400;color:var(--ink-soft);margin-top:2px}
   .cho-img{flex:0 0 auto; width:64px; height:64px; padding:0; border:1px solid #e3e0d8; border-radius:8px; background:#fff; overflow:hidden; cursor:zoom-in; margin-right:4px;}
   .cho-img img{width:100%; height:100%; object-fit:cover; display:block;}
-  .ph-upg{margin:18px 0 2px;padding-top:12px;border-top:2px solid var(--line-soft,#ece9df);font-family:Georgia,serif;font-size:19px;color:var(--navy)}
+  .ph-upg{margin:18px 0 2px;padding-top:12px;border-top:2px solid var(--line-soft,#ece9df);font-family:inherit;font-size:19px;font-weight:700;color:var(--navy)}
   .ph-groups{display:flex; flex-wrap:wrap; gap:4px 18px; align-items:flex-start;}
   .ph-groups > .ph-group{flex:0 1 calc(var(--n, 1) * 224px); max-width:100%; min-width:min(210px, 100%);}
   .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px;}
@@ -357,7 +357,7 @@
   #photoView button{border:none; border-radius:22px; padding:10px 18px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit;}
   #photoView .pv-choose{background:#fff; color:var(--navy,#1f3550);} #photoView .pv-close, #photoView .pv-nav{background:rgba(255,255,255,.18); color:#fff;}
   @media print{ #photoView{display:none !important;} .ph-zoom{display:none;} }
-  .doc h3 span{font-family:"Courier New",monospace;font-size:14px}
+  .doc h3 span{font-family:inherit;font-variant-numeric:tabular-nums;font-size:14px}
   .doc table{font-size:14px;table-layout:fixed;width:100%}
   .doc td:first-child{width:46%}
   .doc td.num{width:122px}
@@ -391,7 +391,7 @@
   .cho{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;border:2px solid var(--line);border-radius:10px;padding:8px 12px;background:#fff}
   .cho.on{border-color:var(--good);background:var(--good-soft)}
   .cho .ct{flex:1 1 200px;min-width:0;font-size:14.5px;font-weight:600}
-  .cho .cp{font-family:"Courier New",monospace;font-weight:700;color:var(--navy);white-space:nowrap}
+  .cho .cp{font-family:inherit;font-variant-numeric:tabular-nums;font-weight:700;color:var(--navy);white-space:nowrap}
   .cho .cp.tbd{font-family:inherit;font-weight:400;color:#8a5d14}
   .cho button.tog{border:2px solid var(--line);background:#fff;border-radius:20px;padding:6px 14px;font-weight:700;font-size:13.5px;color:var(--navy)}
   .cho.on button.tog{border-color:var(--good);background:var(--good);color:#fff}
@@ -429,7 +429,7 @@
   .guide .q{padding:28px 30px 24px;margin-top:12px;border-radius:16px;box-shadow:0 2px 14px rgba(31,53,80,.08)}
   .guide .sel{border-top:none;padding:0}
   .guide .sel-h{cursor:default}
-  .guide .sel-h b{font-size:28px;font-family:Georgia,serif;text-decoration:none!important;line-height:1.2}
+  .guide .sel-h b{font-size:28px;font-family:inherit;letter-spacing:-0.4px;text-decoration:none!important;line-height:1.2}
   .guide .q-sub{font-size:14.5px;margin-bottom:6px}
   .guide .sel-h .arrow{display:none}
   .guide .cho{padding:14px 16px;margin-top:10px}
@@ -448,7 +448,7 @@
   @media print{ body.printdoc #root > :not(.docwrap){display:none!important} body.printdoc .doc, body.quote .doc{box-shadow:none;max-width:none;margin:0;padding:10mm 12mm} body.quote{background:#fff} }
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
-<link rel="stylesheet" href="apple.css?v=25">
+<link rel="stylesheet" href="apple.css?v=28">
 <script src="apple.js?v=8"></script>
 </head>
 <body>
