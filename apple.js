@@ -177,6 +177,18 @@
      swipe an item left → Done (green) + Delete (red), a long swipe checks it off; tap an item → its options (Edit, date, photo,
      priority) show, otherwise they're hidden. The buttons press the item's own check / delete buttons, so the page's rules apply. */
   let swipeOn = false;
+  /* phones: the mic button slides away while scrolling down (reading) and comes back on any scroll up or at the top / bottom (owner, 2026-11-02) */
+  function fabTuck(){
+    if(fabTuck.on) return; fabTuck.on = true;
+    let y = window.scrollY;
+    window.addEventListener('scroll', ()=>{
+      if(!root.classList.contains('phone')){ root.classList.remove('ab-fab-away'); return; }
+      const now = window.scrollY, d = now - y, end = now + window.innerHeight >= document.documentElement.scrollHeight - 40;
+      if(Math.abs(d) < 6) return;
+      root.classList.toggle('ab-fab-away', d > 0 && now > 80 && !end);
+      y = now;
+    }, { passive: true });
+  }
   function punchSwipe(){
     if(page !== 'punch.html' || swipeOn) return;
     swipeOn = true;
@@ -244,7 +256,7 @@
     document.querySelectorAll('[data-ab-unread]').forEach(b=>{ b.textContent = unread || ''; b.hidden = !unread; });
   });
   window.addEventListener('hashchange', ()=>{ build(); hubTouches(); });
-  const ready = ()=>{ build(); hubTouches(); houseSections(); punchNewItem(); punchSwipe(); crumbs(); };
+  const ready = ()=>{ build(); hubTouches(); houseSections(); punchNewItem(); punchSwipe(); crumbs(); fabTuck(); };
   // a home's name arrives after the page loads: keep its crumb current
   if(page === 'house.html') document.addEventListener('DOMContentLoaded', ()=>{ const h = document.getElementById('hTitle'); if(h) new MutationObserver(crumbs).observe(h, { childList: true, characterData: true, subtree: true }); });
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();

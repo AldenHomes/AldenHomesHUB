@@ -453,7 +453,8 @@ html.apple.phone .back-link{display:none;}
 html.apple.phone .titlebar .hub-chat-btn{display:none !important;}   /* Chat is on the bottom bar */
 html.apple.phone .hub-cols{grid-template-columns:minmax(0,1fr);}
 html.apple.phone .hub-cols > *{min-width:0;}
-html.apple.phone .ai-fab{bottom:calc(96px + env(safe-area-inset-bottom));}
+html.apple.phone .ai-fab{bottom:calc(96px + env(safe-area-inset-bottom)); transition:transform .25s ease, opacity .25s ease;}
+html.apple.phone.ab-fab-away .ai-fab{transform:translateY(40px) scale(.5); opacity:0; pointer-events:none;}
 html.apple.phone .ai-panel{bottom:calc(92px + env(safe-area-inset-bottom)); max-height:calc(100vh - 120px);}
 html.apple.phone .tabbar{padding:0 12px 8px;}
 html.apple.phone .tab-btn{padding:6px 11px;}

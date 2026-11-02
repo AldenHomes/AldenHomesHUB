@@ -365,8 +365,30 @@
   .doc tr{break-inside:avoid}
   .doc .dn{font-style:italic;color:var(--ink-soft)}
   .doc table.withph td.dph{width:92px;padding:6px 8px 6px 0} .doc table.withph td:nth-child(2){width:40%}
+  .doc td.dph{position:relative}
+  .dph-add{position:absolute;right:4px;bottom:4px;width:26px;height:26px;border-radius:50%;background:#4B4F54;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .dph-del{position:absolute;right:4px;top:2px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#b3452f;font-size:16px;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2);padding:0}
+  .doc td.dph:not(:has(img)) .dph-add{position:static;margin:4px 0}
   .doc td.dph img{width:84px;height:84px;object-fit:contain;display:block;background:#fff;border:1px solid #ece9df;border-radius:6px}
   .doc table.withph td{vertical-align:middle}
+  /* phones: each line stacks — (photo) · question over the pick · price on the right — instead of squeezed columns (owner, 2026-11-02).
+     Only the sheet on screen (#quoteDoc); the PDF copy (#quoteDocPdf) and printing keep the columns. */
+  @media screen and (max-width:600px){
+    #quoteDoc table, #quoteDoc tbody{display:block}
+    #quoteDoc tr{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;row-gap:2px;padding:10px 0;border-bottom:1px solid #f0ede4;align-items:start}
+    #quoteDoc td{display:block;width:auto!important;padding:0!important;border:0!important;min-width:0}
+    #quoteDoc td:nth-child(1){grid-column:1;font-size:12.5px;color:#7a7a7a}
+    #quoteDoc td:nth-child(2){grid-column:1}
+    #quoteDoc td.num{grid-column:2;grid-row:1 / span 2;align-self:center;white-space:nowrap}
+    #quoteDoc td[colspan]{grid-column:1 / -1;font-size:inherit;color:inherit}
+    #quoteDoc table.withph tr{grid-template-columns:68px minmax(0,1fr) auto}
+    #quoteDoc table.withph td.dph{grid-column:1;grid-row:1 / span 2;align-self:center}
+    #quoteDoc table.withph td.dph img{width:64px;height:64px}
+    #quoteDoc table.withph td:nth-child(2){grid-column:2;grid-row:1;font-size:12.5px;color:#7a7a7a}
+    #quoteDoc table.withph td:nth-child(3){grid-column:2;grid-row:2}
+    #quoteDoc table.withph td.num{grid-column:3}
+    #quoteDoc table.withph td[colspan]{grid-column:2 / -1;grid-row:1 / span 2}
+  }
   .doc .dstd{color:var(--ink-soft)}
   .doc-total{margin-top:24px;border-top:3px solid var(--navy);padding-top:12px;break-inside:avoid}
   .doc-total div{display:flex;justify-content:space-between;gap:12px;padding:3px 6px}
@@ -448,8 +470,8 @@
   @media print{ body.printdoc #root > :not(.docwrap){display:none!important} body.printdoc .doc, body.quote .doc{box-shadow:none;max-width:none;margin:0;padding:10mm 12mm} body.quote{background:#fff} }
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
 </style>
-<link rel="stylesheet" href="apple.css?v=29">
-<script src="apple.js?v=9"></script>
+<link rel="stylesheet" href="apple.css?v=30">
+<script src="apple.js?v=10"></script>
 </head>
 <body>
 
@@ -471,6 +493,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script>
 /* ============================================================
    Alden Homes — Selections (the real one, moved over from demo/selections.html on 2026-10-19)
@@ -1387,7 +1410,7 @@ const homeLabel = L=>[L.model, L.dev ? (DEVS.find(d=>d.code===L.dev)||{}).name :
    Every second the open sheet either sends what changed or asks whether anything is new (another office device, or the
    customer's screen). Only the changes travel, so two people tapping at once don't undo each other. */
 const SEL_URL = 'https://us-central1-alden-homes-hub.cloudfunctions.net/selectionsApi';
-const SYNC_FIELDS = ['name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn','quoteOk','line','basePrice','notes','follow','address','versions','housePrice','lotPrice'];
+const SYNC_FIELDS = ['linePhotos','name','name2','phone','email','dev','lot','model','stage','created','v1Date','updated','pricedOn','v1Snap','custom','favs','cos','signedOn','quoteOk','line','basePrice','notes','follow','address','versions','housePrice','lotPrice'];
 /* Earlier versions of the pricing sheet (owner, 2026-10-21: buyers come back to bring the price down or up, and the office wants the
    old version and the new one on record). A copy is kept each time pricing is confirmed, and whenever someone presses "Keep a copy of
    this version". L.versions = [{ at, why, by, total, sheet:{ answers, custom, basePrice, model, line, dev, lot, name, name2, pricedOn } }],
@@ -2073,6 +2096,8 @@ const quoteUrl = L=>pageUrl() + '?quote=' + encodeURIComponent(L.id) + '&k=' + e
    meetings, section by section, with totals), and "With photos" adds each choice's picture — the photo in the finish this home picked
    (`linePhoto`). Print / Download PDF work as for the pricing sheet. opts: { title, photos } */
 function linePhoto(l, L){
+  const own = l && l.key && L.linePhotos && L.linePhotos[l.key];   // a photo the office added to this line (owner, 2026-11-02)
+  if(own && own.url) return own.url;
   if(!l.key || !l.key.includes('#')) return '';
   const q = l.q, i = Number(l.key.split('#')[1]), c = q && q.c ? q.c[i] : null; if(!c) return '';
   const fin = q.room ? bathFin(L, q.room.id) : 'ch';
@@ -2083,7 +2108,11 @@ function linePhoto(l, L){
 function quoteDoc(L, forCustomer, opts){
   opts = opts || {};
   const office = !forCustomer && view === 'staff', staff = false, ph = !!opts.photos, title = opts.title || 'Pricing Sheet', selDoc = title !== 'Pricing Sheet';
-  const phCell = l=>ph ? `<td class="dph">${(u=>u ? `<img src="${esc(u)}" alt="">` : '')(l ? linePhoto(l, L) : '')}</td>` : '';
+  /* With photos: a small + on each line takes a photo (phone / iPad) or picks one (computer) for that line; × takes it off again.
+     Office screens only — never on the customer's links. */
+  const canPh = ph && !PRESENT && !QUOTE && !SHOW && !forCustomer;
+  const phCell = l=>{ if(!ph) return ''; const u = l ? linePhoto(l, L) : '', own = l && l.key && L.linePhotos && L.linePhotos[l.key];
+    return `<td class="dph">${u ? `<img src="${esc(u)}" alt="">` : ''}${canPh && l && l.key ? `<label class="dph-add noprint" title="${u ? 'Use a different photo' : 'Add a photo'}">+<input type="file" accept="image/*" data-lphoto="${esc(l.key)}" hidden></label>${own ? `<button type="button" class="dph-del noprint" data-lphoto-del="${esc(l.key)}" title="Remove this photo">&times;</button>` : ''}` : ''}</td>`; };
   const ls = lines(L);
   const dname = (DEVS.find(d=>d.code === L.dev) || {}).name || '';
   const phase = (L.answers.phase || {}).label || '';
@@ -2394,8 +2423,41 @@ function infoForm(L){
     <div style="margin-top:12px;display:flex;gap:8px"><button type="button" class="btn good" id="infoSave">Save details</button><button type="button" class="btn" id="infoCancel">Cancel</button></div>
   </div>`;
 }
+/* the line's photo: shrunk to 1600px, saved in Storage under houses/selections/photos/, kept on the sheet as linePhotos[key] = { url, path, at, by } */
+async function shrinkLinePhoto(file){
+  try{
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height)), c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(res=>c.toBlob(b=>res(b || file), 'image/jpeg', 0.82));
+  } catch(e){ return file; }
+}
+document.addEventListener('change', async e=>{
+  const inp = e.target.closest('input[data-lphoto]'); if(!inp || !inp.files || !inp.files[0]) return;
+  const L = lead(); if(!L) return;
+  const key = inp.dataset.lphoto; toast('Adding the photo…');
+  try{
+    const blob = await shrinkLinePhoto(inp.files[0]);
+    const path = 'houses/selections/photos/sel-' + L.id + '-' + Date.now() + '.jpg';
+    const ref = firebase.storage().ref().child(path);
+    await ref.put(blob, { contentType: 'image/jpeg' });
+    const url = await ref.getDownloadURL();
+    const old = L.linePhotos && L.linePhotos[key];
+    L.linePhotos = { ...(L.linePhotos || {}), [key]: { url, path, at: iso(new Date()), by: (firebase.auth().currentUser || {}).email || '' } };
+    L.updated = iso(new Date());
+    if(old && old.path) firebase.storage().ref().child(old.path).delete().catch(()=>{});
+    const y = window.scrollY; render(); window.scrollTo(0, y); toast('Photo added');
+  } catch(err){ console.error(err); toast('Could not add the photo — check your connection'); }
+});
 document.addEventListener('click', async e=>{
   const t = e.target, L = lead();
+  const lpd = t.closest('[data-lphoto-del]');
+  if(lpd && L && L.linePhotos){
+    const key = lpd.dataset.lphotoDel, old = L.linePhotos[key];
+    const next = { ...L.linePhotos }; delete next[key]; L.linePhotos = next; L.updated = iso(new Date());
+    if(old && old.path) firebase.storage().ref().child(old.path).delete().catch(()=>{});
+    const y = window.scrollY; render(); window.scrollTo(0, y); toast('Photo removed'); return;
+  }
   const sw = t.closest('#viewSw button'); if(sw){ view = sw.dataset.view; if(view !== 'staff' && ['vendors','codes'].includes(tab)) tab = 'summary'; render(); return; }
   if(QUOTE){ if(t.closest('#docPrint')) window.print(); else if(t.closest('#docPdf') && L) docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + '.pdf'); return; }
   if(t.closest('#shPdf')){ showPdf(t.closest('#shPdf')); return; }
