@@ -709,10 +709,13 @@ const MIRROR_IMG = [[/^std\. mirror:?$/i, '', '', 'Standard mirror'], [/rectangl
 /* SAME LOOK AS THE FAUCETS (owner, 2026-10-29: "make the toilets present like the faucets… the questions to all have the same feel"): these
    lines are drawn as photo tiles (q.photo) instead of rows — tap a tile to choose, the product in small type under the name, the standard
    shown as "✓ Standard" until something else is picked, prices on the tiles in Office view. */
-const TILE_BT = ['273', '313', '353', '379', '277', '317', '357', '383', '156'];
+const TILE_BT = ['273', '313', '353', '379', '277', '317', '357', '383', '156', '152'];
 const CHOICE_IMG = { '273':TOILET_IMG, '313':TOILET_IMG, '353':TOILET_IMG, '379':TOILET_IMG, '156':[[/^laundry tub$/i, 'laundry-tub', 'Mustee 18W Utilatub laundry tub with Moen 74998 Chateau faucet (chrome)'],
     [/^rough in for laundry tub$/i, '', 'Water and drain lines only, ready for a tub later', 'Plumbing rough-in only', 'Pipes only'], [/^move the laundry tub/i, '', 'Put it in the laundry room instead of the garage', 'Move it to the laundry room', 'Laundry room']], '518':[[/^wood pantry shelves/i, 'pantry-wood'], [/appliance shelf/i, 'pantry-wire-wood-appliance']],
-  '277':MIRROR_IMG, '317':MIRROR_IMG, '357':MIRROR_IMG, '383':MIRROR_IMG };
+  '277':MIRROR_IMG, '317':MIRROR_IMG, '357':MIRROR_IMG, '383':MIRROR_IMG,
+  '152':[[/^therma-tru s6021/i, 'mandoor-s6021', "Therma-Tru Smooth-Star S6021 · half glass, 2 panel · 6'8\" tall", "Man door, 6'8\""],
+    [/^therma-tru s86021/i, 'mandoor-s86021', "Therma-Tru Smooth-Star S86021 · half glass, 2 panel · 8'0\" tall", "Man door, 8'0\""],
+    [/^no man door/i, '', 'The garage is built without a man door', 'No man door', 'No door']] };
 const TIMBERTECH = ['American Walnut', 'Boardwalk', 'Brownstone', 'Castle Gate', 'Coastline', 'Dark Hickory', 'English Walnut', 'French White Oak', 'Kona', 'Mahogany', 'Slate Gray', 'Weathered Teak'];
 const INT_DOORS = ['Cambrian', 'Camdale', 'Colburn', 'Conmivo', 'Connelly', 'Crayburn', 'Maddox', 'Montgomery', 'Rochele'];
 // Moen Designer Grab Bars by collection; finishes = what Moen makes each in
@@ -817,6 +820,9 @@ let floorPick = { type:'lvp', level:10 };          // the "add a flooring area" 
 let CAT_RAW = [];
 const rawPrice = (bt, re)=>{ const s = CAT_RAW.find(x=>x.bt === bt); const c = s && s.c.find(x=>re.test(x.t)); return c ? c.p : null; };
 function patioChoices(bt, list){
+  // garage man door (owner, 2026-11-02): Therma-Tru S6021 is the standard (6'8"), S86021 is the 8' one, or no man door at all.
+  // The part numbers ride on each choice (spec) so they reach the pricing sheet, the vendor list and the signed sheet.
+  if(bt === '152') return [{ t:'Therma-Tru S6021 man door', p:0, unit:'' }, { t:"Therma-Tru S86021 man door (8')", p:0, unit:'' }, { t:'No man door', p:0, unit:'' }];
   if(bt === '600') return [{ t:'Patio', p:rawPrice('602', /patio/i), unit:'sq ft' }, { t:'Deck', p:rawPrice('602', /deck/i), unit:'sq ft' }];
   if(bt === '640') return list.flatMap(c=>/add covered/i.test(c.t) ? [{ ...c, t:'Covered patio (10x14)', unit:'' }, { ...c, t:'Covered deck (10x14)', unit:'' }] : [c]);
   if(bt === '642') return list.map(c=>({ ...c, t: /patio/i.test(c.t) ? 'Additional sq ft - covered patio' : /deck/i.test(c.t) ? 'Additional sq ft - covered deck' : c.t, unit:'sq ft' }));
@@ -1059,7 +1065,7 @@ function buildCatalog(cat){
     const line = s.line || (twins[s.bt + '|' + s.t] ? 'ALDEN' : '');
     const tw = BATHS.includes(sec.id) ? s.t.replace(/\s*-\s*(Master|Main|Third|Powder) (Bath|Room).*$/i, '').trim() : '';
     const std = STD_FIRST[s.bt] || [];
-    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || !!KITCHEN_KIND[s.bt] || s.bt === '522' || TILE_BT.includes(s.bt) || ['526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt] || s.bt === '522' || TILE_BT.includes(s.bt), want: !!WANT_FIRST[s.bt], fauc: !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], mix: ['hwset', 'hwset-m', 'hwadd', 'hook'].includes(FAUCET_KIND[s.bt]), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
+    sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || !!KITCHEN_KIND[s.bt] || s.bt === '522' || TILE_BT.includes(s.bt) || ['152', '526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt] || s.bt === '522' || TILE_BT.includes(s.bt), want: !!WANT_FIRST[s.bt], fauc: !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], mix: ['hwset', 'hwset-m', 'hwadd', 'hook'].includes(FAUCET_KIND[s.bt]), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
       c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, up:c.up, kitm:c.kitm, kit:c.kit, gb:c.gb,
         ...(!c.img && CHOICE_IMG[s.bt] ? (m=>m ? { ...(m[1] ? { img:MISC + m[1] + '.jpg' } : {}), ...(m[2] ? { spec:m[2] } : {}), ...(m[3] ? { show:m[3] } : {}), ...(m[4] ? { noimg:m[4] } : {}) } : {})(CHOICE_IMG[s.bt].find(([re])=>re.test(String(c.t).trim()))) : {}), unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
@@ -1147,7 +1153,7 @@ const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.a
 /* Standards shown as a choice (owner, 2026-10-14: "show it like the other options, just preset to it and marked no charge"):
    the toilet's "Standard toilet", the finish's chrome, the home's standard ceiling height. The standard is "picked" while nothing else
    is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
-const stdOf = (q, L)=>q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
+const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:0, order:true } : q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
   : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
   : q.one && /^shower faucet/i.test(q.t) ? { label:'Standard shower faucet', idx: q.c.findIndex(c=>c.t === 'Standard shower faucet') }
   : ['277', '317', '357', '383'].includes(q.bt) ? { label:'Standard mirror', idx: q.c.findIndex(c=>/^std. mirror/i.test(c.t)) }
@@ -1254,6 +1260,11 @@ function lines(L){
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
       out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : (q.fauc || q.sh || c.gb) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.spec ? (c.show || c.t) + ' — ' + c.spec : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.p == null });
       });
+      const so = stdOf(q, L);
+      if(so && so.order && so.idx >= 0 && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty)){
+        const c = q.c[so.idx];
+        out.push({ key:q.id + '#' + so.idx, q, where:'', label:(c.show || c.t) + (c.spec ? ' — ' + c.spec : ''), price:0, cost:0, std:true, count:1 });
+      }
       if(q.want && (L.answers['want:' + q.id] || {}).label && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty))
         out.push({ key:'want:' + q.id, q, where:'', label:'Wanted — style still to pick', price:0, cost:0, std:false, typed:true });
       const qn = L.answers[qNoteKey(q)];   // the question's own note, after its picks
@@ -1302,7 +1313,7 @@ function photoGridInner(q, L, lock, head, only){
   const cs = choicesOf(q, L).filter(only || (()=>true)), brands = [...new Set(cs.map(c=>c.brand || ''))];
   const fin = q.col ? (()=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + q.room.id); if(!fq) return ''; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : ''; })() : '';
   // groups sit side by side, each as wide as its tiles (owner, 2026-10-27: one-tile collections were "one large list")
-  return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.fauc || q.col ? 'ph-product' : ''}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
+  return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.fauc || q.col || q.bt === '152' ? 'ph-product' : ''}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
     const k = q.id + '#' + c.i, isStd = !!(stdOn && (std0.idx != null && std0.idx >= 0 ? c.i === std0.idx : c.t === std0.label)), on = !!(L.answers[k] || {}).qty || isStd, name = c.show || (c.brand ? c.t.slice(c.brand.length + 3) : c.t);
     const pr = view === 'customer' || isStd ? '' : c.p == null ? '<small class="ph-price tbd">price to come</small>' : c.p ? `<small class="ph-price">${c.p < 0 ? '− ' + money2(-c.p) + ' credit' : '+ ' + money2(c.p)}</small>` : '';
     return `<div class="ph-tile ${on ? 'on' : ''} ${isStd ? 'stdon' : ''} ${flashKey === k ? 'flash' : ''}">
