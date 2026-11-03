@@ -67,6 +67,15 @@
   .tag.due{background:#ece8dd; color:var(--ink-soft);}
   .tag.due.soon{background:#fdf0dc; color:#96661a;}
   .tag.due.late{background:#fbeae4; color:var(--danger);}
+  .voice-btn{background:none; font:inherit; font-weight:600; cursor:pointer;}
+  .voice-btn::before{content:""; display:inline-block; width:9px; height:9px; border-radius:50%; background:#b3452f; margin-right:7px; vertical-align:1px;}
+  .voice-btn.recording, .item-tools button.recording{border-color:#b3452f; color:#b3452f; background:#fbeeea;}
+  .voice-btn.recording::before{animation:recblink 1s steps(2) infinite;}
+  @keyframes recblink{50%{opacity:0;}}
+  .new-voice, .item-voice{display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--ink-soft);}
+  .new-voice audio, .item-voice audio{height:36px; max-width:min(320px, 100%);}
+  .new-voice button{border:none; background:none; color:#b3452f; font:inherit; font-weight:600; cursor:pointer; padding:4px;}
+  .item-voice{display:flex; margin-top:8px;}
   .item-photos{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
   .item-photos a{display:block; width:76px; height:76px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--steel-line);}
   .item-photos img{width:100%; height:100%; object-fit:cover; display:block;}
@@ -211,8 +220,10 @@ html, body{max-width:100%; overflow-x:clip;}
         <label><input type="checkbox" id="newHigh"> High priority</label>
         <label class="pick-photo">+ Add photo<input type="file" id="newPhotos" accept="image/*" multiple style="display:none;"></label>
         <span class="muted" id="newPhotoNote" style="color:var(--ink-soft); font-size:13px;"></span>
+        <button type="button" class="pick-photo voice-btn" id="newVoiceBtn">Record voice note</button>
+        <span id="newVoiceBox" class="new-voice"></span>
       </div>
-      <div class="hint">The home, the person, the date, the photo and the priority are all optional. You can also add an item from a home's page: type <strong>@todo</strong> in a note there.</div>
+      <div class="hint">The home, the person, the date, the photo, the voice note and the priority are all optional. A voice note can stand in for typing: record it and press Add item. You can also add an item from a home's page: type <strong>@todo</strong> in a note there.</div>
     </div>
 
     <div class="filters">
@@ -402,6 +413,88 @@ async function uploadPhotos(fileList, itemId, houseId, startAt){
   return { urls, paths, failed };
 }
 
+/* ---- voice notes (owner, 2026-11-03: "the option to record a voice note to attach") ----
+   Recorded in the browser (MediaRecorder; iPhones record .m4a, which every device plays), up to 2 minutes, stored next to the item's
+   photos (houses/{home or punch-list}/photos/punch-voice-…) and kept on the item as voice (url), voicePath, voiceSecs. */
+const VOICE_MAX = 120;
+let rec = null;        // the recording in progress: { mr, chunks, stream, start, timer, target: 'new' | item id, type }
+let newVoice = null;   // a finished recording waiting for "Add item": { blob, secs, url }
+const voiceLen = s=>Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+const voiceType = ()=>['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(t=>window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+async function startVoice(target){
+  if(rec){ const same = rec.target === target; stopVoice(); if(same) return; await voiceDone(); }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){ alert('This browser can\'t record sound. Try Safari on an iPhone, or Chrome.'); return; }
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch(err){ alert('The microphone is blocked for the hub. Allow the microphone (in the browser, or the phone\'s Settings for Safari), then try again.'); return; }
+  const type = voiceType();
+  let mr;
+  try{ mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined); }
+  catch(err){ mr = new MediaRecorder(stream); }
+  rec = { mr, chunks: [], stream, start: Date.now(), target, type: (mr.mimeType || type || 'audio/webm').split(';')[0] };
+  mr.ondataavailable = e=>{ if(e.data && e.data.size) rec && rec.chunks.push(e.data); };
+  mr.onstop = finishVoice;
+  mr.start(1000);
+  rec.timer = setInterval(()=>{ if(!rec) return; if((Date.now() - rec.start) / 1000 >= VOICE_MAX) stopVoice(); voiceUi(); }, 500);
+  voiceUi(); if(target !== 'new') render();
+}
+function stopVoice(){ if(rec && rec.mr.state !== 'inactive') rec.mr.stop(); }
+const voiceDone = ()=>new Promise(res=>{ const iv = setInterval(()=>{ if(!rec){ clearInterval(iv); res(); } }, 80); });
+async function finishVoice(){
+  const r = rec; if(!r) return;
+  clearInterval(r.timer); r.stream.getTracks().forEach(t=>t.stop());
+  const blob = new Blob(r.chunks, { type: r.type }), secs = Math.max(1, Math.round((Date.now() - r.start) / 1000));
+  rec = null;
+  if(r.target === 'new'){
+    if(newVoice) URL.revokeObjectURL(newVoice.url);
+    newVoice = blob.size ? { blob, secs, url: URL.createObjectURL(blob) } : null;
+    voiceUi(); return;
+  }
+  render();
+  const t = items.find(x=>x.id === r.target);
+  if(!t || !blob.size) return;
+  setSyncStatus('saving');
+  const up = await uploadVoice(blob, t.id, t.houseId || '');
+  if(!up){ alert('The voice note didn\'t upload — check your connection and try again.'); setSyncStatus('idle'); return; }
+  const old = t.voicePath;
+  await patchItem(t.id, { voice: up.url, voicePath: up.path, voiceSecs: secs });
+  if(old) firebase.storage().ref().child(old).delete().catch(()=>{});
+}
+async function uploadVoice(blob, itemId, houseId){
+  const ext = /mp4|aac|m4a/.test(blob.type) ? 'm4a' : 'webm';
+  const path = `houses/${houseId || 'punch-list'}/photos/punch-voice-${itemId}-${Date.now()}.${ext}`;
+  try{
+    const ref = firebase.storage().ref().child(path);
+    await ref.put(blob, { contentType: blob.type || 'audio/mp4' });
+    return { url: await ref.getDownloadURL(), path };
+  } catch(err){ console.error('voice upload failed', err); return null; }
+}
+// the button + the recording waiting in the add box; an item's button shows a running time while it records
+function voiceUi(){
+  const secs = rec ? Math.round((Date.now() - rec.start) / 1000) : 0;
+  const btn = $('newVoiceBtn');
+  if(btn){
+    const recNew = rec && rec.target === 'new';
+    btn.classList.toggle('recording', !!recNew);
+    btn.textContent = recNew ? `■ Stop · ${voiceLen(secs)}` : newVoice ? 'Record again' : 'Record voice note';
+  }
+  const box = $('newVoiceBox');
+  if(box){
+    const want = newVoice && !(rec && rec.target === 'new') ? newVoice.url : '';
+    if(box.dataset.url !== want){
+      box.dataset.url = want;
+      box.innerHTML = want ? `<audio controls src="${want}"></audio><span>${voiceLen(newVoice.secs)}</span><button type="button" id="newVoiceDel">Remove</button>` : '';
+    }
+  }
+  if(rec && rec.target !== 'new'){ const b = document.querySelector(`[data-voice="${CSS.escape(rec.target)}"]`); if(b) b.textContent = `■ Stop recording · ${voiceLen(secs)}`; }
+}
+document.addEventListener('click', e=>{
+  if(e.target.closest('#newVoiceBtn')){ e.preventDefault(); startVoice('new'); return; }
+  if(e.target.closest('#newVoiceDel')){ if(newVoice) URL.revokeObjectURL(newVoice.url); newVoice = null; voiceUi(); return; }
+  const v = e.target.closest('[data-voice]');
+  if(v){ e.preventDefault(); startVoice(v.dataset.voice); }
+});
+
 /* ---- the pickers: which home, who it's for ---- */
 function renderPickers(){
   const keep = (id, html)=>{ const el = $(id), v = el.value; el.innerHTML = html; if([...el.options].some(o=>o.value === v)) el.value = v; };
@@ -458,7 +551,10 @@ function itemHtml(t){
     : `Added${t.by && t.by.name ? ' by ' + esc(t.by.name) : ''}${t.at ? ' · ' + esc(shortWhen(t.at)) : ''}`;
   const high = t.priority === 'high';
   const photos = (t.photos || []).map(url=>`<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Photo" loading="lazy"></a>`).join('');
+  const recHere = rec && rec.target === t.id;
+  const voice = t.voice ? `<div class="item-voice"><audio controls preload="none" src="${esc(t.voice)}"></audio>${t.voiceSecs ? `<span>${voiceLen(t.voiceSecs)}</span>` : ''}</div>` : '';
   const tools = t.done ? '' : `<div class="item-tools">
+      <button type="button" class="${recHere ? 'recording' : ''}" data-voice="${esc(t.id)}">${recHere ? '■ Stop recording' : t.voice ? 'Record a new voice note' : 'Add voice note'}</button>
       <button type="button" data-edit="${esc(t.id)}">Edit</button>
       <button type="button" data-due="${esc(t.id)}">${t.due ? 'Change date' : 'Set a date'}</button>
       ${t.due ? `<button type="button" data-due-clear="${esc(t.id)}">Remove date</button>` : ''}
@@ -467,7 +563,7 @@ function itemHtml(t){
     </div>`;
   return `<div class="item${t.done ? ' done' : ''}${high && !t.done ? ' high' : ''}">
     <button type="button" class="check${t.done ? ' on' : ''}" data-check="${esc(t.id)}" aria-label="${t.done ? 'Mark as not done' : 'Mark as done'}" title="${t.done ? 'Not done after all' : 'Done'}">${t.done ? '&#10003;' : ''}</button>
-    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${high && !t.done ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${names}${meta}${t.requestId ? ` · <a href="service.html?open=${encodeURIComponent(t.requestId)}" style="color:inherit">from ${esc(t.requestFrom ? t.requestFrom + '\'s' : 'a')} service request</a>` : ''}</div>${photos ? `<div class="item-photos">${photos}</div>` : ''}${tools}</div>
+    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${high && !t.done ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${names}${meta}${t.requestId ? ` · <a href="service.html?open=${encodeURIComponent(t.requestId)}" style="color:inherit">from ${esc(t.requestFrom ? t.requestFrom + '\'s' : 'a')} service request</a>` : ''}</div>${voice}${photos ? `<div class="item-photos">${photos}</div>` : ''}${tools}</div>
     <button type="button" class="x-btn" data-delete="${esc(t.id)}" title="Delete this item">&times;</button>
   </div>`;
 }
@@ -553,7 +649,8 @@ $('doneToggle').addEventListener('click', ()=>{ doneOpen = !$('doneToggle').clas
 
 /* ---- add / check off / delete ---- */
 async function addItem(){
-  const text = $('newText').value.trim();
+  if(rec && rec.target === 'new'){ stopVoice(); await voiceDone(); }   // still recording: finish it first, it goes with the item
+  const text = $('newText').value.trim() || (newVoice ? 'Voice note' : '');
   const user = me();
   if(!text || !user) return;
   const job = jobs.find(j=>j.id === $('newHome').value) || null;
@@ -566,7 +663,14 @@ async function addItem(){
     if(picked.length) $('addBtn').textContent = 'Uploading photo…';
     const up = await uploadPhotos(picked, ref.id, job ? job.id : '', 0);
     if(up.failed) alert(`${up.failed} photo${up.failed === 1 ? '' : 's'} didn't upload — the item is being saved without ${up.failed === 1 ? 'it' : 'them'}. If this keeps happening, the storage security rules may need updating.`);
+    let voice = null;
+    if(newVoice){
+      $('addBtn').textContent = 'Uploading voice note…';
+      voice = await uploadVoice(newVoice.blob, ref.id, job ? job.id : '');
+      if(!voice) alert('The voice note didn\'t upload — the item is being saved without it.');
+    }
     await ref.set({
+      ...(voice ? { voice: voice.url, voicePath: voice.path, voiceSecs: newVoice.secs } : {}),
       todo: true, done: false,
       due: $('newDue').value || '',
       priority: $('newHigh').checked ? 'high' : '',
@@ -582,6 +686,7 @@ async function addItem(){
     });
     $('newText').value = '';
     $('newDue').value = ''; $('newHigh').checked = false; $('newPhotos').value = ''; $('newPhotoNote').textContent = '';
+    if(newVoice){ URL.revokeObjectURL(newVoice.url); newVoice = null; voiceUi(); }
     $('newText').focus();
   } catch(err){ console.error(err); alert('Could not save the item — check your connection and try again.'); setSyncStatus('idle'); }
   $('addBtn').disabled = false;
@@ -668,7 +773,7 @@ document.addEventListener('click', async e=>{
   if(del){
     const t = items.find(x=>x.id === del.dataset.delete);
     if(!t || !confirm(`Delete "${t.text}"?\n\nTo keep a record that it was finished, check it off instead.`)) return;
-    for(const path of (t.photoPaths || [])){
+    for(const path of [...(t.photoPaths || []), ...(t.voicePath ? [t.voicePath] : [])]){
       try{ await firebase.storage().ref().child(path).delete(); } catch(err){ console.warn('photo was already gone', err); }
     }
     try{ await notesCol.doc(t.id).delete(); }
