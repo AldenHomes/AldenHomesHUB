@@ -2484,7 +2484,7 @@ if(EMAIL_ON) exports.onNoteCreated = onDocumentCreated({ document: 'notes/{noteI
     : note.kind === 'invReady' ? `${site}invoices.html?tab=ready`
     : note.kind === 'selPrice' ? `${site}selections.html?open=${encodeURIComponent(note.sheetId || '')}`
     : note.kind === 'permitsNeeded' ? `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#permitsCard`
-    : note.todo ? `${site}punch.html`
+    : note.todo ? `${site}punch.html?item=${encodeURIComponent(event.params.noteId)}`
     : fromSub ? `${site}construction.html?house=${encodeURIComponent(note.houseId || '')}&task=${encodeURIComponent(note.taskId || '')}`
     : `${site}house.html?id=${encodeURIComponent(note.houseId || '')}#notes`;
   const where = note.houseId ? ` for <strong>${esc(house)}</strong>` : '';
@@ -2549,7 +2549,7 @@ if(EMAIL_ON) exports.onNoteReplied = onDocumentUpdated({ document: 'notes/{noteI
   const who = (reply.by && reply.by.name) || 'Someone';
   const house = note.houseId ? (note.houseLabel || 'a home') : 'the punch list';
   const site = 'https://aldenhomes.github.io/AldenHomesHUB/';
-  const link = note.houseId ? `${site}house.html?id=${encodeURIComponent(note.houseId)}#notes` : `${site}punch.html`;
+  const link = note.todo ? `${site}punch.html?item=${encodeURIComponent(event.params.noteId)}` : note.houseId ? `${site}house.html?id=${encodeURIComponent(note.houseId)}#notes` : `${site}punch.html`;
   const original = String(note.text || '');
   const font = 'font-family:Arial,Helvetica,sans-serif;';
   const html = `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f4ef"><tr><td align="center" style="padding:24px 12px;">
@@ -2928,7 +2928,7 @@ function notePush(note){
     : kind === 'selPrice' ? 'selections.html?open=' + encodeURIComponent(note.sheetId || '')
     : kind === 'permitsNeeded' ? 'house.html?id=' + encodeURIComponent(note.houseId || '') + '#permitsCard'
     : kind === 'costOver' ? 'house.html?id=' + encodeURIComponent(note.houseId || '') + '#costs'
-    : kind === 'punch' ? 'punch.html'
+    : kind === 'punch' ? 'punch.html?item=' + encodeURIComponent(note.id || '')
     : fromSub ? 'construction.html?house=' + encodeURIComponent(note.houseId || '') + '&task=' + encodeURIComponent(note.taskId || '')
     : 'house.html?id=' + encodeURIComponent(note.houseId || '') + '#notes';
   const title = {
@@ -2958,7 +2958,7 @@ if(PUSH_ON) exports.pushNoteCreated = onDocumentCreated({ document: 'notes/{note
 if(PUSH_ON) exports.pushNoteUpdated = onDocumentUpdated({ document: 'notes/{noteId}', secrets: [VAPID_PRIVATE_KEY] }, async event=>{
   const before = event.data.before.data() || {}, note = { ...(event.data.after.data() || {}), id: event.params.noteId };
   const house = note.houseLabel || (note.houseId ? 'a home' : 'the punch list'), text = String(note.text || '').replace(/\s+/g, ' ').trim();
-  const url = note.houseId ? 'house.html?id=' + encodeURIComponent(note.houseId) + '#notes' : 'punch.html';
+  const url = note.todo ? 'punch.html?item=' + encodeURIComponent(note.id) : note.houseId ? 'house.html?id=' + encodeURIComponent(note.houseId) + '#notes' : 'punch.html';
   const had = new Set((before.replies || []).map(r=>r.id));
   const fresh = (note.replies || []).filter(r=>r && r.id && !had.has(r.id));
   if(fresh.length === 1 && (note.replies || []).length > (before.replies || []).length){

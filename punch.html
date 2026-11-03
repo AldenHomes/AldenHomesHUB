@@ -67,6 +67,18 @@
   .tag.due{background:#ece8dd; color:var(--ink-soft);}
   .tag.due.soon{background:#fdf0dc; color:#96661a;}
   .tag.due.late{background:#fbeae4; color:var(--danger);}
+  .c-wrap{margin-top:8px;}
+  .c-reply{margin:0 0 8px 2px; padding:6px 0 1px 12px; border-left:3px solid #e2ddd0;}
+  .c-head{display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:var(--ink-soft);}
+  .c-head strong{color:var(--ink); font-size:13px;}
+  .c-text{font-size:14px; margin-top:2px; white-space:pre-wrap; overflow-wrap:anywhere;}
+  .c-del{margin-left:auto; border:none; background:none; color:var(--ink-soft); font-size:16px; cursor:pointer; padding:0 4px;}
+  .c-link{background:none; border:none; padding:2px 0; font:inherit; font-size:13px; font-weight:700; color:var(--navy); cursor:pointer;}
+  .c-link:hover{text-decoration:underline;}
+  .c-new{margin-left:8px; font-size:11.5px; font-weight:700; color:#fff; background:#b3452f; border-radius:20px; padding:2px 8px;}
+  .c-box{display:flex; gap:8px; flex-wrap:wrap;}
+  .c-box input{flex:1 1 220px; min-width:0; padding:9px 11px; border:1px solid var(--steel-line); border-radius:var(--radius); font:inherit; font-size:15px; background:#fff; color:var(--ink);}
+  .c-box .btn{padding:8px 16px;}
   .voice-btn{background:none; font:inherit; font-weight:600; cursor:pointer;}
   .voice-btn::before{content:""; display:inline-block; width:9px; height:9px; border-radius:50%; background:#b3452f; margin-right:7px; vertical-align:1px;}
   .voice-btn.recording, .item-tools button.recording{border-color:#b3452f; color:#b3452f; background:#fbeeea;}
@@ -539,6 +551,55 @@ function editHtml(t){
     </div>
   </div>`;
 }
+/* ---- comments on an item (owner, 2026-11-03: "comment on a task assigned to you… if you have a question or need something") ----
+   Same shape as comments on a home's notes: replies:[{ id, text, by:{uid,name}, at, notify:[uid] }] on the item itself. A comment goes
+   to everyone in the conversation (who added it, who it's for, earlier commenters) — their bell, My work, email and phone (the server's
+   onNoteReplied / pushNoteUpdated already handle note comments). */
+let cOpen = '', cDraft = '', cFocus = false;
+let OPEN_ITEM = new URLSearchParams(location.search).get('item') || '';
+function commentsHtml(t){
+  const uid = me() ? me().uid : '';
+  const list = (t.replies || []).map(r=>`<div class="c-reply">
+      <div class="c-head"><strong>${esc((r.by && r.by.name) || 'Someone')}</strong><span>${esc(shortWhen(r.at))}</span>${r.by && r.by.uid === uid ? `<button type="button" class="c-del" data-c-del="${esc(t.id)}" data-c-rid="${esc(r.id)}" title="Delete this comment">&times;</button>` : ''}</div>
+      <div class="c-text">${esc(r.text || '')}</div></div>`).join('');
+  const isNew = uid && (t.replies || []).length && t.readBy && t.readBy[uid] === false && (t.watchers || []).includes(uid);
+  const box = cOpen === t.id
+    ? `<div class="c-box"><input type="text" data-c-input="${esc(t.id)}" placeholder="Ask a question or say what you need…" maxlength="1000" autocomplete="off"><button type="button" class="btn btn-primary" data-c-send="${esc(t.id)}">Post</button></div>`
+    : `<button type="button" class="c-link" data-c-open="${esc(t.id)}">${list ? 'Reply' : 'Comment'}</button>${isNew ? '<span class="c-new">New comment</span>' : ''}`;
+  return `<div class="c-wrap">${list}${box}</div>`;
+}
+async function postComment(id){
+  const t = items.find(x=>x.id === id), user = me(), text = cDraft.trim();
+  if(!t || !user || !text) return;
+  const thread = [t.by && t.by.uid, ...(t.mentions || []), ...(t.watchers || []), ...(t.replies || []).map(r=>r.by && r.by.uid)];
+  const notify = [...new Set(thread)].filter(u=>u && u !== user.uid);
+  const now = new Date().toISOString(), FV = firebase.firestore.FieldValue;
+  const patch = { replies: FV.arrayUnion({ id: now + '-' + Math.random().toString(36).slice(2, 8), text, by: { uid: user.uid, name: myName() }, at: now, notify }), lastAt: now, ['readBy.' + user.uid]: true };
+  if(notify.length){ patch.watchers = FV.arrayUnion(...notify); notify.forEach(u=>{ patch['readBy.' + u] = false; }); }
+  const sent = cDraft; cDraft = ''; cOpen = ''; cFocus = false;
+  render();
+  try{ setSyncStatus('saving'); await notesCol.doc(id).update(patch); }
+  catch(err){ console.error(err); cOpen = id; cDraft = sent; cFocus = true; render(); alert('Could not save the comment — check your connection and try again.'); setSyncStatus('idle'); }
+}
+function markRead(t){ const uid = me() && me().uid; if(uid && t && t.readBy && t.readBy[uid] === false) notesCol.doc(t.id).update(new firebase.firestore.FieldPath('readBy', uid), true).catch(()=>{}); }
+document.addEventListener('click', async e=>{
+  const o = e.target.closest('[data-c-open]');
+  if(o){ cOpen = o.dataset.cOpen; cDraft = ''; cFocus = true; markRead(items.find(x=>x.id === cOpen)); render(); return; }
+  const s = e.target.closest('[data-c-send]');
+  if(s){ postComment(s.dataset.cSend); return; }
+  const d = e.target.closest('[data-c-del]');
+  if(d){
+    const t = items.find(x=>x.id === d.dataset.cDel), r = t && (t.replies || []).find(x=>x.id === d.dataset.cRid);
+    if(!r || !confirm('Delete this comment?')) return;
+    try{ await notesCol.doc(t.id).update({ replies: firebase.firestore.FieldValue.arrayRemove(r) }); } catch(err){ console.error(err); alert('Could not delete — check your connection and try again.'); }
+  }
+});
+document.addEventListener('input', e=>{ if(e.target.matches('[data-c-input]')) cDraft = e.target.value; });
+document.addEventListener('keydown', e=>{
+  if(!e.target.matches('[data-c-input]')) return;
+  if(e.key === 'Enter'){ e.preventDefault(); postComment(e.target.dataset.cInput); }
+  else if(e.key === 'Escape'){ cOpen = ''; cDraft = ''; render(); }
+});
 function itemHtml(t){
   if(editing && editing.id === t.id) return editHtml(t);
   const uid = me() ? me().uid : '';
@@ -563,7 +624,7 @@ function itemHtml(t){
     </div>`;
   return `<div class="item${t.done ? ' done' : ''}${high && !t.done ? ' high' : ''}">
     <button type="button" class="check${t.done ? ' on' : ''}" data-check="${esc(t.id)}" aria-label="${t.done ? 'Mark as not done' : 'Mark as done'}" title="${t.done ? 'Not done after all' : 'Done'}">${t.done ? '&#10003;' : ''}</button>
-    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${high && !t.done ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${names}${meta}${t.requestId ? ` · <a href="service.html?open=${encodeURIComponent(t.requestId)}" style="color:inherit">from ${esc(t.requestFrom ? t.requestFrom + '\'s' : 'a')} service request</a>` : ''}</div>${voice}${photos ? `<div class="item-photos">${photos}</div>` : ''}${tools}</div>
+    <div class="item-main"><div class="item-text">${esc(t.text || '')}</div><div class="item-meta">${high && !t.done ? '<span class="tag high">High priority</span>' : ''}${dueTag(t)}${names}${meta}${t.requestId ? ` · <a href="service.html?open=${encodeURIComponent(t.requestId)}" style="color:inherit">from ${esc(t.requestFrom ? t.requestFrom + '\'s' : 'a')} service request</a>` : ''}</div>${voice}${photos ? `<div class="item-photos">${photos}</div>` : ''}${tools}${commentsHtml(t)}</div>
     <button type="button" class="x-btn" data-delete="${esc(t.id)}" title="Delete this item">&times;</button>
   </div>`;
 }
@@ -617,6 +678,10 @@ function render(){
   $('doneList').style.display = show ? 'block' : 'none';
   $('doneList').innerHTML = done.length ? groupsHtml(done) : '<div class="empty">Nothing checked off yet.</div>';
   if(typing){ const box = document.querySelector('[data-edit-text]'); if(box){ box.focus(); box.setSelectionRange(typing[0], typing[1]); } }
+  // an open comment box keeps what was typed (and the cursor) when the list redraws
+  if(cOpen){ const i = document.querySelector('[data-c-input]'); if(i){ i.value = cDraft; if(cFocus || document.activeElement === document.body){ i.focus(); i.setSelectionRange(cDraft.length, cDraft.length); cFocus = false; } } }
+  // punch.html?item=<id> (from a notification): open that item's comments once
+  if(OPEN_ITEM && items.some(t=>t.id === OPEN_ITEM)){ const id = OPEN_ITEM; OPEN_ITEM = ''; const el = document.querySelector(`[data-c-open="${CSS.escape(id)}"]`); if(el) setTimeout(()=>{ el.scrollIntoView({ block:'center' }); el.click(); }, 50); }
 }
 document.addEventListener('input', e=>{ if(editing && e.target.matches('[data-edit-text]')) editing.text = e.target.value; });
 document.addEventListener('change', e=>{
