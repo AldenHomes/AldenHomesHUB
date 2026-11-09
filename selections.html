@@ -992,10 +992,19 @@ const doorModes = L=>has3d(L) ? `<div class="ds-modes">${[['close', 'Close-up on
    are close on-screen shades (Haas publishes none). Wood grains not offered yet (ask the owner). The doors are DRAWN (house3d.js
    garageMaps/garagePic from the spec 'panel|windows'), so pictures and the 3D house always match; `gdMode` / `gdAt` are screen only. */
 const GARAGE_DOORS = [['663', 'Recessed long panel, carriage house windows', 'long|carriage'], ['673', 'Recessed long panel, ranch windows', 'long|ranch'],
-  ['661', 'Recessed short panel, carriage house windows', 'short|carriage'], ['671', 'Recessed short panel, ranch windows', 'short|ranch'], ['681', 'Recessed short panel, standard windows', 'short|standard']];
+  ['661', 'Recessed short panel, carriage house windows', 'short|carriage'], ['671', 'Recessed short panel, ranch windows', 'short|ranch'], ['681', 'Recessed short panel, standard windows', 'short|standard'],
+  // added 2026-11-09 (owner: 'the all glass ones and the ones that have glass going down from top to bottom'): upgrades, priced in Other option prices
+  ['RA 360', 'Full view aluminum, all glass', 'full|glass', 'gd-ra360'], ['SelectView', 'Flush panel, one column of windows top to bottom', 'flush|column', 'gd-selectview'],
+  ['SelectView', 'Flush panel, two columns of windows top to bottom', 'flush|column2', 'gd-selectview2'],
+  ['SelectView', 'Flush panel, windows staggered side to side', 'flush|stagger', 'gd-selectview3'], ['SelectView', 'Flush panel, a row of windows across the top', 'flush|toprow', 'gd-selectview4'],
+  ['TL Series', 'Flush panel with TL lites (25" x 12")', 'flush|tl', 'gd-tl']];
 const HAAS_COLORS = [['Polar White', '#f1f1ec'], ['Almond', '#e2d9c3'], ['Sahara Tan', '#cdbb98'], ['Sandstone', '#bba98a'], ['Trinar Beige', '#d3c6a9'], ['Bronze', '#5b4b3d'],
-  ['Trinar Brown', '#5a4535'], ['Brown', '#6a513f'], ['Espresso', '#3d3129'], ['Gray', '#9b9c98'], ['Charcoal', '#4a4c4d'], ['Carbon Black', '#27282a']];
-const gdChoices = ()=>GARAGE_DOORS.map(([m, d, spec])=>({ t:'Haas ' + m + ' garage door - ' + d, p:0, unit:'', model:m, gd:spec, desc:d }));
+  ['Trinar Brown', '#5a4535'], ['Brown', '#6a513f'], ['Espresso', '#3d3129'], ['Gray', '#9b9c98'], ['Charcoal', '#4a4c4d'], ['Carbon Black', '#27282a'],
+  // RA 360 aluminum only (Haas: powder-coated wood grains and anodized finishes)
+  ['National Oak (RA 360)', '#a9763f'], ['Knotty Pine (RA 360)', '#c48a45'], ['Colony Maple (RA 360)', '#b9732f'], ['European Cherry (RA 360)', '#8e4a2a'], ['Antique Cherry (RA 360)', '#7a3f26'],
+  ['Heritage Maple (RA 360)', '#a8652f'], ['Coffee (RA 360)', '#4a3326'], ['Cherry with Flame (RA 360)', '#9a4f2c'], ['National Cherry (RA 360)', '#7d3d24'], ['Spiced Walnut (RA 360)', '#6b4429'],
+  ['Black Walnut (RA 360)', '#3f2b1f'], ['Clear Anodized (RA 360)', '#b9bcbd'], ['Black Anodized (RA 360)', '#2a2b2d'], ['Dark Bronze Anodized (RA 360)', '#4b3a2c']];
+const gdChoices = ()=>GARAGE_DOORS.map(([m, d, spec, k])=>({ t:'Haas ' + m + ' garage door - ' + d, p:k ? null : 0, ...(k ? { k } : {}), unit:'', model:m, gd:spec, desc:d }));
 let gdMode = 'garage', gdAt = null;
 const gdPic = (spec, hex, w)=>window.House3D && House3D.garagePic ? House3D.garagePic(spec, hex, w) : '';
 function gdShown(L){ const q = qById('gdstyle'); if(!q) return null; const i = gdAt != null ? gdAt : Math.max(0, pickedIdx(q, L)); return { q, i, c:q.c[i] }; }
@@ -1007,9 +1016,11 @@ function houseAttrs(L, opt = {}){
   return ` data-model="${esc(L.model || '')}" data-door="${esc(door ? door.img : '')}" data-door-hex="${esc((dh && dh.hex) || '#f4f3ee')}" data-siding="${esc(sidingImgOf(L))}"`
     + (gq && gi >= 0 ? ` data-gd="${esc(gq.c[gi].gd)}" data-gd-hex="${esc(gc ? gc.hex : '#f1f1ec')}"` : '');
 }
+// thumbnail name: the model, numbered when several share it (SelectView 1–4)
+const gdShort = (q, i)=>{ const m = q.c[i].model, same = q.c.filter(c=>c.model === m); return same.length > 1 ? m + ' ' + (same.indexOf(q.c[i]) + 1) : m; };
 function garageStage(q, L, lock){
   if(q.id === 'gdcolor') return `<div class="ds"><div class="ds-sw">${q.c.map((c, i)=>`<button type="button" class="ds-chip ${(L.answers[q.id + '#' + i] || {}).qty ? 'on' : ''}" data-bt-tog="${esc(q.id + '#' + i)}" ${lock ? 'disabled' : ''}><span style="background:${c.hex}"></span><b>${esc(c.t)}</b></button>`).join('')}</div>
-    <div class="q-sub">Haas's standard colors. Colors on screen are close, not exact — check Haas's color chips. The garage door picture above updates with the color.</div></div>`;
+    <div class="q-sub">Haas's standard colors, then the RA 360 aluminum door's wood grains and anodized finishes (RA 360 only). Colors on screen are close, not exact — check Haas's color chips. The garage door picture above updates with the color.</div></div>`;
   const sh = gdShown(L); if(!sh) return '';
   const col = gdColorOf(L), hex = col ? col.hex : '#f1f1ec', picked = pickedIdx(q, L), sk = q.id + '#' + sh.i, on = !!(L.answers[sk] || {}).qty, isStd = sh.i === 0;
   const modes = has3d(L) ? `<div class="ds-modes">${[['garage', 'Close-up on the house'], ['far', 'Whole house'], ['door', 'Just the door']].map(([k, t])=>`<button type="button" class="${gdMode === k ? 'on' : ''}" data-gd-mode="${k}">${t}</button>`).join('')}</div>` : '';
@@ -1021,7 +1032,7 @@ function garageStage(q, L, lock){
   return `<div class="ds">${modes}${view}
     <div class="ds-name"><b>Haas ${esc(sh.c.model)} · ${esc(sh.c.desc)}</b><small>${sh.i + 1} of ${q.c.length}${isStd ? ' · Alden standard, no charge' : ''} · ${esc(col ? col.t : 'Polar White (no color picked yet)')}</small></div>
     <div class="ds-pick"><button type="button" class="btn ${on || (isStd && picked < 0) ? '' : 'primary'}" data-bt-tog="${esc(sk)}" ${lock ? 'disabled' : ''}>${pickBtn}</button></div>
-    <div class="ds-strip">${q.c.map((c, i)=>`<button type="button" class="ds-thumb gd-thumb ${i === sh.i ? 'cur' : ''} ${(L.answers[q.id + '#' + i] || {}).qty || (i === 0 && picked < 0) ? 'on' : ''}" data-gd-go="${i}" title="${esc(c.t)}"><img src="${gdPic(c.gd, hex, 240)}" alt=""><span>${esc(c.model)}${i === 0 ? ' · std' : ''}</span></button>`).join('')}</div>
+    <div class="ds-strip">${q.c.map((c, i)=>`<button type="button" class="ds-thumb gd-thumb ${i === sh.i ? 'cur' : ''} ${(L.answers[q.id + '#' + i] || {}).qty || (i === 0 && picked < 0) ? 'on' : ''}" data-gd-go="${i}" title="${esc(c.t)}"><img src="${gdPic(c.gd, hex, 240)}" alt=""><span>${esc(gdShort(q, i))}${i === 0 ? ' · std' : ''}</span></button>`).join('')}</div>
     <div class="q-sub">Haas Door 600 series (through Shank Door). The pictures are drawn from Haas's panel and window layouts; windows are single pane unless double pane glass is added below.</div></div>`;
 }
 // the big door: white casing, soft shadow, plain wall (a tiled siding photo behind it, and painting the door, were tried and dropped)
@@ -1848,6 +1859,12 @@ function bathCard(){
     ${row('rail-lf', 'Deck railing, per linear ft', 'Asked on the patio & deck section')}
     ${row('bsmt-open', 'Open stairs to basement', 'Basement section; closed stairs are standard')}
     ${row('bsmt-rail', 'Basement railing', 'Basement section')}
+    ${row('gd-ra360', 'Garage door: Haas RA 360 full view (all glass)', 'Upgrade over the standard Haas 663')}
+    ${row('gd-selectview', 'Garage door: Haas SelectView, one column of windows', 'Upgrade over the standard Haas 663')}
+    ${row('gd-selectview2', 'Garage door: Haas SelectView, two columns of windows', 'Upgrade over the standard Haas 663')}
+    ${row('gd-selectview3', 'Garage door: Haas SelectView, windows staggered', 'Upgrade over the standard Haas 663')}
+    ${row('gd-selectview4', 'Garage door: Haas SelectView, row of windows across the top', 'Upgrade over the standard Haas 663')}
+    ${row('gd-tl', 'Garage door: Haas TL Series lites', 'Upgrade over the standard Haas 663')}
     ${row('gd-dblpane', 'Garage door: double pane glass', 'Haas windows are single pane as standard; this upgrades the garage door windows (price from Shank Door)')}
     ${row('hosebib', 'Additional hose bib, each', 'Exterior section; 2 are standard')}
     ${row('walk-sf', 'Additional walkway, per sq ft', 'Front porch & entrance section')}
@@ -3092,7 +3109,7 @@ boot();
 
 </script>
 <script src="sorttables.js"></script>
-<script src="house3d.js?v=4"></script>
+<script src="house3d.js?v=11"></script>
 <script>
 /* SQ FT CALCULATOR (owner, 2026-10-27: "a little simple pop out tool to calculate sqft on the right side of the screen when doing the
    pricing part and selections"). Office view only, on the Pricing and Selections tabs of an open sheet: a "Sq ft" tab on the right edge
