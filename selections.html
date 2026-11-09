@@ -292,6 +292,10 @@
   .doc h3{font-family:Georgia,serif;font-size:17px;color:var(--navy);margin:22px 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid #d9d6cc;padding:7px 10px 6px;background:#eeede8;border-radius:4px 4px 0 0;break-after:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   /* photo picks */
   .ph-product .ph-pick img{object-fit:contain; aspect-ratio:1/1; background:#fff; padding:6px; box-sizing:border-box;}
+  /* doors (interior styles, garage man door): the whole door, top to bottom, never cropped (owner, 2026-11-09) */
+  .ph-door .ph-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  .ph-groups > .ph-group.ph-door{flex-basis:calc(var(--n, 1) * 164px); min-width:min(150px, 100%);}
+  .ph-door .ph-pick img{object-fit:contain; aspect-ratio:10/21; background:#fff; padding:8px; box-sizing:border-box;}
   .ph-product .ph-tile:has(.ph-fins) .ph-pick img{padding-top:40px;}   /* room for the finish dots so they don't cover the top of the photo */
   .ph-fins{position:absolute; top:8px; left:50%; transform:translateX(-50%); display:flex; gap:6px; padding:4px 6px; background:rgba(255,255,255,.92); border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.18);}
   .ph-fin{width:18px; height:18px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.25); cursor:pointer; padding:0;}
@@ -1426,7 +1430,7 @@ function photoGridInner(q, L, lock, head, only){
   const cs = choicesOf(q, L).filter(only || (()=>true)), brands = [...new Set(cs.map(c=>c.brand || ''))];
   const fin = q.col ? (()=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + q.room.id); if(!fq) return ''; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : ''; })() : '';
   // groups sit side by side, each as wide as its tiles (owner, 2026-10-27: one-tile collections were "one large list")
-  return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.fauc || q.col || q.bt === '152' ? 'ph-product' : ''}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
+  return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.id === 'idstyle' || q.bt === '152' ? 'ph-door' : (q.fauc || q.col ? 'ph-product' : '')}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
     const k = q.id + '#' + c.i, isStd = !!(stdOn && (std0.idx != null && std0.idx >= 0 ? c.i === std0.idx : c.t === std0.label)), on = !!(L.answers[k] || {}).qty || isStd, name = c.show || (c.brand ? c.t.slice(c.brand.length + 3) : c.t);
     const pr = view === 'customer' || isStd ? '' : c.p == null ? '<small class="ph-price tbd">price to come</small>' : c.p ? `<small class="ph-price">${c.p < 0 ? '− ' + money2(-c.p) + ' credit' : '+ ' + money2(c.p)}</small>` : '';
     return `<div class="ph-tile ${on ? 'on' : ''} ${isStd ? 'stdon' : ''} ${flashKey === k ? 'flash' : ''}">
