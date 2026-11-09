@@ -712,15 +712,24 @@ const TOILET_IMG = [[/^standard toilet$/i, 'toilet-grn31102', 'Gerber Banner GRN
   [/^toilet elongated vortens$/i, 'toilet-grn31212', 'Gerber Banner GRN31212 · standard height', 'Elongated toilet, standard height'],
   [/^toilet 18'' elongated vortens$/i, 'toilet-grn31218', 'Gerber Banner ErgoHeight GRN31218 · comfort height (ADA)', 'Elongated toilet, comfort height'],
   [/kohler persuade/i, 'toilet-k6355', 'Kohler K-6355-0 · comfort height, elongated, dual flush, white', 'Kohler Persuade Curv']];
+const SHOWER_IMG = [[/^standard shower$/i, 'shower-aker-s60', 'Aker S-60 · one-piece fiberglass shower, 60" x 35½", two seats'],
+  [/^standard tub\/shower$/i, 'tubshower-aker-ts6032', 'Aker TS6032 · one-piece tub/shower, 60" x 32"'],
+  [/^aker 16034stts/i, 'shower-aker-16034stts', 'Aker 16034STTS · AcrylX one-piece shower, center drain, 60" x 35¼" x 81¼", white · 6-8 week lead time, non-returnable', 'One-piece shower, subway tile look'],
+  [/^aker to-3660 tub with fiberglass/i, 'tub-aker-to3660', 'Aker TO-3660 AFR alcove tub 141353-000-002-501, 60" x 36" · fiberglass walls · 6 week lead time', 'Tub with fiberglass walls'],
+  [/^aker to-3660 tub with tile walls/i, 'tub-aker-to3660', 'Aker TO-3660 AFR alcove tub 141353-000-002-501, 60" x 36" · tile walls 3x5 to 7 ft', 'Tub with tile walls'],
+  [/^aker to-3660 tub with 18/i, 'tub-aker-to3660', 'Aker TO-3660 AFR alcove tub 141353-000-002-501, 60" x 36" · 18" tile surround', 'Tub with 18" tile surround']];
 const MIRROR_IMG = [[/^std\. mirror:?$/i, '', '', 'Standard mirror'], [/rectangle mirror - black/i, 'mirror-black-rectangle'], [/rectangle mirror - gold/i, 'mirror-gold-rectangle'], [/rectangle mirror - silver/i, 'mirror-silver-rectangle'],
   [/round mirror - gold/i, 'mirror-gold-round'], [/round mirror - silver/i, 'mirror-silver-round'], [/round mirror - black/i, 'mirror-black-round']];
 /* SAME LOOK AS THE FAUCETS (owner, 2026-10-29: "make the toilets present like the faucets… the questions to all have the same feel"): these
    lines are drawn as photo tiles (q.photo) instead of rows — tap a tile to choose, the product in small type under the name, the standard
    shown as "✓ Standard" until something else is picked, prices on the tiles in Office view. */
-const TILE_BT = ['273', '313', '353', '379', '277', '317', '357', '383', '156', '152'];
+const TILE_BT = ['273', '313', '353', '379', '277', '317', '357', '383', '156', '152', '256', '300', '340', '258'];
 const CHOICE_IMG = { '273':TOILET_IMG, '313':TOILET_IMG, '353':TOILET_IMG, '379':TOILET_IMG, '156':[[/^laundry tub$/i, 'laundry-tub', 'Mustee 18W Utilatub laundry tub with Moen 74998 Chateau faucet (chrome)'],
     [/^rough in for laundry tub$/i, '', 'Water and drain lines only, ready for a tub later', 'Plumbing rough-in only', 'Pipes only'], [/^move the laundry tub/i, '', 'Put it in the laundry room instead of the garage', 'Move it to the laundry room', 'Laundry room']], '518':[[/^wood pantry shelves/i, 'pantry-wood'], [/appliance shelf/i, 'pantry-wire-wood-appliance']],
   '277':MIRROR_IMG, '317':MIRROR_IMG, '357':MIRROR_IMG, '383':MIRROR_IMG,
+  '256':SHOWER_IMG, '300':SHOWER_IMG, '340':SHOWER_IMG,
+  '258':[[/chrome tub filler/i, 'tub-pulse-pt1003-ch', 'Pulse PT-1003 freestanding tub + 3021-FSTF-CH tub filler (chrome)'], [/matte black tub filler/i, 'tub-pulse-pt1003-mb', 'Pulse PT-1003 freestanding tub + 3021-FSTF-MB tub filler (matte black)'],
+    [/brushed nickel tub filler/i, 'tub-pulse-pt1003-bn', 'Pulse PT-1003 freestanding tub + 3021-FSTF-BN tub filler (brushed nickel)']],
   '152':[[/^therma-tru s6021/i, 'mandoor-s6021', "Therma-Tru Smooth-Star S6021 · half glass, 2 panel · 6'8\" tall", "Man door, 6'8\""],
     [/^therma-tru s86021/i, 'mandoor-s86021', "Therma-Tru Smooth-Star S86021 · half glass, 2 panel · 8'0\" tall", "Man door, 8'0\""],
     [/^no man door/i, '', 'The garage is built without a man door', 'No man door', 'No door']] };
@@ -731,6 +740,9 @@ const GRAB_BARS = [['Align', 'YG0418', '18"', 'ch,bn,black'], ['Align', 'YG0424'
   ['Eva', 'YG2818', '18"', 'ch,bn,orb'], ['Eva', 'YG2824', '24"', 'ch,bn,orb']];
 // [id, after-BT (the line it follows and depends on), section, title, cost code, choices]
 const FOLLOW_UPS = [
+  // TO-3660 tub colour (owner, 2026-11-09: 'let them pick the color'): asked only when that bath's Shower Options pick is a TO-3660 tub
+  ...[['mbath', '256'], ['bath2', '300'], ['bath3', '340']].map(([rid, bt])=>['tubclr_' + rid, [bt], rid, 'Tub Color', 50,
+    ()=>['White', 'Bone', 'Biscuit'].map(t=>({ t:'Aker TO-3660 tub color: ' + t, p:0, unit:'' })), /^aker to-3660/i]),
   ...[['mbath', '280'], ['bath2', '320'], ['bath3', '360'], ['powder', '386']].map(([rid, bt])=>['gbar_' + rid, [bt], rid, 'Grab Bar Style', 50,
     ()=>GRAB_BARS.map(([col, m, size, fins])=>({ t: col + ' - ' + size + ' designer grab bar (' + m + ')', p:0, unit:'', brand:col, img:moenImg(m), model:m, fins:fins.split(','), gb:true }))]),
   ['ttcolor', ['182'], null, 'Composite Porch Color (TimberTech)', 40, ()=>TIMBERTECH.map(n=>({ t:'TimberTech - ' + n, p:0, unit:'', brand:'TimberTech', img:MISC + 'timbertech-' + slugOf(n) + '.jpg' }))],
@@ -828,6 +840,14 @@ let floorPick = { type:'lvp', level:10 };          // the "add a flooring area" 
 let CAT_RAW = [];
 const rawPrice = (bt, re)=>{ const s = CAT_RAW.find(x=>x.bt === bt); const c = s && s.c.find(x=>re.test(x.t)); return c ? c.p : null; };
 function patioChoices(bt, list){
+  /* TUBS & SHOWERS (owner, 2026-11-09, the office's product sheets): the two standards are Aker by MAAX units (photos + part numbers via
+     CHOICE_IMG); upgrades priced in Home styles → Other option prices (prices to be confirmed — none written here). Soaking tub = Pulse. */
+  if(['256', '300', '340'].includes(bt)) return [...list,
+    { t:'Aker 16034STTS one-piece shower (subway tile look)', k:'shower-16034stts', p:null, unit:'' },
+    { t:'Aker TO-3660 tub with fiberglass walls', k:'tub-3660-fg', p:null, unit:'' },
+    { t:'Aker TO-3660 tub with tile walls (to 7 ft)', k:'tub-3660-tile', p:null, unit:'' },
+    { t:'Aker TO-3660 tub with 18" tile surround', k:'tub-3660-tile18', p:null, unit:'' }];
+  if(bt === '258') return [['chrome', 'CH'], ['matte black', 'MB'], ['brushed nickel', 'BN']].map(([f])=>({ t:'Pulse freestanding tub with ' + f + ' tub filler', k:'tub-pt1003', p:null, unit:'' }));
   // garage man door (owner, 2026-11-02): Therma-Tru S6021 is the standard (6'8"), S86021 is the 8' one, or no man door at all.
   // The part numbers ride on each choice (spec) so they reach the pricing sheet, the vendor list and the signed sheet.
   if(bt === '152') return [{ t:'Therma-Tru S6021 man door', p:0, unit:'' }, { t:"Therma-Tru S86021 man door (8')", p:0, unit:'' }, { t:'No man door', p:0, unit:'' }];
@@ -1188,10 +1208,10 @@ function buildCatalog(cat){
       c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) });
     sec.qs.unshift({ id:'col_' + rid, bt:'', num, t:'Faucet Collection - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, col:true, tw:'Faucet Collection',
       c:FAUCETS.map(x=>({ t:x.name, p:0, p0:0, unit:'', img:moenImg(x.lav[0][0]), model:x.lav[0][0], fins:x.fins, sub:x.fins.map(k=>FIN_LABEL[k]).join(' · ') })) }); });
-  FOLLOW_UPS.forEach(([id, after, rid, title, cc, make])=>{
+  FOLLOW_UPS.forEach(([id, after, rid, title, cc, make, afterRe])=>{
     const parent = SECTIONS.flatMap(r=>r.qs).filter(q=>after.includes(q.bt) && (!rid || q.room.id === rid)); if(!parent.length) return;
     const sec = parent[0].room, at = sec.qs.lastIndexOf(parent[parent.length - 1]);
-    sec.qs.splice(at + 1, 0, { id, bt:'', num:parent[0].num, t: title + (rid ? ' - ' + sec.name : ''), cc, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, after:parent.map(q=>q.id), c:make() }); });
+    sec.qs.splice(at + 1, 0, { id, bt:'', num:parent[0].num, t: title + (rid ? ' - ' + sec.name : ''), cc, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:!afterRe, after:parent.map(q=>q.id), ...(afterRe ? { afterRe } : {}), c:make() }); });
   { const sec = SECTIONS.find(r=>r.id === 'doors'), at = sec ? sec.qs.findIndex(q=>q.bt === '200') : -1;
     if(at >= 0) sec.qs.splice(at + 1, 0, { id:'idstyle', bt:'', num:200, t:'Interior Door Style', cc:32, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true,
       c:INT_DOORS.map(n=>({ t:n, p:0, unit:'', img:MISC + 'door-int-' + slugOf(n) + '.jpg' })) }); }
@@ -1244,7 +1264,9 @@ const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.a
 /* Standards shown as a choice (owner, 2026-10-14: "show it like the other options, just preset to it and marked no charge"):
    the toilet's "Standard toilet", the finish's chrome, the home's standard ceiling height. The standard is "picked" while nothing else
    is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
-const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:0, order:true } : q.id === 'gdstyle' ? { label:q.c[0].t, idx:0, order:true } : q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
+const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:0, order:true }
+  : q.bt === '256' ? { label:'Standard shower', idx: q.c.findIndex(c=>c.t === 'Standard shower'), order:true }
+  : ['300', '340'].includes(q.bt) ? { label:'Standard tub/shower', idx: q.c.findIndex(c=>c.t === 'Standard tub/shower'), order:true } : q.id === 'gdstyle' ? { label:q.c[0].t, idx:0, order:true } : q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
   : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
   : q.one && /^shower faucet/i.test(q.t) ? { label:'Standard shower faucet', idx: q.c.findIndex(c=>c.t === 'Standard shower faucet') }
   : ['277', '317', '357', '383'].includes(q.bt) ? { label:'Standard mirror', idx: q.c.findIndex(c=>/^std. mirror/i.test(c.t)) }
@@ -1302,7 +1324,7 @@ const asked = (q, L)=>{
   if(isSkip(q, L)) return false;
   // a home with a basement doesn't need the slab foundation line (owner, 2026-10-27)
   if(q.bt === '122' && hasFeat(L, FEATURES.find(f=>f.id === 'bsmt'))) return false;
-  if(q.after && !q.after.some(id=>{ const p = qById(id); return p && p.c.some((c, i)=>(L.answers[id + '#' + i] || {}).qty); })) return false;
+  if(q.after && !q.after.some(id=>{ const p = qById(id); return p && p.c.some((c, i)=>(L.answers[id + '#' + i] || {}).qty && (!q.afterRe || q.afterRe.test(c.t))); })) return false;
   const f = featOf(q);
   return !f || hasFeat(L, f);
 };
@@ -1859,6 +1881,11 @@ function bathCard(){
     ${row('rail-lf', 'Deck railing, per linear ft', 'Asked on the patio & deck section')}
     ${row('bsmt-open', 'Open stairs to basement', 'Basement section; closed stairs are standard')}
     ${row('bsmt-rail', 'Basement railing', 'Basement section')}
+    ${row('shower-16034stts', 'Aker 16034STTS one-piece shower (subway tile look)', 'Shower Options in each bath; the standard is the Aker S-60 fiberglass shower')}
+    ${row('tub-3660-fg', 'Aker TO-3660 tub with fiberglass walls', 'Shower Options in each bath')}
+    ${row('tub-3660-tile', 'Aker TO-3660 tub with tile walls (to 7 ft)', 'Shower Options in each bath')}
+    ${row('tub-3660-tile18', 'Aker TO-3660 tub with 18" tile surround', 'Shower Options in each bath')}
+    ${row('tub-pt1003', 'Pulse freestanding tub + tub filler (any finish)', 'Master bath Soaking Tub')}
     ${row('gd-ra360', 'Garage door: Haas RA 360 full view (all glass)', 'Upgrade over the standard Haas 663')}
     ${row('gd-selectview', 'Garage door: Haas SelectView, one column of windows', 'Upgrade over the standard Haas 663')}
     ${row('gd-selectview2', 'Garage door: Haas SelectView, two columns of windows', 'Upgrade over the standard Haas 663')}
