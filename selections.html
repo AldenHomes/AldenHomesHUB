@@ -315,6 +315,8 @@
   .ds-modes{display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:10px;}
   .ds-modes button{border:1px solid #d6d1c4; background:#fff; border-radius:999px; padding:7px 14px; font:inherit; font-size:14px; cursor:pointer; color:#1f3550;}
   .ds-modes button.on{background:#1f3550; border-color:#1f3550; color:#fff;}
+  .ds-gd{padding:20px 10px;} .ds-gd::after{display:none;} .gd-pic{flex:1 1 auto; min-width:0; max-width:760px;} .gd-pic img{width:100%; display:block; border-radius:4px; box-shadow:0 8px 20px rgba(0,0,0,.2);}
+  .ds-thumb.gd-thumb{width:136px;} .ds-thumb.gd-thumb img{width:100%; height:auto;}
   .ds-on{text-align:center; font-size:13px; color:#6b6558; margin-top:8px;}
   @media (max-width:600px){ .ds-house .ds-arrow{width:40px; height:40px; font-size:26px;} }
   .ds-name{text-align:center; margin-top:12px;} .ds-name b{display:block; font-size:18px;} .ds-name small{color:#6b6558;}
@@ -977,11 +979,51 @@ function houseView(L, door){
   const dh = doorHexOf(L), sid = sidingNameOf(L);
   return `<div class="ds-view ds-house">
     <button type="button" class="ds-arrow" data-door-nav="fdstyle|-1" aria-label="Back">&lsaquo;</button>
-    <div class="h3d-slot" data-h3d="${doorMode === 'far' ? 'far' : 'close'}" data-model="${esc(L.model || '')}" data-door="${esc(door.img)}" data-door-hex="${esc((dh && dh.hex) || '#f4f3ee')}" data-siding="${esc(sidingImgOf(L))}"></div>
+    <div class="h3d-slot" data-h3d="${doorMode === 'far' ? 'far' : 'close'}"${houseAttrs(L, { door })}></div>
     <button type="button" class="ds-arrow" data-door-nav="fdstyle|1" aria-label="Next">&rsaquo;</button></div>
     <div class="ds-on">${esc(L.model)} · siding: <b>${esc(sid ? sid.replace(/^(CT|EP) - /, '') : 'not picked yet (shown gray)')}</b> · door color: <b>${esc(dh ? (dh.hex ? dh.name : dh.name + ' (shown white, not a color we know)') : 'white, as they come')}</b></div>`;
 }
 const doorModes = L=>has3d(L) ? `<div class="ds-modes">${[['close', 'Close-up on the house'], ['far', 'Whole house'], ['door', 'Just the door']].map(([k, t])=>`<button type="button" class="${doorMode === k ? 'on' : ''}" data-door-mode="${k}">${t}</button>`).join('')}</div>` : '';
+/* GARAGE DOOR (owner, 2026-11-09: photos of the Haas Door brochure + Shank Door's email "I need an answer for our Alden garage door"):
+   Haas 600 series steel. The model number says panel + windows (haasdoor.com/residential/600): 663 recessed long panel + carriage house
+   windows = THE ALDEN STANDARD (marked "Alden stnd" on the email, 4 windows on a 16x8), 673 long + ranch, 661 / 671 / 681 recessed short
+   panel + carriage / ranch / standard windows (the models in the owner's photos). Windows are single pane; double pane glass is an extra
+   (`k:'gd-dblpane'`, priced in Home styles → Other option prices — Shank's quote, NOT written here). 12 Haas standard colours; the hexes
+   are close on-screen shades (Haas publishes none). Wood grains not offered yet (ask the owner). The doors are DRAWN (house3d.js
+   garageMaps/garagePic from the spec 'panel|windows'), so pictures and the 3D house always match; `gdMode` / `gdAt` are screen only. */
+const GARAGE_DOORS = [['663', 'Recessed long panel, carriage house windows', 'long|carriage'], ['673', 'Recessed long panel, ranch windows', 'long|ranch'],
+  ['661', 'Recessed short panel, carriage house windows', 'short|carriage'], ['671', 'Recessed short panel, ranch windows', 'short|ranch'], ['681', 'Recessed short panel, standard windows', 'short|standard']];
+const HAAS_COLORS = [['Polar White', '#f1f1ec'], ['Almond', '#e2d9c3'], ['Sahara Tan', '#cdbb98'], ['Sandstone', '#bba98a'], ['Trinar Beige', '#d3c6a9'], ['Bronze', '#5b4b3d'],
+  ['Trinar Brown', '#5a4535'], ['Brown', '#6a513f'], ['Espresso', '#3d3129'], ['Gray', '#9b9c98'], ['Charcoal', '#4a4c4d'], ['Carbon Black', '#27282a']];
+const gdChoices = ()=>GARAGE_DOORS.map(([m, d, spec])=>({ t:'Haas ' + m + ' garage door - ' + d, p:0, unit:'', model:m, gd:spec, desc:d }));
+let gdMode = 'garage', gdAt = null;
+const gdPic = (spec, hex, w)=>window.House3D && House3D.garagePic ? House3D.garagePic(spec, hex, w) : '';
+function gdShown(L){ const q = qById('gdstyle'); if(!q) return null; const i = gdAt != null ? gdAt : Math.max(0, pickedIdx(q, L)); return { q, i, c:q.c[i] }; }
+function gdColorOf(L){ const q = qById('gdcolor'), i = q ? pickedIdx(q, L) : -1; return i >= 0 ? q.c[i] : null; }
+// what the house shows: the garage door being looked at (or picked / the standard) in the picked colour, and the front door picked (or the one on screen)
+function houseAttrs(L, opt = {}){
+  const gq = qById('gdstyle'), gi = opt.gd != null ? opt.gd : gq ? Math.max(0, pickedIdx(gq, L)) : -1, gc = gdColorOf(L);
+  const fq = qById('fdstyle'), fi = opt.door ? -1 : fq ? pickedIdx(fq, L) : -1, door = opt.door || (fi >= 0 ? fq.c[fi] : (doorShown(L) || {}).c), dh = doorHexOf(L);
+  return ` data-model="${esc(L.model || '')}" data-door="${esc(door ? door.img : '')}" data-door-hex="${esc((dh && dh.hex) || '#f4f3ee')}" data-siding="${esc(sidingImgOf(L))}"`
+    + (gq && gi >= 0 ? ` data-gd="${esc(gq.c[gi].gd)}" data-gd-hex="${esc(gc ? gc.hex : '#f1f1ec')}"` : '');
+}
+function garageStage(q, L, lock){
+  if(q.id === 'gdcolor') return `<div class="ds"><div class="ds-sw">${q.c.map((c, i)=>`<button type="button" class="ds-chip ${(L.answers[q.id + '#' + i] || {}).qty ? 'on' : ''}" data-bt-tog="${esc(q.id + '#' + i)}" ${lock ? 'disabled' : ''}><span style="background:${c.hex}"></span><b>${esc(c.t)}</b></button>`).join('')}</div>
+    <div class="q-sub">Haas's standard colors. Colors on screen are close, not exact — check Haas's color chips. The garage door picture above updates with the color.</div></div>`;
+  const sh = gdShown(L); if(!sh) return '';
+  const col = gdColorOf(L), hex = col ? col.hex : '#f1f1ec', picked = pickedIdx(q, L), sk = q.id + '#' + sh.i, on = !!(L.answers[sk] || {}).qty, isStd = sh.i === 0;
+  const modes = has3d(L) ? `<div class="ds-modes">${[['garage', 'Close-up on the house'], ['far', 'Whole house'], ['door', 'Just the door']].map(([k, t])=>`<button type="button" class="${gdMode === k ? 'on' : ''}" data-gd-mode="${k}">${t}</button>`).join('')}</div>` : '';
+  const arrows = d=>`<button type="button" class="ds-arrow" data-gd-nav="${d}" aria-label="${d < 0 ? 'Back' : 'Next'}">${d < 0 ? '&lsaquo;' : '&rsaquo;'}</button>`;
+  const view = has3d(L) && gdMode !== 'door'
+    ? `<div class="ds-view ds-house">${arrows(-1)}<div class="h3d-slot" data-h3d="${gdMode === 'far' ? 'far' : 'garage'}"${houseAttrs(L, { gd: sh.i })}></div>${arrows(1)}</div>`
+    : `<div class="ds-view ds-gd">${arrows(-1)}<div class="gd-pic"><img src="${gdPic(sh.c.gd, hex, 900)}" alt="${esc(sh.c.t)}"></div>${arrows(1)}</div>`;
+  const pickBtn = on ? '&#10003; This is their garage door (tap to undo)' : isStd && picked < 0 ? '&#10003; Standard — comes with the home (tap to choose it)' : 'Choose this door';
+  return `<div class="ds">${modes}${view}
+    <div class="ds-name"><b>Haas ${esc(sh.c.model)} · ${esc(sh.c.desc)}</b><small>${sh.i + 1} of ${q.c.length}${isStd ? ' · Alden standard, no charge' : ''} · ${esc(col ? col.t : 'Polar White (no color picked yet)')}</small></div>
+    <div class="ds-pick"><button type="button" class="btn ${on || (isStd && picked < 0) ? '' : 'primary'}" data-bt-tog="${esc(sk)}" ${lock ? 'disabled' : ''}>${pickBtn}</button></div>
+    <div class="ds-strip">${q.c.map((c, i)=>`<button type="button" class="ds-thumb gd-thumb ${i === sh.i ? 'cur' : ''} ${(L.answers[q.id + '#' + i] || {}).qty || (i === 0 && picked < 0) ? 'on' : ''}" data-gd-go="${i}" title="${esc(c.t)}"><img src="${gdPic(c.gd, hex, 240)}" alt=""><span>${esc(c.model)}${i === 0 ? ' · std' : ''}</span></button>`).join('')}</div>
+    <div class="q-sub">Haas Door 600 series (through Shank Door). The pictures are drawn from Haas's panel and window layouts; windows are single pane unless double pane glass is added below.</div></div>`;
+}
 // the big door: white casing, soft shadow, plain wall (a tiled siding photo behind it, and painting the door, were tried and dropped)
 function doorView(L, door, paint, anim){
   if(doorMode !== 'door' && has3d(L)) return houseView(L, door);
@@ -1121,6 +1163,14 @@ function buildCatalog(cat){
       sec.qs.splice(at >= 0 ? at + 1 : sec.qs.length, 0,
         { id:'fdstyle', bt:'', num:231, t:'Front Door Style', cc:32, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, door:true, c:doorChoices() },
         { id:'fdcolor', bt:'', num:231, t:'Front Door Color (Benjamin Moore)', cc:60, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, door:true, c:paintChoices() }); } }
+  // garage door style + colour + double pane glass (see garageStage), right after BT 161 (garage door size) in the garage section
+  { const gar = SECTIONS.find(r=>r.id === 'gar');
+    if(gar){ const at = gar.qs.findIndex(q=>q.bt === '161'), cc = at >= 0 ? gar.qs[at].cc : 0;
+      gar.qs.splice(at >= 0 ? at + 1 : gar.qs.length, 0,
+        { id:'gdstyle', bt:'', num:161, t:'Garage Door Style (Haas)', cc, line:'', room:gar, opt:1, type:'bt', v1:0, one:true, gdoor:true, c:gdChoices() },
+        { id:'gdcolor', bt:'', num:161, t:'Garage Door Color (Haas)', cc, line:'', room:gar, opt:1, type:'bt', v1:0, one:true, gdoor:true, c:HAAS_COLORS.map(([t, hex])=>({ t, hex, p:0, unit:'' })) },
+        { id:'gdglass', bt:'', num:161, t:'Garage Door Glass', cc, line:'', room:gar, opt:1, type:'bt', v1:1, one:true, nostep:true,
+          c:[{ t:'Double pane glass in the garage door windows', k:'gd-dblpane', p:null, unit:'' }] }); } }
   [['mbath', 256], ['bath2', 300], ['bath3', 340], ['powder', 379]].forEach(([rid, num])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec || !sec.qs.length) return;
     sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
       // the master bath's finishes have their own prices (owner, 2026-10-21: the master often has double fixtures): keys 'fin-bn-m' etc.
@@ -1183,7 +1233,7 @@ const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.a
 /* Standards shown as a choice (owner, 2026-10-14: "show it like the other options, just preset to it and marked no charge"):
    the toilet's "Standard toilet", the finish's chrome, the home's standard ceiling height. The standard is "picked" while nothing else
    is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
-const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:0, order:true } : q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
+const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:0, order:true } : q.id === 'gdstyle' ? { label:q.c[0].t, idx:0, order:true } : q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
   : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
   : q.one && /^shower faucet/i.test(q.t) ? { label:'Standard shower faucet', idx: q.c.findIndex(c=>c.t === 'Standard shower faucet') }
   : ['277', '317', '357', '383'].includes(q.bt) ? { label:'Standard mirror', idx: q.c.findIndex(c=>/^std. mirror/i.test(c.t)) }
@@ -1370,7 +1420,7 @@ function prow(q, L, force){
   const changed = q.v1 && was !== null && was !== now ? `<span class="chip soon">changed since pricing${was ? ' · was ' + esc(was) : ' · added'}</span>` : '';
   const std = stdOf(q, L);
   const stdActive = std && (std.keep || !choicesOf(q, L).some(c=>c.i !== std.idx && !c.side && (L.answers[q.id + '#' + c.i] || {}).qty));
-  const rows = q.door ? doorStage(q, L, lock) : q.photo ? photoGrid(q, L, lock) : (std ? stdRow(q, L, std, stdActive, lock) : '') + (q.bt === '790' ? floorRows(q, L, lock) : choicesOf(q, L).filter(c=>!std || c.i !== std.idx).map(c=>{
+  const rows = q.gdoor ? garageStage(q, L, lock) : q.door ? doorStage(q, L, lock) : q.photo ? photoGrid(q, L, lock) : (std ? stdRow(q, L, std, stdActive, lock) : '') + (q.bt === '790' ? floorRows(q, L, lock) : choicesOf(q, L).filter(c=>!std || c.i !== std.idx).map(c=>{
     const k = q.id + '#' + c.i, a = L.answers[k], n = a ? a.qty : 0, p = a ? a.price : c.p;
     const price = view === 'customer' ? '' : c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
     if(isAllow(q, c)){
@@ -1798,6 +1848,7 @@ function bathCard(){
     ${row('rail-lf', 'Deck railing, per linear ft', 'Asked on the patio & deck section')}
     ${row('bsmt-open', 'Open stairs to basement', 'Basement section; closed stairs are standard')}
     ${row('bsmt-rail', 'Basement railing', 'Basement section')}
+    ${row('gd-dblpane', 'Garage door: double pane glass', 'Haas windows are single pane as standard; this upgrades the garage door windows (price from Shank Door)')}
     ${row('hosebib', 'Additional hose bib, each', 'Exterior section; 2 are standard')}
     ${row('walk-sf', 'Additional walkway, per sq ft', 'Front porch & entrance section')}
     <div class="eyebrow" style="margin-top:16px">Kitchen (price per finish, from the kitchen faucet sheet)</div>
@@ -2681,6 +2732,9 @@ document.addEventListener('click', async e=>{
     if(wa) L.answers['want:' + q.id] = { label:'yes', qty:0, price:0 }; else { delete L.answers['want:' + q.id]; q.c.forEach((c, i)=>{ delete L.answers[q.id + '#' + i]; }); }
     touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const mx = t.closest('[data-mix]'); if(mx){ mixOpen[mx.dataset.mix] = !mixOpen[mx.dataset.mix]; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  const gm = t.closest('[data-gd-mode]'); if(gm){ gdMode = gm.dataset.gdMode; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  const gn = t.closest('[data-gd-nav]'), gg = t.closest('[data-gd-go]');
+  if(gn || gg){ const q = qById('gdstyle'); if(!q) return; const cur = gdAt != null ? gdAt : Math.max(0, pickedIdx(q, L)); gdAt = gn ? (cur + Number(gn.dataset.gdNav) + q.c.length) % q.c.length : Number(gg.dataset.gdGo); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const dm = t.closest('[data-door-mode]'); if(dm){ doorMode = dm.dataset.doorMode; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const dn = t.closest('[data-door-nav]'), dg = t.closest('[data-door-go]');
   if(dn || dg){ const [qid, v] = (dn ? dn.dataset.doorNav : dg.dataset.doorGo).split('|'), q = qById(qid); if(!q) return;
@@ -3038,7 +3092,7 @@ boot();
 
 </script>
 <script src="sorttables.js"></script>
-<script src="house3d.js?v=2"></script>
+<script src="house3d.js?v=4"></script>
 <script>
 /* SQ FT CALCULATOR (owner, 2026-10-27: "a little simple pop out tool to calculate sqft on the right side of the screen when doing the
    pricing part and selections"). Office view only, on the Pricing and Selections tabs of an open sheet: a "Sq ft" tab on the right edge

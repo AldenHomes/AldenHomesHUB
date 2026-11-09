@@ -20,8 +20,10 @@
   const MODELS = {
     percy: { label: 'Percy A', file: 'models/percy-a/percyA.dae', grass: 'PERCY_A_textures/Grass7.jpg',
       door: { hide: /mat147/, at: [12.45, 0.02, -10.62], w: 0.91, h: 2.01, fill: [12.95, 1.9, -8.4] },
-      garage: { mat: /mat146/ },
-      views: { close: { pos: [12.75, 1.6, -2.2], tgt: [12.9, 1.05, -10.6] }, far: { pos: [11.8, 1.7, 10], tgt: [14, 2.6, -9] } } },
+      // Chief's garage door face: x 14.38–19.23, floor 0.0–2.13 (16' x 7'), face z −5.045, trim stands out to −4.931 (mat146 is also used elsewhere, so it isn't hidden — ours goes just in front)
+      garage: { mat: /mat146/, at: [14.38, 0.0, -5.06], w: 4.85, h: 2.13, inW: 192, inH: 84 },
+      views: { close: { pos: [12.75, 1.6, -2.2], tgt: [12.9, 1.05, -10.6] }, far: { pos: [11.8, 1.7, 10], tgt: [14, 2.6, -9] },
+        garage: { pos: [16.3, 1.75, 3.4], tgt: [16.8, 1.35, -5] } } },
   };
   const keyOf = style=>{ const s = String(style || '').trim().toLowerCase(); return Object.keys(MODELS).find(k=>s === k || s.startsWith(k + ' ')) || null; };
 
@@ -203,6 +205,70 @@
     return g;
   }
 
+  /* ---------- a garage door, drawn (Haas 600 series, owner 2026-11-09) ----------
+     spec = 'long|carriage' etc.: panel 'short' (8 across) or 'long' (4 across), windows in the top section 'carriage' (4-pane, one per
+     long panel / pair of short panels), 'ranch' (one long window per long panel / pair), 'standard' (one per short panel) or 'none'.
+     Four sections. Drawn at 6 px per inch: grey shading (paint colour multiplies it), a bump map for the recessed panels and joints, and
+     a glass mask. The same drawing makes the flat picture (garagePic) and the 3D door. */
+  const gdCache = {};
+  function garageMaps(spec, inW = 192, inH = 84){
+    const key = spec + '|' + inW + 'x' + inH; if(gdCache[key]) return gdCache[key];
+    const [panel, win] = String(spec).split('|'), S = 6, W = inW * S, H = inH * S, mk = ()=>{ const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+    const shade = mk(), bump = mk(), mask = mk(), sx = shade.getContext('2d'), bx = bump.getContext('2d'), mx = mask.getContext('2d');
+    const g = v=>`rgb(${v},${v},${v})`, R = (ctx, v, x, y, w, h)=>{ ctx.fillStyle = typeof v === 'number' ? g(v) : v; ctx.fillRect(x * S, y * S, w * S, h * S); };
+    R(sx, 238, 0, 0, inW, inH); R(bx, 170, 0, 0, inW, inH);
+    // a light stucco texture so the steel isn't flat
+    { const d = sx.getImageData(0, 0, W, H), p = d.data; for(let i = 0; i < p.length; i += 4){ const n = (Math.random() - 0.5) * 6; p[i] += n; p[i + 1] += n; p[i + 2] += n; } sx.putImageData(d, 0, 0); }
+    const secs = 4, secH = inH / secs, edge = 3, gap = 2.5, n = panel === 'long' ? 4 : 8, pw = (inW - 2 * edge - (n - 1) * gap) / n, vm = secH * 0.17, ph = secH - 2 * vm;
+    const recess = (x, y, w, h)=>{   // a recessed panel: darker field, shadowed top/left edge, lit bottom/right edge
+      R(sx, 229, x, y, w, h); R(sx, 196, x, y, w, 0.6); R(sx, 205, x, y, 0.6, h); R(sx, 250, x, y + h - 0.6, w, 0.6); R(sx, 247, x + w - 0.6, y, 0.6, h);
+      R(bx, 150, x, y, w, h); R(bx, 110, x, y, w, 0.5); R(bx, 110, x, y, 0.5, h); R(bx, 110, x, y + h - 0.5, w, 0.5); R(bx, 110, x + w - 0.5, y, 0.5, h); };
+    const windowAt = (x, y, w, h, panes)=>{   // trim, glass, and grilles (door colour)
+      R(sx, 246, x - 1.2, y - 1.2, w + 2.4, h + 2.4); R(bx, 205, x - 1.2, y - 1.2, w + 2.4, h + 2.4); R(sx, 205, x - 1.2, y + h + 1, w + 2.4, 0.4);
+      R(mx, '#fff', x, y, w, h); R(bx, 90, x, y, w, h);
+      for(let k = 1; k < panes; k++){ const gx = x + w * k / panes - 0.5; R(mx, '#000', gx, y, 1, h); R(sx, 244, gx, y, 1, h); R(bx, 200, gx, y, 1, h); } };
+    for(let s = 0; s < secs; s++){
+      const y0 = s * secH;
+      if(s){ R(sx, 150, 0, y0 - 0.35, inW, 0.5); R(sx, 252, 0, y0 + 0.15, inW, 0.4); R(bx, 40, 0, y0 - 0.4, inW, 0.8); }   // the joint between sections
+      for(let i = 0; i < n; i++){
+        const x = edge + i * (pw + gap), y = y0 + vm;
+        if(s === 0 && win === 'standard' && panel === 'short'){ const ww = 18.4, wh = 11.4; windowAt(x + (pw - ww) / 2, y0 + (secH - wh) / 2, ww, wh, 1); continue; }
+        recess(x, y, pw, ph); }
+      if(s === 0 && (win === 'carriage' || win === 'ranch')){   // one wide window per long panel (or per pair of short panels)
+        const ww = win === 'carriage' ? 39.4 : 39.4, wh = win === 'carriage' ? 13.6 : 11.5, slots = 4, sw = (inW - 2 * edge) / slots;
+        for(let i = 0; i < slots; i++){ const cx = edge + sw * (i + 0.5); R(sx, 238, cx - sw / 2 + 0.5, y0 + 1, sw - 1, secH - 2); R(bx, 170, cx - sw / 2 + 0.5, y0 + 1, sw - 1, secH - 2);
+          windowAt(cx - ww / 2, y0 + (secH - wh) / 2, ww, wh, win === 'carriage' ? 4 : 1); } }
+    }
+    // outline
+    sx.strokeStyle = g(170); sx.lineWidth = 3; sx.strokeRect(1.5, 1.5, W - 3, H - 3);
+    return gdCache[key] = { shade, bump, mask };
+  }
+  // a flat coloured picture of a garage door (for the question's tiles and the "Just the door" view)
+  const picCache = {};
+  function garagePic(spec, hex, w = 480){
+    const key = spec + '|' + hex + '|' + w; if(picCache[key]) return picCache[key];
+    const m = garageMaps(spec), h = Math.round(w * m.shade.height / m.shade.width), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+    x.fillStyle = hex || '#f2f2ee'; x.fillRect(0, 0, w, h); x.globalCompositeOperation = 'multiply'; x.drawImage(m.shade, 0, 0, w, h);
+    const gl = document.createElement('canvas'); gl.width = w; gl.height = h; const gx = gl.getContext('2d'), gr = gx.createLinearGradient(0, 0, 0, h * 0.3);
+    gr.addColorStop(0, '#5e6b75'); gr.addColorStop(1, '#2f3a43'); gx.fillStyle = gr; gx.fillRect(0, 0, w, h);
+    // keep the glass only where the mask is white
+    const md = document.createElement('canvas'); md.width = w; md.height = h; const mdx = md.getContext('2d'); mdx.drawImage(m.mask, 0, 0, w, h);
+    const a = mdx.getImageData(0, 0, w, h), gd = gx.getImageData(0, 0, w, h); for(let i = 0; i < a.data.length; i += 4) gd.data[i + 3] = a.data[i + 1]; gx.putImageData(gd, 0, 0);
+    x.globalCompositeOperation = 'source-over'; x.drawImage(gl, 0, 0);
+    return picCache[key] = c.toDataURL('image/jpeg', 0.9);
+  }
+  async function makeGarage(spec, hex){
+    const { THREE } = V, G = V.model.M.garage, maps = garageMaps(spec, G.inW, G.inH), aniso = V.renderer.capabilities.getMaxAnisotropy();
+    const tex = (cv, srgb)=>{ const t = new THREE.CanvasTexture(cv); if(srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; return t; };
+    const T = 0.04, g = new THREE.Group();
+    const paint = new THREE.MeshStandardMaterial({ color: hex, map: tex(maps.shade, true), bumpMap: tex(maps.bump), bumpScale: 1.5, roughness: 0.55, envMapIntensity: 0.6 });
+    const edge = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.6 });
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(G.w, G.h, T), [edge, edge, edge, edge, paint, edge]); slab.position.set(G.w / 2, G.h / 2, T / 2); slab.castShadow = slab.receiveShadow = true; g.add(slab);
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(G.w, G.h), new THREE.MeshPhysicalMaterial({ color: 0x2a343c, roughness: 0.12, metalness: 0.2, clearcoat: 1, envMapIntensity: 1.5, alphaMap: tex(maps.mask), alphaTest: 0.5 }));
+    glass.position.set(G.w / 2, G.h / 2, T + 0.0015); g.add(glass);
+    g.position.set(...G.at); g.userData.paint = [paint, edge]; return g;
+  }
+
   /* ---------- siding colour from the siding picture they picked ---------- */
   const sideCache = {};
   function sidingHex(src){ return sideCache[src] || (sideCache[src] = new Promise(res=>{ const im = new Image(); im.onload = ()=>{ try {
@@ -217,19 +283,26 @@
   async function update(slot){
     if(busy){ again = true; return; } busy = true;
     try {
-      const want = { key: keyOf(slot.dataset.model), view: slot.dataset.h3d === 'far' ? 'far' : 'close', door: slot.dataset.door || '', hex: slot.dataset.doorHex || '#f4f3ee', siding: slot.dataset.siding || '' };
+      const want = { key: keyOf(slot.dataset.model), view: ['far', 'garage'].includes(slot.dataset.h3d) ? slot.dataset.h3d : 'close', door: slot.dataset.door || '', hex: slot.dataset.doorHex || '#f4f3ee', siding: slot.dataset.siding || '',
+        gd: slot.dataset.gd || '', gdHex: slot.dataset.gdHex || '#f2f2ee' };
       if(!want.key){ say('There’s no 3D model of this home style yet.'); return; }
       await boot(); fit();
       const { THREE } = V;
       if(!V.model || V.model.key !== want.key){
         if(V.model) V.scene.remove(V.model.group);
-        V.model = await loadModel(want.key); V.scene.add(V.model.group); V.doorObj = null; V.have = {};
+        V.model = await loadModel(want.key); V.scene.add(V.model.group); V.doorObj = null; V.gdObj = null; V.have = {};
       }
       if(V.have.door !== want.door && want.door){
         say('Hanging the door…');
         const d = await makeDoor(want.door, want.hex); if(V.doorObj) V.model.group.remove(V.doorObj);
         V.doorObj = d; V.model.group.add(d); V.have.door = want.door; V.have.hex = want.hex;
       }
+      if(V.have.gd !== want.gd && V.model.M.garage.at){
+        if(V.gdObj){ V.model.group.remove(V.gdObj); V.gdObj = null; }
+        if(want.gd){ V.gdObj = await makeGarage(want.gd, want.gdHex); V.model.group.add(V.gdObj); }
+        V.have.gd = want.gd; V.have.gdHex = want.gdHex;
+      }
+      if(V.gdObj && V.have.gdHex !== want.gdHex){ V.gdObj.userData.paint.forEach(m=>m.color.set(want.gdHex)); V.have.gdHex = want.gdHex; }
       if(V.doorObj && V.have.hex !== want.hex){ V.doorObj.userData.paint.forEach(m=>m.color.set(want.hex)); V.have.hex = want.hex; }
       if(V.have.siding !== want.siding){
         const hex = want.siding ? await sidingHex(want.siding) : null;
@@ -257,11 +330,11 @@
     const slot = document.querySelector('.h3d-slot'); if(!slot) return;
     if(!V) makeView();
     if(V.wrap.parentNode !== slot) slot.appendChild(V.wrap);
-    const sig = [slot.dataset.model, slot.dataset.h3d, slot.dataset.door, slot.dataset.doorHex, slot.dataset.siding].join('|');
+    const sig = [slot.dataset.model, slot.dataset.h3d, slot.dataset.door, slot.dataset.doorHex, slot.dataset.siding, slot.dataset.gd, slot.dataset.gdHex].join('|');
     if(sig !== lastSig || !V.renderer){ lastSig = sig; update(slot); } else fit();
   }
   new MutationObserver(check).observe(document.documentElement, { childList: true, subtree: true });
   document.addEventListener('DOMContentLoaded', check);
 
-  window.House3D = { has: style=>!!keyOf(style), models: MODELS };
+  window.House3D = { has: style=>!!keyOf(style), models: MODELS, garagePic };
 })();
