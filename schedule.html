@@ -488,9 +488,12 @@
       <select class="filter phone-sort" id="sortSelect" aria-label="Sort the homes">
         <option value="settle|asc">Sort: Settle date (soonest)</option>
         <option value="settle|desc">Sort: Settle date (latest)</option>
-        <option value="walk|asc">Sort: Walk date</option>
-        <option value="move|asc">Sort: Move date</option>
-        <option value="fndn|asc">Sort: Foundation date</option>
+        <option value="move|asc">Sort: Move-in date (soonest)</option>
+        <option value="move|desc">Sort: Move-in date (latest)</option>
+        <option value="walk|asc">Sort: Walk date (soonest)</option>
+        <option value="walk|desc">Sort: Walk date (latest)</option>
+        <option value="fndn|asc">Sort: Foundation date (soonest)</option>
+        <option value="fndn|desc">Sort: Foundation date (latest)</option>
         <option value="client|asc">Sort: Client (A–Z)</option>
         <option value="community|asc">Sort: Community</option>
         <option value="lot|asc">Sort: Lot</option>
@@ -1436,6 +1439,9 @@ function renderSchedule(){
     }
     if(av===undefined||av===null) av='';
     if(bv===undefined||bv===null) bv='';
+    // homes with nothing filled in go to the bottom either way (owner, 2026-11-09: "soonest" listed the undated homes first)
+    if(av==='' && bv!=='') return 1;
+    if(bv==='' && av!=='') return -1;
     if(av<bv) return sortDir==='asc'? -1: 1;
     if(av>bv) return sortDir==='asc'? 1: -1;
     return 0;
