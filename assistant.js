@@ -48,6 +48,11 @@
   .ai-foot input:focus{outline:2px solid var(--amber, #c98a2b); outline-offset:0; border-color:var(--amber, #c98a2b);}
   .ai-round{flex:none; width:44px; height:44px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; background:#eef0e8; color:var(--rust-2, #6B7355);}
   .ai-round.send{background:var(--navy, #4B4F54); color:#fff;}
+  .ai-attach{display:none; align-items:center; gap:10px; padding:8px 12px 0; font-size:13px; color:var(--ink-soft, #6b6f72);}
+  .ai-attach.on{display:flex;}
+  .ai-attach img{width:46px; height:46px; object-fit:cover; border-radius:6px; border:1px solid var(--steel-line, #d4d2c8);}
+  .ai-attach button{margin-left:auto; border:none; background:none; color:var(--danger, #b3452f); font-weight:700; cursor:pointer; font-family:inherit; font-size:13px;}
+  .ai-msg img.ai-sent, .ai-card img.ai-sent{display:block; max-width:160px; max-height:160px; border-radius:6px; margin-bottom:6px;}
   .ai-round:disabled{opacity:.45; cursor:default;}
   .ai-round.listening{background:var(--danger, #b3452f); color:#fff; animation:aiPulse 1.2s ease-in-out infinite;}
   @keyframes aiPulse{0%,100%{box-shadow:0 0 0 0 rgba(179,69,47,.45);} 50%{box-shadow:0 0 0 10px rgba(179,69,47,0);}}
@@ -86,7 +91,12 @@
     <div class="ai-walk-text quiet" id="aiWalkText">Walk through and say what needs doing as you point the camera at it.</div>
     <div class="ai-walk-btns"><button type="button" class="cancel" id="aiWalkCancel">Cancel</button><button type="button" class="stop" id="aiWalkStop">Done &mdash; make the list</button></div>
   </div>
+  <div class="ai-attach" id="aiAttach"><img id="aiAttachImg" alt="Photo to send"><span>Photo added — say what to do with it (e.g. “make this service request”)</span><button type="button" id="aiAttachX">Remove</button></div>
   <div class="ai-foot">
+    <input type="file" id="aiPhotoFile" accept="image/*" style="display:none;">
+    <button type="button" class="ai-round" id="aiPhoto" title="Add a photo (e.g. a handwritten service request)" aria-label="Add a photo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>
+    </button>
     <button type="button" class="ai-round" id="aiMic" title="Tap and speak" aria-label="Tap and speak">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
     </button>
@@ -176,7 +186,7 @@
   // with the time each was said. An item's picture is the still from the moment its piece was spoken;
   // Earlier / Later on the card step through the neighbouring stills. Only the one showing when
   // Confirm is pressed gets uploaded.
-  function showActions(actions, tape){
+  function showActions(actions, tape, sentPhoto){
     const ids = [];
     const words = t=>String(t || '').toLowerCase().match(/[a-z]{4,}/g) || [];
     const guessClip = text=>{
@@ -199,10 +209,11 @@
         const clip = tape.clips[(a.clip || 0) - 1] || tape.clips[guessClip((a.summary || {}).text) - 1];
         if(clip) fi = frameAt(clip.t - WALK_LAG_MS);
       }
-      pending[id] = fi >= 0 ? { ...a, _tape: tape, _fi: fi } : (fromWalk ? { ...a, _walk: true } : a);
+      const withPhoto = !!sentPhoto && a.type === 'add_service_request';
+      pending[id] = fi >= 0 ? { ...a, _tape: tape, _fi: fi } : (fromWalk ? { ...a, _walk: true } : (withPhoto ? { ...a, _photo: sentPhoto.blob, fromPhoto: true } : a));
       ids.push(id);
       const sum = a.summary || {};
-      const card = add(`<div class="t">${escHtml(sum.title || 'Change')}</div>
+      const card = add(`${withPhoto ? `<img class="ai-sent" src="${sentPhoto.url}" alt="The photo, saved with the request">` : ''}<div class="t">${escHtml(sum.title || 'Change')}</div>
         <div class="x">${escHtml(sum.text || '')}</div>
         ${sum.people ? `<div class="p">${escHtml(sum.people)}</div>` : ''}
         <div class="row"><button type="button" class="ai-no" data-ai-cancel="${id}">Cancel</button><button type="button" class="ai-yes" data-ai-confirm="${id}">Confirm</button></div>`, 'ai-card');
@@ -239,21 +250,59 @@
     div.innerHTML = links.map(l=>`<a class="ai-link" href="${l.kind === 'home' ? 'house.html?id=' : 'invoices.html?open='}${encodeURIComponent(l.id)}">${escHtml(l.label)}</a>`).join('');
     after.after(div);
   }
+  /* A photo to go with the next message (owner, 2026-11-09: a homeowner's handwritten service request form →
+     "make this service request"). Shrunk to 1600px JPEG here; sent with the words; kept in memory so it can be
+     attached to the service request when its card is confirmed. */
+  let photo = null;   // { blob, url, b64 }
+  function clearPhoto(){
+    if(photo) URL.revokeObjectURL(photo.url);
+    photo = null; el('aiAttach').classList.remove('on'); el('aiPhotoFile').value = '';
+  }
+  async function shrinkForAi(file){
+    let src;
+    try{ src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+    catch(e){ src = await new Promise((res, rej)=>{ const im = new Image(); im.onload = ()=>res(im); im.onerror = rej; im.src = URL.createObjectURL(file); }); }
+    const w0 = src.width || src.naturalWidth, h0 = src.height || src.naturalHeight, k = Math.min(1, 1600 / Math.max(w0, h0));
+    const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    const blob = await new Promise(res=>c.toBlob(res, 'image/jpeg', 0.85));
+    const b64 = await new Promise(res=>{ const r = new FileReader(); r.onload = ()=>res(String(r.result).split(',')[1]); r.readAsDataURL(blob); });
+    return { blob, url: URL.createObjectURL(blob), b64 };
+  }
+  el('aiPhoto').addEventListener('click', ()=>el('aiPhotoFile').click());
+  el('aiAttachX').addEventListener('click', clearPhoto);
+  el('aiPhotoFile').addEventListener('change', async e=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    try{
+      clearPhoto();
+      photo = await shrinkForAi(f);
+      el('aiAttachImg').src = photo.url;
+      el('aiAttach').classList.add('on');
+      if(!el('aiText').value.trim()) el('aiText').value = 'Make this a service request';
+      el('aiText').focus();
+    } catch(err){ console.error(err); add('That photo couldn\'t be opened. Try a JPEG or PNG picture.', 'ai-msg bot'); }
+  });
+
   async function send(){
-    const text = el('aiText').value.trim();
-    if(!text || busy) return;
+    let text = el('aiText').value.trim();
+    if((!text && !photo) || busy) return;
+    if(!text) text = 'Make this a service request';
     stopListening();
     el('aiText').value = '';
-    add(escHtml(text), 'ai-msg user');
-    const waiting = add('Thinking…', 'ai-msg bot');
+    const sentPhoto = photo;
+    photo = null; el('aiAttach').classList.remove('on'); el('aiPhotoFile').value = '';
+    add((sentPhoto ? `<img class="ai-sent" src="${sentPhoto.url}" alt="Photo sent">` : '') + escHtml(text), 'ai-msg user');
+    const waiting = add(sentPhoto ? 'Reading the photo…' : 'Thinking…', 'ai-msg bot');
     busy = true; el('aiSend').disabled = true;
     try{
-      const data = await call({ action:'ask', text, history, context: pageContext() });
+      const data = await call({ action:'ask', text, history, context: pageContext(),
+        ...(sentPhoto ? { image: { type: 'image/jpeg', data: sentPhoto.b64 } } : {}) });
       waiting.textContent = data.reply || '';
       showLinks(waiting, data.links);
-      history.push({ role:'user', text }, { role:'assistant', text: data.reply || '' });
+      history.push({ role:'user', text: sentPhoto ? text + ' (with a photo)' : text }, { role:'assistant', text: data.reply || '' });
       history = history.slice(-6);
-      showActions(data.actions || []);
+      showActions(data.actions || [], null, sentPhoto);
     } catch(err){
       console.error(err);
       waiting.textContent = problemText(err);
@@ -288,7 +337,7 @@
       add(text, 'ai-msg bot');
     };
     try{
-      const { summary, _tape, _fi, _walk, ...toRun } = action;
+      const { summary, _tape, _fi, _walk, _photo, ...toRun } = action;
       const _shot = _tape ? _tape.frames[_fi].shot : null;
       let noPicture = false;
       if(_shot){
@@ -296,12 +345,17 @@
         try{ const up = await uploadShot(_shot, toRun.homeId); toRun.photos = [up.url]; toRun.photoPaths = [up.path]; }
         catch(err){ console.error('walk-through picture did not upload', err); noPicture = String((err && (err.code || err.message)) || 'unknown reason').slice(0, 80); }
       }
+      if(_photo){
+        // the photographed form is kept on the service request, like a photo a homeowner sends in
+        try{ const up = await uploadBlob(_photo, `service-photos/ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}/0-paper-form.jpg`); toRun.photos = [up.url]; }
+        catch(err){ console.error('service request photo did not upload', err); noPicture = String((err && (err.code || err.message)) || 'unknown reason').slice(0, 80); }
+      }
       const data = await call({ action:'run', actions:[toRun] });
       const r = (data.results || [])[0] || {};
       if(r.ok){
         // say what became of the picture, so a missing one isn't a mystery
         const pic = noPicture ? ' · the picture didn\'t upload (' + noPicture + '), so it was saved without one'
-          : _shot ? (r.photosSaved ? ' · picture attached' : ' · saved, but the picture was not kept')
+          : (_shot || _photo) ? (r.photosSaved ? (_photo ? ' · photo of the form attached' : ' · picture attached') : ' · saved, but the picture was not kept')
           : _walk ? ' · no picture was taken for this one' : '';
         finish('done', '✓ Done' + pic);
         history.push({ role:'user', text:'(I confirmed that and it was saved.)' });
@@ -565,6 +619,9 @@
   // Save one walk-through picture where punch list photos live. Pages that don't already use
   // file storage load that part of Firebase the first time it's needed.
   async function uploadShot(blob, homeId){
+    return uploadBlob(blob, `houses/${homeId || 'punch-list'}/photos/punch-walk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`);
+  }
+  async function uploadBlob(blob, path){
     if(typeof firebase.storage !== 'function'){
       const app = document.querySelector('script[src*="firebase-app-compat"]');
       await new Promise((res, rej)=>{
@@ -574,7 +631,6 @@
         document.head.appendChild(sc);
       });
     }
-    const path = `houses/${homeId || 'punch-list'}/photos/punch-walk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
     const stored = firebase.storage().ref().child(path);
     await stored.put(blob, { contentType: 'image/jpeg' });
     return { url: await stored.getDownloadURL(), path };

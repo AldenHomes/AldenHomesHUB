@@ -1207,11 +1207,12 @@ const ASSISTANT_TOOLS = [
     description: 'Propose adding a homeowner service request (a warranty / repair request) to the Service Center, for example when someone says a buyer called about a problem. Pick the home from the list (finished homes are usually the ones with service requests); the buyer\'s name, phone, email and address are filled in from that home. Shown to the user to confirm.',
     input_schema: { type: 'object', properties: {
       home_id: { ...str, description: 'The id of the home the request is for, or an empty string if the home is not in the hub.' },
-      description: { ...str, description: 'What is wrong, in plain words, as the homeowner would put it. Several problems can go on separate lines.' },
+      description: { ...str, description: 'What is wrong, in plain words, as the homeowner would put it. When there are several problems, one short line per problem, each starting with "• ". Anything that is not a problem (best time to call, how to get in, a question) goes on its own line after them, starting with "Note: ".' },
       name: { ...str, description: 'Who is asking, only if it is NOT the buyer on file for that home (or the home is not in the hub). Otherwise an empty string.' },
       phone: { ...str, description: 'A phone number they gave, only if it differs from the one on file. Otherwise an empty string.' },
+      email: { ...str, description: 'An email address they gave, only if it differs from the one on file. Otherwise an empty string.' },
       address: { ...str, description: 'Only when the home is not in the hub: the street address they gave. Otherwise an empty string.' },
-    }, required: ['home_id', 'description', 'name', 'phone', 'address'], additionalProperties: false } },
+    }, required: ['home_id', 'description', 'name', 'phone', 'email', 'address'], additionalProperties: false } },
   { name: 'complete_punch_item', strict: true,
     description: 'Propose checking an item off the punch list. Find the item id with list_punch_items or get_home first. Shown to the user to confirm.',
     input_schema: { type: 'object', properties: { item_id: { ...str, description: 'The id of the punch list item.' } }, required: ['item_id'], additionalProperties: false } },
@@ -1290,6 +1291,7 @@ Walk-throughs: sometimes the message is the transcript of someone walking throug
 
 Records and statistics: you can read everything in the hub. find_invoices finds invoices (then show_links so they can open them — always offer the buttons for invoices or homes you name). For numbers — totals, averages, counts, "how much did we spend with X this year", "average cost of a Percy", "which vendor declines most" — write Python in code execution that calls hub_data for the collections it needs and computes the answer; never add up figures in your head. Give the answer in plain words with the key numbers; a short list is fine when there are several items.
 
+Photos: a message can come with a photo. Often it is a homeowner's handwritten service request on Alden's paper form (or a letter, note or email print-out asking for repairs). Then read it carefully, handwriting included, and call add_service_request once: find the home from the lot number, address or name written on it (lots and house numbers are often written loosely; check against the homes list), and write the description as a clean list — one "• " line per separate problem, in plain words close to the homeowner's own, spelling fixed, each line making sense on its own (say which room or spot when they did). Put anything that is not a problem (best time to reach them, how to get in, pets, a question) on "Note: " lines after the list. Use name / phone / email only when what is written differs from the home on file. If a word can't be read, write your best guess with "(?)" after it rather than leaving the problem out. If the home can't be worked out and none is on their screen, ask which home before proposing. If the photo is of something else (a problem in a house, a receipt), just do what they ask with it.
 If they ask for something you have no way to do — moving schedule dates, emailing a sub, changing a service request — say you can't do that from here yet, and mention where in the hub it's done if you know (Construction Schedules, Service Center, Punch List, Admin Settings).`;
 
 // Everything the assistant is told up front: who is asking, the team, and every home.
@@ -1428,12 +1430,13 @@ async function assistantCheck(name, input, ctx){
     if(!description) return { error: 'The request needs a description of the problem.' };
     const name = cleanText(input.name, 120) || (job && job.client) || '';
     const phone = cleanText(input.phone, 40) || (job && job.phone) || '';
+    const email = cleanText(input.email, 120) || (job && job.email) || '';
     const address = (job && job.address) || cleanText(input.address, 200);
     if(!name) return { error: 'Ask who the request is from (no buyer is on file for that home).' };
     if(!address) return { error: 'Ask for the address (the home is not in the hub, or has no address on file).' };
-    return { action: { type: 'add_service_request', homeId: job ? job.id : '', description, name, phone, address },
+    return { action: { type: 'add_service_request', homeId: job ? job.id : '', description, name, phone, email, address },
       summary: { title: `New service request${job ? ' for ' + jobLabel(job) : ''}`, text: description,
-        people: [name, phone, job ? '' : address].filter(Boolean).join(' · ') } };
+        people: [name, phone, email, job ? '' : address].filter(Boolean).join(' · ') } };
   }
   if(name === 'complete_punch_item'){
     const doc = typeof input.item_id === 'string' && input.item_id ? await db.collection('notes').doc(input.item_id).get() : null;
@@ -1484,13 +1487,23 @@ async function assistantRun(action, ctx){
   if(action.type === 'add_service_request'){
     const job0 = action.homeId ? ctx.jobs.find(j=>j.id === action.homeId) : null;
     const ok = await assistantCheck('add_service_request', { home_id: action.homeId || '', description: action.description,
-      name: job0 && action.name === job0.client ? '' : action.name, phone: job0 && action.phone === job0.phone ? '' : action.phone, address: action.address }, ctx);
+      name: job0 && action.name === job0.client ? '' : action.name, phone: job0 && action.phone === job0.phone ? '' : action.phone,
+      email: job0 && action.email === job0.email ? '' : (action.email || ''), address: action.address }, ctx);
     if(ok.error) return ok.error;
     const a = ok.action, job = a.homeId ? ctx.jobs.find(j=>j.id === a.homeId) : null;
+    // the photo of a paper form the hub uploaded just before calling: only our own storage, only where service photos live
+    const pics = (Array.isArray(action.photos) ? action.photos : []).slice(0, 4)
+      .filter(url=>typeof url === 'string' && url.length < 1000 && /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/[^/]+\/o\/service-photos%2F/.test(url));
+    // each "• " line is one thing to fix → the request's items, ready to route in the Service Center
+    const items = a.description.split('\n').map(l=>l.trim()).filter(l=>/^[•*-]\s*\S/.test(l))
+      .map(l=>({ id: 'i' + Math.random().toString(36).slice(2, 9), text: l.replace(/^[•*-]\s*/, '').slice(0, 500), route: '' })).slice(0, 40);
     await db.collection('service-requests').add({
-      name: a.name, phone: a.phone, email: (job && job.email) || '', address: a.address, lot: (job && job.lot) || '', description: a.description,
-      photoUrls: [], status: 'new', submittedAt: now, ...(job ? { houseId: job.id } : {}), addedBy: by,
+      name: a.name, phone: a.phone, email: a.email, address: a.address, lot: (job && job.lot) || '', description: a.description,
+      photoUrls: pics, status: 'new', submittedAt: now, ...(job ? { houseId: job.id } : {}), ...(items.length > 1 ? { items } : {}),
+      ...(action.fromPhoto ? { fromPaperForm: true } : {}), addedBy: by,
     });
+    action.photosSent = Array.isArray(action.photos) ? action.photos.length : 0;
+    action.photosSaved = pics.length;
     return '';
   }
   if(action.type === 'complete_punch_item'){
@@ -1527,7 +1540,10 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
     if(body.action !== 'ask'){ res.status(400).json({ error: 'action' }); return; }
     // a walk-through is a whole transcript, so it is allowed to be much longer than a spoken command
     const walk = body.walk === true;
-    const said = cleanText(body.text, walk ? 12000 : 1000);
+    // a photo (a handwritten service request form, a picture of a problem…): one JPEG/PNG the hub already shrank
+    const img = body.image && typeof body.image.data === 'string' && /^image\/(jpeg|png|webp)$/.test(body.image.type || '')
+      && body.image.data.length < 6e6 && /^[A-Za-z0-9+/=]+$/.test(body.image.data.slice(0, 200)) ? body.image : null;
+    const said = cleanText(body.text, walk ? 12000 : 1000) || (img ? 'Here is a photo.' : '');
     if(!said){ res.status(400).json({ error: 'text' }); return; }
     const text = walk ? 'This is the transcript of a walk-through I just recorded, in numbered clips. Please turn it into punch list items.\n\n' + said : said;
     // a little of the conversation so far, so "no, I meant lot 41" makes sense
@@ -1535,7 +1551,9 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
       .filter(h=>h && ['user', 'assistant'].includes(h.role) && typeof h.text === 'string' && h.text.trim())
       .map(h=>({ role: h.role, content: h.text.slice(0, 1500) }));
     while(history.length && history[0].role !== 'user') history.shift();
-    const messages = [...history, { role: 'user', content: text }];
+    const messages = [...history, { role: 'user', content: img
+      ? [{ type: 'image', source: { type: 'base64', media_type: img.type, data: img.data } }, { type: 'text', text }]
+      : text }];
 
     const sdk = require('@anthropic-ai/sdk');
     const Anthropic = sdk.Anthropic || sdk.default || sdk;
@@ -1544,7 +1562,8 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
       model: ASSISTANT_MODEL,
       max_tokens: 16000,
       // short spoken commands: quick answers matter more than deep deliberation
-      output_config: { effort: 'low' },
+      // (reading handwriting off a photo is worth more care)
+      output_config: { effort: img ? 'medium' : 'low' },
       // the instructions never change, so they can be cached; the lists of homes and people follow
       system: [{ type: 'text', text: ASSISTANT_RULES, cache_control: { type: 'ephemeral' } }, { type: 'text', text: ctx.facts }],
       tools: ASSISTANT_TOOLS,
@@ -1600,7 +1619,7 @@ if(ASSISTANT_ON) exports.hubAssistant = onRequest({ cors: ALLOWED_ORIGINS, maxIn
       }
       messages.push({ role: 'user', content: results });
     }
-    logger.info('Assistant request', { by: ctx.me.name, tokensIn, tokensOut, proposed: proposed.map(p=>p.type), ...(walk ? { walk: true, clips: proposed.map(p=>p.clip || 0) } : {}) });
+    logger.info('Assistant request', { by: ctx.me.name, tokensIn, tokensOut, proposed: proposed.map(p=>p.type), ...(img ? { photo: true } : {}), ...(walk ? { walk: true, clips: proposed.map(p=>p.clip || 0) } : {}) });
     res.json({ reply: reply || (proposed.length ? 'Here is what I\'ll do once you confirm.' : 'Sorry, I didn\'t catch that. Could you say it another way?'), actions: proposed, links: ctx.links || [] });
   } catch(err){
     logger.error('hubAssistant failed', { error: String(err), status: err && err.status });
