@@ -728,7 +728,7 @@ const MIRROR_IMG = [[/^std\. mirror:?$/i, '', '', 'Standard mirror'], [/rectangl
    lines are drawn as photo tiles (q.photo) instead of rows — tap a tile to choose, the product in small type under the name, the standard
    shown as "✓ Standard" until something else is picked, prices on the tiles in Office view. */
 const TILE_BT = ['273', '313', '353', '379', '277', '317', '357', '383', '156', '152', '256', '300', '340', '258'];
-const CHOICE_IMG = { '273':TOILET_IMG, '313':TOILET_IMG, '353':TOILET_IMG, '379':TOILET_IMG, '156':[[/^laundry tub$/i, 'laundry-tub', 'Mustee 18W Utilatub laundry tub with Moen 74998 Chateau faucet (chrome)'],
+const CHOICE_IMG = { '273':TOILET_IMG, '313':TOILET_IMG, '353':TOILET_IMG, '379':TOILET_IMG, '156':[[/^laundry tub$/i, 'laundry-tub-2', 'Mustee 18W Utilatub laundry tub with Moen 74998 Chateau faucet (chrome)'],
     [/^rough in for laundry tub$/i, '', 'Water and drain lines only, ready for a tub later', 'Plumbing rough-in only', 'Pipes only'], [/^move the laundry tub/i, '', 'Put it in the laundry room instead of the garage', 'Move it to the laundry room', 'Laundry room']], '518':[[/^wood pantry shelves/i, 'pantry-wood'], [/appliance shelf/i, 'pantry-wire-wood-appliance']],
   '277':MIRROR_IMG, '317':MIRROR_IMG, '357':MIRROR_IMG, '383':MIRROR_IMG,
   '256':SHOWER_IMG, '300':SHOWER_IMG, '340':SHOWER_IMG,
@@ -1040,6 +1040,19 @@ function houseAttrs(L, opt = {}){
   return ` data-model="${esc(L.model || '')}" data-door="${esc(door ? door.img : '')}" data-door-hex="${esc((dh && dh.hex) || '#f4f3ee')}" data-siding="${esc(sidingImgOf(L))}"`
     + (gq && gi >= 0 ? ` data-gd="${esc(gq.c[gi].gd)}" data-gd-hex="${esc(gc ? gc.hex : '#f1f1ec')}"` : '');
 }
+/* NO PART NUMBERS FOR THE BUYER (owner, 2026-11-09: "we do not want the customers looking at them and going to compare pricing"):
+   in Customer view (and on the customer's pricing sheet, quote link and share page) model / part numbers are taken out of choice names,
+   product lines and the big photo view. Office view, the office copy and the "For vendors" list keep them. A part number = an
+   upper-case word with letters AND digits (GRN31102, S6021, K-6355-0, 7594C, 18W) or 4+ digits in a row (74998, 141353-000-002-501);
+   sizes, grades and specs are left alone (R-49, CAT6, 2X4, L10, 3SR, 60", 10x14). */
+const PART_NO = /\b(?=[A-Z0-9-]*\d)[A-Z0-9]+(?:-[A-Z0-9]+)*\b(?!['’"″])/g;
+const notPart = t=>(!/[A-Z]/.test(t) && !/\d{4}/.test(t)) || /^R-?\d+$|^CAT\d|^\d+X\d+$|^\d{1,3}(ST|ND|RD|TH)$|^L\d{1,2}$|^\dSR$/.test(t);
+const noPart = str=>String(str == null ? '' : str).replace(PART_NO, t=>notPart(t) ? t : '')
+  .replace(/\s\+\s*(?=$|·|\))/g, '').replace(/\s*·\s*order\b(?=\s*(?:·|$))/g, '').replace(/\s*\(order every part in [^)]*\)/g, '')
+  .replace(/\(\s*[,·+\s]*\)/g, '').replace(/\(\s*[,·+]?\s*/g, '(').replace(/\s*[,·+]?\s*\)/g, ')')
+  .replace(/(,\s*)+,/g, ',').replace(/\s+,/g, ',').replace(/·\s*·/g, '·').replace(/:\s*,\s*/g, ': ').replace(/\s{2,}/g, ' ')
+  .replace(/^[\s·,:-]+|[\s·,+-]+$/g, '').trim();
+const pn = t=>view === 'customer' ? noPart(t) : String(t == null ? '' : t);
 // thumbnail name: the model, numbered when several share it (SelectView 1–4)
 const gdShort = (q, i)=>{ const m = q.c[i].model, same = q.c.filter(c=>c.model === m); return same.length > 1 ? m + ' ' + (same.indexOf(q.c[i]) + 1) : m; };
 function garageStage(q, L, lock){
@@ -1051,12 +1064,12 @@ function garageStage(q, L, lock){
   const arrows = d=>`<button type="button" class="ds-arrow" data-gd-nav="${d}" aria-label="${d < 0 ? 'Back' : 'Next'}">${d < 0 ? '&lsaquo;' : '&rsaquo;'}</button>`;
   const view = has3d(L) && gdMode !== 'door'
     ? `<div class="ds-view ds-house">${arrows(-1)}<div class="h3d-slot" data-h3d="${gdMode === 'far' ? 'far' : 'garage'}"${houseAttrs(L, { gd: sh.i })}></div>${arrows(1)}</div>`
-    : `<div class="ds-view ds-gd">${arrows(-1)}<div class="gd-pic"><img src="${gdPic(sh.c.gd, hex, 900)}" alt="${esc(sh.c.t)}"></div>${arrows(1)}</div>`;
+    : `<div class="ds-view ds-gd">${arrows(-1)}<div class="gd-pic"><img src="${gdPic(sh.c.gd, hex, 900)}" alt="${esc(pn(sh.c.t))}"></div>${arrows(1)}</div>`;
   const pickBtn = on ? '&#10003; This is their garage door (tap to undo)' : isStd && picked < 0 ? '&#10003; Standard — comes with the home (tap to choose it)' : 'Choose this door';
   return `<div class="ds">${modes}${view}
-    <div class="ds-name"><b>Haas ${esc(sh.c.model)} · ${esc(sh.c.desc)}</b><small>${sh.i + 1} of ${q.c.length}${isStd ? ' · Alden standard, no charge' : ''} · ${esc(col ? col.t : 'Polar White (no color picked yet)')}</small></div>
+    <div class="ds-name"><b>${view === 'customer' ? 'Haas · ' : 'Haas ' + esc(sh.c.model) + ' · '}${esc(sh.c.desc)}</b><small>${sh.i + 1} of ${q.c.length}${isStd ? ' · Alden standard, no charge' : ''} · ${esc(col ? col.t : 'Polar White (no color picked yet)')}</small></div>
     <div class="ds-pick"><button type="button" class="btn ${on || (isStd && picked < 0) ? '' : 'primary'}" data-bt-tog="${esc(sk)}" ${lock ? 'disabled' : ''}>${pickBtn}</button></div>
-    <div class="ds-strip">${q.c.map((c, i)=>`<button type="button" class="ds-thumb gd-thumb ${i === sh.i ? 'cur' : ''} ${(L.answers[q.id + '#' + i] || {}).qty || (i === 0 && picked < 0) ? 'on' : ''}" data-gd-go="${i}" title="${esc(c.t)}"><img src="${gdPic(c.gd, hex, 240)}" alt=""><span>${esc(gdShort(q, i))}${i === 0 ? ' · std' : ''}</span></button>`).join('')}</div>
+    <div class="ds-strip">${q.c.map((c, i)=>`<button type="button" class="ds-thumb gd-thumb ${i === sh.i ? 'cur' : ''} ${(L.answers[q.id + '#' + i] || {}).qty || (i === 0 && picked < 0) ? 'on' : ''}" data-gd-go="${i}" title="${esc(pn(c.t))}"><img src="${gdPic(c.gd, hex, 240)}" alt=""><span>${view === 'customer' ? i + 1 : esc(gdShort(q, i))}${i === 0 ? ' · std' : ''}</span></button>`).join('')}</div>
     <div class="q-sub">Haas Door 600 series (through Shank Door). The pictures are drawn from Haas's panel and window layouts; windows are single pane unless double pane glass is added below.</div></div>`;
 }
 // the big door: white casing, soft shadow, plain wall (a tiled siding photo behind it, and painting the door, were tried and dropped)
@@ -1064,7 +1077,7 @@ function doorView(L, door, paint, anim){
   if(doorMode !== 'door' && has3d(L)) return houseView(L, door);
   return `<div class="ds-view">
     <button type="button" class="ds-arrow" data-door-nav="fdstyle|-1" aria-label="Back">&lsaquo;</button>
-    <div class="ds-door ${anim ? 'in' : ''}"><div class="ds-case"><img src="${esc(door.img)}" alt="${esc(door.t)}"></div></div>
+    <div class="ds-door ${anim ? 'in' : ''}"><div class="ds-case"><img src="${esc(door.img)}" alt="${esc(pn(door.t))}"></div></div>
     <button type="button" class="ds-arrow" data-door-nav="fdstyle|1" aria-label="Next">&rsaquo;</button></div>`;
 }
 function doorStage(q, L, lock){
@@ -1075,11 +1088,11 @@ function doorStage(q, L, lock){
   const shown = doorShown(L); if(!shown) return '';
   const paint = paintNow(L), sq = qById('fdstyle'), sk = 'fdstyle#' + shown.i, on = !!(L.answers[sk] || {}).qty, name = shown.c.t.replace('Therma-Tru Smooth-Star ', '');
   const head = `${q.id === 'fdstyle' ? doorModes(L) : ''}${doorView(L, shown.c, paint, anim)}
-    <div class="ds-name"><b>${esc(name)}</b><small>${shown.i + 1} of ${sq.c.length}</small></div>`;
+    <div class="ds-name"><b>${esc(pn(name))}</b><small>${shown.i + 1} of ${sq.c.length}</small></div>`;
   if(q.id === 'fdstyle') return `<div class="ds">${head}
       <div class="ds-pick"><button type="button" class="btn ${on ? '' : 'primary'}" data-bt-tog="${esc(sk)}" ${lock ? 'disabled' : ''}>${on ? '&#10003; This is their door (tap to undo)' : 'Choose this door'}</button></div>
-      <div class="ds-strip">${sq.c.map((c, i)=>`<button type="button" class="ds-thumb ${i === shown.i ? 'cur' : ''} ${(L.answers['fdstyle#' + i] || {}).qty ? 'on' : ''}" data-door-go="fdstyle|${i}" title="${esc(c.t)}"><img src="${esc(c.img)}" alt="" loading="lazy"><span>${esc(c.model)}</span></button>`).join('')}</div>
-      <div class="q-sub">Doors come white and are painted; the colour code goes under Front Door Color. <a href="https://www.thermatru.com/${/^S1[LR]?$/.test(shown.c.model) ? 'search?q=' : 'explore-products/door-style/'}${esc(shown.c.model)}" target="_blank" rel="noopener">This door on Therma-Tru's site</a>.</div></div>`;
+      <div class="ds-strip">${sq.c.map((c, i)=>`<button type="button" class="ds-thumb ${i === shown.i ? 'cur' : ''} ${(L.answers['fdstyle#' + i] || {}).qty ? 'on' : ''}" data-door-go="fdstyle|${i}" title="${esc(pn(c.t))}"><img src="${esc(c.img)}" alt="" loading="lazy"><span>${view === 'customer' ? i + 1 : esc(c.model)}</span></button>`).join('')}</div>
+      <div class="q-sub">Doors come white and are painted; the colour code goes under Front Door Color.${view === 'customer' ? '' : ` <a href="https://www.thermatru.com/${/^S1[LR]?$/.test(shown.c.model) ? 'search?q=' : 'explore-products/door-style/'}${esc(shown.c.model)}" target="_blank" rel="noopener">This door on Therma-Tru's site</a>.`}</div></div>`;
   const ok = q.id + '#0', oa = L.answers[ok] || {};
   return `<div class="ds">${head}
     <div class="ds-sw">${q.c.map((c, i)=>c.bmOther ? '' : `<button type="button" class="ds-chip ${(L.answers[q.id + '#' + i] || {}).qty ? 'on' : ''}" data-bt-tog="${esc(q.id + '#' + i)}" ${lock ? 'disabled' : ''}><span style="background:${c.hex}"></span><b>${esc(c.short)}</b><small>${esc(c.num)}${c.office ? ' · ours' : ''}</small></button>`).join('')}</div>
@@ -1294,7 +1307,7 @@ function floorRows(q, L, lock){
     const each = cust ? '' : c.rate
       ? `<span class="muted">at $</span><input type="number" min="0" step="0.01" data-rate="${esc(k)}" value="${p || ''}" placeholder="0.00" style="width:90px" aria-label="Price per sq ft" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">/ sq ft</span>`
       : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'} / sq ft</span>`;
-    return `<div class="cho on ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>${each}
+    return `<div class="cho on ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(pn(c.t))}</span>${each}
       <input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">sq ft</span>
       ${!cust && n && p ? `<span class="cp">= ${plus(Math.round(p * n * 100) / 100)}</span>` : ''}
       <button type="button" class="tog" data-floor-del="${esc(k)}" ${lock ? 'disabled' : ''}>Remove</button></div>`;
@@ -1313,7 +1326,7 @@ function floorRows(q, L, lock){
 }
 function stdRow(q, L, std, active, lock){
   const sc = q.c.find(c=>c.t === std.label && c.img), sk = sc ? q.id + '#' + q.c.indexOf(sc) : '';
-  return `<div class="cho std ${active ? 'on' : ''}">${sc ? `<button type="button" class="cho-img" data-photo-view="${esc(sk)}" title="See it bigger"><img src="${esc(sc.img)}" alt="${esc(std.label)}" loading="lazy"></button>` : ''}<span class="ct">${esc(std.label)}${sc && sc.spec ? `<small class="cho-spec">${esc(sc.spec)}</small>` : ''}</span><span class="nochg">No charge</span>
+  return `<div class="cho std ${active ? 'on' : ''}">${sc ? `<button type="button" class="cho-img" data-photo-view="${esc(sk)}" title="See it bigger"><img src="${esc(sc.img)}" alt="${esc(pn(std.label))}" loading="lazy"></button>` : ''}<span class="ct">${esc(pn(std.label))}${sc && sc.spec ? `<small class="cho-spec">${esc(pn(sc.spec))}</small>` : ''}</span><span class="nochg">No charge</span>
     ${active ? '<span class="stdmark">&#10003; Standard</span>' : `<button type="button" class="tog" data-std="${esc(q.id)}" ${lock ? 'disabled' : ''}>Use standard</button>`}</div>`;
 }
 // a selection that belongs to the other collection isn't asked
@@ -1430,15 +1443,15 @@ function photoGridInner(q, L, lock, head, only){
   const cs = choicesOf(q, L).filter(only || (()=>true)), brands = [...new Set(cs.map(c=>c.brand || ''))];
   const fin = q.col ? (()=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + q.room.id); if(!fq) return ''; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : ''; })() : '';
   // groups sit side by side, each as wide as its tiles (owner, 2026-10-27: one-tile collections were "one large list")
-  return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.id === 'idstyle' || q.bt === '152' ? 'ph-door' : (q.fauc || q.col ? 'ph-product' : '')}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(cs.find(c=>c.brand === b).note)}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
+  return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.id === 'idstyle' || q.bt === '152' ? 'ph-door' : (q.fauc || q.col ? 'ph-product' : '')}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(pn(cs.find(c=>c.brand === b).note))}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
     const k = q.id + '#' + c.i, isStd = !!(stdOn && (std0.idx != null && std0.idx >= 0 ? c.i === std0.idx : c.t === std0.label)), on = !!(L.answers[k] || {}).qty || isStd, name = c.show || (c.brand ? c.t.slice(c.brand.length + 3) : c.t);
     const pr = view === 'customer' || isStd ? '' : c.p == null ? '<small class="ph-price tbd">price to come</small>' : c.p ? `<small class="ph-price">${c.p < 0 ? '− ' + money2(-c.p) + ' credit' : '+ ' + money2(c.p)}</small>` : '';
     return `<div class="ph-tile ${on ? 'on' : ''} ${isStd ? 'stdon' : ''} ${flashKey === k ? 'flash' : ''}">
-      <button type="button" class="ph-pick" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''} aria-pressed="${on}" title="${on ? 'Chosen' : 'Choose'} ${esc(c.t)}">
-        ${c.img ? `<img src="${esc(tileImg(q, c, L))}" alt="${esc(c.t)}" loading="lazy">` : `<span class="ph-none">${std0 && std0.idx === c.i ? 'Comes with the home' : c.noimg || 'Photo to come'}</span>`}
-        <span class="ph-name">${esc(name)}${c.sub || c.spec ? `<small class="ph-sub">${esc(c.sub || c.spec)}</small>` : ''}${pr}${q.col && fin && !(faucetOf(c.t) || { fins:[] }).fins.includes(fin) ? `<small class="ph-warn">Not made in ${esc(FIN_LABEL[fin])}</small>` : ''}</span>${on ? '<span class="ph-check">&#10003;</span>' : ''}</button>
+      <button type="button" class="ph-pick" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''} aria-pressed="${on}" title="${on ? 'Chosen' : 'Choose'} ${esc(pn(c.t))}">
+        ${c.img ? `<img src="${esc(tileImg(q, c, L))}" alt="${esc(pn(c.t))}" loading="lazy">` : `<span class="ph-none">${std0 && std0.idx === c.i ? 'Comes with the home' : c.noimg || 'Photo to come'}</span>`}
+        <span class="ph-name">${esc(pn(name))}${c.sub || c.spec ? `<small class="ph-sub">${esc(pn(c.sub || c.spec))}</small>` : ''}${pr}${q.col && fin && !(faucetOf(c.t) || { fins:[] }).fins.includes(fin) ? `<small class="ph-warn">Not made in ${esc(FIN_LABEL[fin])}</small>` : ''}</span>${on ? '<span class="ph-check">&#10003;</span>' : ''}</button>
       ${c.fins && c.model && c.fins.length > 1 ? `<div class="ph-fins">${c.fins.map(fk=>`<button type="button" class="ph-fin ${tileFinOf(q, c, L) === fk ? 'on' : ''}" data-fin-view="${esc(k)}|${fk}" title="See it in ${esc(FIN_LABEL[fk])}" aria-label="See it in ${esc(FIN_LABEL[fk])}" style="background:${FIN_DOT[fk]}"></button>`).join('')}</div>` : ''}
-      ${c.img ? `<button type="button" class="ph-zoom" data-photo-view="${esc(k)}" title="See it bigger" aria-label="See ${esc(c.t)} bigger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>` : ''}</div>`; }).join('')}</div></div>`).join('') + '</div>';
+      ${c.img ? `<button type="button" class="ph-zoom" data-photo-view="${esc(k)}" title="See it bigger" aria-label="See ${esc(pn(c.t))} bigger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>` : ''}</div>`; }).join('')}</div></div>`).join('') + '</div>';
 }
 function prow(q, L, force){
   if(!asked(q, L)) return '';
@@ -1462,13 +1475,13 @@ function prow(q, L, force){
     const price = view === 'customer' ? '' : c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
     if(isAllow(q, c)){
       const amt = n ? p : allowDefault(q, c.i);
-      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}${/allowance/i.test(c.t) ? '' : ' — allowance'}</span>
+      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(pn(c.t))}${/allowance/i.test(c.t) ? '' : ' — allowance'}</span>
         <span class="muted">$</span><input type="number" min="0" step="1" data-allow="${esc(k)}" value="${amt}" style="width:110px" aria-label="Allowance amount" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">allowance</span>
         <button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button></div>`;
     }
     if(c.rate){
       const rate = a && a.price ? a.price : '';
-      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(c.t)}</span>
+      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(pn(c.t))}</span>
         <input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">sq ft</span>
         ${view === 'customer' ? '' : `<span class="muted">at $</span><input type="number" min="0" step="0.01" data-rate="${esc(k)}" value="${rate}" placeholder="0.00" style="width:90px" aria-label="Price per sq ft" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">/ sq ft</span>${n && rate ? `<span class="cp">= ${plus(Math.round(rate * n * 100) / 100)}</span>` : ''}`}</div>`;
     }
@@ -1476,13 +1489,13 @@ function prow(q, L, force){
       ? `<input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.unit}</span>${n && view !== 'customer' ? `<span class="cp">= ${plus(p * n)}</span>` : ''}`
       : (n && !(q.one || q.opts || q.ceil || q.nostep || c.side || c.grp) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
         + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
-    return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">${c.img ? `<button type="button" class="cho-img" data-photo-view="${esc(k)}" title="See it bigger"><img src="${esc(c.img)}" alt="${esc(c.t)}" loading="lazy"></button>` : ''}<span class="ct">${esc(c.show || c.t)}${c.spec ? `<small class="cho-spec">${esc(c.spec)}</small>` : ''}</span>${price}${ctl}</div>`;
+    return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">${c.img ? `<button type="button" class="cho-img" data-photo-view="${esc(k)}" title="See it bigger"><img src="${esc(c.img)}" alt="${esc(pn(c.t))}" loading="lazy"></button>` : ''}<span class="ct">${esc(pn(c.show || c.t))}${c.spec ? `<small class="cho-spec">${esc(pn(c.spec))}</small>` : ''}</span>${price}${ctl}</div>`;
   }).join(''));
   const isOpen = force || openSel.has(q.id), shown = choicesOf(q, L);
   const stdNote = q.fin && q.id !== 'fin_kit' ? '<div class="q-sub">The finish covers the shower door, faucets and hardware in this bathroom.</div>' : '';
   const autoNow = q.tw && !L.answers['own:' + q.id] && shown.some(c=>(L.answers[q.id + '#' + c.i] || {}).auto);
   const got = shown.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty), sum = got.reduce((t, c)=>{ const a = L.answers[q.id + '#' + c.i]; return t + a.price * a.qty; }, 0);
-  const picked = std && stdActive && !got.length ? `<span class="picked">Standard: ${esc(std.label)}</span>` : got.length ? `<span class="picked">${got.length === 1 ? esc(got[0].t.length > 34 ? got[0].t.slice(0, 32) + '…' : got[0].t) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
+  const picked = std && stdActive && !got.length ? `<span class="picked">Standard: ${esc(pn(std.label))}</span>` : got.length ? `<span class="picked">${got.length === 1 ? esc(pn(got[0].t).length > 34 ? pn(got[0].t).slice(0, 32) + '…' : pn(got[0].t)) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
   return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" ${force ? '' : `data-sel="${esc(q.id)}"`} aria-expanded="${isOpen}"><b>${esc(qTitle(q))}</b>${autoNow ? '<span class="chip plain">same as master bath</span>' : ''}${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
       ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}${isOpen || got.length || std ? '' : `<span class="cnt">${shown.length} choice${shown.length === 1 ? '' : 's'}</span>`}
       <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
@@ -1688,7 +1701,7 @@ function showScreen(){
   const ls = lines(L).filter(l=>!l.typed && l.price >= 0 && l.q.num > 126 && !/^misc\b|credit/i.test(l.label));
   const artOf = l=>{ if(l.q.type === 'qty') return `<span class="count">${L.answers[l.key].qty.toLocaleString('en-US')}</span>`; const o = (l.q.o || []).find(x=>x[0] === l.label); return (o && o[3]) || `<div class="noart">${esc(l.q.room.name)}</div>`; };
   const tile = (l, big)=>`<div class="sh-tile">${l.price > 0 ? '<span class="up">Upgrade</span>' : ''}<div class="art">${artOf(l)}</div>
-      <div class="txt"><div class="lab">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.room.name : l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</div><div class="val">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.t : l.q.type === 'money' ? l.q.t : l.label)}</div></div></div>`;
+      <div class="txt"><div class="lab">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.room.name : l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</div><div class="val">${esc(l.q.o && /^yes$/i.test(l.label) ? l.q.t : l.q.type === 'money' ? l.q.t : l.q.id === 'fdcolor' ? l.label : noPart(l.label))}</div></div></div>`;
   // the three biggest choices lead the page
   const sig = ls.filter(l=>l.price > 0 && l.q.type !== 'qty' && l.q.type !== 'money').sort((a,b)=>b.price - a.price).slice(0, 3);
   const made = [...L.custom.map(c=>c.desc), ...L.cos.map(c=>c.desc)];
@@ -2266,7 +2279,7 @@ function quoteDoc(L, forCustomer, opts){
     r.qs.forEach(q=>{ if(!asked(q, L)) return; const got = mine.filter(l=>l.q.id === q.id);
       if(got.length) got.forEach(l=>rows.push(l.typed
         ? `<tr>${ph ? '<td class="dph"></td>' : ''}<td colspan="${staff ? 5 : 2}" class="dn">${/_n$/.test(l.q.id) || l.q.id === 'misc' ? 'Note: ' : esc(l.q.t) + ': '}${esc(l.label)}</td></tr>`
-        : `<tr>${phCell(l)}<td>${office && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(selDoc ? qTitle(l.q) : l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(l.label)}</td><td class="num">${l.tbd ? '<em>price to come</em>' : l.price ? plus(l.price) : 'no charge'}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
+        : `<tr>${phCell(l)}<td>${office && l.q.bt ? `<span class="mono" style="font-size:12px">${esc(l.q.bt)}</span> ` : ''}${esc(selDoc ? qTitle(l.q) : l.q.t)}${l.where ? ' · ' + esc(l.where) : ''}</td><td>${esc(office || l.q.id === 'fdcolor' ? l.label : noPart(l.label))}</td><td class="num">${l.tbd ? '<em>price to come</em>' : l.price ? plus(l.price) : 'no charge'}</td>${staff ? `<td class="num st">${l.cost ? money(l.cost) : ''}</td><td class="num st">${l.price ? money(l.price - l.cost) : ''}</td>` : ''}</tr>`));
       else if(docAll && q.v1) rows.push(stdRow(q));
     });
     mine.filter(l=>l.typed && !r.qs.includes(l.q)).forEach(l=>rows.push(`<tr>${ph ? '<td class="dph"></td>' : ''}<td colspan="2" class="dn">Note: ${esc(l.label)}</td></tr>`));
@@ -3235,8 +3248,8 @@ function photoView(k){
   const c = q.c[Number(k.split('#')[1])]; if(!c || !c.img) return;
   pvKey = k;
   const ci = { ...c, i:Number(k.split('#')[1]) }, fk = c.fins && c.model ? tileFinOf(q, ci, L) : '';
-  document.getElementById('pvImg').src = tileImg(q, ci, L); document.getElementById('pvImg').alt = c.t;
-  document.getElementById('pvName').textContent = c.t + (fk ? ' · ' + FIN_LABEL[fk] : '');
+  document.getElementById('pvImg').src = tileImg(q, ci, L); document.getElementById('pvImg').alt = pn(c.t);
+  document.getElementById('pvName').textContent = pn(c.t) + (fk ? ' · ' + FIN_LABEL[fk] : '');
   const on = !!(L.answers[k] || {}).qty, lock = locked(L);
   const ch = document.getElementById('pvChoose'); ch.textContent = on ? '\u2713 Chosen' : 'Choose this'; ch.disabled = lock; ch.style.display = lock ? 'none' : '';
   document.getElementById('photoView').classList.add('show');
