@@ -1462,6 +1462,11 @@ function renderSchedule(){
   const empty = document.getElementById('emptyState');
   if(rows.length===0){
     tbody.innerHTML=''; empty.style.display='block';
+  } else if(sortKey !== 'settle'){
+    // sorted by anything but the settle date: one plain list, every home showing (owner, 2026-11-09 — inside the settle-year groups
+    // a move-in / walk sort looked the same as the normal list, and later years stayed folded up)
+    empty.style.display='none';
+    tbody.innerHTML = rows.map(j=>buildJobRow(j, oKeys)).join('');
   } else {
     empty.style.display='none';
 
