@@ -311,6 +311,12 @@
   .ds-dot{display:inline-block; width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,.2); vertical-align:-2px;}
   .ds-arrow{z-index:1; width:52px; height:52px; border-radius:50%; border:1px solid #d6d1c4; background:#fff; font-size:34px; line-height:1; color:#1f3550; cursor:pointer; flex:0 0 auto; box-shadow:0 2px 6px rgba(0,0,0,.08);}
   .ds-arrow:hover{border-color:#1f3550;}
+  .ds-house{padding:10px; gap:10px; background:#eef2f5;} .ds-house::after{display:none;} .ds-house .h3d-slot{flex:1 1 auto; min-width:0;}
+  .ds-modes{display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:10px;}
+  .ds-modes button{border:1px solid #d6d1c4; background:#fff; border-radius:999px; padding:7px 14px; font:inherit; font-size:14px; cursor:pointer; color:#1f3550;}
+  .ds-modes button.on{background:#1f3550; border-color:#1f3550; color:#fff;}
+  .ds-on{text-align:center; font-size:13px; color:#6b6558; margin-top:8px;}
+  @media (max-width:600px){ .ds-house .ds-arrow{width:40px; height:40px; font-size:26px;} }
   .ds-name{text-align:center; margin-top:12px;} .ds-name b{display:block; font-size:18px;} .ds-name small{color:#6b6558;}
   .ds-pick{text-align:center; margin:10px 0;}
   .ds-strip{display:flex; gap:8px; overflow-x:auto; padding:6px 2px 10px;}
@@ -953,8 +959,32 @@ function paintDoor(src, hex){ const key = src + '|' + hex; if(paintCache[key]) r
 // PAINTING IS OFF (owner, 2026-10-27: the painted doors "still don't look that great" — show the plain white door). paintDoor is kept for a
 // better source picture some day; nothing calls it.
 function paintStages(){}
+/* ON THE HOUSE (owner, 2026-11-09: "seeing the door on the house when making door selections… a close up door view and then one faraway
+   shot… the house should have the siding color applied"): for home styles with a 3D model (house3d.js, `House3D.has`), the door can be
+   shown on the house — "Close-up" (default) or "Whole house" — or as before ("Just the door"). `doorMode` is screen only. The house
+   wears the siding they picked (BT 171's picture, its average colour) and the door the colour typed under Front Door Color when it's a
+   Benjamin Moore colour we know (BM_COLORS / the office's list), else white as the doors come. */
+let doorMode = 'close';
+const has3d = L=>!!(window.House3D && L && House3D.has(L.model));
+function sidingImgOf(L){ for(const q of ALL_QS){ if(q.bt !== '171') continue; const i = pickedIdx(q, L); if(i >= 0 && q.c[i].img) return q.c[i].img; } return ''; }
+function sidingNameOf(L){ for(const q of ALL_QS){ if(q.bt !== '171') continue; const i = pickedIdx(q, L); if(i >= 0) return q.c[i].t; } return ''; }
+function doorHexOf(L){ const p = paintNow(L); if(p && p.hex) return { hex: p.hex, name: p.name };
+  const a = L.answers['fdcolor#0'] || {}, typed = String(a.label || '').trim(); if(!typed) return null;
+  const low = typed.toLowerCase(), all = [...DOOR_CFG.map(c=>[c.name, c.num, c.hex]), ...BM_COLORS];
+  const hit = all.find(([n, num])=>num && new RegExp('(^|[^a-z0-9])' + String(num).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])').test(low)) || all.find(([n])=>low.includes(String(n).toLowerCase()));
+  return hit ? { hex: hit[2], name: hit[0] + ' ' + hit[1] } : { hex: null, name: typed }; }
+function houseView(L, door){
+  const dh = doorHexOf(L), sid = sidingNameOf(L);
+  return `<div class="ds-view ds-house">
+    <button type="button" class="ds-arrow" data-door-nav="fdstyle|-1" aria-label="Back">&lsaquo;</button>
+    <div class="h3d-slot" data-h3d="${doorMode === 'far' ? 'far' : 'close'}" data-model="${esc(L.model || '')}" data-door="${esc(door.img)}" data-door-hex="${esc((dh && dh.hex) || '#f4f3ee')}" data-siding="${esc(sidingImgOf(L))}"></div>
+    <button type="button" class="ds-arrow" data-door-nav="fdstyle|1" aria-label="Next">&rsaquo;</button></div>
+    <div class="ds-on">${esc(L.model)} · siding: <b>${esc(sid ? sid.replace(/^(CT|EP) - /, '') : 'not picked yet (shown gray)')}</b> · door color: <b>${esc(dh ? (dh.hex ? dh.name : dh.name + ' (shown white, not a color we know)') : 'white, as they come')}</b></div>`;
+}
+const doorModes = L=>has3d(L) ? `<div class="ds-modes">${[['close', 'Close-up on the house'], ['far', 'Whole house'], ['door', 'Just the door']].map(([k, t])=>`<button type="button" class="${doorMode === k ? 'on' : ''}" data-door-mode="${k}">${t}</button>`).join('')}</div>` : '';
 // the big door: white casing, soft shadow, plain wall (a tiled siding photo behind it, and painting the door, were tried and dropped)
 function doorView(L, door, paint, anim){
+  if(doorMode !== 'door' && has3d(L)) return houseView(L, door);
   return `<div class="ds-view">
     <button type="button" class="ds-arrow" data-door-nav="fdstyle|-1" aria-label="Back">&lsaquo;</button>
     <div class="ds-door ${anim ? 'in' : ''}"><div class="ds-case"><img src="${esc(door.img)}" alt="${esc(door.t)}"></div></div>
@@ -967,7 +997,7 @@ function doorStage(q, L, lock){
   const anim = doorAnim === q.id; if(anim) doorAnim = '';
   const shown = doorShown(L); if(!shown) return '';
   const paint = paintNow(L), sq = qById('fdstyle'), sk = 'fdstyle#' + shown.i, on = !!(L.answers[sk] || {}).qty, name = shown.c.t.replace('Therma-Tru Smooth-Star ', '');
-  const head = `${doorView(L, shown.c, paint, anim)}
+  const head = `${q.id === 'fdstyle' ? doorModes(L) : ''}${doorView(L, shown.c, paint, anim)}
     <div class="ds-name"><b>${esc(name)}</b><small>${shown.i + 1} of ${sq.c.length}</small></div>`;
   if(q.id === 'fdstyle') return `<div class="ds">${head}
       <div class="ds-pick"><button type="button" class="btn ${on ? '' : 'primary'}" data-bt-tog="${esc(sk)}" ${lock ? 'disabled' : ''}>${on ? '&#10003; This is their door (tap to undo)' : 'Choose this door'}</button></div>
@@ -2651,6 +2681,7 @@ document.addEventListener('click', async e=>{
     if(wa) L.answers['want:' + q.id] = { label:'yes', qty:0, price:0 }; else { delete L.answers['want:' + q.id]; q.c.forEach((c, i)=>{ delete L.answers[q.id + '#' + i]; }); }
     touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const mx = t.closest('[data-mix]'); if(mx){ mixOpen[mx.dataset.mix] = !mixOpen[mx.dataset.mix]; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
+  const dm = t.closest('[data-door-mode]'); if(dm){ doorMode = dm.dataset.doorMode; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   const dn = t.closest('[data-door-nav]'), dg = t.closest('[data-door-go]');
   if(dn || dg){ const [qid, v] = (dn ? dn.dataset.doorNav : dg.dataset.doorGo).split('|'), q = qById(qid); if(!q) return;
     const curI = doorAt[qid] != null ? doorAt[qid] : Math.max(0, pickedIdx(q, L));
@@ -3007,6 +3038,7 @@ boot();
 
 </script>
 <script src="sorttables.js"></script>
+<script src="house3d.js?v=2"></script>
 <script>
 /* SQ FT CALCULATOR (owner, 2026-10-27: "a little simple pop out tool to calculate sqft on the right side of the screen when doing the
    pricing part and selections"). Office view only, on the Pricing and Selections tabs of an open sheet: a "Sq ft" tab on the right edge
