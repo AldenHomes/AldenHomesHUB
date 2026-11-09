@@ -334,7 +334,9 @@
 
   .app-shell.locked{display:none;}
 
+  select.filter.phone-sort{display:none;}
   @media (max-width: 760px){
+    select.filter.phone-sort{display:block;}
     .grid, .checklist{grid-template-columns:1fr;}
     table thead{display:none;}
     table, tbody, tr, td{display:block; width:100%;}
@@ -481,6 +483,19 @@
       </select>
       <select class="filter" id="draftsmanFilter">
         <option value="">All Draftsmen</option>
+      </select>
+      <!-- phones: the column headings are hidden (each home is a card), so sorting is a drop-down (owner, 2026-11-09) -->
+      <select class="filter phone-sort" id="sortSelect" aria-label="Sort the homes">
+        <option value="settle|asc">Sort: Settle date (soonest)</option>
+        <option value="settle|desc">Sort: Settle date (latest)</option>
+        <option value="walk|asc">Sort: Walk date</option>
+        <option value="move|asc">Sort: Move date</option>
+        <option value="fndn|asc">Sort: Foundation date</option>
+        <option value="client|asc">Sort: Client (A–Z)</option>
+        <option value="community|asc">Sort: Community</option>
+        <option value="lot|asc">Sort: Lot</option>
+        <option value="model|asc">Sort: Model</option>
+        <option value="address|asc">Sort: Address</option>
       </select>
       <button class="btn btn-ghost" id="exportBtn">Export CSV</button>
       <button class="btn btn-ghost" id="printScheduleBtn">Print / PDF</button>
@@ -1474,6 +1489,8 @@ function renderSchedule(){
   }).length;
   document.getElementById('tabBadgeSchedule').textContent = jobs.length;
 
+  { const ss = document.getElementById('sortSelect'), v = sortKey + '|' + sortDir;
+    if(![...ss.options].some(o=>o.value === v)) ss.add(new Option('Sort: ' + sortKey + (sortDir === 'desc' ? ' (reverse)' : ''), v)); ss.value = v; }
   document.querySelectorAll('#headerRow th[data-key]').forEach(th=>{
     th.classList.toggle('sorted', th.dataset.key===sortKey);
     th.classList.toggle('asc', th.dataset.key===sortKey && sortDir==='asc');
@@ -1491,6 +1508,7 @@ document.getElementById('headerRow').addEventListener('click', e=>{
   renderSchedule();
 });
 document.getElementById('searchBox').addEventListener('input', renderSchedule);
+document.getElementById('sortSelect').addEventListener('change', e=>{ const [k, d] = e.target.value.split('|'); sortKey = k; sortDir = d; renderSchedule(); });
 document.getElementById('communityFilter').addEventListener('change', renderSchedule);
 document.getElementById('draftsmanFilter').addEventListener('change', renderSchedule);
 
