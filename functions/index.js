@@ -1885,8 +1885,9 @@ exports.selectionsApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10 }, a
         const n = Math.round(Number(v) * 100) / 100;
         if(/^[A-Za-z0-9_]{1,30}#\d{1,3}$/.test(k) && isFinite(n) && n >= 0 && n <= 1000000) allow[k] = n;
       });
+      // 'ft' = each extra foot of ceiling height (owner, 2026-11-09); the old move prices are kept so older sheets still read
       const ceil = {};
-      ['8-9', '8-10', '9-10', '9-8'].forEach(k=>{ const n = Math.round(Number((b.ceil || {})[k]) * 100) / 100; if(b.ceil && b.ceil[k] !== undefined && b.ceil[k] !== '' && isFinite(n) && Math.abs(n) <= 1000000) ceil[k] = n; });
+      ['ft', '8-9', '8-10', '9-10', '9-8'].forEach(k=>{ const n = Math.round(Number((b.ceil || {})[k]) * 100) / 100; if(b.ceil && b.ceil[k] !== undefined && b.ceil[k] !== '' && isFinite(n) && Math.abs(n) <= 1000000) ceil[k] = n; });
       const prices = {};
       Object.entries(b.prices && typeof b.prices === 'object' ? b.prices : {}).slice(0, 200).forEach(([k, v])=>{
         const n = Math.round(Number(v) * 100) / 100;

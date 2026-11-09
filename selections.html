@@ -661,7 +661,7 @@ const chg = (g, k)=>{ const c = CHANGED[g + ':' + k]; if(!c) return '';
 const houseOf = L=>L.housePrice != null ? Number(L.housePrice) || 0 : (Number(L.basePrice) || 0) - (Number(L.lotPrice) || 0);
 const setBase = (L, house, lot)=>{ L.housePrice = Math.round(house); L.lotPrice = Math.round(lot); L.basePrice = L.housePrice + L.lotPrice; };
 const overKey = (q, c)=>q.id + '|' + c.t;
-const overOn = c=>!c.k && !c.rate && !c.h;              // choices priced elsewhere: back-end option prices, typed tile, ceiling moves
+const overOn = c=>!c.k && !c.rate && !c.h && !c.ceilAdd;              // choices priced elsewhere: back-end option prices, typed tile, ceiling moves
 const OPT_BASE = {};                                    // no prices in this file: they come from the server
 const optPrice = k=>OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k]
   : /-m$/.test(k) ? optPrice(k.slice(0, -2)) : null;   // a master bath finish price not set yet = the other baths' price
@@ -1141,10 +1141,16 @@ function syncBaths(L){
 const markOwn = (L, q)=>{ if(q && q.tw && BATHS.slice(1).includes(q.room.id)) L.answers['own:' + q.id] = { qty:1, price:0 }; };
 const CEIL_BASE = {};                                   // no prices in this file: they come from the server
 const ceilStd = L=>{ const c = cfgOf(L).ceil; return c === 8 || c === 9 ? c : (L && (L.line === 'MCC' || STYLES.MCC.includes(L.model)) ? 9 : 8); };
-const ceilPrice = (std, h)=>{ const k = std + '-' + h; return CEIL_CFG[k] != null ? CEIL_CFG[k] : CEIL_BASE[k] != null ? CEIL_BASE[k] : 0; };
-const ceilLabel = (std, h)=>(h < std ? 'Credit to ' : 'Upgrade to ') + h + "' ceilings";
+/* CEILING HEIGHT (owner, 2026-11-09: "choose the standard height which is 8ft or 9ft then you can add a ft of height which is $4100 per
+   foot"): the question is the standard height — 8' or 9', no charge (the style's own standard preset, see ceilStd) — plus "Add a foot of
+   ceiling height", counted with + / −, at CEIL_CFG.ft per foot (set in Home styles → Ceiling height; kept on the server; while unset it uses
+   the old 8'→9' upgrade price). The old moves (8→10, 9→8 credit) are gone. */
+const ceilFt = ()=>CEIL_CFG.ft != null ? CEIL_CFG.ft : CEIL_CFG['8-9'] != null ? CEIL_CFG['8-9'] : null;
+const ceilBase = L=>{ const q = qById('ceil'); const i = q ? q.c.findIndex((c, j)=>c.h && (L.answers['ceil#' + j] || {}).qty) : -1; return i >= 0 ? q.c[i].h : ceilStd(L); };
+const ceilAdded = L=>{ const q = qById('ceil'); const i = q ? q.c.findIndex(c=>c.ceilAdd) : -1; return i >= 0 ? ((L.answers['ceil#' + i] || {}).qty || 0) : 0; };
+const ceilLabel = (L, c, n)=>c.ceilAdd ? 'Add ' + n + (n === 1 ? ' foot' : ' feet') + ' of ceiling height (' + (ceilBase(L) + n) + "' ceilings)" : c.h + "' ceilings (standard height)";
 // what a choice costs when it's first taken: ceiling moves and allowances have their own; everything else is the selection sheet's
-const choicePrice = (q, i, L)=>q.c[i].kf ? (optPrice(headPriceKey(q.c[i], L, q)) || 0) : (q.opts || q.c[i].k) ? (optPrice(q.c[i].k) || 0) : q.ceil ? ceilPrice(ceilStd(L), q.c[i].h) : isAllow(q, q.c[i]) ? allowDefault(q, i) : (q.c[i].p || 0);
+const choicePrice = (q, i, L)=>q.c[i].kf ? (optPrice(headPriceKey(q.c[i], L, q)) || 0) : (q.opts || q.c[i].k) ? (optPrice(q.c[i].k) || 0) : q.ceil ? (q.c[i].ceilAdd ? (ceilFt() || 0) : 0) : isAllow(q, q.c[i]) ? allowDefault(q, i) : (q.c[i].p || 0);
 const ALLOW_BASE = { '193': 0 };                         // BT numbers that are allowances though not named so (amount: from the server)
 const isAllow = (q, c)=>!!c && (/allowance/i.test(c.t) || ALLOW_BASE[q.bt] != null);
 const allowDefault = (q, i)=>{ const k = q.id + '#' + i; return ALLOW_CFG[k] != null ? ALLOW_CFG[k] : ALLOW_BASE[q.bt] != null ? ALLOW_BASE[q.bt] : (q.c[i].p || 0); };
@@ -1177,7 +1183,7 @@ function buildCatalog(cat){
     }
     if(s.bt === '244'){                                 // ceiling height: one question for both collections (see ceilStd)
       if(!ceilDone) sec.qs.push({ id:'ceil', bt:'244', num:244, t:'Ceiling Height', cc:s.cc || 34, line:'', room:sec, opt:1, type:'bt', v1:1, ceil:true,
-        c:[{ t:"8' ceilings", h:8, p:null, unit:'' }, { t:"9' ceilings", h:9, p:null, unit:'' }, { t:"10' ceilings", h:10, p:null, unit:'' }] });
+        c:[{ t:"8' ceilings", h:8, p:0, unit:'' }, { t:"9' ceilings", h:9, p:0, unit:'' }, { t:'Add a foot of ceiling height', ceilAdd:true, side:true, p:null, unit:'' }] });
       ceilDone = true; return;
     }
     let id = 'b' + (s.bt || 'x') + (s.line ? s.line[0].toLowerCase() : '');
@@ -1283,7 +1289,7 @@ const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.a
    is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
 const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:0, order:true }
   : q.bt === '256' ? { label:'Standard shower', idx: q.c.findIndex(c=>c.t === 'Standard shower'), order:true }
-  : ['300', '340'].includes(q.bt) ? { label:'Standard tub/shower', idx: q.c.findIndex(c=>c.t === 'Standard tub/shower'), order:true } : q.id === 'gdstyle' ? { label:q.c[0].t, idx:0, order:true } : q.ceil ? { label: ceilStd(L) + "' ceilings" } : q.fin ? { label:'Chrome' }
+  : ['300', '340'].includes(q.bt) ? { label:'Standard tub/shower', idx: q.c.findIndex(c=>c.t === 'Standard tub/shower'), order:true } : q.id === 'gdstyle' ? { label:q.c[0].t, idx:0, order:true } : q.ceil ? { label: ceilStd(L) + "' ceilings (standard height)", idx: q.c.findIndex(c=>c.h === ceilStd(L)) } : q.fin ? { label:'Chrome' }
   : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
   : q.one && /^shower faucet/i.test(q.t) ? { label:'Standard shower faucet', idx: q.c.findIndex(c=>c.t === 'Standard shower faucet') }
   : ['277', '317', '357', '383'].includes(q.bt) ? { label:'Standard mirror', idx: q.c.findIndex(c=>/^std. mirror/i.test(c.t)) }
@@ -1354,7 +1360,7 @@ const choicesOf = (q, L)=>{ if(q.opts){ const all = q.c.map((c, i)=>({ ...c, i, 
     const mine = all.filter(c=>c.brand === col || c.up || (L.answers[q.id + '#' + c.i] || {}).qty);
     // towel bars, rings, hooks and the set: the bath's collection first; the other collections' pieces on request (mix and match)
     return q.mix && mixOpen[q.id] ? mine.concat(all.filter(c=>!mine.includes(c))) : mine; }
-  if(q.ceil){ const std = ceilStd(L); return q.c.map((c, i)=>({ ...c, i, t:ceilLabel(std, c.h), p:ceilPrice(std, c.h) })).filter(c=>c.h !== std); }
+  if(q.ceil) return q.c.map((c, i)=>({ ...c, i, t: c.ceilAdd ? 'Add a foot of ceiling height' : c.h + "' ceilings (standard height)", p: c.ceilAdd ? ceilFt() : 0 }));
   const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p:optPrice(c.k) } : {}), ...(c.kf && L ? { p:optPrice(headPriceKey(c, L, q)) } : {}) }));
   if(q.bt === '642'){ const cov = ALL_QS.find(x=>x.bt === '640'); const got = cov ? cov.c.map((c, i)=>(L.answers[cov.id + '#' + i] || {}).qty ? c.t : '').filter(Boolean).join(' ') : '';
     if(/patio/i.test(got) || /deck/i.test(got)) return all.filter(c=>/patio/i.test(got) ? /patio/i.test(c.t) : /deck/i.test(c.t)); } if(q.bt !== '126' || !L.model) return all; const mine = all.filter(c=>c.t.toLowerCase().replace(/ basement$/, '') === L.model.toLowerCase()); return mine.length ? mine : all; };
@@ -1388,7 +1394,7 @@ function lines(L){
     r.qs.forEach(q=>{ if(!asked(q, L)) return;
       q.c.forEach((c, i)=>{
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
-      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(ceilStd(L), c.h) : (q.fauc || q.sh || c.gb) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.spec ? (c.show || c.t) + ' — ' + c.spec : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.p == null });
+      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(L, c, a.qty) : (q.fauc || q.sh || c.gb) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.spec ? (c.show || c.t) + ' — ' + c.spec : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 && !c.ceilAdd ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.ceilAdd ? ceilFt() == null : c.p == null });
       });
       const so = stdOf(q, L);
       if(so && so.order && so.idx >= 0 && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty)){
@@ -1487,7 +1493,7 @@ function prow(q, L, force){
     }
     const ctl = c.unit
       ? `<input type="number" min="0" step="1" data-bt-num="${esc(k)}" value="${n || ''}" placeholder="0" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.unit}</span>${n && view !== 'customer' ? `<span class="cp">= ${plus(p * n)}</span>` : ''}`
-      : (n && !(q.one || q.opts || q.ceil || q.nostep || c.side || c.grp) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
+      : (n && (c.ceilAdd || !(q.one || q.opts || q.ceil || q.nostep || c.side || c.grp)) ? `<div class="stepper"><button type="button" data-bt-step="${esc(k)}" data-d="-1" ${lock ? 'disabled' : ''}>&minus;</button><span>${n}</span><button type="button" data-bt-step="${esc(k)}" data-d="1" ${lock ? 'disabled' : ''}>+</button></div>` : '')
         + `<button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button>`;
     return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">${c.img ? `<button type="button" class="cho-img" data-photo-view="${esc(k)}" title="See it bigger"><img src="${esc(c.img)}" alt="${esc(pn(c.t))}" loading="lazy"></button>` : ''}<span class="ct">${esc(pn(c.show || c.t))}${c.spec ? `<small class="cho-spec">${esc(pn(c.spec))}</small>` : ''}</span>${price}${ctl}</div>`;
   }).join(''));
@@ -1824,7 +1830,7 @@ function pricesScreen(){
   const cell = (q, c, i)=>{
     if(isAllow(q, c)) return `<span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(q.id + '#' + i)}" value="${allowDefault(q, i)}" style="width:110px"><span class="pnote">allowance (typed on the sheet)</span>${chg('allow', q.id + '#' + i)}`;
     if(c.rate) return '<span class="pnote">price typed on the sheet</span>';
-    if(c.h) return '<span class="pnote">ceiling moves are priced in the card at the top</span>';
+    if(c.h || c.ceilAdd) return '<span class="pnote">priced in the Ceiling height card at the top</span>';
     if(c.kf) return '<span class="pnote">priced per finish in Other option prices</span>';
     if(c.k) return `<span class="muted">$</span><input type="number" step="0.01" data-optp="${esc(c.k)}" value="${optPrice(c.k) == null ? '' : optPrice(c.k)}" placeholder="price to come" style="width:110px">${chg('prices', c.k)}`;
     const k = overKey(q, c), on = PRICE_OVER[k] != null;
@@ -1918,11 +1924,11 @@ function bathCard(){
 </div>${floorCard()}`;
 }
 function ceilCard(){
-  const row = (k, name)=>`<div class="sty-row"><div class="t"><b>${name}</b><small>${k === '9-8' ? 'A credit: type it as a minus number' : k === '8-10' ? 'Not in BuilderTrend' : 'From BuilderTrend'}</small>${chg('ceil', k)}</div>
-    <span class="muted">$</span><input type="number" step="1" data-ceilp="${k}" value="${ceilPrice(k.split('-')[0], k.split('-')[1])}" style="width:120px"></div>`;
-  return `<div class="card"><h2 style="font-size:18px">Ceiling height prices</h2>
-    <p class="muted" style="font-size:13.5px;margin-top:4px">Each style's standard height is set with the style below. The sheet offers the moves from it at these prices.</p>
-    ${row('8-9', "8' standard → upgrade to 9'")}${row('8-10', "8' standard → upgrade to 10'")}${row('9-10', "9' standard → upgrade to 10'")}${row('9-8', "9' standard → credit to 8'")}</div>`;
+  const v = ceilFt();
+  return `<div class="card"><h2 style="font-size:18px">Ceiling height</h2>
+    <p class="muted" style="font-size:13.5px;margin-top:4px">The sheet asks for the standard height (8' or 9', no charge — each style's own standard is set with the style below) and then how many feet to add, at this price per foot.</p>
+    <div class="sty-row"><div class="t"><b>Each extra foot of ceiling height</b>${chg('ceil', 'ft')}</div>
+    <span class="muted">$</span><input type="number" step="1" data-ceilp="ft" value="${v == null ? '' : v}" placeholder="price to come" style="width:120px"></div></div>`;
 }
 function allowCard(){
   const rows = ALL_QS.flatMap(q=>q.c.map((c, i)=>isAllow(q, c) ? { q, c, i } : null).filter(Boolean));
