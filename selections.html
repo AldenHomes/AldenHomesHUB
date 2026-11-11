@@ -847,6 +847,9 @@ let floorPick = { type:'lvp', level:10 };          // the "add a flooring area" 
 let CAT_RAW = [];
 const rawPrice = (bt, re)=>{ const s = CAT_RAW.find(x=>x.bt === bt); const c = s && s.c.find(x=>re.test(x.t)); return c ? c.p : null; };
 function patioChoices(bt, list){
+  /* COUNTERTOPS (owner, 2026-11-11): "an option for upgrade from granite to quartz" — a flat price set in Home styles → Every price /
+     Other option prices (k 'counter-quartz'; $2,575 on the server). Added at the END so the allowances keep their indexes (sheets use them). */
+  if(bt === '500') return [...list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }), { t:'Upgrade countertops from granite to quartz', k:'counter-quartz', p:null, unit:'', side:true }];
   /* TUBS & SHOWERS (owner, 2026-11-09, the office's product sheets): the two standards are Aker by MAAX units (photos + part numbers via
      CHOICE_IMG); upgrades priced in Home styles → Other option prices (prices to be confirmed — none written here). Soaking tub = Pulse. */
   if(['256', '300', '340'].includes(bt)) return [...list,
