@@ -459,7 +459,8 @@ function renderPlan(){
     ${unmatched.length ? `<div class="imp-warn"><strong>${unmatched.length} project${unmatched.length === 1 ? '' : 's'} couldn't be matched to a home.</strong> Pick the home for each one, or leave it on Skip.</div>` : ''}
     <table class="jc"><thead><tr><th>QuickBooks project</th><th>Home in the hub</th><th class="num">Lines</th><th class="num">Total</th></tr></thead><tbody>
       ${plan.projects.map((p, i)=>`<tr><td><strong>${esc(p.project)}</strong>${p.noCode ? `<div class="muted" style="font-size:12px;">${p.noCode} line${p.noCode === 1 ? '' : 's'} without a cost code</div>` : ''}
-        <div class="muted" style="font-size:12px;margin-top:4px;">Also off the sale, with the lot (e.g. a lot premium not in the costs): $<input type="number" min="0" step="0.01" data-lotx="${i}" value="${p.lotExtra || ''}" placeholder="0" style="width:90px;"></div></td>
+        <div class="muted" style="font-size:12px;margin-top:4px;">Also off the sale, with the lot (a lot premium, carrying costs…): $<input type="number" min="0" step="0.01" data-lotx="${i}" value="${p.lotExtra || ''}" placeholder="0" style="width:90px;"></div>
+        <div class="muted" style="font-size:12px;margin-top:4px;">Utilities moved to carrying costs (taken off the job costs): $<input type="number" min="0" step="0.01" data-utilx="${i}" value="${p.utilMoved || ''}" placeholder="0" style="width:90px;"></div></td>
         <td><select data-pick="${i}">${opts(p.houseId)}</select></td><td class="num">${projLines(p).length}</td><td class="num">${money2(projTotal(p))}</td></tr>`).join('')}
       <tr class="tot"><td colspan="2">${go.length} home${go.length === 1 ? '' : 's'} will be imported${replacing.length ? ` (${replacing.length} already ha${replacing.length === 1 ? 's' : 've'} costs, which will be replaced)` : ''}</td><td class="num">${go.reduce((t, p)=>t + projLines(p).length, 0)}</td><td class="num">${money2(go.reduce((t, p)=>t + projTotal(p), 0))}</td></tr>
     </tbody></table>
@@ -473,7 +474,8 @@ $('qbFile').addEventListener('change', async e=>{
   catch(err){ console.error(err); plan = null; $('qbFileName').textContent = ''; $('impPreview').innerHTML = `<div class="imp-warn">${esc(err.message || 'That file couldn\'t be read.')}</div>`; return; }
   renderPlan();
 });
-$('impPreview').addEventListener('input', e=>{ const lx = e.target.closest('[data-lotx]'); if(lx && plan) plan.projects[Number(lx.dataset.lotx)].lotExtra = Math.max(0, Number(lx.value) || 0); });
+$('impPreview').addEventListener('input', e=>{ const lx = e.target.closest('[data-lotx]'); if(lx && plan) plan.projects[Number(lx.dataset.lotx)].lotExtra = Math.max(0, Number(lx.value) || 0);
+  const ux = e.target.closest('[data-utilx]'); if(ux && plan) plan.projects[Number(ux.dataset.utilx)].utilMoved = Math.max(0, Number(ux.value) || 0); });
 $('impPreview').addEventListener('change', e=>{ const lb = e.target.closest('[data-lot]'); if(lb && plan){ plan.projects[Number(lb.dataset.lot)].withLot = lb.checked; renderPlan(); return; } const s = e.target.closest('[data-pick]'); if(s && plan){ plan.projects[Number(s.dataset.pick)].houseId = s.value; renderPlan(); } });
 $('impPreview').addEventListener('click', async e=>{
   if(e.target.closest('#impCancel')){ plan = null; $('qbFileName').textContent = ''; renderPlan(); return; }
@@ -484,7 +486,7 @@ $('impPreview').addEventListener('click', async e=>{
     // a few homes per call, so a large report doesn't make one huge request
     let done = 0;
     for(let i = 0; i < go.length; i += 10){
-      const part = go.slice(i, i + 10).map(p=>({ houseId:p.houseId, project:p.project, label: homeLabel(jobs.find(j=>j.id === p.houseId) || {}), lines: projLines(p).map(({ lot, ...l })=>l), lotCost: (p.lotTotal && !p.withLot ? p.lotTotal : 0) + (Number(p.lotExtra) || 0) }));
+      const part = go.slice(i, i + 10).map(p=>({ houseId:p.houseId, project:p.project, label: homeLabel(jobs.find(j=>j.id === p.houseId) || {}), lines: projLines(p).map(({ lot, ...l })=>l).concat(p.utilMoved ? [{ date: new Date().toISOString().slice(0, 10), vendor:'Adjustment', type:'Adjustment', num:'', account:'Adjustment', memo:'Utilities moved to carrying costs (typed at import)', item:'80 - Utilities', amount: -p.utilMoved }] : []), lotCost: (p.lotTotal && !p.withLot ? p.lotTotal : 0) + (Number(p.lotExtra) || 0) }));
       done += ((await api({ action:'costsImport', source: plan.source, houses: part })).done || []).length;
     }
     $('impPreview').innerHTML = `<div class="imp-ok">Imported ${done} home${done === 1 ? '' : 's'} from ${esc(plan.source)}.</div>`;
