@@ -1939,8 +1939,7 @@ function pricesScreen(){
     <div class="card"><h2 style="font-size:18px">Every price</h2>
       <p class="muted" style="font-size:13.5px;margin-top:4px">Every choice on the pricing and selection sheets. Type a new price to change it; leave the box empty to use BuilderTrend's (shown greyed in the box). A credit is a minus number. Prices on sheets already quoted don't change by themselves: those sheets get the usual "prices have changed" offer.</p>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px"><input type="search" id="priceFind" placeholder="Find a question or choice…" style="flex:1 1 260px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius)">
-        <span class="muted" style="font-size:13.5px">${n} price${n === 1 ? '' : 's'} changed · <span id="styState">${esc(styState)}</span></span>
-        <button type="button" class="btn" id="pricePrint">Print a price list to fill in</button></div></div>
+        <span class="muted" style="font-size:13.5px">${n} price${n === 1 ? '' : 's'} changed · <span id="styState">${esc(styState)}</span></span></div></div>
     ${SECTIONS.map(r=>{ const qs = r.qs.filter(q=>!q.mvAway && q.c.length && !isLotPrem(q)); if(!qs.length) return '';
       return `<div class="card psec"><h2 style="font-size:18px">${esc(r.name)}</h2>${qs.map(q=>`<div class="pq" data-find="${esc((q.t + ' ' + q.bt + ' ' + q.c.map(c=>c.t).join(' ')).toLowerCase())}">
         <div class="pq-h"><b>${esc(q.t)}</b> <small class="muted">BT ${esc(q.bt || '—')}${q.line && LINE_NAMES[q.line] ? ' · ' + esc(LINE_NAMES[q.line]) : ''}${q.v1 ? ' · on the pricing sheet' : ''}</small></div>
@@ -1962,6 +1961,7 @@ function stylesScreen(){
   return `<div style="margin-top:18px"><a href="#" id="styBack" class="muted" style="font-size:13px;text-decoration:none">&larr; All leads</a>
       <div class="eyebrow" style="margin-top:6px">Office setup</div><h1>Home style pricing sheets</h1>
       <div class="viewsw noprint" style="display:inline-flex;margin-top:10px"><button type="button" data-styview="show" class="${styView === 'show' ? 'on' : ''}">What each style shows</button><button type="button" data-styview="prices" class="${styView === 'prices' ? 'on' : ''}">Every price</button><button type="button" data-styview="sizes" class="${styView === 'sizes' ? 'on' : ''}">Home style sizes</button></div>
+      <button type="button" class="btn" id="pricePrint" style="margin:10px 0 0 10px;vertical-align:top">Print a price list to fill in</button>
       <p class="lede" style="display:${styView === 'sizes' || styView === 'doors' ? 'none' : ''}">Allowance amounts are at the top. Below them, pick a home style and choose what its pricing sheet asks. <strong>Show</strong> = asked as normal. <strong>Included</strong> = comes with this style, no charge (the sheet says so and nothing is added). <strong>Hide</strong> = left off this style's sheets. Prices themselves don't change here.</p></div>
     <div class="card" style="display:${styView !== 'show' ? 'none' : 'flex'};gap:12px 18px;align-items:flex-end;flex-wrap:wrap">
       <div><label class="f">Home style</label><select id="styPick">${opts}</select></div>
