@@ -664,7 +664,7 @@ const overKey = (q, c)=>q.id + '|' + c.t;
 const overOn = c=>!c.k && !c.rate && !c.h && !c.ceilAdd;              // choices priced elsewhere: back-end option prices, typed tile, ceiling moves
 const OPT_BASE = {};                                    // no prices in this file: they come from the server
 const optPrice = k=>OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k]
-  : /-m$/.test(k) ? optPrice(k.slice(0, -2)) : null;   // a master bath finish price not set yet = the other baths' price
+  : /^fin-.*-[mp]$/.test(k) ? optPrice(k.slice(0, -2)) : null;   // a master bath / powder room finish price not set yet = the main bath's price
 const DOOR_CHOICES = [{ t:'Framed shower door', k:'door-framed' }, { t:'Frameless shower door', k:'door-frameless' }, { t:'Semi-frameless shower door', k:'door-semi' }];
 const FIN_CHOICES = [{ t:'Brushed nickel', k:'fin-bn' }, { t:'Brushed brass', k:'fin-brass' }, { t:'Black', k:'fin-black' }, { t:'Oil rubbed bronze', k:'fin-orb', baths:true }];
 /* FAUCET COLLECTIONS (owner, 2026-10-27: "go look at the faucet wall then go back and make the selection"; "make sure they match the list,
@@ -806,6 +806,9 @@ const faucetChoices = kind=>FAUCETS.flatMap(x=>{
   .concat(kind === 'shower' ? SHOWER_HEADS.map(h=>({ t:'Magnetix by Moen - ' + h.t + ' (' + h.model + ')', p:null, unit:'', brand:'Magnetix by Moen',
     note:'goes with any collection, added on top of the shower faucet', img:moenImg(h.model), model:h.model, fins:h.fins, kf:h.kf, side:true, up:true })) : []);
 // the collection picked for a bathroom (its name), or ''
+/* FAUCETS PER BATH (owner, 2026-11-11): what a collection covers in each bathroom — shown under Faucet Collection on screen and on the
+   pricing / selection sheet line, and why the finish costs less in the smaller baths. */
+const FAUCET_COUNT = { mbath:'Lav faucets 2 · Shower faucet 1', bath2:'Lav faucet 1 · Shower faucet 1', bath3:'Lav faucet 1 · Shower faucet 1', powder:'Lav faucet 1' };
 const faucetCol = (L, rid)=>{ const q = ALL_QS.find(x=>x.id === 'col_' + rid); if(!q) return ''; const i = q.c.findIndex((c, j)=>(L.answers[q.id + '#' + j] || {}).qty); return i >= 0 ? q.c[i].t : ''; };
 const faucetOf = name=>FAUCETS.find(x=>x.name === name);
 /* Standard choices at no charge (owner, 2026-10-14): every toilet line starts with "Standard toilet" (what the home gets unless
@@ -1228,7 +1231,8 @@ function buildCatalog(cat){
   [['mbath', 256], ['bath2', 300], ['bath3', 340], ['powder', 379]].forEach(([rid, num])=>{ const sec = SECTIONS.find(r=>r.id === rid); if(!sec || !sec.qs.length) return;
     sec.qs.unshift({ id:'fin_' + rid, bt:'', num, t:'Fixture Finish - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:1, opts:true, fin:true, tw:'Fixture Finish',
       // the master bath's finishes have their own prices (owner, 2026-10-21: the master often has double fixtures): keys 'fin-bn-m' etc.
-      c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : {}), p:null, unit:'' })) });
+      // and the powder room its own (owner, 2026-11-11: fewer faucets): 'fin-bn-p' etc.; the main and third bath use the plain keys
+      c:FIN_CHOICES.map(({ baths, ...x })=>({ ...x, ...(rid === 'mbath' ? { k:x.k + '-m' } : rid === 'powder' ? { k:x.k + '-p' } : {}), p:null, unit:'' })) });
     sec.qs.unshift({ id:'col_' + rid, bt:'', num, t:'Faucet Collection - ' + sec.name, cc:50, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, col:true, tw:'Faucet Collection',
       c:FAUCETS.map(x=>({ t:x.name, p:0, p0:0, unit:'', img:moenImg(x.lav[0][0]), model:x.lav[0][0], fins:x.fins, sub:x.fins.map(k=>FIN_LABEL[k]).join(' · ') })) }); });
   FOLLOW_UPS.forEach(([id, after, rid, title, cc, make, afterRe])=>{
@@ -1394,7 +1398,7 @@ function lines(L){
     r.qs.forEach(q=>{ if(!asked(q, L)) return;
       q.c.forEach((c, i)=>{
       const k = q.id + '#' + i, a = L.answers[k]; if(!a || !a.qty) return;
-      out.push({ key:k, q, where:'', label:(q.ceil ? ceilLabel(L, c, a.qty) : (q.fauc || q.sh || c.gb) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.spec ? (c.show || c.t) + ' — ' + c.spec : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 && !c.ceilAdd ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.ceilAdd ? ceilFt() == null : c.p == null });
+      out.push({ key:k, q, where:'', label:(q.col && FAUCET_COUNT[q.room.id] ? c.t + ' — ' + FAUCET_COUNT[q.room.id] : q.ceil ? ceilLabel(L, c, a.qty) : (q.fauc || q.sh || c.gb) && (c.model || c.kit) ? orderLabel(q, c, L) : q.id === 'fdcolor' ? 'Benjamin Moore ' + (a.label || '(name to come)') : c.spec ? (c.show || c.t) + ' — ' + c.spec : c.t) + (c.unit ? ' · ' + a.qty.toLocaleString('en-US') + ' ' + c.unit : a.qty > 1 && !c.ceilAdd ? ' × ' + a.qty : ''), price:a.price * a.qty, cost:0, std:false, count:a.qty, tbd: c.kf ? optPrice(headPriceKey(c, L, q)) == null : c.k ? optPrice(c.k) == null : c.ceilAdd ? ceilFt() == null : c.p == null });
       });
       const so = stdOf(q, L);
       if(so && so.order && so.idx >= 0 && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty)){
@@ -1433,7 +1437,7 @@ function photoGrid(q, L, lock){
   if(q.want && !wanted(q, L)) return `<div class="cho"><span class="ct">${esc(WANT_FIRST[q.bt])}?</span><button type="button" class="tog" data-want="${esc(q.id)}" ${lock ? 'disabled' : ''}>Yes, add one</button></div>`;
   if(q.want) return photoGridInner(q, L, lock) + `<div style="margin-top:10px"><button type="button" class="btn sm" data-unwant="${esc(q.id)}" ${lock ? 'disabled' : ''}>No thanks, take it off</button></div>`;
   if(q.mix && faucetCol(L, q.room.id)) return photoGridInner(q, L, lock) + `<div style="margin-top:10px"><button type="button" class="btn sm" data-mix="${esc(q.id)}">${mixOpen[q.id] ? 'Show only ' + esc(faucetCol(L, q.room.id)) : 'Mix and match: show the other collections'}</button></div>`;
-  if(q.col) return '<div class="q-sub">The Moen faucets on the showroom wall. Pick the look here; the sink and shower faucets below then show only this collection, and the finish only the colours it comes in.</div>' + photoGridInner(q, L, lock);
+  if(q.col) return (FAUCET_COUNT[q.room.id] ? `<div class="q-sub" style="font-weight:600;color:var(--ink)">In this bathroom: ${FAUCET_COUNT[q.room.id]}</div>` : '') + '<div class="q-sub">The Moen faucets on the showroom wall. Pick the look here; the sink and shower faucets below then show only this collection, and the finish only the colours it comes in.</div>' + photoGridInner(q, L, lock);
   /* VERTICAL SPA AS AN UPGRADE TOO (owner, 2026-10-27: "the vertical spa can also be offered in the upgrade section [with] the Magnetix"):
      a Shower Faucet line also draws the same bath's Vertical Spa tiles under its own. They ARE that question's tiles (same keys), so a pick
      here is the Vertical Spa pick there — one answer, one price (BuilderTrend's spa line). */
@@ -1896,8 +1900,10 @@ function bathCard(){
   return `<div class="card"><h2 style="font-size:18px">Other option prices</h2>
     <p class="muted" style="font-size:13.5px;margin-top:4px">Prices for options BuilderTrend doesn't have (or prices per foot). Shower doors and finishes are the same in every bathroom; chrome is standard at no charge. Leave a box empty and the sheet says "price to come".</p>
     ${DOOR_CHOICES.map(x=>row(x.k, x.t, 'Not priced in BuilderTrend')).join('')}
-    ${FIN_CHOICES.map(x=>row(x.k, x.t + ' finish', 'Every bath except the master: added once per bathroom that picks it (door, faucets and hardware)')).join('')}
-    ${FIN_CHOICES.map(x=>`<div class="sty-row"><div class="t"><b>Master bath: ${esc(x.t)} finish</b><small>The master often has double fixtures. Empty = the same as the other baths${optPrice(x.k) != null ? ' (' + money2(optPrice(x.k)) + ')' : ''}</small></div>
+    ${FIN_CHOICES.map(x=>row(x.k, 'Main bath: ' + x.t + ' finish', 'Main bath (lav faucet 1, shower faucet 1) and the third bath: added once per bathroom that picks it (door, faucets and hardware)')).join('')}
+    ${FIN_CHOICES.map(x=>`<div class="sty-row"><div class="t"><b>Powder room: ${esc(x.t)} finish</b><small>Lav faucet 1. Empty = the same as the main bath${optPrice(x.k) != null ? ' (' + money2(optPrice(x.k)) + ')' : ''}</small>${chg('prices', x.k + '-p')}</div>
+      <span class="muted">$</span><input type="number" step="0.01" data-optp="${x.k}-p" value="${OPT_PRICES[x.k + '-p'] == null ? '' : OPT_PRICES[x.k + '-p']}" placeholder="same as main bath" style="width:130px"></div>`).join('')}
+    ${FIN_CHOICES.map(x=>`<div class="sty-row"><div class="t"><b>Master bath: ${esc(x.t)} finish</b><small>Lav faucets 2, shower faucet 1. Empty = the same as the main bath${optPrice(x.k) != null ? ' (' + money2(optPrice(x.k)) + ')' : ''}</small></div>
       <span class="muted">$</span><input type="number" step="0.01" data-optp="${x.k}-m" value="${OPT_PRICES[x.k + '-m'] == null ? '' : OPT_PRICES[x.k + '-m']}" placeholder="same as other baths" style="width:130px"></div>`).join('')}
     ${SHOWER_HEADS.flatMap(h=>h.fins.map(fk=>row(h.kf + '-' + fk, 'Shower head ' + h.model + ' · ' + FIN_LABEL[fk], 'Magnetix by Moen; the price follows the bathroom\'s finish'))).join('')}
     ${row('pantry-lf', 'Added pantry shelves, per linear ft', '4 wire shelves are standard; this is each extra foot of shelf')}
