@@ -412,9 +412,12 @@ async function readOldReport(file){
   if(!projs.length) throw new Error('This PDF doesn\'t look like a Billing Detail Report from the old accounting system.');
   return { range: 'All Dates (old accounting system report)', source: file.name, projects: projs.map(project=>{
     const { lines, reportTotal } = byProj[project];
-    // the lot purchase: code-10 (or code-5 — MM 49's lot was booked there) lines of $50,000 or more. Its closing costs (smaller lines on
-    // the same bill) stay in as costs (owner, 2026-10-14)
+    // the lot purchase: code-10 (or code-5 — MM 49's lot was booked there) lines of $50,000 or more, PLUS its closing costs = the other
+    // lines with the same vendor and invoice (owner, 2026-11-11: closing "goes against the lot", as the accountant does it; this reverses
+    // the 2026-10-14 "closing cost back in")
     lines.forEach(l=>{ if(/^(10|5) - /.test(l.item) && l.amount >= 50000) l.lot = true; });
+    const lotBills = new Set(lines.filter(l=>l.lot).map(l=>(l.vendor + '|' + l.num).toUpperCase()));
+    lines.forEach(l=>{ if(lotBills.has((l.vendor + '|' + l.num).toUpperCase())) l.lot = true; });
     return { project, lines, total: lines.reduce((t, l)=>t + l.amount, 0), houseId: matchHome(project), noCode: 0,
       lotTotal: lines.filter(l=>l.lot).reduce((t, l)=>t + l.amount, 0), withLot: false, reportTotal };
   }) };
