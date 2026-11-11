@@ -16,7 +16,7 @@
    - Everything else (Firestore, Storage, sign-in, QR images) is
      left completely alone.
    ============================================================ */
-const CACHE = 'alden-hub-v13';
+const CACHE = 'alden-hub-v14';   // v14: the new high-resolution logo + app icons (2026-11-11)
 
 const SHELL = [
   'index.html',
