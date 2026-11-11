@@ -838,7 +838,14 @@ const PANTRY_DROP = /^(number of pantry shelves:?|add't wire pantry shelves)$/i;
 const FLOOR_TYPES = [{ key:'lvp', t:'LVP', levels:[10, 20, 30, 40] }, { key:'vinyl', t:'Vinyl', levels:[10, 30, 40, 50] },
   { key:'hw', t:'Hardwood', levels:[20, 30, 40, 50, 60] }, { key:'carpet', t:'Carpet', levels:[10, 20, 30] },
   { key:'io', t:'Indoor/outdoor carpet', levels:[10, 20] }, { key:'tile', t:'Tile', levels:[] }];
-let floorPick = { type:'lvp', level:10 };          // the "add a flooring area" form (not stored)
+let floorPick = { type:'lvp', level:10 };
+/* STANDARD FLOORING PER HOME (owner, 2026-11-11: "sometimes the standard on some homes is level 10"): Office view has "Standard flooring
+   for this home" on the Flooring question — Vinyl / carpet (default) or LVP Level 10, kept as answers.floorstd = { label:'lvp10' }.
+   With LVP Level 10 standard, LVP 10 is no charge and the other LVP, vinyl and hardwood levels cost only what they cost OVER LVP 10
+   (never below 0); carpet and tile are unchanged. Switching re-prices the areas already added. */
+const floorL10 = L=>!!(L && L.answers && (L.answers.floorstd || {}).label === 'lvp10');
+const floorPrice = (c, L)=>{ const p = optPrice(c.k); if(p == null || !floorL10(L) || !['lvp', 'vinyl', 'hw'].includes(c.ft)) return p;
+  const base = optPrice('floor-lvp10') || 0; return Math.max(0, Math.round((p - base) * 100) / 100); };          // the "add a flooring area" form (not stored)
 /* Patio & deck (owner, 2026-10-19). BuilderTrend has a blank "Patio/Deck" (600) plus extra sq ft prices for each (602), one "Add
    covered patio/deck" (640) plus extra covered sq ft for each (642), and composite deck flooring per sq ft (608). On the sheet:
    600 = Patio OR Deck, typed in sq ft at 602's prices (602 itself is folded in, not asked); 640 = Covered patio OR Covered deck, each
@@ -1156,7 +1163,7 @@ const ceilBase = L=>{ const q = qById('ceil'); const i = q ? q.c.findIndex((c, j
 const ceilAdded = L=>{ const q = qById('ceil'); const i = q ? q.c.findIndex(c=>c.ceilAdd) : -1; return i >= 0 ? ((L.answers['ceil#' + i] || {}).qty || 0) : 0; };
 const ceilLabel = (L, c, n)=>c.ceilAdd ? 'Add ' + n + (n === 1 ? ' foot' : ' feet') + ' of ceiling height (' + (ceilBase(L) + n) + "' ceilings)" : c.h + "' ceilings (standard height)";
 // what a choice costs when it's first taken: ceiling moves and allowances have their own; everything else is the selection sheet's
-const choicePrice = (q, i, L)=>q.c[i].kf ? (optPrice(headPriceKey(q.c[i], L, q)) || 0) : (q.opts || q.c[i].k) ? (optPrice(q.c[i].k) || 0) : q.ceil ? (q.c[i].ceilAdd ? (ceilFt() || 0) : 0) : isAllow(q, q.c[i]) ? allowDefault(q, i) : (q.c[i].p || 0);
+const choicePrice = (q, i, L)=>q.bt === '790' && q.c[i].k ? (floorPrice(q.c[i], L) || 0) : q.c[i].kf ? (optPrice(headPriceKey(q.c[i], L, q)) || 0) : (q.opts || q.c[i].k) ? (optPrice(q.c[i].k) || 0) : q.ceil ? (q.c[i].ceilAdd ? (ceilFt() || 0) : 0) : isAllow(q, q.c[i]) ? allowDefault(q, i) : (q.c[i].p || 0);
 const ALLOW_BASE = { '193': 0 };                         // BT numbers that are allowances though not named so (amount: from the server)
 const isAllow = (q, c)=>!!c && (/allowance/i.test(c.t) || ALLOW_BASE[q.bt] != null);
 const allowDefault = (q, i)=>{ const k = q.id + '#' + i; return ALLOW_CFG[k] != null ? ALLOW_CFG[k] : ALLOW_BASE[q.bt] != null ? ALLOW_BASE[q.bt] : (q.c[i].p || 0); };
@@ -1313,7 +1320,7 @@ const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:
   : q.id === 'bstairs' ? { label:'Closed stairs to basement' }
   : q.bt === '128' ? { label:"8' basement walls (standard height)" }   // foundation walls (owner, 2026-11-11): 8' preset, 9' / 10' are upgrades
   : q.bt === '780' ? { label:'Interior paint - flat ceiling/flat walls' }
-  : q.bt === '790' ? { label:'Standard flooring (vinyl / carpet)', keep:true }
+  : q.bt === '790' ? { label: floorL10(L) ? 'LVP Level 10 (standard for this home)' : 'Standard flooring (vinyl / carpet)', keep:true }
   : q.bt === '175' ? { label:'2 standard hose bibs', keep:true }
   : q.bt === '170' ? { label:'Standard as per plan' } : null;
 /* Flooring areas (owner, 2026-10-19): like the calculator's rows — each added area is a type + level with its sq ft; the form
@@ -1331,13 +1338,16 @@ function floorRows(q, L, lock){
       ${!cust && n && p ? `<span class="cp">= ${plus(Math.round(p * n * 100) / 100)}</span>` : ''}
       <button type="button" class="tog" data-floor-del="${esc(k)}" ${lock ? 'disabled' : ''}>Remove</button></div>`;
   }).join('');
+  const stdSw = cust || lock ? '' : `<div class="cho" style="flex-wrap:wrap;gap:8px"><span class="ct"><b>Standard flooring for this home</b></span>
+    <select data-floor-std aria-label="Standard flooring for this home"><option value="">Vinyl / carpet</option><option value="lvp10" ${floorL10(L) ? 'selected' : ''}>LVP Level 10</option></select>
+    <span class="muted" style="font-size:13px">${floorL10(L) ? 'LVP Level 10 is no charge; other levels cost only the difference over it.' : 'LVP Level 10 is an upgrade.'}</span></div>`;
   if(lock) return rows;
   const ft = FLOOR_TYPES.find(x=>x.key === floorPick.type) || FLOOR_TYPES[0];
   const lv = ft.levels.includes(floorPick.level) ? floorPick.level : ft.levels[0] || 0;
   const pc = cs.find(c=>c.ft === ft.key && c.lv === lv);
   const each = cust || !pc ? '' : pc.rate ? '<span class="muted" style="font-size:13px">price typed once added</span>'
     : pc.p == null ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${pc.p ? (pc.p < 0 ? '− ' + money2(-pc.p) + ' credit' : '+ ' + money2(pc.p)) : 'no charge'} / sq ft</span>`;
-  return rows + `<div class="cho floor-add" style="flex-wrap:wrap;gap:8px"><span class="ct"><b>Add a flooring area</b></span>
+  return stdSw + rows + `<div class="cho floor-add" style="flex-wrap:wrap;gap:8px"><span class="ct"><b>Add a flooring area</b></span>
     <select data-floor-type aria-label="Flooring type">${FLOOR_TYPES.map(x=>`<option value="${x.key}" ${x.key === ft.key ? 'selected' : ''}>${esc(x.t)}</option>`).join('')}</select>
     ${ft.levels.length ? `<select data-floor-level aria-label="Level">${ft.levels.map(n=>`<option value="${n}" ${n === lv ? 'selected' : ''}>Level ${n}</option>`).join('')}</select>` : ''}
     <input type="number" min="0" step="1" id="floorSq" placeholder="0" style="width:90px" aria-label="Square feet"><span class="muted" style="font-size:13px">sq ft</span>${each}
@@ -1374,7 +1384,7 @@ const choicesOf = (q, L)=>{ if(q.opts){ const all = q.c.map((c, i)=>({ ...c, i, 
     // towel bars, rings, hooks and the set: the bath's collection first; the other collections' pieces on request (mix and match)
     return q.mix && mixOpen[q.id] ? mine.concat(all.filter(c=>!mine.includes(c))) : mine; }
   if(q.ceil) return q.c.map((c, i)=>({ ...c, i, t: c.ceilAdd ? 'Add a foot of ceiling height' : c.h + "' ceilings (standard height)", p: c.ceilAdd ? ceilFt() : 0 }));
-  const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p:optPrice(c.k) } : {}), ...(c.kf && L ? { p:optPrice(headPriceKey(c, L, q)) } : {}) }));
+  const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p: q.bt === '790' ? floorPrice(c, L) : optPrice(c.k) } : {}), ...(c.kf && L ? { p:optPrice(headPriceKey(c, L, q)) } : {}) }));
   if(q.bt === '642'){ const cov = ALL_QS.find(x=>x.bt === '640'); const got = cov ? cov.c.map((c, i)=>(L.answers[cov.id + '#' + i] || {}).qty ? c.t : '').filter(Boolean).join(' ') : '';
     if(/patio/i.test(got) || /deck/i.test(got)) return all.filter(c=>/patio/i.test(got) ? /patio/i.test(c.t) : /deck/i.test(c.t)); } if(q.bt !== '126' || !L.model) return all; const mine = all.filter(c=>c.t.toLowerCase().replace(/ basement$/, '') === L.model.toLowerCase()); return mine.length ? mine : all; };
 const missing = ()=>[];                       // nothing on either sheet has to be answered: untouched = standard
@@ -2925,6 +2935,13 @@ document.addEventListener('change', e=>{
     if(c3 && c3.grp && e.target.value !== '') q3.c.forEach((x, j)=>{ if(x.grp === c3.grp && q3.id + '#' + j !== k) delete L3.answers[q3.id + '#' + j]; });
     if(e.target.value === '') delete L3.answers[k]; else L3.answers[k] = { ...(L3.answers[k] || {}), qty:1, price:v };
     touch(L3); const y = window.scrollY; render(); window.scrollTo(0, y); return;
+  }
+  if(e.target.matches && e.target.matches('[data-floor-std]')){
+    const L = lead(); if(!L || locked(L)) return; const q = ALL_QS.find(x=>x.bt === '790'); if(!q) return;
+    if(e.target.value === 'lvp10') L.answers.floorstd = { label:'lvp10', qty:0, price:0 }; else delete L.answers.floorstd;
+    // re-price the areas already added (tile keeps its typed price)
+    q.c.forEach((c, i)=>{ const a = L.answers[q.id + '#' + i]; if(a && a.qty && c.k) a.price = floorPrice(c, L) || 0; });
+    markOwn(L, q); touch(L); const y = window.scrollY; render(); window.scrollTo(0, y); toast('Standard flooring: ' + (floorL10(L) ? 'LVP Level 10' : 'vinyl / carpet')); return;
   }
   if(e.target.matches && e.target.matches('[data-floor-type],[data-floor-level]')){
     const keep = ($('floorSq') || {}).value || '';
