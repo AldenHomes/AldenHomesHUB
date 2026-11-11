@@ -1919,9 +1919,9 @@ function priceListDoc(){
     + '.bar{margin-bottom:14px}.bar button{font:inherit;font-weight:bold;padding:9px 16px;border:0;border-radius:3px;background:#4B4F54;color:#fff;cursor:pointer}'
     + '</style></head><body><div class="bar noprint"><button onclick="print()">Print</button></div>'
     + '<div class="head"><div><h1>Selections pricing — to fill in</h1><div class="sub">Alden Homes · from the hub\'s Selections price list · ' + esc(today) + '</div></div><div class="sub">Filled in by: ______________________</div></div>'
-    + '<div class="note"><b>How to use this:</b> Part 1 lists every choice that has <b>no price yet</b> (the sheet says "price to come") — write the price in the last column. Part 2 lists every current price — if one is wrong, write the new price beside it. Prices are what the customer pays; per-unit prices say so (per sq ft, per ft). Hand it back and the prices get typed into Selections → Home styles → Every price.</div>'
-    + '<h2>Part 1 · Needs a price <small>· ' + need.length + ' items</small></h2>' + table(need, true)
-    + '<div class="part"></div><h2>Part 2 · Current prices <small>· ' + have.length + ' items · check and correct</small></h2>' + table(have, false)
+    + '<div class="note"><b>How to use this:</b> these are the choices that have <b>no price yet</b> (the sheet says "price to come"). Write the price in the last column. Prices are what the customer pays; per-unit prices say so (per sq ft, per ft). Anything already priced isn\'t listed. Hand it back and the prices get typed into Selections → Home styles → Every price.</div>'
+    + '<h2>Needs a price <small>· ' + need.length + ' items</small></h2>' + table(need, true)
+    // owner, 2026-11-11: "only want to print things that need pricing" — the current-price list (have) is no longer printed
     + '</body></html>';
 }
 
