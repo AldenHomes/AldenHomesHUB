@@ -187,9 +187,9 @@ html, body{max-width:100%; overflow-x:clip;}
     /* phones: Home · Sold · Profit · GP % only (lot, costs, overhead, usual and style are in the home's detail) */
     table.jc.gp{display:table; white-space:normal;}
     table.jc.gp > thead > tr > th:nth-child(3), table.jc.gp > thead > tr > th:nth-child(4), table.jc.gp > thead > tr > th:nth-child(5),
-    table.jc.gp > thead > tr > th:nth-child(8), table.jc.gp > thead > tr > th:nth-child(9),
+    table.jc.gp > thead > tr > th:nth-child(8), table.jc.gp > thead > tr > th:nth-child(9), table.jc.gp > thead > tr > th:nth-child(10),
     table.jc.gp > tbody > tr:not(.gp-detail) > td:nth-child(3), table.jc.gp > tbody > tr:not(.gp-detail) > td:nth-child(4), table.jc.gp > tbody > tr:not(.gp-detail) > td:nth-child(5),
-    table.jc.gp > tbody > tr:not(.gp-detail) > td:nth-child(8), table.jc.gp > tbody > tr:not(.gp-detail) > td:nth-child(9){display:none;}
+    table.jc.gp > tbody > tr:not(.gp-detail) > td:nth-child(8), table.jc.gp > tbody > tr:not(.gp-detail) > td:nth-child(9), table.jc.gp > tbody > tr:not(.gp-detail) > td:nth-child(10){display:none;}
     table.jc.gp .sub{display:none;}
     tr.gp-detail > td{padding:6px 4px 14px !important;}
     tr.gp-detail table.jc{display:block; overflow-x:auto; white-space:nowrap;}
@@ -525,7 +525,7 @@ function renderHomes(){
      Sold · Lot · Costs · Overhead · Profit · GP % · Usual — and a totals row. Clicking a row opens its cost codes underneath (the detail
      row is one wide cell, so sorttables.js keeps it under its home when sorting). GP is green at or above the usual for the style, red
      when more than 2 points under it. */
-  const COLS = 9;
+  const COLS = 10;
   const gpOf = h=>{ const s = sold[h.houseId]; if(!s) return null; const net = s - (h.lotCost || 0); const profit = net - (h.total || 0) - overhead; return { net, profit, gp: net > 0 ? profit / net : null }; };
   const pct = v=>v == null ? '—' : (v * 100).toFixed(1) + '%';
   const rows = list.map(h=>{
@@ -535,7 +535,7 @@ function renderHomes(){
     const name = h.job ? homeLabel(h.job) : h.label || h.project;
     const main = `<tr class="gp-row${open ? ' on' : ''}" data-home="${esc(h.houseId)}" title="${open ? 'Close' : 'Open'} this home's cost codes">
         <td><span class="caret">${open ? '&#9662;' : '&#9656;'}</span> <b>${esc(name)}</b>${flags.length ? ` <span class="flag" title="${flags.length} cost code${flags.length === 1 ? '' : 's'} over the last build: ${esc(flags.map(f=>f.name).join(', '))}">${flags.length} over</span>` : ''}
-          <div class="sub">${esc(h.project)} · imported ${esc(new Date(h.importedAt).toLocaleDateString())}</div></td>
+          <div class="sub">${esc(h.project)}</div></td>
         <td class="num" data-sort-value="${sold[h.houseId] || ''}">${sold[h.houseId] ? money(sold[h.houseId]) : `<button type="button" class="linkbtn" data-sold="${esc(h.houseId)}">Set</button>`}</td>
         <td class="num" data-sort-value="${h.lotCost || 0}">${h.lotCost ? money(h.lotCost) : '—'}</td>
         <td class="num" data-sort-value="${h.total || 0}">${money(h.total || 0)}</td>
@@ -543,7 +543,8 @@ function renderHomes(){
         <td class="num" data-sort-value="${g ? g.profit : ''}">${g ? money(g.profit) : '—'}</td>
         <td class="num" data-sort-value="${g && g.gp != null ? g.gp : ''}" style="font-weight:700; color:${tone};">${g ? pct(g.gp) : '—'}</td>
         <td class="num muted" data-sort-value="${tg && tg.gp != null ? tg.gp : ''}" title="${tg ? 'Average gross profit of the latest ' + (tg.n || '') + ' ' + esc(tg.style + (tg.bsmtLabel || '')) + ' builds' : ''}">${tg && tg.gp != null ? pct(tg.gp) : '—'}</td>
-        <td class="muted" style="font-size:12px;">${tg ? esc(tg.style) : ''}</td></tr>`;
+        <td class="muted" style="font-size:12px;">${tg ? esc(tg.style) : ''}</td>
+        <td class="num muted" style="font-size:12.5px;" data-sort-value="${esc(h.importedAt || '')}">${h.importedAt ? esc(new Date(h.importedAt).toLocaleDateString()) : '—'}</td></tr>`;
     if(!open) return main;
     return main + `<tr class="gp-detail"><td colspan="${COLS}"><div style="display:flex; gap:10px; align-items:center; margin-top:4px;"><span class="muted" style="font-size:13px;">Click a cost code to see its invoices.</span><div style="flex:1"></div>
           <button class="btn" data-expand="${esc(h.houseId)}" style="border:1px solid var(--steel-line); background:#fff; padding:7px 12px; font-size:13px;">${codes.length && codes.every(([c])=>openCodes.has(h.houseId + '|' + c)) ? 'Collapse all' : 'Expand all'}</button></div>
@@ -559,12 +560,12 @@ function renderHomes(){
   // totals: costs for every home listed; profit and GP only over the homes that have a sale price
   const withSale = list.filter(h=>sold[h.houseId]), gs = withSale.map(gpOf);
   const tNet = gs.reduce((t, g)=>t + g.net, 0), tProfit = gs.reduce((t, g)=>t + g.profit, 0);
-  $('homesList').innerHTML = list.length ? `<table class="jc gp"><thead><tr><th>Home</th><th class="num">Sold</th><th class="num">Lot</th><th class="num">Costs</th><th class="num">Overhead</th><th class="num">Profit</th><th class="num">GP %</th><th class="num">Usual</th><th>Style</th></tr></thead><tbody>
+  $('homesList').innerHTML = list.length ? `<table class="jc gp"><thead><tr><th>Home</th><th class="num">Sold</th><th class="num">Lot</th><th class="num">Costs</th><th class="num">Overhead</th><th class="num">Profit</th><th class="num">GP %</th><th class="num">Usual</th><th>Style</th><th class="num">Imported</th></tr></thead><tbody>
       ${rows.join('')}
       <tr class="tot"><td>Total · ${list.length} home${list.length === 1 ? '' : 's'}${withSale.length < list.length ? ` <span class="muted" style="font-weight:400;">(${withSale.length} with a sale price)</span>` : ''}</td>
         <td class="num">${money(withSale.reduce((t, h)=>t + sold[h.houseId], 0))}</td><td class="num">${money(list.reduce((t, h)=>t + (h.lotCost || 0), 0))}</td>
         <td class="num">${money(list.reduce((t, h)=>t + (h.total || 0), 0))}</td><td class="num">${money(overhead * list.length)}</td>
-        <td class="num">${withSale.length ? money(tProfit) : '—'}</td><td class="num">${tNet > 0 ? pct(tProfit / tNet) : '—'}</td><td></td><td></td></tr></tbody></table>`
+        <td class="num">${withSale.length ? money(tProfit) : '—'}</td><td class="num">${tNet > 0 ? pct(tProfit / tNet) : '—'}</td><td></td><td></td><td></td></tr></tbody></table>`
     : `<p class="muted" style="margin-top:12px;">${homes.length ? 'No homes match.' : !homesLoaded ? 'Loading…' : 'Nothing imported yet. Press "Import costs" to bring them in.'}</p>`;
 }
 $('search').addEventListener('input', renderHomes);
