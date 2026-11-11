@@ -1216,7 +1216,8 @@ function buildCatalog(cat){
   { const kit = SECTIONS.find(r=>r.id === 'kit'), at = kit ? kit.qs.findIndex(q=>q.bt === '520') : -1;
     // 2026-10-27: the kitchen sheet's finishes, no charge here — each kitchen item is priced in its finish (KITCHEN `kf`)
     if(at >= 0) kit.qs.splice(at, 0, { id:'fin_kit', bt:'', num:520, t:'Kitchen Faucet Finish', cc:50, line:'', room:kit, opt:1, type:'bt', v1:1, one:true, fin:true,
-      c:KIT_FINS.map(t=>({ t, p:0, unit:'' })) }); }
+      // matte black is charged (owner, 2026-11-11: $320, set in the back end as 'fin-kit-black'); the others stay no charge
+      c:KIT_FINS.map(t=>({ t, p:0, unit:'', ...(t === 'Matte black' ? { k:'fin-kit-black', p:null } : {}) })) }); }
   // front door style + colour on a drawn house (see doorStage), right after BT 231 Front Door
   { const sec = SECTIONS.find(r=>r.id === 'doors');
     if(sec){ const at = sec.qs.findIndex(q=>q.bt === '231');
