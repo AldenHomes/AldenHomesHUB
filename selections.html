@@ -298,6 +298,8 @@
   .ph-door .ph-pick img{object-fit:contain; aspect-ratio:10/21; background:#fff; padding:8px; box-sizing:border-box;}
   .ph-product .ph-tile:has(.ph-fins) .ph-pick img{padding-top:40px;}   /* room for the finish dots so they don't cover the top of the photo */
   .ph-fins{position:absolute; top:8px; left:50%; transform:translateX(-50%); display:flex; gap:6px; padding:4px 6px; background:rgba(255,255,255,.92); border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.18);}
+  .ph-fins{flex-wrap:wrap; justify-content:center; max-width:calc(100% - 56px);}   /* many finishes (Schlage Accent has 10) wrap to a second row */
+  .ph-tile:has(.ph-fins .ph-fin:nth-child(8)) .ph-pick img{padding-top:66px;}
   .ph-fin{width:18px; height:18px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.25); cursor:pointer; padding:0;}
   .ph-fin.on{box-shadow:0 0 0 2px var(--navy,#1f3550);}
   .ph-tile.on .ph-check{display:none;}
@@ -778,14 +780,32 @@ const moenImg = (m, fin)=>`selection-photos/faucets/moen-${m.toLowerCase()}${fin
    screen-only (not saved). 76 finish photos saved from Moen alongside the chrome ones. */
 const tileFin = {};
 const FIN_DOT = { ss:'linear-gradient(135deg,#e2e2df,#a9a9a4)', ch:'linear-gradient(135deg,#f4f6f8,#aab1b8)', bn:'linear-gradient(135deg,#d8d3c8,#9d978a)', brass:'linear-gradient(135deg,#e6c77d,#a8823a)', orb:'linear-gradient(135deg,#6b4a35,#2e1f16)', black:'linear-gradient(135deg,#4a4a4a,#151515)' };
+/* DOOR HARDWARE (owner, 2026-11-11: "they can choose Schlage Latitude or Accent handles… front doors and man doors as well as interior
+   doors… they also can choose colors… nice images… like the faucets where the image changes with the color"): two Selections-side questions
+   in Doors & trim — "Door Hardware Style (Schlage)" (Latitude / Accent lever tiles with finish dots that swap the photo) and "Door Hardware
+   Finish" (one tile per finish, showing the picked style in that finish). Photos are Schlage's own (F10 passage lever, exterior view),
+   trimmed to 600px: selection-photos/hardware/schlage-<lat|acc>-<finish code>.jpg. Finish keys 'h' + Schlage's code. */
+const HW_FIN = { h605:['Bright Brass', '#e7c35a,#a8821f'], h608:['Satin Brass', '#d8bf7a,#9c8445'], h609:['Antique Brass', '#b08a4f,#5e4625'], h618:['Bright Nickel', '#eef0f0,#a7abad'],
+  h619:['Satin Nickel', '#d6d4ce,#96938b'], h620:['Antique Pewter', '#a8a49b,#5d5a54'], h622:['Matte Black', '#4a4a4a,#151515'], h625:['Bright Chrome', '#f6f8fa,#aab1b8'],
+  h626:['Satin Chrome', '#e3e5e6,#a3a7aa'], h716:['Aged Bronze', '#6b4a35,#2a1c14'] };
+Object.entries(HW_FIN).forEach(([k, [n, g]])=>{ FIN_LABEL[k] = n; FIN_DOT[k] = 'linear-gradient(135deg,' + g + ')'; });
+const HW_STYLES = [{ model:'lat', t:'Schlage Latitude lever', sub:'Square, modern lines', fins:['h619', 'h622', 'h716', 'h626', 'h625', 'h618', 'h608'] },
+  { model:'acc', t:'Schlage Accent lever', sub:'Soft, curved wave', fins:['h619', 'h622', 'h716', 'h626', 'h625', 'h618', 'h608', 'h605', 'h609', 'h620'] }];
+const hwImg = (m, f)=>'selection-photos/hardware/schlage-' + m + '-' + String(f).slice(1) + '.jpg';
+const hwStyleOf = L=>{ const q = qById('dhstyle'); const i = q ? q.c.findIndex((c, j)=>(L.answers['dhstyle#' + j] || {}).qty) : -1; return i >= 0 ? q.c[i] : null; };
+const hwFinOf = L=>{ const q = qById('dhfin'); const i = q ? q.c.findIndex((c, j)=>(L.answers['dhfin#' + j] || {}).qty) : -1; return i >= 0 ? q.c[i].code : ''; };
 const bathFin = (L, rid)=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + rid); if(!fq) return 'ch'; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : 'ch'; };
 // the finish a tile is showing, and its photo
-const tileFinOf = (q, c, L)=>{ const k = q.id + '#' + c.i; if(tileFin[k] && c.fins.includes(tileFin[k])) return tileFin[k]; const b = bathFin(L, q.room.id); return c.fins.includes(b) ? b : 'ch'; };
+const tileFinOf = (q, c, L)=>{ const k = q.id + '#' + c.i; if(tileFin[k] && c.fins.includes(tileFin[k])) return tileFin[k];
+  if(c.hw){ const f = L ? hwFinOf(L) : ''; return c.fins.includes(f) ? f : c.fins[0]; }
+  const b = bathFin(L, q.room.id); return c.fins.includes(b) ? b : 'ch'; };
 /* SPA DISPLAY BOARDS (owner, 2026-10-27: the vertical spa is a kit of parts; "not sure the best way to add a photo… for reference"): a spa
    tile shows the showroom display board from the office's wall photo (selection-photos/faucets/display-<collection>[-black].jpg) for the
    finish it was photographed in — 90 Degree and Voss in chrome, Align in chrome and matte black; other finishes / collections show
    Moen's picture of the main part. The parts list stays in the name. */
 const tileImg = (q, c, L)=>{ if(c.kit && c.kitm && !c.model) return '';
+  if(c.hw) return hwImg(c.model, tileFinOf(q, c, L));
+  if(c.hwFin){ const st = L && hwStyleOf(L); return hwImg(st && st.fins.includes(c.code) ? st.model : HW_STYLES.find(x=>x.fins.includes(c.code)).model, c.code); }
   if(c.disp){ const d = c.disp[tileFinOf(q, c, L)]; if(d) return 'selection-photos/faucets/' + d + '.jpg'; }
   return c.fins && c.model ? moenImg(c.model, tileFinOf(q, c, L)) : c.img; };
 const faucetChoices = kind=>FAUCETS.flatMap(x=>{
@@ -1255,6 +1275,11 @@ function buildCatalog(cat){
   // foundation wall height is one choice: 8' standard, or 9' or 10'
   { const q = SECTIONS.flatMap(r=>r.qs).find(q=>q.bt === '128'); if(q) q.one = true; }
   { const sec = SECTIONS.find(r=>r.id === 'doors'), at = sec ? sec.qs.findIndex(q=>q.bt === '200') : -1;
+    if(at >= 0) sec.qs.splice(at + 1, 0,
+      { id:'dhstyle', bt:'', num:200, t:'Door Hardware Style (Schlage)', cc:58, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, hwq:true,
+        c:HW_STYLES.map(x=>({ t:x.t, show:x.t.replace('Schlage ', '').replace(/^./, m=>m.toUpperCase()), p:0, unit:'', brand:'Schlage', note:'front door, garage man door and interior doors', model:x.model, fins:x.fins, hw:true, sub:x.sub, img:hwImg(x.model, 'h619') })) },
+      { id:'dhfin', bt:'', num:200, t:'Door Hardware Finish', cc:58, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, hwq:true,
+        c:Object.keys(HW_FIN).map(k=>({ t:HW_FIN[k][0], p:0, unit:'', code:k, hwFin:true, img:hwImg('acc', k) })) });
     if(at >= 0) sec.qs.splice(at + 1, 0, { id:'idstyle', bt:'', num:200, t:'Interior Door Style', cc:32, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true,
       c:INT_DOORS.map(n=>({ t:n, p:0, unit:'', img:MISC + 'door-int-' + slugOf(n) + '.jpg' })) }); }
   SECTIONS = SECTIONS.filter(r=>r.qs.length);
@@ -1375,7 +1400,8 @@ const asked = (q, L)=>{
   return !f || hasFeat(L, f);
 };
 // the basement line lists every home style: show only this home's, when there is one
-const choicesOf = (q, L)=>{ if(q.opts){ const all = q.c.map((c, i)=>({ ...c, i, p:optPrice(c.k) }));
+const choicesOf = (q, L)=>{ if(q.id === 'dhfin' && L){ const st = hwStyleOf(L), all = q.c.map((c, i)=>({ ...c, i })); return st ? all.filter(c=>st.fins.includes(c.code) || (L.answers['dhfin#' + c.i] || {}).qty) : all; }
+  if(q.opts){ const all = q.c.map((c, i)=>({ ...c, i, p:optPrice(c.k) }));
     if(q.fin && q.id !== 'fin_kit'){ const col = faucetOf(faucetCol(L, q.room.id)); if(col) return all.filter(c=>col.fins.includes(FIN_CODE[c.t]) || (L.answers[q.id + '#' + c.i] || {}).qty); }
     return all; }
   if(q.fauc){ const col = faucetCol(L, q.room.id), all = q.c.map((c, i)=>({ ...c, i, ...(c.kf && L ? { p:optPrice(headPriceKey(c, L, q)) } : {}) }));
@@ -1472,7 +1498,7 @@ function photoGridInner(q, L, lock, head, only){
   const cs = choicesOf(q, L).filter(only || (()=>true)), brands = [...new Set(cs.map(c=>c.brand || ''))];
   const fin = q.col ? (()=>{ const fq = ALL_QS.find(x=>x.id === 'fin_' + q.room.id); if(!fq) return ''; const i = fq.c.findIndex((c, j)=>(L.answers[fq.id + '#' + j] || {}).qty); return i >= 0 ? FIN_CODE[fq.c[i].t] : ''; })() : '';
   // groups sit side by side, each as wide as its tiles (owner, 2026-10-27: one-tile collections were "one large list")
-  return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.id === 'idstyle' || q.bt === '152' ? 'ph-door' : (q.fauc || q.col ? 'ph-product' : '')}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(pn(cs.find(c=>c.brand === b).note))}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
+  return '<div class="ph-groups">' + brands.map(b=>`<div class="ph-group ${q.id === 'idstyle' || q.bt === '152' ? 'ph-door' : (q.fauc || q.col || q.hwq ? 'ph-product' : '')}" style="--n:${cs.filter(c=>(c.brand || '') === b).length}">${b || head ? `<div class="ph-brand">${head ? esc(head) + (b ? ' · ' + esc(b) : '') : esc(b)}${(cs.find(c=>c.brand === b) || {}).note ? ` <span class="ph-note">· ${esc(pn(cs.find(c=>c.brand === b).note))}</span>` : ''}</div>` : ''}<div class="ph-grid">${cs.filter(c=>(c.brand || '') === b).map(c=>{
     const k = q.id + '#' + c.i, isStd = !!(stdOn && (std0.idx != null && std0.idx >= 0 ? c.i === std0.idx : c.t === std0.label)), on = !!(L.answers[k] || {}).qty || isStd, name = c.show || (c.brand ? c.t.slice(c.brand.length + 3) : c.t);
     const pr = view === 'customer' || isStd ? '' : c.p == null ? '<small class="ph-price tbd">price to come</small>' : c.p ? `<small class="ph-price">${c.p < 0 ? '− ' + money2(-c.p) + ' credit' : '+ ' + money2(c.p)}</small>` : '';
     return `<div class="ph-tile ${on ? 'on' : ''} ${isStd ? 'stdon' : ''} ${flashKey === k ? 'flash' : ''}">
@@ -2333,6 +2359,7 @@ function linePhoto(l, L){
   const q = l.q, i = Number(l.key.split('#')[1]), c = q && q.c ? q.c[i] : null; if(!c) return '';
   const fin = q.room ? bathFin(L, q.room.id) : 'ch';
   if(c.disp){ const d = c.disp[fin] || c.disp.ch; if(d) return 'selection-photos/faucets/' + d + '.jpg'; }
+  if(c.hw || c.hwFin) return tileImg(q, { ...c, i }, L);
   if(c.fins && c.model) return moenImg(c.model, c.fins.includes(fin) ? fin : 'ch');
   return c.img || '';
 }
