@@ -1243,6 +1243,8 @@ function buildCatalog(cat){
     const parent = SECTIONS.flatMap(r=>r.qs).filter(q=>after.includes(q.bt) && (!rid || q.room.id === rid)); if(!parent.length) return;
     const sec = parent[0].room, at = sec.qs.lastIndexOf(parent[parent.length - 1]);
     sec.qs.splice(at + 1, 0, { id, bt:'', num:parent[0].num, t: title + (rid ? ' - ' + sec.name : ''), cc, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:!afterRe, after:parent.map(q=>q.id), ...(afterRe ? { afterRe } : {}), c:make() }); });
+  // STAIRS (owner, 2026-11-11): every stairs line can take several choices, each with a + / − quantity (e.g. two sets of stairs)
+  { const sec = SECTIONS.find(r=>r.id === 'stairs'); if(sec) sec.qs.forEach(q=>{ q.one = false; q.multi = true; }); }
   { const sec = SECTIONS.find(r=>r.id === 'doors'), at = sec ? sec.qs.findIndex(q=>q.bt === '200') : -1;
     if(at >= 0) sec.qs.splice(at + 1, 0, { id:'idstyle', bt:'', num:200, t:'Interior Door Style', cc:32, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true,
       c:INT_DOORS.map(n=>({ t:n, p:0, unit:'', img:MISC + 'door-int-' + slugOf(n) + '.jpg' })) }); }
