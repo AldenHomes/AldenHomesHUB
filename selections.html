@@ -1245,6 +1245,8 @@ function buildCatalog(cat){
     sec.qs.splice(at + 1, 0, { id, bt:'', num:parent[0].num, t: title + (rid ? ' - ' + sec.name : ''), cc, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:!afterRe, after:parent.map(q=>q.id), ...(afterRe ? { afterRe } : {}), c:make() }); });
   // STAIRS (owner, 2026-11-11): every stairs line can take several choices, each with a + / − quantity (e.g. two sets of stairs)
   { const sec = SECTIONS.find(r=>r.id === 'stairs'); if(sec) sec.qs.forEach(q=>{ q.one = false; q.multi = true; }); }
+  // foundation wall height is one choice: 8' standard, or 9' or 10'
+  { const q = SECTIONS.flatMap(r=>r.qs).find(q=>q.bt === '128'); if(q) q.one = true; }
   { const sec = SECTIONS.find(r=>r.id === 'doors'), at = sec ? sec.qs.findIndex(q=>q.bt === '200') : -1;
     if(at >= 0) sec.qs.splice(at + 1, 0, { id:'idstyle', bt:'', num:200, t:'Interior Door Style', cc:32, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true,
       c:INT_DOORS.map(n=>({ t:n, p:0, unit:'', img:MISC + 'door-int-' + slugOf(n) + '.jpg' })) }); }
@@ -1309,6 +1311,7 @@ const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:
   : q.bt === '608' ? { label:'#1 pressure treated' }
   : q.bt === '701' ? { label:'White windows' }
   : q.id === 'bstairs' ? { label:'Closed stairs to basement' }
+  : q.bt === '128' ? { label:"8' basement walls (standard height)" }   // foundation walls (owner, 2026-11-11): 8' preset, 9' / 10' are upgrades
   : q.bt === '780' ? { label:'Interior paint - flat ceiling/flat walls' }
   : q.bt === '790' ? { label:'Standard flooring (vinyl / carpet)', keep:true }
   : q.bt === '175' ? { label:'2 standard hose bibs', keep:true }
