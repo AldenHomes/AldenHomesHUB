@@ -2326,6 +2326,7 @@ function quoteDoc(L, forCustomer, opts){
       <div><h1>${esc(title)}</h1><div class="sub">${selDoc ? (L.signedOn ? 'Signed ' + esc(nice(L.signedOn)) : 'Selections in progress · ' + esc(nice(iso(new Date())))) : (L.quoteOk ? 'Confirmed ' + esc(nice(L.quoteOk)) : 'Draft · not yet confirmed') + ' · prices as of ' + esc(nice(L.pricedOn))}</div></div></div>
     <div class="doc-facts">
       <div><span>Prepared for</span><b>${esc([L.name, L.name2].filter(Boolean).join(' & '))}</b></div>
+      <div style="grid-column:span 2"><span>Address</span><b>${esc(L.address || 'To be decided')}</b></div>
       <div><span>Community</span><b>${esc(dname || 'To be decided')}</b></div>
       <div><span>Lot</span><b>${esc(L.lot ? '#' + L.lot : 'To be decided')}${phase ? ' · Phase ' + esc(phase) : ''}</b></div>
       <div><span>Home style</span><b>${esc(L.model || '')}</b></div>
