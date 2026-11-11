@@ -1871,18 +1871,33 @@ const styColl = name=>Object.keys(STYLES).find(k=>STYLES[k].includes(name)) || '
    with a "change to" blank. Colour / style picks at no charge, BuilderTrend's blank "type it" lines and the hidden contract lines are left out. */
 function priceListDoc(){
   const fmt = (p, u)=>p === 'typed' ? 'typed on the sheet' : (p < 0 ? '− ' + money2(-p) + ' credit' : money2(p)).replace(/\.00$/, '') + (u ? ' / ' + u : '');
-  const rows = [];
+  const rows = [], seen = new Set();
+  /* SIMPLER (owner, 2026-11-11: "a bit confusing… they choose faucet style they pay for the finish… make it super easy"): every thing to
+     price appears ONCE (deduped by what it's priced by — the same price key in three bathrooms is one line); faucet / hardware styles and
+     colour picks at no charge are left out; the kitchen add-ons and the Magnetix head are one line each ("any style, any finish"); no-charge
+     lines are left off the current-price list. */
+  const add = (key, r)=>{ if(seen.has(key)) return; seen.add(key); rows.push(r); };
+  const room = q=>q.room && q.room.name && /bath/i.test(q.room.name) ? q.room.name : '';
   SECTIONS.forEach(sec=>sec.qs.forEach(q=>{
-    if(/^(Contract Price|Miscellaneous|Lot Premium)$/i.test(q.t)) return;
+    if(/^(Contract Price|Miscellaneous|Lot Premium)$/i.test(q.t) || q.hwq || q.col) return;
     const qt = qTitle(q) + (q.line ? ' (' + (LINE_NAMES[q.line] || q.line) + ')' : '');
     q.c.forEach((c, i)=>{
       if(/:\s*$/.test(c.t) && !c.k) return;
-      if(q.photo && !c.k && !c.kf && !c.model && !c.fins && c.p === 0) return;
       if(q.ceil && !c.ceilAdd) return;
-      if(c.kf && c.fins){ c.fins.forEach(f=>rows.push({ s:sec.name, q:qt, c:c.t + ' — ' + FIN_LABEL[f], p:optPrice(c.kf + '-' + f), u:c.unit })); return; }
+      if(c.kf){                                       // priced per item per finish: one line per add-on, kitchen faucet styles not at all
+        const kk = KITCHEN_KIND[q.bt];
+        if(kk === 'kitchen' && !c.side) return;
+        const ac = kk === 'kitchen' && c.side, head = !kk;   // !kk = the Magnetix head in a bathroom's Shower Faucet
+        const label = ac ? 'Touchless faucet AC adapter (optional add-on)' : head ? 'Magnetix handheld shower head upgrade (any finish, any bathroom)' : (WANT_FIRST[q.bt] || c.t) + ' (any style, any finish)';
+        const keys = c.fins.map(f=>c.kf + '-' + f), prices = keys.map(optPrice).filter(v=>v != null);
+        add(ac ? 'kf:ac' : 'kfq:' + (kk || c.kf), { s: head ? 'Bathrooms (same price in every bathroom)' : sec.name, q: kk ? 'Kitchen add-ons' : 'Shower head', c: label, p: prices.length ? prices[0] : null, u:'' });
+        return; }
+      if((q.fauc || q.photo) && !c.k && !c.rate && !isAllow(q, c) && !c.p) return;   // a style / colour pick, no charge
       const allow = isAllow(q, c);
       const pr = q.ceil ? ceilFt() : c.k ? optPrice(c.k) : allow ? allowDefault(q, i) : c.rate ? 'typed' : c.p;
-      rows.push({ s:sec.name, q:qt, c:c.t + (allow ? ' (starting amount)' : ''), p:pr, u:c.unit });
+      if(pr === 0 || pr === 'typed') return;           // no charge, or typed on the sheet: nothing to fill in
+      const key = q.ceil ? 'ceil' : c.k ? 'k:' + c.k : q.tw && room(q) ? 'tw:' + q.tw + '|' + c.t + '|' + pr : q.id + '#' + i;
+      add(key, { s: q.tw && room(q) && !c.k ? 'Bathrooms (same price in every bathroom)' : sec.name, q: q.tw && !c.k ? q.tw : qt, c:c.t.replace(/ with (chrome|matte black|brushed nickel) tub filler$/i, ' with tub filler (any finish)') + (allow ? ' (starting amount)' : ''), p:pr, u:c.unit });
     });
   }));
   const houses = []; Object.keys(STYLES).forEach(k=>STYLES[k].forEach(m=>houses.push({ s:'House prices (by home style)', q:LINE_NAMES[k] || k, c:m, p:BASE_CFG[m] == null || BASE_CFG[m] === '' ? null : Number(BASE_CFG[m]), u:'' }))); rows.unshift(...houses);
@@ -1893,7 +1908,7 @@ function priceListDoc(){
       + S.qs.map(Q=>Q.rs.map((r, j)=>'<tr' + (j ? '' : ' class="first"') + '><td>' + (j ? '' : esc(Q.q)) + '</td><td>' + esc(r.c) + '</td><td class="p">' + (r.p == null ? '<span class="tbd">needed</span>' : esc(fmt(r.p, r.u))) + '</td><td class="w">$ ____________' + (r.u && r.p == null ? ' / ' + esc(r.u) : '') + '</td></tr>').join('')).join('') + '</tbody></table>').join(''); };
   const today = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
   return '<!doctype html><html><head><meta charset="utf-8"><title>Alden Homes - pricing to fill in - ' + esc(today) + '</title><style>'
-    + '@page{size:letter;margin:.5in .5in .6in}body{font-family:Arial,Helvetica,sans-serif;color:#222;font-size:10.5pt;margin:24px}@media print{body{margin:0}.noprint{display:none}}'
+    + '@page{size:letter;margin:.5in .5in .6in}:root{color-scheme:light}body{background:#fff;font-family:Arial,Helvetica,sans-serif;color:#222;font-size:10.5pt;margin:24px}@media print{body{margin:0}.noprint{display:none}}'
     + '.head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;border-bottom:3px solid #A3AA83;padding-bottom:8px;margin-bottom:10px}h1{font-size:19pt;margin:0;color:#33363a}.sub{color:#666;font-size:10pt;margin-top:3px}'
     + 'h2{font-size:14pt;margin:22px 0 4px;color:#33363a;break-after:avoid}h2 small{font-weight:normal;color:#666;font-size:10pt}'
     + 'h3{font-size:11pt;background:#eeede8;padding:5px 8px;margin:14px 0 0;break-after:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
