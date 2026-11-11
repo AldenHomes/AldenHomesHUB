@@ -1838,6 +1838,52 @@ function render(){
 let baseEdit = false;   // the base price box in a sheet's header is open
 let styleEdit = false, styName = STYLES.ALDEN[0], styState = '', styTimer = null;
 const styColl = name=>Object.keys(STYLES).find(k=>STYLES[k].includes(name)) || 'ALDEN';
+
+/* PRINT A PRICE LIST TO FILL IN (owner, 2026-11-11: "a simple sheet that shows all current pricing and pricing needs… they wanted a paper
+   document"): Home styles → Every price → "Print a price list to fill in" opens a printable page built from the live prices (nothing is
+   stored or written into this file): Part 1 = every choice still "price to come" with a blank to write in, Part 2 = every current price
+   with a "change to" blank. Colour / style picks at no charge, BuilderTrend's blank "type it" lines and the hidden contract lines are left out. */
+function priceListDoc(){
+  const fmt = (p, u)=>p === 'typed' ? 'typed on the sheet' : (p < 0 ? '− ' + money2(-p) + ' credit' : money2(p)).replace(/\.00$/, '') + (u ? ' / ' + u : '');
+  const rows = [];
+  SECTIONS.forEach(sec=>sec.qs.forEach(q=>{
+    if(/^(Contract Price|Miscellaneous|Lot Premium)$/i.test(q.t)) return;
+    const qt = qTitle(q) + (q.line ? ' (' + (LINE_NAMES[q.line] || q.line) + ')' : '');
+    q.c.forEach((c, i)=>{
+      if(/:\s*$/.test(c.t) && !c.k) return;
+      if(q.photo && !c.k && !c.kf && !c.model && !c.fins && c.p === 0) return;
+      if(q.ceil && !c.ceilAdd) return;
+      if(c.kf && c.fins){ c.fins.forEach(f=>rows.push({ s:sec.name, q:qt, c:c.t + ' — ' + FIN_LABEL[f], p:optPrice(c.kf + '-' + f), u:c.unit })); return; }
+      const allow = isAllow(q, c);
+      const pr = q.ceil ? ceilFt() : c.k ? optPrice(c.k) : allow ? allowDefault(q, i) : c.rate ? 'typed' : c.p;
+      rows.push({ s:sec.name, q:qt, c:c.t + (allow ? ' (starting amount)' : ''), p:pr, u:c.unit });
+    });
+  }));
+  const houses = []; Object.keys(STYLES).forEach(k=>STYLES[k].forEach(m=>houses.push({ s:'House prices (by home style)', q:LINE_NAMES[k] || k, c:m, p:BASE_CFG[m] == null || BASE_CFG[m] === '' ? null : Number(BASE_CFG[m]), u:'' }))); rows.unshift(...houses);
+  const need = rows.filter(r=>r.p == null), have = rows.filter(r=>r.p != null);
+  const table = (list, blank)=>{ const secs = [];
+    list.forEach(r=>{ let S = secs.find(x=>x.s === r.s); if(!S) secs.push(S = { s:r.s, qs:[] }); let Q = S.qs.find(x=>x.q === r.q); if(!Q) S.qs.push(Q = { q:r.q, rs:[] }); Q.rs.push(r); });
+    return secs.map(S=>'<h3>' + esc(S.s) + '</h3><table><thead><tr><th style="width:30%">Question</th><th>Choice</th><th class="p">' + (blank ? 'Price' : 'Current price') + '</th><th class="w">' + (blank ? 'Price to use' : 'Change to (if different)') + '</th></tr></thead><tbody>'
+      + S.qs.map(Q=>Q.rs.map((r, j)=>'<tr' + (j ? '' : ' class="first"') + '><td>' + (j ? '' : esc(Q.q)) + '</td><td>' + esc(r.c) + '</td><td class="p">' + (r.p == null ? '<span class="tbd">needed</span>' : esc(fmt(r.p, r.u))) + '</td><td class="w">$ ____________' + (r.u && r.p == null ? ' / ' + esc(r.u) : '') + '</td></tr>').join('')).join('') + '</tbody></table>').join(''); };
+  const today = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+  return '<!doctype html><html><head><meta charset="utf-8"><title>Alden Homes - pricing to fill in - ' + esc(today) + '</title><style>'
+    + '@page{size:letter;margin:.5in .5in .6in}body{font-family:Arial,Helvetica,sans-serif;color:#222;font-size:10.5pt;margin:24px}@media print{body{margin:0}.noprint{display:none}}'
+    + '.head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;border-bottom:3px solid #A3AA83;padding-bottom:8px;margin-bottom:10px}h1{font-size:19pt;margin:0;color:#33363a}.sub{color:#666;font-size:10pt;margin-top:3px}'
+    + 'h2{font-size:14pt;margin:22px 0 4px;color:#33363a;break-after:avoid}h2 small{font-weight:normal;color:#666;font-size:10pt}'
+    + 'h3{font-size:11pt;background:#eeede8;padding:5px 8px;margin:14px 0 0;break-after:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + 'table{width:100%;border-collapse:collapse}th{text-align:left;font-size:8.5pt;text-transform:uppercase;letter-spacing:.4px;color:#666;border-bottom:1.5px solid #bbb;padding:4px 6px}'
+    + 'td{padding:5px 6px;border-bottom:1px solid #e3e1da;vertical-align:top}tr{break-inside:avoid}tr.first td{border-top:1px solid #cfccc2}'
+    + '.p{text-align:right;white-space:nowrap;width:16%}.w{white-space:nowrap;width:22%;color:#999}.tbd{color:#b3452f;font-weight:bold}'
+    + '.note{background:#f6f5f0;border:1px solid #e3e1da;padding:8px 10px;font-size:9.5pt;line-height:1.45;margin:8px 0}.part{break-before:page}'
+    + '.bar{margin-bottom:14px}.bar button{font:inherit;font-weight:bold;padding:9px 16px;border:0;border-radius:3px;background:#4B4F54;color:#fff;cursor:pointer}'
+    + '</style></head><body><div class="bar noprint"><button onclick="print()">Print</button></div>'
+    + '<div class="head"><div><h1>Selections pricing — to fill in</h1><div class="sub">Alden Homes · from the hub\'s Selections price list · ' + esc(today) + '</div></div><div class="sub">Filled in by: ______________________</div></div>'
+    + '<div class="note"><b>How to use this:</b> Part 1 lists every choice that has <b>no price yet</b> (the sheet says "price to come") — write the price in the last column. Part 2 lists every current price — if one is wrong, write the new price beside it. Prices are what the customer pays; per-unit prices say so (per sq ft, per ft). Hand it back and the prices get typed into Selections → Home styles → Every price.</div>'
+    + '<h2>Part 1 · Needs a price <small>· ' + need.length + ' items</small></h2>' + table(need, true)
+    + '<div class="part"></div><h2>Part 2 · Current prices <small>· ' + have.length + ' items · check and correct</small></h2>' + table(have, false)
+    + '</body></html>';
+}
+
 let styView = 'show';   // back end: 'show' = what each style's sheet shows; 'prices' = every price; 'sizes' = home style sizes
 function sizesScreen(){
   const box = (m, f, ph)=>`<input type="number" min="0" step="${f === 'sqft' ? 1 : 0.5}" data-size="${esc(m + '|' + f)}" value="${(SIZE_CFG[m] || {})[f] || ''}" placeholder="${ph}" style="width:${f === 'sqft' ? 110 : 80}px">`;
@@ -1867,7 +1913,8 @@ function pricesScreen(){
     <div class="card"><h2 style="font-size:18px">Every price</h2>
       <p class="muted" style="font-size:13.5px;margin-top:4px">Every choice on the pricing and selection sheets. Type a new price to change it; leave the box empty to use BuilderTrend's (shown greyed in the box). A credit is a minus number. Prices on sheets already quoted don't change by themselves: those sheets get the usual "prices have changed" offer.</p>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px"><input type="search" id="priceFind" placeholder="Find a question or choice…" style="flex:1 1 260px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius)">
-        <span class="muted" style="font-size:13.5px">${n} price${n === 1 ? '' : 's'} changed · <span id="styState">${esc(styState)}</span></span></div></div>
+        <span class="muted" style="font-size:13.5px">${n} price${n === 1 ? '' : 's'} changed · <span id="styState">${esc(styState)}</span></span>
+        <button type="button" class="btn" id="pricePrint">Print a price list to fill in</button></div></div>
     ${SECTIONS.map(r=>{ const qs = r.qs.filter(q=>!q.mvAway && q.c.length && !isLotPrem(q)); if(!qs.length) return '';
       return `<div class="card psec"><h2 style="font-size:18px">${esc(r.name)}</h2>${qs.map(q=>`<div class="pq" data-find="${esc((q.t + ' ' + q.bt + ' ' + q.c.map(c=>c.t).join(' ')).toLowerCase())}">
         <div class="pq-h"><b>${esc(q.t)}</b> <small class="muted">BT ${esc(q.bt || '—')}${q.line && LINE_NAMES[q.line] ? ' · ' + esc(LINE_NAMES[q.line]) : ''}${q.v1 ? ' · on the pricing sheet' : ''}</small></div>
@@ -2664,6 +2711,7 @@ document.addEventListener('click', async e=>{
     return;
   }
   const sv = t.closest('[data-styview]'); if(sv){ styView = sv.dataset.styview; render(); return; }
+  if(t.closest('#pricePrint')){ const w = window.open('', '_blank'); if(!w){ toast('Allow pop-ups for the hub to print the price list'); return; } w.document.open(); w.document.write(priceListDoc()); w.document.close(); return; }
   const da = t.closest('[data-doorc-add]'), dd = t.closest('[data-doorc-del]');
   if(da || dd){ if(da) DOOR_CFG.push({ name:'', num:'', hex:'#5a6470' }); else DOOR_CFG.splice(Number(dd.dataset.doorcDel), 1); const dq = qById('fdcolor'); if(dq) dq.c = paintChoices(); const y = window.scrollY; render(); window.scrollTo(0, y); if(dd) styleSave(); return; }
   const oc = t.closest('[data-overclear]'); if(oc){ delete PRICE_OVER[oc.dataset.overclear]; applyOver(); styleSave(); const y = window.scrollY; render(); window.scrollTo(0, y); toast('Back to BuilderTrend\'s price'); return; }
