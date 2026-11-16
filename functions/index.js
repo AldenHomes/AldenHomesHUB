@@ -3063,43 +3063,75 @@ const ISSUE_AI_GROUPS = [
 ];
 const issueSrc = r=>(Array.isArray(r.items) && r.items.some(i=>i && i.text))
   ? r.items.filter(i=>i && i.text).map(i=>String(i.text).trim()).join('\n') : String(r.description || '').trim();
+/* SPECIFIC ISSUES (owner, 2026-11-16: "some of these issues are not the same — under doors these are missing installed items … if doors
+   sticking is repeatedly happening we can adjust them at final walk-through … I just want to see real repeat issues"): v2 gives every
+   problem a SPECIFIC issue name (what is wrong + what part), reused word for word when it's the same problem at another home (the names
+   already used are sent with each run), a `kind` (defect | missed | damage | question) and its area (group). After sorting, issues on
+   2+ homes get a one-line "check at final walk-through" tip (settings/service-issues.tips[name]). A request sorted by v1 is redone. */
+const ISSUE_V = 2;
+const ISSUE_KINDS = ['defect', 'missed', 'damage', 'question'];
 const ISSUE_SCHEMA = { type: 'object', additionalProperties: false, required: ['requests'], properties: { requests: { type: 'array', items: {
   type: 'object', additionalProperties: false, required: ['id', 'problems'], properties: {
     id: { type: 'string' },
-    problems: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['text', 'groups'], properties: {
-      text: { type: 'string' }, groups: { type: 'array', items: { type: 'string', enum: ISSUE_AI_GROUPS.map(g=>g[0]) } } } } } } } } } };
+    problems: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['text', 'issue', 'kind', 'group'], properties: {
+      text: { type: 'string' }, issue: { type: 'string' }, kind: { type: 'string', enum: ISSUE_KINDS },
+      group: { type: 'string', enum: ISSUE_AI_GROUPS.map(g=>g[0]) } } } } } } } } };
+const TIP_SCHEMA = { type: 'object', additionalProperties: false, required: ['tips'], properties: { tips: { type: 'array', items: {
+  type: 'object', additionalProperties: false, required: ['issue', 'tip'], properties: { issue: { type: 'string' }, tip: { type: 'string' } } } } } };
 async function issueSortRun(by){
   const snap = await db.collection('service-requests').get();
-  const todo = snap.docs.map(d=>({ id: d.id, ref: d.ref, r: d.data() })).map(x=>({ ...x, src: issueSrc(x.r) }))
-    .filter(x=>x.src && !(x.r.aiIssues && x.r.aiIssues.src === x.src));
+  const docs = snap.docs.map(d=>({ id: d.id, ref: d.ref, r: d.data() })).map(x=>({ ...x, src: issueSrc(x.r) }));
+  const todo = docs.filter(x=>x.src && !(x.r.aiIssues && x.r.aiIssues.v === ISSUE_V && x.r.aiIssues.src === x.src));
+  // issue names already in use (so the same problem keeps the same name)
+  const names = new Map();
+  docs.forEach(x=>{ if(!todo.includes(x) && x.r.aiIssues && x.r.aiIssues.v === ISSUE_V) (x.r.aiIssues.items || []).forEach(p=>{ if(p.i) names.set(p.i, (names.get(p.i) || 0) + 1); }); });
   let sorted = 0;
-  if(todo.length){
-    const sdk = require('@anthropic-ai/sdk');
-    const Anthropic = sdk.Anthropic || sdk.default || sdk;
-    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value().trim() });
-    const system = 'You sort homeowner service requests for Alden Homes, a home builder, so the office can see problems that keep coming back across homes.\n'
-      + 'For each request: split its text into the separate problems it reports (one per item / sentence / bullet; keep one problem whole - don\'t split "door sticks and needs adjusting").\n'
-      + 'For each problem give "text" = the homeowner\'s own words for that one problem (copy, don\'t rewrite; drop list markers like "-" or "Interior:"), and "groups" = the group(s) the PROBLEM is about.\n'
-      + 'Group by what is actually wrong, not by where it is: "drywall crack above the storage room door" is drywall only; "paint touch-ups behind the kitchen faucet" is paint only; "water pours between the gutter and the house" is gutter AND water.\n'
-      + 'Usually one group; two only when the problem truly is both. Use "other" when nothing fits. Skip greetings, sign-offs, contact details and lines that report no problem.\n'
-      + 'Groups (id - name - what belongs):\n' + ISSUE_AI_GROUPS.map(g=>g.join(' - ')).join('\n');
-    const ok = new Set(ISSUE_AI_GROUPS.map(g=>g[0]));
-    for(let i = 0; i < todo.length; i += 20){
-      const part = todo.slice(i, i + 20);
-      const msg = await client.messages.stream({ model: INV_MODEL, max_tokens: 16000,
-        output_config: { effort: 'low', format: { type: 'json_schema', schema: ISSUE_SCHEMA } },
-        system, messages: [{ role: 'user', content: part.map(x=>'<request id="' + x.id + '">\n' + x.src.slice(0, 6000) + '\n</request>').join('\n\n') }] }).finalMessage();
-      if(msg.stop_reason === 'refusal' || msg.stop_reason === 'max_tokens') throw new Error('issues: ' + msg.stop_reason);
-      const out = JSON.parse(msg.content.filter(b=>b.type === 'text').map(b=>b.text).join(''));
-      const at = new Date().toISOString(), batch = db.batch();
-      (out.requests || []).forEach(o=>{ const x = part.find(p=>p.id === o.id); if(!x) return;
-        const items = (o.problems || []).slice(0, 80).map(p=>({ t: String(p.text || '').trim().slice(0, 600), g: [...new Set((p.groups || []).filter(g=>ok.has(g)))].slice(0, 3) }))
-          .filter(p=>p.t).map(p=>({ ...p, g: p.g.length ? p.g : ['other'] }));
-        batch.update(x.ref, { aiIssues: { src: x.src, at, items } }); sorted++; });
-      await batch.commit();
+  const sdk = require('@anthropic-ai/sdk');
+  const Anthropic = sdk.Anthropic || sdk.default || sdk;
+  const client = todo.length ? new Anthropic({ apiKey: ANTHROPIC_API_KEY.value().trim() }) : null;
+  const ask = async (system, user, schema)=>{
+    const msg = await client.messages.stream({ model: INV_MODEL, max_tokens: 16000, output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
+      system, messages: [{ role: 'user', content: user }] }).finalMessage();
+    if(msg.stop_reason === 'refusal' || msg.stop_reason === 'max_tokens') throw new Error('issues: ' + msg.stop_reason);
+    return JSON.parse(msg.content.filter(b=>b.type === 'text').map(b=>b.text).join(''));
+  };
+  const okG = new Set(ISSUE_AI_GROUPS.map(g=>g[0]));
+  for(let i = 0; i < todo.length; i += 15){
+    const part = todo.slice(i, i + 15);
+    const system = 'You sort homeowner service requests for Alden Homes, a home builder, so the office can spot the SAME problem coming back on different homes and fix it before handover (at the final walk-through) instead of after.\n'
+      + 'For each request, split its text into the separate problems it reports (one per item / sentence / bullet; keep one problem whole). Skip greetings, sign-offs, contact details and lines that report no problem.\n'
+      + 'For each problem give:\n'
+      + '- "text": the homeowner\'s own words for that one problem (copy, don\'t rewrite; drop list markers like "-" or "Interior:").\n'
+      + '- "issue": a SHORT, SPECIFIC name for the problem: what is wrong + which part, general enough to match the same problem in another house (no room names, lot numbers or people). Good: "Interior door sticks / rubs", "Door stop missing", "Exterior door lock / deadbolt needs adjusting", "Drywall nail / screw pops", "Drywall crack at ceiling or wall corner", "Water runs behind the gutter", "Downspout doesn\'t reach the ground or drain", "Cabinet door out of alignment", "Window latch doesn\'t lock". Bad (too broad): "Door problem", "Drywall". Bad (too narrow): "Master bath door sticks".\n'
+      + '  If two problems are the same thing, give them EXACTLY the same name, also across requests. When an existing name below fits, reuse it word for word; make a new name only for a truly different problem.\n'
+      + '- "kind": defect = something built or working wrong (sticks, cracks, leaks, doesn\'t work); missed = an item never installed, left unfinished or missing a part (door stop missing, extension not installed, missing screw); damage = scratched, dented, broken or dirty (incl. construction glue/mess); question = the homeowner asks something without reporting a problem.\n'
+      + '- "group": the area it belongs to (by what is wrong, not where it is: a drywall crack above a door is drywall).\n'
+      + 'Groups (id - name - what belongs):\n' + ISSUE_AI_GROUPS.map(g=>g.join(' - ')).join('\n')
+      + '\n\nIssue names already in use:\n' + ([...names.keys()].sort().join('\n') || '(none yet)');
+    const out = await ask(system, part.map(x=>'<request id="' + x.id + '">\n' + x.src.slice(0, 6000) + '\n</request>').join('\n\n'), ISSUE_SCHEMA);
+    const at = new Date().toISOString(), batch = db.batch();
+    (out.requests || []).forEach(o=>{ const x = part.find(p=>p.id === o.id); if(!x) return;
+      const items = (o.problems || []).slice(0, 80).map(p=>({ t: String(p.text || '').trim().slice(0, 600), i: String(p.issue || '').trim().slice(0, 90),
+        k: ISSUE_KINDS.includes(p.kind) ? p.kind : 'defect', g: [okG.has(p.group) ? p.group : 'other'] })).filter(p=>p.t && p.i);
+      items.forEach(p=>names.set(p.i, (names.get(p.i) || 0) + 1));
+      batch.update(x.ref, { aiIssues: { v: ISSUE_V, src: x.src, at, items } }); sorted++; });
+    await batch.commit();
+  }
+  // a walk-through tip for every issue on 2+ homes that has none yet
+  const set = (await db.collection('settings').doc('service-issues').get()).data() || {}, tips = { ...(set.tips || {}) };
+  if(sorted){
+    const homes = new Map();
+    (await db.collection('service-requests').get()).docs.forEach(d=>{ const r = d.data(), a = r.aiIssues; if(!a || a.v !== ISSUE_V) return;
+      const home = r.houseId || String(r.address || r.name || d.id).toLowerCase();
+      (a.items || []).forEach(p=>{ if(p.k === 'question') return; if(!homes.has(p.i)) homes.set(p.i, new Set()); homes.get(p.i).add(home); }); });
+    const want = [...homes.entries()].filter(([n, h])=>h.size >= 2 && !tips[n]).map(([n])=>n);
+    if(want.length){
+      const out = await ask('You help Alden Homes, a home builder, catch repeat warranty problems before the buyer moves in. For each issue name, write ONE short, practical line (max 20 words) saying what to check or adjust at the final walk-through (or just before) so it doesn\'t come back as a service request. Plain words, no fluff.',
+        want.map(n=>'- ' + n).join('\n'), TIP_SCHEMA);
+      (out.tips || []).forEach(t=>{ if(want.includes(t.issue) && t.tip) tips[t.issue] = String(t.tip).slice(0, 200); });
     }
   }
-  await db.collection('settings').doc('service-issues').set({ at: new Date().toISOString(), by, sorted, waiting: todo.length - sorted }, { merge: true });
+  await db.collection('settings').doc('service-issues').set({ at: new Date().toISOString(), by, sorted, waiting: todo.length - sorted, tips }, { merge: true });
   return { sorted, of: todo.length };
 }
 if(ASSISTANT_ON){

@@ -117,7 +117,7 @@
   .iss-box{background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); padding:12px 14px; margin:-4px 0 18px;}
   .iss-top{display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; color:var(--ink-soft); margin-bottom:8px;}
   .iss-top select, .iss-m select{width:auto !important; max-width:190px;} .iss-top select{padding:6px 8px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:13px; background:#fff;}
-  .iss-row{display:grid; grid-template-columns:minmax(150px,230px) minmax(0,1fr) auto; gap:4px 12px; align-items:center; padding:8px 4px; border-top:1px solid #ece8dd; cursor:pointer;}
+  .iss-row{display:grid; grid-template-columns:minmax(200px,1.3fr) minmax(80px,1fr) auto; gap:4px 12px; align-items:center; padding:8px 4px; border-top:1px solid #ece8dd; cursor:pointer;}
   .iss-row:hover{background:#faf8f2;} .iss-row.open{background:#f3f1ea;}
   .iss-name{font-weight:700; color:var(--navy); font-size:14px;}
   .iss-bar{height:10px; background:#ece8dd; border-radius:6px; overflow:hidden;} .iss-bar i{display:block; height:100%; background:var(--navy); border-radius:6px;}
@@ -132,6 +132,13 @@
   .iss-m button, .iss-m select{font-size:11.5px; padding:3px 7px; border:1px solid var(--steel-line); border-radius:var(--radius); background:#fff; cursor:pointer; color:var(--ink-soft); font-family:inherit;}
   .iss-m button:hover{color:var(--navy); border-color:var(--navy);}
   .iss-note{font-size:12px; color:var(--ink-soft); margin-top:8px;}
+  .iss-sub{display:flex; gap:5px; flex-wrap:wrap; margin-top:3px;}
+  .iss-chip{font-size:11px; font-weight:600; background:#ece8dd; color:var(--ink-soft); border-radius:10px; padding:1px 8px; white-space:nowrap;}
+  .iss-chip.k-defect{background:#f5e7e3; color:var(--danger);} .iss-chip.k-missed{background:#e9ebee; color:var(--navy);} .iss-chip.k-damage{background:#f3ece0; color:#8a6a2e;}
+  .iss-tip{grid-column:1 / -1; font-size:12.5px; color:#3f7a4e; background:#edf3ee; border-radius:6px; padding:5px 8px; margin-top:6px; line-height:1.4;}
+  .iss-h{display:flex; align-items:center; gap:8px; width:100%; font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-soft); margin:12px 0 4px; background:none; border:none; padding:0; font-family:inherit; text-align:left;}
+  .iss-h span{font-weight:700; letter-spacing:0; background:#ece8dd; border-radius:10px; padding:0 8px; color:var(--ink-soft);} .iss-h .arrow{background:none; padding:0;}
+  .iss-onceT{cursor:pointer; margin-top:16px;}
   .iss-ai{display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; background:#fff; border:1px solid #ece8dd; border-radius:var(--radius); padding:8px 10px; margin:2px 0 8px; font-size:13px; color:var(--ink-soft);}
   .iss-ai b{color:var(--ink);} .iss-ai b.iss-wait{color:#a0721c;} .iss-ai .btn{padding:7px 12px; font-size:13px;} .iss-ai .btn:disabled{opacity:.5; cursor:default;}
   @media (max-width:640px){ .iss-row{grid-template-columns:1fr auto;} .iss-bar{display:none;} .iss-m{flex-wrap:wrap;} .iss-m .w{flex-basis:100%;} }
@@ -1290,123 +1297,109 @@ document.getElementById('deleteBtn').addEventListener('click', async ()=>{
 </script>
 <script>
 /* ============================================================
-   REPEAT ISSUES (owner, 2026-11-16: "a trend on some of the service requests, especially these end of year ones … track if there are
-   common repeat issues — one I've seen a few times is water missing gutters and flowing down behind them").
-   Each request is cut into its separate problems (its items, or else its description split at new lines, bullets and dashes), and each
-   problem is sorted into the groups below by its wording. A group shows how many homes had it, how often, and when it was last seen;
-   click it for every mention (click one to open the request). A problem sorted wrong can be taken out of a group, and anything can be
-   put in a group by hand — saved on the request as issueTags[pieceKey] = { add:[group ids], off:[group ids] }. Nothing else is stored.
-   To add a group: one line in ISSUE_GROUPS (id, name, words to look for).
+   REPEAT ISSUES (owner, 2026-11-16: "a trend on some of the service requests … track if there are common repeat issues — water missing
+   gutters and flowing down behind them"; then: "some of these issues are not the same … missing installed items … if doors sticking is
+   repeatedly happening we can adjust them at final walk-through … I just want to see real repeat issues").
+   The server (issuesApi button / issuesMonthly on the 1st, functions/index.js `issueSortRun`) has Claude split each request into problems
+   and give each a SPECIFIC issue name (same name = same problem on another home), a kind (defect / missed / damage / question) and an
+   area. Saved as r.aiIssues { v:2, src, at, items:[{ t, i, k, g:[area] }] }; settings/service-issues { at, by, tips:{ name: walk-through tip } }.
+   This box lists the issues on 2+ homes first (with the tip), then the ones seen once. A request not sorted yet (new or edited since)
+   counts as "waiting" until the next run. "Not the same issue" moves one mention to another name (or hides it) — saved on the request
+   as issueTags[pieceKey] = { issue: name } | { hide: true } and kept when the AI runs again.
    ============================================================ */
-const ISSUE_GROUPS = [
-  // over: groups this one overrules when both match — there the other word only says WHERE the problem is ("crack above the door")
-  { id:'gutter', n:'Gutters & downspouts', re:/gutter|down ?spout|leader pipe|splash ?block|drain spout/i, over:['plumbing','deck','roof'] },
-  { id:'water', n:'Water getting in / pooling', re:/water (runs|running|pours|pouring|com(es|ing) in|gets in|getting in|leak|behind|into)|leak|puddl|pool(s|ing)\b|moisture|\bwet\b|damp|flood|ice dam|seep/i },
-  { id:'drywall', n:'Drywall cracks & nail pops', re:/dry ?wall|sheet ?rock|nail pop|screw pop|nail\/screw|nail holes|settlement crack|seam crack|ceiling seam|crack(ed|s)? (in|on|by|near|at|above|below|where)? ?(the )?(ceiling|wall|drywall|corner)|(ceiling|wall)s? (crack|seam)|cracked ceiling|cracks in the (garage )?ceiling|^\W*crack (by|at|above|below|near|down|where)|bubble by/i,
-    over:['doors','windows','trim','deck','plumbing','electric','cabinets','floor'] },
-  { id:'doors', n:'Doors sticking / need adjusting', re:/(?<!cabinet |cabinet corner |shower |oven |garage )\bdoors?\b(?! ?(stop|bell))|door ?knob|deadbolt|hinge|weather ?strip/i },
-  { id:'windows', n:'Windows, drafts & latches', re:/window|draft|cold air|whistl|latch/i, over:['deck','trim'] },
-  { id:'concrete', n:'Concrete & foundation cracks', re:/foundation|concrete|cement|\bslab|cinder ?block|stoop|parg/i, over:['plumbing','deck','drywall'] },
-  { id:'caulk', n:'Caulk & sealing', re:/caulk|\bseal(ed|ing|ant)?\b/i, over:['plumbing','trim','deck','doors','windows'] },
-  { id:'cabinets', n:'Cabinets & countertops', re:/cabinet|drawer|countertop|\bisland\b|trash can slide|shelf support/i, over:['plumbing','doors'] },
-  { id:'siding', n:'Siding & exterior trim', re:/siding|soffit|fascia|shutter|exterior trim/i, over:['plumbing','windows'] },
-  { id:'roof', n:'Roof & flashing', re:/roof|shingle|flashing/i },
-  { id:'plumbing', n:'Plumbing & faucets', re:/faucet|hose ?bib|spigot|toilet|shower|\btub\b|sink|plumb|water heater|drain/i },
-  { id:'electric', n:'Lights, outlets & detectors', re:/\blights?\b|lighting|outlet|receptacle|switch|breaker|electric|smoke|detector|ceiling fan|gfci|\bfan\b/i, over:['deck','doors'] },
-  { id:'appliance', n:'Appliances', re:/microwave|dishwasher|refrigerator|fridge|appliance|\brange hood/i },
-  { id:'hvac', n:'Heating & cooling', re:/hvac|furnace|heat pump|\ba\/?c\b|air condition|thermostat|duct|register/i },
-  { id:'deck', n:'Deck, porch & railings', re:/deck|porch|patio|railing|handrail|stair cable|trex|composite/i },
-  { id:'trim', n:'Stairs, trim & baseboard', re:/\bstair|baseboard|\btrim\b|nosing|casing|molding|moulding|banister/i },
-  { id:'paint', n:'Paint & touch-ups', re:/paint|\bstain\b|scratch|touch ?up|\bnick|glue/i, over:['doors','plumbing','trim','deck'] },
-  { id:'floor', n:'Flooring', re:/floor(ing)?\b|carpet|\btile|\blvp\b|grout/i },
-  { id:'garage', n:'Garage door', re:/garage door|opener/i },
-  { id:'yard', n:'Yard, trees & grading', re:/\btree|lawn|grass|seed|grading|\byard\b|mulch|landscap|erosion|wash(ed)? out|channel in the ground/i },
-];
-const ISS_OTHER = { id:'other', n:'Other' };
-let issOpen = false, issGroup = '', issRange = '12', issDev = '', issRun = null, issBusy = false;
-/* AI SORTING (owner, 2026-11-16: "a button that has AI scan and sort them … once a month"): the server (issuesApi / issuesMonthly in
-   functions/index.js) has Claude split each request into problems and group them, saved as r.aiIssues { src, at, items:[{ t, g }] }.
-   A request whose text still matches aiIssues.src uses the AI's problems and groups; one not sorted yet (new or edited) falls back to
-   the word matching below until the next run. issueSrc must stay the same as the server's. */
+const ISS_AREAS = { gutter:'Gutters & downspouts', water:'Water getting in', drywall:'Drywall', doors:'Doors', windows:'Windows',
+  concrete:'Concrete & foundation', caulk:'Caulk & sealing', cabinets:'Cabinets & countertops', siding:'Siding & exterior trim', roof:'Roof',
+  plumbing:'Plumbing', electric:'Electrical', appliance:'Appliances', hvac:'Heating & cooling', deck:'Deck, porch & railings',
+  trim:'Stairs & trim', paint:'Paint & finish', floor:'Flooring', garage:'Garage door', yard:'Yard & grading', other:'Other' };
+const ISS_KINDS = { defect:'Built or working wrong', missed:'Missed / unfinished', damage:'Damage / clean-up', question:'Question' };
 const ISS_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/issuesApi';
+// the text that was sorted — must stay the same as the server's issueSrc
 const issueSrc = r=>(Array.isArray(r.items) && r.items.some(i=>i && i.text))
   ? r.items.filter(i=>i && i.text).map(i=>String(i.text).trim()).join(String.fromCharCode(10)) : String(r.description || '').trim();
-const issueAi = r=>!!(r.aiIssues && Array.isArray(r.aiIssues.items) && r.aiIssues.src === issueSrc(r));
-let issRunSub = null;
+const issueAi = r=>!!(r.aiIssues && r.aiIssues.v === 2 && Array.isArray(r.aiIssues.items) && r.aiIssues.src === issueSrc(r));
+let issOpen = false, issSel = '', issRange = '12', issDev = '', issArea = '', issKind = 'fix', issOnce = false, issRun = null, issBusy = false, issRunSub = null;
 try{ issOpen = localStorage.getItem('svcIssuesOpen') === '1'; }catch(e){}
-// a request's separate problems: { key, text }
-function issuePieces(r){
-  if(issueAi(r)) return r.aiIssues.items.map((x, i)=>({ key:'a' + i, text:String(x.t || ''), ai:(x.g || []).slice() }));
-  if(Array.isArray(r.items) && r.items.length) return r.items.filter(i=>i && i.text).map(i=>({ key:'i_' + i.id, text:String(i.text) }));
-  const out = [];
-  String(r.description || '').split(/\r?\n|•|(?:^|\s)-(?=[A-Za-z])|(?:^|\s)\d{1,2}[.)]\s+(?=[A-Za-z])/).map(s=>s.trim()).filter(s=>s.length > 2)
-    .forEach((t, i)=>out.push({ key:'d' + i, text:t }));
-  return out;
-}
-function issueGroupsOf(r, p){
-  const tag = (r.issueTags || {})[p.key] || {}, off = tag.off || [], add = tag.add || [];
-  let ids;
-  if(p.ai) ids = p.ai.filter(g=>g !== 'other' && ISSUE_GROUPS.some(x=>x.id === g) && !off.includes(g));
-  else { const hit = ISSUE_GROUPS.filter(g=>g.re.test(p.text)), drop = new Set(hit.flatMap(g=>g.over || []));
-    ids = hit.filter(g=>!drop.has(g.id) && !off.includes(g.id)).map(g=>g.id); }
-  add.forEach(a=>{ if(!ids.includes(a) && ISSUE_GROUPS.some(g=>g.id === a)) ids.push(a); });
-  return ids.length ? ids : ['other'];
-}
 function issueWhen(r){ return String(r.submittedAt || '').slice(0, 10); }
+const issDate = d=>d ? new Date(d + 'T12:00').toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) : '';
+// a sorted request's problems, with any hand changes applied
+function issuePieces(r){
+  if(!issueAi(r)) return [];
+  return r.aiIssues.items.map((x, n)=>{ const key = 'a' + n, tag = (r.issueTags || {})[key] || {};
+    return { key, text:String(x.t || ''), issue: tag.issue || String(x.i || ''), kind: x.k || 'defect', area: (x.g || [])[0] || 'other', hide: !!tag.hide, moved: !!tag.issue }; });
+}
 function renderIssues(){
   if(!issRunSub && typeof db !== 'undefined' && db && firebase.auth().currentUser){ issRunSub = db.collection('settings').doc('service-issues').onSnapshot(d=>{ issRun = d.exists ? d.data() : null; renderIssues(); }, ()=>{}); }
   const wrap = document.getElementById('issuesWrap'), tg = document.getElementById('issuesToggle'); if(!wrap || !tg) return;
   const cut = issRange === 'all' ? '' : issRange === 'year' ? new Date().getFullYear() + '-01-01'
     : new Date(Date.now() - Number(issRange) * 30.44 * 864e5).toISOString().slice(0, 10);
   const devOf = r=>{ const h = homeFor(r); return h ? h.community || '' : ''; };
+  const all = requests.filter(r=>issueSrc(r)), sortedN = all.filter(issueAi).length, waiting = all.length - sortedN;
   const reqs = requests.filter(r=>(!cut || issueWhen(r) >= cut) && (!issDev || devOf(r) === issDev));
-  // group id → { mentions: [{ r, p }], homes: Set }
-  const G = {};
-  [...ISSUE_GROUPS, ISS_OTHER].forEach(g=>{ G[g.id] = { g, m:[], homes:new Set(), last:'' }; });
+  const okKind = k=>issKind === 'all' ? true : issKind === 'fix' ? k !== 'question' : k === issKind;
+  // issue name → { name, m:[{ r, p }], homes:Set, last, kinds:{}, areas:{} }
+  const I = new Map(), allNames = new Set();
   reqs.forEach(r=>{
-    const home = homeFor(r), hk = home ? home.id : (r.address || r.name || r.id).toLowerCase();
-    issuePieces(r).forEach(p=>issueGroupsOf(r, p).forEach(id=>{ const x = G[id]; x.m.push({ r, p }); x.homes.add(hk); if(issueWhen(r) > x.last) x.last = issueWhen(r); }));
+    const home = homeFor(r), hk = home ? home.id : String(r.address || r.name || r.id).toLowerCase();
+    issuePieces(r).forEach(p=>{
+      allNames.add(p.issue);
+      if(p.hide || !okKind(p.kind) || (issArea && p.area !== issArea)) return;
+      if(!I.has(p.issue)) I.set(p.issue, { name:p.issue, m:[], homes:new Set(), last:'', kinds:{}, areas:{} });
+      const x = I.get(p.issue); x.m.push({ r, p }); x.homes.add(hk); if(issueWhen(r) > x.last) x.last = issueWhen(r);
+      x.kinds[p.kind] = (x.kinds[p.kind] || 0) + 1; x.areas[p.area] = (x.areas[p.area] || 0) + 1;
+    });
   });
-  const list = Object.values(G).filter(x=>x.m.length && x.g.id !== 'other').sort((a, b)=>b.homes.size - a.homes.size || b.m.length - a.m.length);
-  const other = G.other, max = Math.max(1, ...list.map(x=>x.homes.size));
-  const top = list.filter(x=>x.homes.size >= 2).slice(0, 3);
-  document.getElementById('issuesTeaser').textContent = top.length ? '· ' + top.map(x=>x.g.n + ' (' + x.homes.size + ' homes)').join(' · ') : '';
+  const top = o=>Object.entries(o).sort((a, b)=>b[1] - a[1])[0][0];
+  const list = [...I.values()].map(x=>({ ...x, kind: top(x.kinds), area: top(x.areas) })).sort((a, b)=>b.homes.size - a.homes.size || b.m.length - a.m.length || a.name.localeCompare(b.name));
+  const reps = list.filter(x=>x.homes.size >= 2), once = list.filter(x=>x.homes.size < 2);
+  document.getElementById('issuesTeaser').textContent = reps.length ? '· ' + reps.slice(0, 3).map(x=>x.name + ' (' + x.homes.size + ' homes)').join(' · ') : '';
   tg.classList.toggle('open', issOpen);
   wrap.style.display = issOpen ? 'block' : 'none';
   if(!issOpen) return;
-  if(wrap.contains(document.activeElement) && document.activeElement.tagName === 'SELECT' && document.activeElement.dataset.issAdd) return;
+  if(wrap.contains(document.activeElement) && document.activeElement.dataset && document.activeElement.dataset.issMove) return;
+  const tips = (issRun && issRun.tips) || {}, max = Math.max(1, ...list.map(x=>x.homes.size));
   const devs = [...new Set(requests.map(devOf).filter(Boolean))].sort();
-  const words = g=>g.re ? new RegExp(g.re.source, 'gi') : null;
-  const mark = (t, g)=>{ const re = words(g); const s = esc(t); if(!re) return s;
-    return esc(t).replace(new RegExp(g.re.source.replace(/\(\?<!.*?\)/g, ''), 'gi'), x=>'<mark>' + x + '</mark>'); };
-  const mention = (g, { r, p })=>{ const home = homeFor(r);
-    return `<div class="iss-m" data-open-req="${esc(r.id)}"><div class="w"><b>${esc(home ? homeLabel(home) : (r.name || 'Unknown'))}</b>${esc(issueWhen(r) ? new Date(issueWhen(r) + 'T12:00').toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) : '')}${r.status === 'sent' ? ' · done' : ''}</div>
-      <div class="t">${mark(p.text.length > 260 ? p.text.slice(0, 260) + '…' : p.text, g)}</div>
-      <div class="a">${g.id !== 'other' ? `<button type="button" data-iss-off="${esc(r.id)}|${esc(p.key)}|${g.id}" title="This one isn't a ${esc(g.n.toLowerCase())} problem">Not this</button>` : ''}
-        <select data-iss-add="${esc(r.id)}|${esc(p.key)}" title="Also count it under another group"><option value="">${g.id === 'other' ? 'Sort into…' : 'Also under…'}</option>${ISSUE_GROUPS.filter(x=>x.id !== g.id).map(x=>`<option value="${x.id}">${esc(x.n)}</option>`).join('')}</select></div></div>`; };
-  const row = x=>{ const open = issGroup === x.g.id, rep = x.homes.size >= 2;
-    return `<div class="iss-row ${open ? 'open' : ''}" data-iss-group="${x.g.id}"><div class="iss-name">${esc(x.g.n)}</div>
-      <div class="iss-bar">${x.g.id === 'other' ? '' : `<i style="width:${(x.homes.size / max * 100).toFixed(1)}%"></i>`}</div>
-      <div class="iss-n"><b class="${rep ? 'iss-rep' : ''}">${x.homes.size} home${x.homes.size === 1 ? '' : 's'}</b> · ${x.m.length} mention${x.m.length === 1 ? '' : 's'} · last ${esc(x.last ? new Date(x.last + 'T12:00').toLocaleDateString(undefined, { month:'short', day:'numeric' }) : '—')}</div>
-      ${open ? `<div class="iss-list">${x.m.slice().sort((a, b)=>issueWhen(b.r).localeCompare(issueWhen(a.r))).map(m=>mention(x.g, m)).join('')}</div>` : ''}</div>`; };
+  const names = [...allNames].sort();
+  const mention = ({ r, p })=>{ const home = homeFor(r);
+    return `<div class="iss-m" data-open-req="${esc(r.id)}"><div class="w"><b>${esc(home ? homeLabel(home) : (r.name || 'Unknown'))}</b>${esc(issDate(issueWhen(r)))}${r.status === 'sent' ? ' · done' : ''}</div>
+      <div class="t">${esc(p.text.length > 260 ? p.text.slice(0, 260) + '…' : p.text)}${p.moved ? ' <span class="iss-chip">moved here by hand</span>' : ''}</div>
+      <div class="a"><select data-iss-move="${esc(r.id)}|${esc(p.key)}" title="This one is a different problem"><option value="">Not the same issue…</option>
+        ${names.filter(n=>n !== p.issue).map(n=>`<option value="i:${esc(n)}">Move to: ${esc(n)}</option>`).join('')}
+        <option value="new">Move to a new issue (type its name)…</option><option value="hide">Not a real issue — hide it</option></select></div></div>`; };
+  const row = x=>{ const open = issSel === x.name, tip = tips[x.name];
+    return `<div class="iss-row ${open ? 'open' : ''}" data-iss-sel="${esc(x.name)}">
+      <div><div class="iss-name">${esc(x.name)}</div><div class="iss-sub"><span class="iss-chip k-${x.kind}">${esc(ISS_KINDS[x.kind] || x.kind)}</span><span class="iss-chip">${esc(ISS_AREAS[x.area] || x.area)}</span></div></div>
+      <div class="iss-bar"><i style="width:${(x.homes.size / max * 100).toFixed(1)}%"></i></div>
+      <div class="iss-n"><b class="${x.homes.size >= 2 ? 'iss-rep' : ''}">${x.homes.size} home${x.homes.size === 1 ? '' : 's'}</b> · ${x.m.length} mention${x.m.length === 1 ? '' : 's'} · last ${esc(x.last ? new Date(x.last + 'T12:00').toLocaleDateString(undefined, { month:'short', day:'numeric' }) : '—')}</div>
+      ${tip && x.homes.size >= 2 ? `<div class="iss-tip"><b>At final walk-through:</b> ${esc(tip)}</div>` : ''}
+      ${open ? `<div class="iss-list">${x.m.slice().sort((a, b)=>issueWhen(b.r).localeCompare(issueWhen(a.r))).map(mention).join('')}</div>` : ''}</div>`; };
   wrap.innerHTML = `<div class="iss-box"><div class="iss-top">
       <select id="issRange"><option value="12">Last 12 months</option><option value="year">This year</option><option value="3">Last 3 months</option><option value="all">All time</option></select>
       <select id="issDev"><option value="">Every development</option>${devs.map(d=>`<option ${d === issDev ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
-      <span>${reqs.length} request${reqs.length === 1 ? '' : 's'} · red = on 2 or more homes · click a group to see each one</span></div>
-    <div class="iss-ai">${(()=>{ const all = requests.filter(r=>issueSrc(r)), done = all.filter(issueAi).length, wait = all.length - done;
-      return `<span><b>${done} of ${all.length}</b> requests sorted by AI${wait ? ` · <b class="iss-wait">${wait} waiting</b> (sorted by key words for now)` : ' · all sorted'}${issRun && issRun.at ? ' · last run ' + esc(new Date(issRun.at).toLocaleDateString(undefined, { month:'short', day:'numeric' })) + (issRun.by ? ' by ' + esc(issRun.by) : '') : ''} · runs by itself on the 1st of each month</span>
-        <button type="button" class="btn btn-ghost" id="issSort" ${issBusy || !wait ? 'disabled' : ''}>${issBusy ? 'Sorting…' : 'Sort the new ones with AI'}</button>`; })()}</div>
-    ${list.length ? list.map(row).join('') : '<div class="muted" style="padding:10px 4px;">No requests in this time.</div>'}
-    ${other.m.length ? row(other) : ''}
-    <div class="iss-note">Still wrong somewhere? "Not this" takes a problem out of a group, "Also under…" / "Sort into…" puts it where it belongs — that sticks even after the AI runs again. A request edited after it was sorted is sorted again on the next run.</div></div>`;
-  document.getElementById('issRange').value = issRange;
+      <select id="issKind"><option value="fix">Every problem (no questions)</option><option value="defect">Built or working wrong</option><option value="missed">Missed / unfinished items</option><option value="damage">Damage / clean-up</option><option value="all">Everything, questions too</option></select>
+      <select id="issArea"><option value="">Every area</option>${Object.entries(ISS_AREAS).map(([k, n])=>`<option value="${k}" ${k === issArea ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+    <div class="iss-ai"><span><b>${sortedN} of ${all.length}</b> requests sorted by AI${waiting ? ` · <b class="iss-wait">${waiting} waiting</b> (not counted until sorted)` : ' · all sorted'}${issRun && issRun.at ? ' · last run ' + esc(new Date(issRun.at).toLocaleDateString(undefined, { month:'short', day:'numeric' })) + (issRun.by ? ' by ' + esc(issRun.by) : '') : ''} · runs by itself on the 1st of each month</span>
+      <button type="button" class="btn btn-ghost" id="issSort" ${issBusy || !waiting ? 'disabled' : ''}>${issBusy ? 'Sorting…' : 'Sort the new ones with AI'}</button></div>
+    <div class="iss-h">On 2 or more homes <span>${reps.length}</span></div>
+    ${reps.length ? reps.map(row).join('') : '<div class="muted" style="padding:8px 4px 12px;">No problem has come up on more than one home in this time.</div>'}
+    <button type="button" class="iss-h iss-onceT" id="issOnceT"><span class="arrow">${issOnce ? '&#9660;' : '&#9654;'}</span> Seen on one home only <span>${once.length}</span></button>
+    ${issOnce ? once.map(row).join('') : ''}
+    <div class="iss-note">Each problem gets a specific name, and the same problem on another home gets the same name. If two aren't really the same, open the issue and use "Not the same issue…" on that one — it sticks even when the AI runs again.</div></div>`;
+  document.getElementById('issRange').value = issRange; document.getElementById('issKind').value = issKind;
 }
 document.getElementById('issuesToggle').addEventListener('click', ()=>{ issOpen = !issOpen; try{ localStorage.setItem('svcIssuesOpen', issOpen ? '1' : '0'); }catch(e){} renderIssues(); });
 document.getElementById('issuesWrap').addEventListener('change', e=>{
-  if(e.target.id === 'issRange'){ issRange = e.target.value; renderIssues(); return; }
-  if(e.target.id === 'issDev'){ issDev = e.target.value; renderIssues(); return; }
-  const a = e.target.dataset.issAdd; if(!a || !e.target.value) return;
-  const [rid, key] = a.split('|'); issueTag(rid, key, e.target.value, 'add');
+  const id = e.target.id;
+  if(id === 'issRange'){ issRange = e.target.value; renderIssues(); return; }
+  if(id === 'issDev'){ issDev = e.target.value; renderIssues(); return; }
+  if(id === 'issKind'){ issKind = e.target.value; renderIssues(); return; }
+  if(id === 'issArea'){ issArea = e.target.value; renderIssues(); return; }
+  const mv = e.target.dataset.issMove; if(!mv || !e.target.value) return;
+  const [rid, key] = mv.split('|'), v = e.target.value;
+  let tag;
+  if(v === 'hide') tag = { hide:true };
+  else if(v === 'new'){ const n = (prompt('Name for this issue (what is wrong + which part, e.g. "Door stop missing"):') || '').trim().slice(0, 90); if(!n){ renderIssues(); return; } tag = { issue:n }; }
+  else tag = { issue:v.slice(2) };
+  e.target.blur(); issueTag(rid, key, tag);
 });
 document.getElementById('issuesWrap').addEventListener('click', async e=>{
   if(e.target.closest('select')) return;
@@ -1416,23 +1409,18 @@ document.getElementById('issuesWrap').addEventListener('click', async e=>{
       const token = await firebase.auth().currentUser.getIdToken();
       const res = await fetch(ISS_API, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body: JSON.stringify({ action:'sort' }) });
       if(!res.ok) throw new Error('issuesApi ' + res.status + ' ' + (await res.text()).slice(0, 200));
-    } catch(err){ console.error(err); alert('The AI sort did not finish — try again in a minute. (' + String(err.message || err).slice(0, 120) + ')'); }
+    } catch(err){ console.error(err); alert('The AI sort did not finish. Try again in a minute. (' + String(err.message || err).slice(0, 120) + ')'); }
     issBusy = false; renderIssues(); return;
   }
-  const off = e.target.closest('[data-iss-off]');
-  if(off){ const [rid, key, gid] = off.dataset.issOff.split('|'); issueTag(rid, key, gid, 'off'); return; }
+  if(e.target.closest('#issOnceT')){ issOnce = !issOnce; renderIssues(); return; }
   const m = e.target.closest('[data-open-req]'); if(m){ openModal(m.dataset.openReq); return; }
-  const g = e.target.closest('[data-iss-group]'); if(g){ issGroup = issGroup === g.dataset.issGroup ? '' : g.dataset.issGroup; renderIssues(); }
+  const g = e.target.closest('[data-iss-sel]'); if(g){ issSel = issSel === g.dataset.issSel ? '' : g.dataset.issSel; renderIssues(); }
 });
-async function issueTag(rid, key, gid, how){
+async function issueTag(rid, key, tag){
   const r = requests.find(x=>x.id === rid); if(!r) return;
-  const tags = JSON.parse(JSON.stringify(r.issueTags || {})), t = tags[key] || { add:[], off:[] };
-  t.add = (t.add || []).filter(x=>x !== gid); t.off = (t.off || []).filter(x=>x !== gid);
-  if(how === 'add') t.add.push(gid);
-  else t.off.push(gid);
-  tags[key] = t; r.issueTags = tags; renderIssues();
-  try{ await requestsCol.doc(rid).update({ ['issueTags.' + key]: t }); }
-  catch(err){ console.error(err); alert('Could not save — check your connection.'); }
+  r.issueTags = { ...(r.issueTags || {}), [key]: tag }; renderIssues();
+  try{ await requestsCol.doc(rid).update({ ['issueTags.' + key]: tag }); }
+  catch(err){ console.error(err); alert('Could not save. Check your connection.'); }
 }
 </script>
 <script>
