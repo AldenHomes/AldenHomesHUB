@@ -6,8 +6,7 @@
    saved on the home as jobs/{id}.permits = { ws:{sent,ok}, zoning:{sent,ok,no}, building:{sent,ok,no}, forms:{ ws:{…}, zoning:{…} } }.
    FILL OUT TO COMPLETION (owner, 2026-10-26: "fill out all the forms in the alden hub to completion then just download pdf to print or
    to email out"): "Fill out" opens a form screen with a box for EVERY blank on the borough's form (FORMS below). Each box starts with
-   what the hub knows (`def`: the home, Alden's details in settings/permits.company, the development, the home style's size in
-   settings/permits.models, today's date); anything typed is saved for that home in permits.forms[form][key] ('' = left blank on
+   what the hub knows (`def`: the home, Alden's details in settings/permits.company, the development, sizes typed for that home only — never from the home style, owner 2026-11-16 — today's date); anything typed is saved for that home in permits.forms[form][key] ('' = left blank on
    purpose). Choices (Residential / Commercial …, Yes / No) are pick lists that circle or tick the form. The applicant's signature is
    drawn once in the Permits app → Settings (settings/permits.signature, a PNG) and added per form with a tick box. "Download PDF" /
    "Open to print" write it all onto the borough's own blank PDF (forms/…, public forms) in the browser with pdf-lib.
@@ -399,13 +398,13 @@
     c.addEventListener('change', onCardChange);
     return c;
   }
-  // the home style's size and other details the forms start from
+  // the details typed for this home that the forms start from (sizes, cost, parcel)
   function info(){
     const job = J(), i = { ...(P().info || {}) };
-    const m = settings && settings.models && job.model ? settings.models[String(job.model).toLowerCase()] : null;
-    ['len', 'wid', 'hgt', 'sqft'].forEach(k=>{ if(i[k] == null || i[k] === ''){ if(job.size && job.size[k]) i[k] = job.size[k]; else if(m && m[k]) i[k] = m[k]; } });
-    if((i.sqft == null || i.sqft === '') && job.sqft) i.sqft = job.sqft;
-    return i;
+    /* NO SIZES FROM THE HOME STYLE (owner, 2026-11-16: "houses sizes change a fair amount based on how custom they are so we can't
+       auto input sizes"): length / width / height / sq ft come only from what was typed for THIS home (permits.info, set whenever a size
+       is typed on any of its forms, so the home's other forms pick it up). Nothing is read from settings/permits.models or jobs.size. */
+    void job; return i;
   }
   window.renderPermits = function(){
     if(!hasJob()) return;
@@ -614,14 +613,15 @@
   function needCount(n){ const el = $('pfNeed'); if(!el) return; el.className = 'pf-needn ' + (n ? 'bad' : 'ok'); el.textContent = n ? n + ' still to fill in' : 'All filled in'; }
   function closeEditor(){ ed = null; const ov = $('pfOv'); if(ov) ov.remove(); if(hasJob()) renderPermits(); }
   document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && ed) closeEditor(); });
-  // one answer changed: shown at once, saved for this home; a home style's size is remembered for the next house of that style
+  // one answer changed: shown at once, saved for this home. A size typed on one form is kept for THIS home only (permits.info), so its
+  // other forms start with it — never remembered for the home style (owner, 2026-11-16: every home is custom).
   function setVal(f, v){
     const s = { ...(saved({ id: ed.form })) }; s[f.k] = v;
     J().permits = { ...(J().permits || {}), forms: { ...((J().permits || {}).forms || {}), [ed.form]: s } };
-    save({ forms: { [ed.form]: { [f.k]: v } } });
-    if(f.size && J().model && v !== '' && isFinite(Number(String(v).replace(/[^\d.]/g, '')))){
-      db.collection('settings').doc('permits').set({ models: { [String(J().model).toLowerCase()]: { [f.size]: Number(String(v).replace(/[^\d.]/g, '')) } } }, { merge: true }).catch(err=>console.error(err));
-    }
+    const patch = { forms: { [ed.form]: { [f.k]: v } } };
+    if(f.size){ const n = String(v).replace(/[^\d.]/g, ''); const iv = n !== '' && isFinite(Number(n)) ? Number(n) : '';
+      J().permits.info = { ...(J().permits.info || {}), [f.size]: iv }; patch.info = { [f.size]: iv }; }
+    save(patch);
   }
   function onEdChange(e){
     const el = e.target; if(!el.dataset || !el.dataset.pf) return;

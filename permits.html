@@ -336,7 +336,7 @@ html, body{max-width:100%; overflow-x:clip;}
         <canvas id="sigPad" width="900" height="240" style="display:block; width:100%; max-width:600px; height:auto; aspect-ratio:900/240; border:1px dashed #b9b4a4; border-radius:8px; background:#fff; touch-action:none; margin-top:10px; cursor:crosshair;"></canvas>
         <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"><button type="button" class="btn2 primary" id="sigSave">Save this signature</button><button type="button" class="btn2" id="sigClear">Clear the pad</button><button type="button" class="btn2" id="sigRemove" style="color:var(--danger);">Remove the saved signature</button></div>
       </div>
-      <div class="card2">
+      <div class="card2" style="display:none">
         <h2>Home style sizes</h2>
         <p class="lede">Length, width and height (feet) and total square feet of each home style, as the zoning form asks for them. A home starts with its style's numbers; anything typed on a single home stays with that home. A home signed through Selections uses its own sheet's square feet.</p>
         <div id="sizes" style="overflow-x:auto;"></div>
@@ -463,7 +463,8 @@ function renderSettings(){
   jobs.filter(j=>window.Permits && Permits.DEVS[j.community] && j.model).forEach(j=>{ names[String(j.model).toLowerCase()] = names[String(j.model).toLowerCase()] || j.model.replace(/\b\w/g, c=>c.toUpperCase()); });
   Object.keys(models).forEach(k=>{ names[k] = names[k] || k.replace(/\b\w/g, c=>c.toUpperCase()); });
   const keys = Object.keys(names).sort();
-  if(!$('sizes').contains(document.activeElement))
+  // home style sizes are no longer used (owner, 2026-11-16: every home is custom — sizes are typed per home); the card stays hidden
+  if(false)
     $('sizes').innerHTML = keys.length ? `<table class="iv sz" data-nosort><thead><tr><th>Home style</th><th>Length (ft)</th><th>Width (ft)</th><th>Height (ft)</th><th>Total sq ft</th></tr></thead><tbody>
       ${keys.map(k=>`<tr><td><b>${esc(names[k])}</b></td>${['len', 'wid', 'hgt', 'sqft'].map(f=>`<td><input type="number" step="${f === 'sqft' ? 1 : 0.5}" data-size="${esc(k + '|' + f)}" value="${esc((models[k] || {})[f] || '')}"></td>`).join('')}</tr>`).join('')}</tbody></table>`
       : '<p class="muted">No home styles yet.</p>';
@@ -548,7 +549,7 @@ firebase.auth().onAuthStateChanged(user=>{
   } else showLoginGate();
 });
 </script>
-<script src="permits.js?v=9"></script>
+<script src="permits.js?v=10"></script>
 <script src="moneyfmt.js"></script>
 <script src="sorttables.js"></script>
 <script src="hubsearch.js"></script>
