@@ -302,9 +302,10 @@ html, body{max-width:100%; overflow-x:clip;}
           <button type="button" class="btn2 primary" id="startBtn">+ Start permits for a home</button>
         </div>
         <div id="startBox" style="display:none; margin-top:12px; padding:12px 14px; background:#f6f5f0; border-radius:8px;">
-          <div style="font-weight:700; margin-bottom:6px;">Start permits before Selections</div>
-          <div class="muted" style="font-size:12.5px; margin-bottom:8px;">Pick the lot from the build schedule. It moves to "To send" and its forms fill from what the hub knows.</div>
+          <div style="font-weight:700; margin-bottom:6px;">Start a permit set for a home</div>
+          <div class="muted" style="font-size:12.5px; margin-bottom:8px;">Any home in the hub — including ones marked "already has its permits" and settled ones. Find it, then press Start: it moves to "To send" and its forms fill from what the hub knows.</div>
           <div class="pm-filters" style="margin-top:0;">
+            <input type="text" id="sFind" placeholder="Find a lot, buyer or street…" style="flex:1 1 200px;">
             <select id="sDev"></select>
             <select id="sHome" style="flex:1 1 260px;"></select>
             <button type="button" class="btn2 primary" id="sGo">Start and open</button>
@@ -395,7 +396,7 @@ function renderList(){
   fd.value = devs.includes(keep) ? keep : '';
   const dev = fd.value, st = $('fState').value, q = $('fFind').value.trim().toLowerCase();
   // homes marked "already has its permits" are left off the list (owner, 2026-11-16)
-  const rows = jobs.filter(active).map(j=>({ j, s: Permits.status(j) })).filter(r=>r.s.state !== 'had');
+  const rows = jobs.filter(j=>active(j) || (j.permits || {}).start).map(j=>({ j, s: Permits.status(j) })).filter(r=>r.s.state !== 'had');
   $('statTodo').textContent = rows.filter(r=>r.s.state === 'todo').length;
   $('statWait').textContent = rows.filter(r=>r.s.state === 'waiting').length;
   const shown = rows.filter(r=>(!dev || r.j.community === dev) && (st === 'all' || (st === 'open' ? r.s.state !== 'done' : r.s.state === st))
@@ -420,24 +421,34 @@ function openHome(id){
 }
 function closeHome(){ $('ov').classList.remove('show'); openId = ''; window.PERMIT_JOB = null; }
 /* START PERMITS BEFORE SELECTIONS (owner, 2026-10-29): pick a lot from the build schedule (jobs) → jobs.permits.start = today */
-const notStarted = j=>active(j) && Permits.status(j).state === 'new';
+/* ANY HOME (owner, 2026-11-16: "even if it thinks the permits are already in … search any house and start a permit set"): the picker
+   lists every home not already on the Permits list — not started, marked "already has its permits", or settled — with a find box.
+   Starting one sets permits.start = today and clears permits.had. */
+const notStarted = j=>{ const st = Permits.status(j).state; return st === 'new' || st === 'had' || !active(j); };
+const startTag = j=>!active(j) ? ' · settled' : Permits.status(j).state === 'had' ? ' · already has its permits' : '';
 function fillStart(){
-  const homes = jobs.filter(notStarted);
+  const q = $('sFind').value.trim().toLowerCase();
+  const homes = jobs.filter(notStarted).filter(j=>!q || [j.community, j.lot, j.client, j.address, j.model].join(' ').toLowerCase().includes(q));
   const devs = [...new Set(homes.map(j=>j.community).filter(Boolean))].sort();
   const sd = $('sDev'), keep = sd.value;
   sd.innerHTML = '<option value="">Every development</option>' + devs.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
-  sd.value = devs.includes(keep) ? keep : (devs.length === 1 ? devs[0] : '');
+  sd.value = devs.includes(keep) ? keep : '';
   const list = homes.filter(j=>!sd.value || j.community === sd.value)
-    .sort((a, b)=>String(a.community).localeCompare(String(b.community)) || String(a.lot).localeCompare(String(b.lot), undefined, { numeric:true }));
-  $('sHome').innerHTML = list.length ? '<option value="">Pick a lot…</option>' + list.map(j=>`<option value="${esc(j.id)}">${esc((j.community || '?') + ' ' + label(j) + (j.address ? ' — ' + j.address : ''))}</option>`).join('')
-    : '<option value="">Every home in the schedule already has permits started</option>';
+    .sort((a, b)=>(active(b) - active(a)) || String(a.community).localeCompare(String(b.community)) || String(a.lot).localeCompare(String(b.lot), undefined, { numeric:true }));
+  const keepH = $('sHome').value;
+  $('sHome').innerHTML = list.length ? `<option value="">${q ? list.length + ' found — pick one…' : 'Pick a lot…'}</option>` + list.map(j=>`<option value="${esc(j.id)}">${esc((j.community || '?') + ' ' + label(j) + (j.address ? ' — ' + j.address : '') + startTag(j))}</option>`).join('')
+    : `<option value="">${q ? 'No home matches' : 'No other homes'}</option>`;
+  if(list.length === 1) $('sHome').value = list[0].id; else if(list.some(j=>j.id === keepH)) $('sHome').value = keepH;
 }
-$('startBtn').addEventListener('click', ()=>{ const b = $('startBox'); b.style.display = b.style.display === 'none' ? '' : 'none'; if(b.style.display === '') fillStart(); });
+$('startBtn').addEventListener('click', ()=>{ const b = $('startBox'); b.style.display = b.style.display === 'none' ? '' : 'none'; if(b.style.display === ''){ $('sFind').value = ''; fillStart(); $('sFind').focus(); } });
 $('sDev').addEventListener('change', fillStart);
+$('sFind').addEventListener('input', fillStart);
+$('sFind').addEventListener('keydown', e=>{ if(e.key === 'Enter' && $('sHome').value) $('sGo').click(); });
 $('sCancel').addEventListener('click', ()=>{ $('startBox').style.display = 'none'; });
 $('sGo').addEventListener('click', async ()=>{
   const id = $('sHome').value; if(!id){ alert('Pick a lot first.'); return; }
-  try{ await db.collection('jobs').doc(id).set({ permits: { start: todayStr() } }, { merge: true }); }
+  try{ await db.collection('jobs').doc(id).set({ permits: { start: todayStr(), had: '' } }, { merge: true });
+    const j = jobs.find(x=>x.id === id); if(j) j.permits = { ...(j.permits || {}), start: todayStr(), had: '' }; }
   catch(err){ console.error(err); alert('Could not save — check your connection.'); return; }
   $('startBox').style.display = 'none';
   openHome(id);
@@ -550,7 +561,7 @@ firebase.auth().onAuthStateChanged(user=>{
   } else showLoginGate();
 });
 </script>
-<script src="permits.js?v=11"></script>
+<script src="permits.js?v=12"></script>
 <script src="moneyfmt.js"></script>
 <script src="sorttables.js"></script>
 <script src="hubsearch.js"></script>

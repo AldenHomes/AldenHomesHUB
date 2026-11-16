@@ -420,7 +420,7 @@
       const tg0 = $('permitsToggle');
       if(tg0){ c.classList.toggle('open', pOpen); tg0.setAttribute('aria-expanded', String(pOpen)); $('permitsHint').textContent = pOpen ? 'Hide' : 'Already has its permits'; $('permitsBody').style.display = pOpen ? 'block' : 'none'; }
       $('permitsBody').innerHTML = `<div class="pm-next"><b>This home already has its permits.</b> <span style="color:#777">Handled before the hub — not on the Permits list.</span></div>
-        <div style="font-size:13px; color:#777; margin-top:6px;">Need to track them here after all? <a href="#" data-pmhad="0" style="color:#1f3550; font-weight:700;">Put it back on the Permits list</a></div>`;
+        <div style="font-size:13px; color:#777; margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">Need a new permit set for it anyway? <button type="button" class="pm-btn primary" data-pmstart="1">Start a permit set</button></div>`;
       if(ed) renderEditor();
       return;
     }
@@ -475,7 +475,7 @@
   }
   function onCardClick(e){
     if(e.target.closest('#permitsToggle')){ setOpen(!pOpen); return; }
-    if(e.target.closest('[data-pmstart]')){ const d = new Date(); save({ start: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }); return; }
+    if(e.target.closest('[data-pmstart]')){ const v = today(); J().permits = { ...(J().permits || {}), start: v, had: '' }; save({ start: v, had: '' }); renderPermits(); return; }
     if(e.target.closest('[data-pmstop]')){ e.preventDefault(); save({ start: '' }); return; }
     const hd = e.target.closest('[data-pmhad]');
     if(hd){ e.preventDefault(); const v = hd.dataset.pmhad === '1' ? today() : ''; J().permits = { ...(J().permits || {}), had: v }; save({ had: v }); renderPermits(); return; }
