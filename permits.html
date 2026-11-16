@@ -469,7 +469,7 @@ function renderSettings(){
       : '<p class="muted">No home styles yet.</p>';
   $('devs').innerHTML = window.Permits ? `<table class="iv" data-nosort><thead><tr><th>Development</th><th>Borough</th><th>Forms in the hub</th></tr></thead><tbody>
     ${[...new Set(jobs.map(j=>j.community).filter(Boolean))].sort().map(d=>{ const x = Permits.DEVS[d];
-      return `<tr><td><b>${esc(d)}</b>${x ? ' · ' + esc(x.subdivision) : ''}</td><td>${x ? esc(x.borough) : '<span class="muted">—</span>'}</td><td>${x ? 'Water & sewer application → zoning permit → building permit (dates only)' : '<span class="muted">None yet — dates are tracked, forms filled by hand</span>'}</td></tr>`; }).join('')}</tbody></table>` : '';
+      return `<tr><td><b>${esc(d)}</b>${x ? ' · ' + esc(x.subdivision) : ''}</td><td>${x ? esc(x.borough) : '<span class="muted">—</span>'}</td><td>${x ? esc((x.steps ? x.steps.map(s=>s.t).join(' → ') : 'Water & sewer application → zoning permit → building permit')) : '<span class="muted">None yet — dates are tracked, forms filled by hand</span>'}</td></tr>`; }).join('')}</tbody></table>` : '';
 }
 document.addEventListener('change', async e=>{
   const el = e.target;
@@ -548,7 +548,7 @@ firebase.auth().onAuthStateChanged(user=>{
   } else showLoginGate();
 });
 </script>
-<script src="permits.js?v=7"></script>
+<script src="permits.js?v=8"></script>
 <script src="moneyfmt.js"></script>
 <script src="sorttables.js"></script>
 <script src="hubsearch.js"></script>

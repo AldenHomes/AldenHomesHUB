@@ -19,7 +19,22 @@
   // developments with permit forms set up (borough info is public)
   const PERMIT_DEVS = {
     CL: { borough: 'Cornwall Borough', city: 'Lebanon PA', zip: '17042', subdivision: 'Cliffs', forms: { ws: 'cornwall-ws', zoning: 'cornwall-zoning' } },
+    /* MOUNTAIN MEADOWS (owner, 2026-11-16, from the office's "MM Permitting Check List" and the MM 69 permits): Tulpehocken Township,
+       Berks County. Sewer (TTSS, no form), driveway, zoning, then the building permit (Commonwealth Code Inspection Service reviews). */
+    MM: { borough: 'Tulpehocken Township', city: 'Myerstown PA', zip: '17067', subdivision: 'Mountain Meadows', zone: 'VC',
+      forms: { drive: 'tulpe-drive', zoning: 'tulpe-zoning', building: 'tulpe-building' },
+      steps: [
+        { id: 'sewer', t: 'Sewer permit (TTSS)', hint: 'Application to connect. One check to TTSS: $150 application fee + the tapping fee (Phase 2 was $4,421.55 as of 7/18/23). No form in the hub.', no: true },
+        { id: 'drive', t: 'Driveway permit', hint: '$75 check to Tulpehocken Township. Attach a sketch of the driveway.', form: 'drive', no: true },
+        { id: 'zoning', t: 'Zoning permit', hint: '$150 check to Tulpehocken Township, plus the $2,500 recreation fee as a separate check to Tulpehocken Township. Attach the deed and plot plan.', form: 'zoning', no: true },
+        { id: 'building', t: 'Building permit', hint: 'Commonwealth Code reviews it; can be emailed to the township (tulpytwp@comcast.net), but they prefer 2 sets of plans + 2 sets of truss drawings and layout on paper. Fee given when the permit is ready.', form: 'building', no: true },
+      ] },
   };
+  const stepsOf = dev=>dev ? (dev.steps || STEPS_FORMS) : OTHER_STEPS;
+  // "100 Freeman Dr, Lebanon PA 17042" → its parts (for forms that ask street / city / state / zip separately)
+  const addr = s=>{ const m = String(s || '').match(/^(.*?),\s*(.*?),?\s+([A-Z]{2})\.?\s+(\d{5})/); return m ? { street: m[1], city: m[2], state: m[3], zip: m[4] } : { street: String(s || ''), city: '', state: '', zip: '' }; };
+  const ft = v=>v === '' || v == null ? '' : /^\d+(\.\d+)?$/.test(String(v)) ? v + "'" : String(v);
+  const YND = (ys)=>[['Yes', 0], ['No', 1], ["Don't know", 2]].map(([v, i])=>({ v, mark: ys[i] }));
   const STEPS_FORMS = [
     { id: 'ws', t: 'Water & sewer application', hint: 'First. The zoning application goes in once this is approved.', form: 'ws' },
     { id: 'zoning', t: 'Zoning permit', hint: 'After water & sewer is approved.', form: 'zoning', no: true },
@@ -111,6 +126,140 @@
       { k: 'sig', l: 'Applicant signature', type: 'sig', p: 0, x: 60, y: 221 },
       { k: 'date', l: 'Date', p: 0, x: 470, y: 222, def: c=>c.date },
     ] },
+
+    /* ---- Tulpehocken Township (MM). Driveway + building are scans, so positions were measured off the page pictures. ---- */
+    'tulpe-drive': { title: 'Driveway permit application', pages: 2, files: ['forms/tulpehocken-driveway.pdf'], fields: [
+      { sec: 'Fee (the township fills in the permit number)' },
+      { k: 'fee', l: 'Fee', p: 0, x: 58, y: 592.5, def: ()=>'$75' },
+      { k: 'paid', l: 'Date paid', p: 0, x: 127, y: 592.5, s: 9 },
+      { k: 'chk', l: 'Check no.', p: 0, x: 196, y: 592.5, s: 9 },
+      { sec: 'Applicant' },
+      { k: 'name', l: 'Name of applicant', p: 0, x: 58, y: 549, def: c=>c.co.name },
+      { k: 'phone', l: 'Telephone no.', p: 0, x: 400, y: 549, def: c=>c.co.phone },
+      { k: 'addr', l: 'Address of applicant', p: 0, x: 58, y: 517, def: c=>{ const a = addr(c.co.address); return [a.street, [a.city, a.state].filter(Boolean).join(' ')].filter(Boolean).join(', '); } },
+      { k: 'zip', l: 'Zip code', p: 0, x: 436, y: 517, def: c=>addr(c.co.address).zip },
+      { sec: 'The site' },
+      { k: 'site', l: 'Site address and physical location', p: 0, x: 58, y: 482, def: c=>c.street + ', ' + c.dev.city + ' ' + c.dev.zip },
+      { k: 'subdiv', l: 'Subdivision / lot number', p: 0, x: 186, y: 467.5, s: 9.5, def: c=>'MM ' + c.lot },
+      { k: 'lotsize', l: 'Lot size', p: 0, x: 298, y: 467.5, s: 9.5 },
+      { sec: 'The driveway' },
+      { k: 'slopeEx', l: 'Slope of existing grade (%)', p: 0, x: 272, y: 443, s: 9.5 },
+      { k: 'slopePr', l: 'Slope of proposed grade (%)', p: 0, x: 272, y: 432, s: 9.5 },
+      { k: 'dwWidth', l: 'Width of proposed driveway (ft)', p: 0, x: 170, y: 421, s: 9.5 },
+      { k: 'roadSlope', l: 'Slope of road within 100 ft (%)', p: 0, x: 262, y: 410, s: 9.5 },
+      { k: 'roadW', l: 'Width of roadway (ft)', p: 0, x: 131, y: 399, s: 9.5 },
+      { k: 'shoulder', l: 'Width of shoulder (ft)', p: 0, x: 259, y: 399, s: 9.5 },
+      { k: 'speed', l: 'Speed limit of road (mph)', p: 0, x: 134, y: 388, s: 9.5, def: ()=>'25' },
+      { k: 'sightExL', l: 'Existing sight distance — left (ft)', p: 0, x: 302, y: 377, s: 9.5 },
+      { k: 'sightExR', l: 'Existing sight distance — right (ft)', p: 0, x: 302, y: 366, s: 9.5 },
+      { k: 'sightPrL', l: 'Proposed sight distance — left (ft)', p: 0, x: 302, y: 355, s: 9.5 },
+      { k: 'sightPrR', l: 'Proposed sight distance — right (ft)', p: 0, x: 302, y: 344, s: 9.5 },
+      { k: 'inter', l: 'Distance to closest intersection (ft)', p: 0, x: 175, y: 332.5, s: 9.5 },
+      { k: 'propLine', l: 'Distance to nearest property line (ft)', p: 0, x: 272, y: 321.5, s: 9.5 },
+      { k: 'storm1', l: 'Stormwater / erosion control', p: 0, x: 58, y: 298, def: ()=>'Per approved LDP' },
+      { k: 'storm2', l: 'Stormwater — second line', p: 0, x: 58, y: 280 },
+      { sec: 'Verification (page 2)' },
+      { k: 'vname', l: 'I, (name)', p: 1, x: 68, y: 643, s: 9.5, def: c=>c.co.applicant || c.co.name },
+      { k: 'sig', l: 'Applicant\'s signature', type: 'sig', p: 1, x: 300, y: 589, w: 140 },
+      { k: 'date', l: 'Date', p: 1, x: 452, y: 589, s: 9.5, def: c=>c.date },
+    ] },
+    'tulpe-zoning': { title: 'Zoning permit application', pages: 3, files: ['forms/tulpehocken-zoning.pdf'], fields: [
+      { sec: 'Applicant' },
+      { k: 'name', l: 'Name of applicant', p: 0, x: 34, y: 500, def: c=>c.co.name },
+      { k: 'phone', l: 'Telephone no.', p: 0, x: 376, y: 500, def: c=>c.co.phone },
+      { k: 'maddr', l: 'Mailing address', p: 0, x: 34, y: 464, def: c=>{ const a = addr(c.co.address); return [a.street, [a.city, a.state].filter(Boolean).join(' ')].filter(Boolean).join(', '); } },
+      { k: 'zip', l: 'Zip code', p: 0, x: 448, y: 464, def: c=>addr(c.co.address).zip },
+      { sec: 'The property' },
+      { k: 'loc', l: 'Physical location of property', p: 0, x: 34, y: 428, def: c=>c.street + ', ' + c.dev.city + ' ' + c.dev.zip + (c.lot ? ' (Lot ' + c.lot + ')' : '') },
+      { k: 'dbook', l: 'Deed book volume', p: 0, x: 109, y: 416, s: 9 },
+      { k: 'dpage', l: 'Deed page', p: 0, x: 178, y: 416, s: 9 },
+      { k: 'parcel', l: 'Tax parcel identification no.', p: 0, x: 331, y: 415, s: 9.5, def: c=>c.inf.parcel },
+      { k: 'subdiv', l: 'Subdivision / lot number', p: 0, x: 34, y: 376, s: 9.5, def: c=>c.dev.subdivision + (c.lot ? ' Lot ' + c.lot : '') },
+      { k: 'sewage', l: 'Sewage permit no.', p: 0, x: 198, y: 376, s: 9.5 },
+      { k: 'lotsize', l: 'Lot size', p: 0, x: 296, y: 376, s: 9.5 },
+      { k: 'storm', l: 'Stormwater controls to be installed', p: 0, x: 34, y: 322, def: ()=>'Per approved LDP' },
+      { k: 'desc', l: 'Description of construction (type & materials)', p: 0, x: 34, y: 262, s: 10, def: ()=>'New single family dwelling' },
+      { k: 'dims', l: 'Dimensions', p: 0, x: 34, y: 226, s: 9.5, def: c=>c.inf.len && c.inf.wid ? ft(c.inf.len) + ' x ' + ft(c.inf.wid) : '' },
+      { k: 'area', l: 'Area (sq ft)', p: 0, x: 124, y: 226, s: 9.5, size: 'sqft', def: c=>c.inf.sqft },
+      { k: 'stories', l: 'No. stories / height', p: 0, x: 196, y: 226, s: 9.5, def: c=>c.inf.hgt ? ft(c.inf.hgt) : '' },
+      { k: 'cost', l: 'Value of construction ($)', p: 0, x: 340, y: 226, s: 9.5, money: true, def: c=>c.inf.cost },
+      { k: 'zdist', l: 'Zoning district', p: 0, x: 34, y: 189, s: 9.5, def: c=>c.dev.zone },
+      { k: 'setReq', l: 'Building setback — required', p: 0, x: 199, y: 201, s: 9 },
+      { k: 'sideReq', l: 'Side yard, each — required', p: 0, x: 343, y: 201, s: 9 },
+      { k: 'rearReq', l: 'Rear yard — required', p: 0, x: 449, y: 201, s: 9 },
+      { k: 'setProv', l: 'Building setback — provided', p: 0, x: 199, y: 189, s: 9 },
+      { k: 'sideProv', l: 'Side yard, each — provided', p: 0, x: 343, y: 189, s: 9 },
+      { k: 'rearProv', l: 'Rear yard — provided', p: 0, x: 449, y: 189, s: 9 },
+      { k: 'septic', l: 'Distance to septic system', p: 0, x: 291, y: 154, s: 9, def: ()=>'N/A - public sewer' },
+      { sec: 'Easements' },
+      { k: 'qEase', l: 'Property contains easements?', type: 'choice', p: 0, opts: YND([[237, 104], [288, 104], [338, 104]]) },
+      { k: 'qSwale', l: 'Swale, ditch, stream on the property?', type: 'choice', p: 0, opts: YND([[263, 82], [312, 82], [364, 82]]) },
+      { k: 'qUtil', l: 'Underground utilities / poles?', type: 'choice', p: 0, opts: YND([[328, 60], [377, 60], [427, 60]]) },
+      { k: 'qShrub', l: 'Shrubs, plants along the rear? (page 2)', type: 'choice', p: 1, opts: YND([[266, 765], [318, 765], [370, 765]]) },
+      { sec: 'Restrictions, variances, environment (page 2)' },
+      { k: 'qDeed', l: 'Deed restrictions?', type: 'choice', p: 1, opts: YND([[233, 721], [287, 721], [339, 721]]) },
+      { k: 'deedList', l: 'If yes, what restrictions', p: 1, x: 168, y: 701, s: 9 },
+      { k: 'qVar', l: 'Zoning variances or relief?', type: 'choice', p: 1, opts: YND([[41, 633], [86, 633], [134, 633]]) },
+      { k: 'varWhat', l: 'If yes, what relief', p: 1, x: 334, y: 635, s: 9 },
+      { k: 'qRezone', l: 'Property rezoned?', type: 'choice', p: 1, opts: YND([[268, 611], [334, 611], [397, 611]]) },
+      { k: 'rezWhat', l: 'If yes, changed to what district', p: 1, x: 240, y: 591, s: 9 },
+      { k: 'qSlope', l: 'Steep slopes or contours?', type: 'choice', p: 1, opts: YND([[266, 543], [334, 543], [398, 543]]) },
+      { k: 'qFlood', l: 'Floods / flood zone / wetlands?', type: 'choice', p: 1, opts: YND([[356, 521], [416, 521], [471, 521]]) },
+      { sec: 'Verification (page 2)' },
+      { k: 'vname', l: 'I, (name)', p: 1, x: 45, y: 329, s: 9.5, def: c=>c.co.applicant || c.co.name },
+      { k: 'sig', l: 'Applicant\'s signature', type: 'sig', p: 1, x: 36, y: 244, w: 112 },
+      { k: 'date', l: 'Date', p: 1, x: 228, y: 244, s: 9.5, def: c=>c.date },
+    ] },
+    'tulpe-building': { title: 'Building permit application', pages: 2, h: 843, files: ['forms/tulpehocken-building.pdf'], fields: [
+      { k: 'muni', l: 'Municipality', p: 0, x: 238, y: 727, def: c=>c.dev.borough },
+      { k: 'adate', l: 'Application date', p: 0, x: 146, y: 710, def: c=>c.date },
+      { sec: '1. Property information' },
+      { k: 'taxmap', l: 'Tax map', p: 0, x: 116, y: 676, s: 9 },
+      { k: 'site1', l: 'Site address', p: 0, x: 246, y: 676, def: c=>c.street + (c.lot ? '   (MM Lot ' + c.lot + ')' : '') },
+      { k: 'parcel', l: 'Parcel no.', p: 0, x: 120, y: 656, s: 8, def: c=>c.inf.parcel },
+      { k: 'site2', l: 'Site address — second line', p: 0, x: 246, y: 652, def: c=>c.dev.city + ' ' + c.dev.zip },
+      { k: 'zone', l: 'Zone', type: 'choice', p: 0, def: ()=>'Residential', opts: [
+        { v: 'Agricultural', mark: [151, 634] }, { v: 'Commercial', mark: [217, 634] }, { v: 'Conservation', mark: [284, 634] },
+        { v: 'Industrial', mark: [343, 634] }, { v: 'Residential', mark: [406, 634] }] },
+      { sec: '2. Owner\'s information' },
+      { k: 'ofirst', l: 'Owner — first name (or company)', p: 0, x: 85, y: 594, def: c=>c.co.name },
+      { k: 'omi', l: 'MI', p: 0, x: 200, y: 594 },
+      { k: 'olast', l: 'Last name', p: 0, x: 298, y: 594 },
+      { k: 'ophone', l: 'Phone no.', p: 0, x: 461, y: 594, def: c=>c.co.phone },
+      { k: 'ostreet', l: 'Street address', p: 0, x: 85, y: 554, def: c=>addr(c.co.address).street },
+      { k: 'ocity', l: 'City', p: 0, x: 235, y: 554, def: c=>addr(c.co.address).city },
+      { k: 'ostate', l: 'State', p: 0, x: 359, y: 554, def: c=>addr(c.co.address).state },
+      { k: 'ozip', l: 'Zip', p: 0, x: 452, y: 554, def: c=>addr(c.co.address).zip },
+      { sec: '3. Building permit application' },
+      { k: 'desc1', l: 'Description of work', p: 0, x: 88, y: 495, def: c=>'Construct new ' + (c.inf.len && c.inf.wid ? ft(c.inf.len) + ' x ' + ft(c.inf.wid) + ' ' : '') + 'single family dwelling' },
+      { k: 'desc2', l: 'Description — line 2', p: 0, x: 88, y: 479, def: c=>[c.job.model ? c.job.model + ' model' : '', c.inf.sqft ? Number(c.inf.sqft).toLocaleString('en-US') + ' sq ft' : '', c.dev.subdivision + (c.lot ? ' Lot ' + c.lot : '')].filter(Boolean).join(', ') },
+      { k: 'desc3', l: 'Description — line 3', p: 0, x: 88, y: 463, def: ()=>'See attached plans and plot plan' },
+      { k: 'cost', l: 'Estimated cost of construction ($)', p: 0, x: 246, y: 311, money: true, def: c=>c.inf.cost },
+      { k: 'start', l: 'Estimated start date (M/D/YY)', p: 0, x: 190, y: 289, slots: [192, 219, 245] },
+      { k: 'finish', l: 'Estimated completion date (M/D/YY)', p: 0, x: 462, y: 288, slots: [464, 490, 515] },
+      { sec: '4. Certification' },
+      { k: 'sig', l: 'Applicant signature', type: 'sig', p: 0, x: 188, y: 182, w: 220 },
+      { k: 'sdate', l: 'Date', p: 0, x: 440, y: 183, def: c=>c.date },
+      { k: 'aaddr', l: 'Address', p: 0, x: 121, y: 164, def: c=>c.co.address },
+      { k: 'aphone', l: 'Phone no.', p: 0, x: 400, y: 164, def: c=>c.co.phone },
+      { sec: '5. Contractor information (page 2)' },
+      { k: 'cname', l: 'Name of contractor', p: 1, x: 153, y: 735, def: c=>c.co.name },
+      { k: 'cphone', l: 'Phone no.', p: 1, x: 424, y: 735, def: c=>c.co.phone },
+      { k: 'ceo', l: 'Chief executive officer', p: 1, x: 166, y: 715 },
+      { k: 'ceophone', l: 'CEO phone no.', p: 1, x: 426, y: 715 },
+      { k: 'charge', l: 'Person in charge of work', p: 1, x: 174, y: 695, def: c=>c.co.applicant },
+      { k: 'chphone', l: 'Phone no. (person in charge)', p: 1, x: 427, y: 695, def: c=>c.co.phone },
+      { k: 'caddr', l: 'Contractor address', p: 1, x: 152, y: 675, def: c=>addr(c.co.address).street },
+      { k: 'ccity', l: 'City', p: 1, x: 102, y: 654, def: c=>addr(c.co.address).city },
+      { k: 'cstate', l: 'State', p: 1, x: 352, y: 654, def: c=>addr(c.co.address).state },
+      { k: 'czip', l: 'Zip', p: 1, x: 466, y: 654, def: c=>addr(c.co.address).zip },
+      { k: 'wcomp', l: 'Proof of workman\'s compensation insurance', p: 1, x: 248, y: 634, s: 9.5, def: ()=>'Certificate attached' },
+      { sec: '6. Subcontractors (optional)' },
+      ...[583, 553, 523, 493, 463].flatMap((y, i)=>[
+        { k: 'sub' + i, l: 'Subcontractor ' + (i + 1), p: 1, x: 85, y, s: 9.5 },
+        { k: 'subc' + i, l: 'City, state, zip', p: 1, x: 287, y, s: 9.5 },
+        { k: 'subp' + i, l: 'Phone no.', p: 1, x: 442, y, s: 9.5 }]),
+    ] },
   };
 
   /* REQUIRED (owner, 2026-10-26: "marked in red [the] sections that need to be filled out before you can send"): the lines the
@@ -120,10 +269,17 @@
     'cornwall-ws': ['street', 'city', 'zip', 'subdiv', 'lot', 'use', 'units', 'oname', 'oaddr', 'owork', 'cname', 'lic', 'wdate1', 'wsig1', 'wname1',
       'sname', 'btype', 'saddr1', 'saddr2', 'saddr3', 'sphone', 'ssig', 'sdate'],
     'cornwall-zoning': ['owner', 'maddr', 'ophone', 'bname', 'baddr', 'bphone', 'site', 'ptype', 'future', 'desc', 'puse', 'cost', 'len', 'wid', 'hgt', 'sqft', 'sig', 'date'],
+    // MM: what the township's zoning checklist calls for, and what the office wrote on MM 69's driveway application
+    'tulpe-drive': ['name', 'phone', 'addr', 'zip', 'site', 'subdiv', 'lotsize', 'slopeEx', 'slopePr', 'dwWidth', 'roadSlope', 'roadW', 'shoulder', 'speed',
+      'sightExL', 'sightExR', 'sightPrL', 'sightPrR', 'inter', 'propLine', 'storm1', 'vname', 'sig', 'date'],
+    'tulpe-zoning': ['name', 'phone', 'maddr', 'zip', 'loc', 'parcel', 'subdiv', 'storm', 'desc', 'dims', 'area', 'stories', 'cost',
+      'qEase', 'qSwale', 'qUtil', 'qShrub', 'qDeed', 'qVar', 'qRezone', 'qSlope', 'qFlood', 'vname', 'sig', 'date'],
+    'tulpe-building': ['muni', 'adate', 'site1', 'site2', 'zone', 'ofirst', 'ophone', 'ostreet', 'ocity', 'ostate', 'ozip', 'desc1', 'cost',
+      'sig', 'sdate', 'aaddr', 'aphone', 'cname', 'cphone', 'caddr', 'ccity', 'cstate', 'czip'],
   };
   Object.entries(REQUIRED).forEach(([id, ks])=>FORMS[id].fields.forEach(f=>{ if(ks.includes(f.k)) f.req = true; }));
   // a choice that needs its own line filled: "Other" needs the explanation, "Apartments" the number of units
-  const NEEDS_TEXT = { ptype: { Other: 'pother' }, btype: { Apartments: 'aunits', Other: 'bother' } };
+  const NEEDS_TEXT = { ptype: { Other: 'pother' }, btype: { Apartments: 'aunits', Other: 'bother' }, qDeed: { Yes: 'deedList' }, qVar: { Yes: 'varWhat' }, qRezone: { Yes: 'rezWhat' } };
   let settings = null, ed = null;   // ed = the form screen that's open { form, step }
   const $ = id=>document.getElementById(id);
   const esc = s=>(s == null ? '' : String(s)).replace(/[&<>"']/g, c=>({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -236,7 +392,7 @@
   }
   window.renderPermits = function(){
     if(!hasJob()) return;
-    const job = J(), dev = PERMIT_DEVS[job.community], STEPS = dev ? STEPS_FORMS : OTHER_STEPS;
+    const job = J(), dev = PERMIT_DEVS[job.community], STEPS = stepsOf(dev);
     const c = card(); if(!c) return;
     c.style.display = '';
     const p = P();
@@ -317,7 +473,7 @@
   let pdfjsP = null;
   const pdfjsLib = ()=>pdfjsP || (pdfjsP = import(PDFJS).then(m=>{ m.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; return m; }));
   // a box's place on the page as % (x, top edge, width, height in PDF points; the page is 612 x 792)
-  const pos = (x, yTop, w, h)=>`left:${(x / 612 * 100).toFixed(3)}%; top:${((792 - yTop) / 792 * 100).toFixed(3)}%; width:${(w / 612 * 100).toFixed(3)}%; height:${(h / 792 * 100).toFixed(3)}%;`;
+  const pos = (x, yTop, w, h, H = 792)=>`left:${(x / 612 * 100).toFixed(3)}%; top:${((H - yTop) / H * 100).toFixed(3)}%; width:${(w / 612 * 100).toFixed(3)}%; height:${(h / H * 100).toFixed(3)}%;`;
   // how wide a blank is: up to the next blank on the same line, or the page's right margin
   function widthOf(f, form){
     const next = form.fields.filter(g=>!g.sec && g.p === f.p && g.type !== 'choice' && g.x > f.x + 5 && Math.abs(g.y - f.y) < 6).map(g=>g.x);
@@ -340,14 +496,14 @@
   // the boxes on each page: made once, then kept up to date (so typing is never interrupted)
   function buildOverlays(form){
     for(let p = 0; p < form.pages; p++){
-      const ol = document.querySelector(`#pfPages [data-page="${p}"] .pf-ol`); if(!ol) continue;
+      const H = form.h || 792, ol = document.querySelector(`#pfPages [data-page="${p}"] .pf-ol`); if(!ol) continue;
       ol.innerHTML = form.fields.filter(f=>!f.sec && f.p === p).map(f=>{
         if(f.type === 'choice') return f.opts.map(o=>o.ring
-          ? `<button type="button" class="pf-ring" data-choice="${f.k}|${esc(o.v)}" title="${esc(f.l)}: ${esc(o.v)}" style="${pos(o.ring[0] - o.ring[2], o.ring[1] + o.ring[3], o.ring[2] * 2, o.ring[3] * 2)}"></button>`
-          : `<button type="button" class="pf-mark" data-choice="${f.k}|${esc(o.v)}" title="${esc(f.l)}: ${esc(o.v)}" style="${pos(o.mark[0] - 3, o.mark[1] + 13, 16, 15)}"></button>`).join('');
-        if(f.type === 'sig') return `<button type="button" class="pf-sigbox" data-sig="${f.k}" title="${esc(f.l)}" style="${pos(f.x, f.y + 26, f.w || 190, 30)}"></button>`;
+          ? `<button type="button" class="pf-ring" data-choice="${f.k}|${esc(o.v)}" title="${esc(f.l)}: ${esc(o.v)}" style="${pos(o.ring[0] - o.ring[2], o.ring[1] + o.ring[3], o.ring[2] * 2, o.ring[3] * 2, H)}"></button>`
+          : `<button type="button" class="pf-mark" data-choice="${f.k}|${esc(o.v)}" title="${esc(f.l)}: ${esc(o.v)}" style="${pos(o.mark[0] - 3, o.mark[1] + 13, 16, 15, H)}"></button>`).join('');
+        if(f.type === 'sig') return `<button type="button" class="pf-sigbox" data-sig="${f.k}" title="${esc(f.l)}" style="${pos(f.x, f.y + 26, f.w || 190, 30, H)}"></button>`;
         const sz = f.s || 10.5;
-        return `<input type="text" class="pf-in" data-pf="${f.k}" title="${esc(f.l)}" placeholder="${esc(f.l)}" autocomplete="off" ${f.money ? 'inputmode="decimal"' : ''} style="${pos(f.x - 2, f.y + sz + 1.5, widthOf(f, form), sz + 5)} font-size:${(sz / 612 * 100).toFixed(3)}cqw;">`;
+        return `<input type="text" class="pf-in" data-pf="${f.k}" title="${esc(f.l)}" placeholder="${esc(f.l)}" autocomplete="off" ${f.money ? 'inputmode="decimal"' : ''} style="${pos(f.x - 2, f.y + sz + 1.5, f.slots ? f.slots[f.slots.length - 1] + 26 - f.x : widthOf(f, form), sz + 5, H)} font-size:${(sz / 612 * 100).toFixed(3)}cqw;">`;
       }).join('');
     }
   }
@@ -413,7 +569,7 @@
         <div class="pf-body">${missing ? '<p class="pf-note" style="color:#b3261e; font-weight:700;">Alden\'s details aren\'t set yet — type them in the Permits app → Settings for the forms.</p>' : ''}
           ${view === 'form'
             ? `<p class="pf-note">Fill it in like the paper form: type on any line (the hub has filled in what it knows), click a choice to circle or mark it, click a signature line to sign. Changes are saved for this home; a darker yellow box was changed by hand. The office-use-only parts are left for the borough.</p>
-               <div class="pf-pages" id="pfPages">${Array.from({ length: form.pages }, (_, p)=>`<div class="pf-page" data-page="${p}"><div class="pf-cv"><div class="pf-loading">Loading the page…</div></div><div class="pf-ol"></div></div>`).join('')}</div>`
+               <div class="pf-pages" id="pfPages">${Array.from({ length: form.pages }, (_, p)=>`<div class="pf-page" data-page="${p}" style="aspect-ratio:612/${form.h || 792}"><div class="pf-cv"><div class="pf-loading">Loading the page…</div></div><div class="pf-ol"></div></div>`).join('')}</div>`
             : `<p class="pf-note">Every blank on the form. Boxes start with what the hub knows; change anything, or fill in what's empty. Changes are saved for this home (a yellow box was changed by hand). Leave a box empty to leave that blank on the form.</p><div id="pfList"></div><p class="pf-note" style="margin-top:14px;">The office-use-only parts of the form are left for the borough.</p>`}</div></div>`;
       if(view === 'form'){ buildOverlays(form); drawPages(ed.form, $('pfPages')).catch(err=>{ console.error(err); document.querySelectorAll('.pf-loading').forEach(x=>{ x.textContent = 'The page couldn\'t be shown — use "As a list".'; }); }); }
     }
@@ -518,6 +674,8 @@
       if(f.money && isFinite(Number(t))) t = Number(t).toLocaleString('en-US');
       if(f.size && ['len', 'wid', 'hgt'].includes(f.size) && /^\d+(\.\d+)?$/.test(t)) t += "'";
       if(f.size === 'sqft' && /^\d+$/.test(t)) t = Number(t).toLocaleString('en-US');
+      // a date written into "___/___/___": each part on its own blank
+      if(f.slots){ const parts = t.split(/[\/\-.]/); if(parts.length === f.slots.length){ parts.forEach((x, i)=>page.drawText(x.trim(), { x: f.slots[i], y: f.y + 1, size: f.s || 10.5, font, color: ink })); return; } }
       let s = f.s || 10.5; while(s > 6.5 && font.widthOfTextAtSize(t, s) > 572 - f.x) s -= 0.5;
       page.drawText(t, { x: f.x, y: f.y + 1, size: s, font, color: ink });
     });
@@ -533,7 +691,7 @@
   // for the Permits app: where a home stands, the developments with forms, and the saved settings
   window.Permits = {
     DEVS: PERMIT_DEVS,
-    stepsFor: job=>PERMIT_DEVS[job.community] ? STEPS_FORMS : OTHER_STEPS,
+    stepsFor: job=>stepsOf(PERMIT_DEVS[job.community]),
     status(job){
       const steps = this.stepsFor(job), p = job.permits || {};
       const i = steps.findIndex(s=>!(p[s.id] || {}).ok), st = i < 0 ? null : steps[i];
