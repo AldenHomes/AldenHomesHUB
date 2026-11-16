@@ -875,8 +875,11 @@ let CAT_RAW = [];
 const rawPrice = (bt, re)=>{ const s = CAT_RAW.find(x=>x.bt === bt); const c = s && s.c.find(x=>re.test(x.t)); return c ? c.p : null; };
 function patioChoices(bt, list){
   /* COUNTERTOPS (owner, 2026-11-11): "an option for upgrade from granite to quartz" — a flat price set in Home styles → Every price /
-     Other option prices (k 'counter-quartz'; $2,575 on the server). Added at the END so the allowances keep their indexes (sheets use them). */
-  if(bt === '500') return [...list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }), { t:'Upgrade countertops from granite to quartz', k:'counter-quartz', p:null, unit:'', side:true }];
+     Other option prices (k 'counter-quartz'; $2,575 on the server). Added at the END so the allowances keep their indexes (sheets use them).
+     TYPED PRICE (owner, 2026-11-16: "for this one they need to type in a price"): no longer a set price — `typed:true` makes isAllow treat
+     it like an allowance (the rep types the amount on the sheet; a starting amount can be set in Home styles → Allowance amounts),
+     shown with the word "price" instead of "allowance". The old server price 'counter-quartz' is no longer used. */
+  if(bt === '500') return [...list.flatMap(c=>{ const to = (SPLIT[bt] || {})[String(c.t).trim().toLowerCase()]; return to ? to.map(x=>({ ...c, ...x })) : [c]; }), { t:'Upgrade countertops from granite to quartz', typed:true, p:0, unit:'', side:true }];
   /* TUBS & SHOWERS (owner, 2026-11-09, the office's product sheets): the two standards are Aker by MAAX units (photos + part numbers via
      CHOICE_IMG); upgrades priced in Home styles → Other option prices (prices to be confirmed — none written here). Soaking tub = Pulse. */
   if(['256', '300', '340'].includes(bt)) return [...list,
@@ -1185,7 +1188,7 @@ const ceilLabel = (L, c, n)=>c.ceilAdd ? 'Add ' + n + (n === 1 ? ' foot' : ' fee
 // what a choice costs when it's first taken: ceiling moves and allowances have their own; everything else is the selection sheet's
 const choicePrice = (q, i, L)=>q.bt === '790' && q.c[i].k ? (floorPrice(q.c[i], L) || 0) : q.c[i].kf ? (optPrice(headPriceKey(q.c[i], L, q)) || 0) : (q.opts || q.c[i].k) ? (optPrice(q.c[i].k) || 0) : q.ceil ? (q.c[i].ceilAdd ? (ceilFt() || 0) : 0) : isAllow(q, q.c[i]) ? allowDefault(q, i) : (q.c[i].p || 0);
 const ALLOW_BASE = { '193': 0 };                         // BT numbers that are allowances though not named so (amount: from the server)
-const isAllow = (q, c)=>!!c && (/allowance/i.test(c.t) || ALLOW_BASE[q.bt] != null);
+const isAllow = (q, c)=>!!c && (c.typed || /allowance/i.test(c.t) || ALLOW_BASE[q.bt] != null);
 const allowDefault = (q, i)=>{ const k = q.id + '#' + i; return ALLOW_CFG[k] != null ? ALLOW_CFG[k] : ALLOW_BASE[q.bt] != null ? ALLOW_BASE[q.bt] : (q.c[i].p || 0); };
 const qById = id=>ALL_QS.find(q=>q.id===id);
 const qOfKey = k=>qById(String(k).split('#')[0]);
@@ -1226,7 +1229,7 @@ function buildCatalog(cat){
     const std = STD_FIRST[s.bt] || [];
     sec.qs.push({ id, bt:s.bt, num, t:({ '764':'Finish Attic Room', '768':'Enlarge Attic Room', '790':'Flooring' })[s.bt] || s.t, cc:s.cc, line, room:sec, opt:1, type:'bt', tw, one: std.length > 0 || !!PHOTO_SETS[s.bt] || FAUCET_ONE.includes(FAUCET_KIND[s.bt]) || !!KITCHEN_KIND[s.bt] || s.bt === '522' || TILE_BT.includes(s.bt) || ['152', '526', '600', '640', '608', '701', '740', '764', '766', '768', '182', '248', '724'].includes(s.bt), photo: !!PHOTO_SETS[s.bt] || !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt] || s.bt === '522' || TILE_BT.includes(s.bt), want: !!WANT_FIRST[s.bt], fauc: !!FAUCET_KIND[s.bt] || !!KITCHEN_KIND[s.bt], mix: ['hwset', 'hwset-m', 'hwadd', 'hook'].includes(FAUCET_KIND[s.bt]), v1: PRICING_BT.has(num) || /lot premium/i.test(s.t) ? 1 : 0,
       // shower options: BuilderTrend's "Custom Shower" is left off (owner: a custom item covers it)
-      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, up:c.up, kitm:c.kitm, kit:c.kit, gb:c.gb,
+      c:splitChoices(s.bt, [...std.map(t=>({ t, p:0, unit:'' })), ...s.c.filter(c=>!(/^Shower Options/i.test(s.t) && /^custom shower$/i.test(String(c.t).trim())))]).map(c=>({ t:c.t, p:c.p, p0:c.p, grp:c.grp, k:c.k, typed:c.typed, side:c.side, rate:c.rate, ft:c.ft, lv:c.lv, mv:c.mv, img:c.img, brand:c.brand, note:c.note, model:c.model, fins:c.fins, disp:c.disp, sub:c.sub, kf:c.kf, up:c.up, kitm:c.kitm, kit:c.kit, gb:c.gb,
         ...(!c.img && CHOICE_IMG[s.bt] ? (m=>m ? { ...(m[1] ? { img:MISC + m[1] + '.jpg' } : {}), ...(m[2] ? { spec:m[2] } : {}), ...(m[3] ? { show:m[3] } : {}), ...(m[4] ? { noimg:m[4] } : {}) } : {})(CHOICE_IMG[s.bt].find(([re])=>re.test(String(c.t).trim()))) : {}), unit: c.unit === 'ft' || c.unit === 'sq ft' ? c.unit : c.unit === '' ? '' : /sq\.? ?ft|\/ ?sf\b|per sf/i.test(c.t) ? 'sq ft' : /\blf\b|linear|per ft|\/ ?ft\b/i.test(c.t) ? 'ft' : '' })) });
   });
   /* Basement stairs (owner, 2026-10-19): closed stairs are standard; open stairs cost extra and a basement railing has a preset
@@ -1530,8 +1533,8 @@ function prow(q, L, force){
     const price = view === 'customer' ? '' : c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
     if(isAllow(q, c)){
       const amt = n ? p : allowDefault(q, c.i);
-      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(pn(c.t))}${/allowance/i.test(c.t) ? '' : ' — allowance'}</span>
-        <span class="muted">$</span><input type="number" min="0" step="1" data-allow="${esc(k)}" value="${amt}" style="width:110px" aria-label="Allowance amount" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">allowance</span>
+      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(pn(c.t))}${/allowance/i.test(c.t) || c.typed ? '' : ' — allowance'}</span>
+        <span class="muted">$</span><input type="number" min="0" step="1" data-allow="${esc(k)}" value="${amt}" style="width:110px" aria-label="${c.typed ? 'Price' : 'Allowance amount'}" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.typed ? 'price' : 'allowance'}</span>
         <button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button></div>`;
     }
     if(c.rate){
@@ -1938,7 +1941,7 @@ function sizesScreen(){
 }
 function pricesScreen(){
   const cell = (q, c, i)=>{
-    if(isAllow(q, c)) return `<span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(q.id + '#' + i)}" value="${allowDefault(q, i)}" style="width:110px"><span class="pnote">allowance (typed on the sheet)</span>${chg('allow', q.id + '#' + i)}`;
+    if(isAllow(q, c)) return `<span class="muted">$</span><input type="number" min="0" step="1" data-allowdef="${esc(q.id + '#' + i)}" value="${allowDefault(q, i)}" style="width:110px"><span class="pnote">${c.typed ? 'price' : 'allowance'} (typed on the sheet)</span>${chg('allow', q.id + '#' + i)}`;
     if(c.rate) return '<span class="pnote">price typed on the sheet</span>';
     if(c.h || c.ceilAdd) return '<span class="pnote">priced in the Ceiling height card at the top</span>';
     if(c.kf) return '<span class="pnote">priced per finish in Other option prices</span>';
