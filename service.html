@@ -1322,7 +1322,7 @@ const ISSUE_GROUPS = [
   { id:'garage', n:'Garage door', re:/garage door|opener/i },
   { id:'yard', n:'Yard, trees & grading', re:/\btree|lawn|grass|seed|grading|\byard\b|mulch|landscap|erosion|wash(ed)? out|channel in the ground/i },
 ];
-const ISS_OTHER = { id:'other', n:'Not sorted yet' };
+const ISS_OTHER = { id:'other', n:'Other' };
 let issOpen = false, issGroup = '', issRange = '12', issDev = '', issRun = null, issBusy = false;
 /* AI SORTING (owner, 2026-11-16: "a button that has AI scan and sort them … once a month"): the server (issuesApi / issuesMonthly in
    functions/index.js) has Claude split each request into problems and group them, saved as r.aiIssues { src, at, items:[{ t, g }] }.
@@ -1394,7 +1394,7 @@ function renderIssues(){
       <select id="issDev"><option value="">Every development</option>${devs.map(d=>`<option ${d === issDev ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
       <span>${reqs.length} request${reqs.length === 1 ? '' : 's'} · red = on 2 or more homes · click a group to see each one</span></div>
     <div class="iss-ai">${(()=>{ const all = requests.filter(r=>issueSrc(r)), done = all.filter(issueAi).length, wait = all.length - done;
-      return `<span>✨ <b>${done} of ${all.length}</b> requests sorted by AI${wait ? ` · <b class="iss-wait">${wait} waiting</b> (sorted by key words for now)` : ' · all sorted'}${issRun && issRun.at ? ' · last run ' + esc(new Date(issRun.at).toLocaleDateString(undefined, { month:'short', day:'numeric' })) + (issRun.by ? ' by ' + esc(issRun.by) : '') : ''} · runs by itself on the 1st of each month</span>
+      return `<span><b>${done} of ${all.length}</b> requests sorted by AI${wait ? ` · <b class="iss-wait">${wait} waiting</b> (sorted by key words for now)` : ' · all sorted'}${issRun && issRun.at ? ' · last run ' + esc(new Date(issRun.at).toLocaleDateString(undefined, { month:'short', day:'numeric' })) + (issRun.by ? ' by ' + esc(issRun.by) : '') : ''} · runs by itself on the 1st of each month</span>
         <button type="button" class="btn btn-ghost" id="issSort" ${issBusy || !wait ? 'disabled' : ''}>${issBusy ? 'Sorting…' : 'Sort the new ones with AI'}</button>`; })()}</div>
     ${list.length ? list.map(row).join('') : '<div class="muted" style="padding:10px 4px;">No requests in this time.</div>'}
     ${other.m.length ? row(other) : ''}
