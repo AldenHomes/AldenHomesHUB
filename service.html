@@ -112,6 +112,27 @@
   .done-toggle:hover{background:#faf8f2;}
   .done-toggle .arrow{display:inline-block; transition:transform .15s; font-size:11px;}
   .done-toggle.open .arrow{transform:rotate(90deg);}
+  /* Repeat issues */
+  .iss-teaser{font-weight:400; font-size:12.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;}
+  .iss-box{background:var(--paper-2); border:1px solid var(--steel-line); border-radius:var(--radius); padding:12px 14px; margin:-4px 0 18px;}
+  .iss-top{display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; color:var(--ink-soft); margin-bottom:8px;}
+  .iss-top select, .iss-m select{width:auto !important; max-width:190px;} .iss-top select{padding:6px 8px; border:1px solid var(--steel-line); border-radius:var(--radius); font-size:13px; background:#fff;}
+  .iss-row{display:grid; grid-template-columns:minmax(150px,230px) minmax(0,1fr) auto; gap:4px 12px; align-items:center; padding:8px 4px; border-top:1px solid #ece8dd; cursor:pointer;}
+  .iss-row:hover{background:#faf8f2;} .iss-row.open{background:#f3f1ea;}
+  .iss-name{font-weight:700; color:var(--navy); font-size:14px;}
+  .iss-bar{height:10px; background:#ece8dd; border-radius:6px; overflow:hidden;} .iss-bar i{display:block; height:100%; background:var(--navy); border-radius:6px;}
+  .iss-n{font-size:12.5px; color:var(--ink-soft); white-space:nowrap; text-align:right;} .iss-n b{color:var(--ink); font-size:13.5px;}
+  .iss-n b.iss-rep{color:var(--danger);}
+  .iss-list{grid-column:1 / -1; padding:4px 0 8px; cursor:default;}
+  .iss-m{display:flex; gap:10px; align-items:flex-start; padding:7px 8px; border-radius:6px; font-size:13.5px; line-height:1.4;}
+  .iss-m:hover{background:#fff;}
+  .iss-m .w{flex:0 0 150px; font-size:12px; color:var(--ink-soft);} .iss-m .w b{display:block; color:var(--ink); font-size:12.5px;}
+  .iss-m .t{flex:1; min-width:0;} .iss-m mark{background:#f6e7b6; color:inherit; padding:0 1px; border-radius:2px;}
+  .iss-m .a{display:flex; gap:6px; flex:none;}
+  .iss-m button, .iss-m select{font-size:11.5px; padding:3px 7px; border:1px solid var(--steel-line); border-radius:var(--radius); background:#fff; cursor:pointer; color:var(--ink-soft); font-family:inherit;}
+  .iss-m button:hover{color:var(--navy); border-color:var(--navy);}
+  .iss-note{font-size:12px; color:var(--ink-soft); margin-top:8px;}
+  @media (max-width:640px){ .iss-row{grid-template-columns:1fr auto;} .iss-bar{display:none;} .iss-m{flex-wrap:wrap;} .iss-m .w{flex-basis:100%;} }
   .done-toggle .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
 
   /* Auth gate */
@@ -274,6 +295,10 @@ html, body{max-width:100%; overflow-x:clip;}
       <button class="btn btn-ghost" id="copyLinkBtn">Copy Customer Link</button>
       <button class="btn btn-primary" id="addRequestBtn">+ Add Request</button>
     </div>
+
+    <!-- Repeat issues (owner, 2026-11-16): the same problems showing up across homes -->
+    <button type="button" class="done-toggle" id="issuesToggle" style="margin-top:4px;"><span class="arrow">&#9654;</span> Repeat issues <span class="iss-teaser" id="issuesTeaser"></span></button>
+    <div id="issuesWrap" style="display:none;"></div>
 
     <table>
       <thead>
@@ -678,6 +703,7 @@ function render(){
   document.getElementById('statTotal').textContent = requests.length;
   document.getElementById('statNew').textContent = requests.filter(r=>(r.status||'new')==='new').length;
   document.getElementById('statInProgress').textContent = requests.filter(r=>r.status==='in-progress').length;
+  if(window.renderIssues) renderIssues();
 
   document.querySelectorAll('#headerRow th[data-key]').forEach(th=>{
     th.classList.toggle('sorted', th.dataset.key===sortKey);
@@ -1259,6 +1285,128 @@ document.getElementById('deleteBtn').addEventListener('click', async ()=>{
     catch(e){ console.error(e); alert('Could not delete — check your connection.'); }
   }
 });
+</script>
+<script>
+/* ============================================================
+   REPEAT ISSUES (owner, 2026-11-16: "a trend on some of the service requests, especially these end of year ones … track if there are
+   common repeat issues — one I've seen a few times is water missing gutters and flowing down behind them").
+   Each request is cut into its separate problems (its items, or else its description split at new lines, bullets and dashes), and each
+   problem is sorted into the groups below by its wording. A group shows how many homes had it, how often, and when it was last seen;
+   click it for every mention (click one to open the request). A problem sorted wrong can be taken out of a group, and anything can be
+   put in a group by hand — saved on the request as issueTags[pieceKey] = { add:[group ids], off:[group ids] }. Nothing else is stored.
+   To add a group: one line in ISSUE_GROUPS (id, name, words to look for).
+   ============================================================ */
+const ISSUE_GROUPS = [
+  // over: groups this one overrules when both match — there the other word only says WHERE the problem is ("crack above the door")
+  { id:'gutter', n:'Gutters & downspouts', re:/gutter|down ?spout|leader pipe|splash ?block|drain spout/i, over:['plumbing','deck','roof'] },
+  { id:'water', n:'Water getting in / pooling', re:/water (runs|running|pours|pouring|com(es|ing) in|gets in|getting in|leak|behind|into)|leak|puddl|pool(s|ing)\b|moisture|\bwet\b|damp|flood|ice dam|seep/i },
+  { id:'drywall', n:'Drywall cracks & nail pops', re:/dry ?wall|sheet ?rock|nail pop|screw pop|nail\/screw|nail holes|settlement crack|seam crack|ceiling seam|crack(ed|s)? (in|on|by|near|at|above|below|where)? ?(the )?(ceiling|wall|drywall|corner)|(ceiling|wall)s? (crack|seam)|cracked ceiling|cracks in the (garage )?ceiling|^\W*crack (by|at|above|below|near|down|where)|bubble by/i,
+    over:['doors','windows','trim','deck','plumbing','electric','cabinets','floor'] },
+  { id:'doors', n:'Doors sticking / need adjusting', re:/(?<!cabinet |cabinet corner |shower |oven |garage )\bdoors?\b(?! ?(stop|bell))|door ?knob|deadbolt|hinge|weather ?strip/i },
+  { id:'windows', n:'Windows, drafts & latches', re:/window|draft|cold air|whistl|latch/i, over:['deck','trim'] },
+  { id:'concrete', n:'Concrete & foundation cracks', re:/foundation|concrete|cement|\bslab|cinder ?block|stoop|parg/i, over:['plumbing','deck','drywall'] },
+  { id:'caulk', n:'Caulk & sealing', re:/caulk|\bseal(ed|ing|ant)?\b/i, over:['plumbing','trim','deck','doors','windows'] },
+  { id:'cabinets', n:'Cabinets & countertops', re:/cabinet|drawer|countertop|\bisland\b|trash can slide|shelf support/i, over:['plumbing','doors'] },
+  { id:'siding', n:'Siding & exterior trim', re:/siding|soffit|fascia|shutter|exterior trim/i, over:['plumbing','windows'] },
+  { id:'roof', n:'Roof & flashing', re:/roof|shingle|flashing/i },
+  { id:'plumbing', n:'Plumbing & faucets', re:/faucet|hose ?bib|spigot|toilet|shower|\btub\b|sink|plumb|water heater|drain/i },
+  { id:'electric', n:'Lights, outlets & detectors', re:/\blights?\b|lighting|outlet|receptacle|switch|breaker|electric|smoke|detector|ceiling fan|gfci|\bfan\b/i, over:['deck','doors'] },
+  { id:'appliance', n:'Appliances', re:/microwave|dishwasher|refrigerator|fridge|appliance|\brange hood/i },
+  { id:'hvac', n:'Heating & cooling', re:/hvac|furnace|heat pump|\ba\/?c\b|air condition|thermostat|duct|register/i },
+  { id:'deck', n:'Deck, porch & railings', re:/deck|porch|patio|railing|handrail|stair cable|trex|composite/i },
+  { id:'trim', n:'Stairs, trim & baseboard', re:/\bstair|baseboard|\btrim\b|nosing|casing|molding|moulding|banister/i },
+  { id:'paint', n:'Paint & touch-ups', re:/paint|\bstain\b|scratch|touch ?up|\bnick|glue/i, over:['doors','plumbing','trim','deck'] },
+  { id:'floor', n:'Flooring', re:/floor(ing)?\b|carpet|\btile|\blvp\b|grout/i },
+  { id:'garage', n:'Garage door', re:/garage door|opener/i },
+  { id:'yard', n:'Yard, trees & grading', re:/\btree|lawn|grass|seed|grading|\byard\b|mulch|landscap|erosion|wash(ed)? out|channel in the ground/i },
+];
+const ISS_OTHER = { id:'other', n:'Not sorted yet' };
+let issOpen = false, issGroup = '', issRange = '12', issDev = '';
+try{ issOpen = localStorage.getItem('svcIssuesOpen') === '1'; }catch(e){}
+// a request's separate problems: { key, text }
+function issuePieces(r){
+  if(Array.isArray(r.items) && r.items.length) return r.items.filter(i=>i && i.text).map(i=>({ key:'i_' + i.id, text:String(i.text) }));
+  const out = [];
+  String(r.description || '').split(/\r?\n|•|(?:^|\s)-(?=[A-Za-z])|(?:^|\s)\d{1,2}[.)]\s+(?=[A-Za-z])/).map(s=>s.trim()).filter(s=>s.length > 2)
+    .forEach((t, i)=>out.push({ key:'d' + i, text:t }));
+  return out;
+}
+function issueGroupsOf(r, p){
+  const tag = (r.issueTags || {})[p.key] || {}, off = tag.off || [], add = tag.add || [];
+  const hit = ISSUE_GROUPS.filter(g=>g.re.test(p.text)), drop = new Set(hit.flatMap(g=>g.over || []));
+  const ids = hit.filter(g=>!drop.has(g.id) && !off.includes(g.id)).map(g=>g.id);
+  add.forEach(a=>{ if(!ids.includes(a) && ISSUE_GROUPS.some(g=>g.id === a)) ids.push(a); });
+  return ids.length ? ids : ['other'];
+}
+function issueWhen(r){ return String(r.submittedAt || '').slice(0, 10); }
+function renderIssues(){
+  const wrap = document.getElementById('issuesWrap'), tg = document.getElementById('issuesToggle'); if(!wrap || !tg) return;
+  const cut = issRange === 'all' ? '' : issRange === 'year' ? new Date().getFullYear() + '-01-01'
+    : new Date(Date.now() - Number(issRange) * 30.44 * 864e5).toISOString().slice(0, 10);
+  const devOf = r=>{ const h = homeFor(r); return h ? h.community || '' : ''; };
+  const reqs = requests.filter(r=>(!cut || issueWhen(r) >= cut) && (!issDev || devOf(r) === issDev));
+  // group id → { mentions: [{ r, p }], homes: Set }
+  const G = {};
+  [...ISSUE_GROUPS, ISS_OTHER].forEach(g=>{ G[g.id] = { g, m:[], homes:new Set(), last:'' }; });
+  reqs.forEach(r=>{
+    const home = homeFor(r), hk = home ? home.id : (r.address || r.name || r.id).toLowerCase();
+    issuePieces(r).forEach(p=>issueGroupsOf(r, p).forEach(id=>{ const x = G[id]; x.m.push({ r, p }); x.homes.add(hk); if(issueWhen(r) > x.last) x.last = issueWhen(r); }));
+  });
+  const list = Object.values(G).filter(x=>x.m.length && x.g.id !== 'other').sort((a, b)=>b.homes.size - a.homes.size || b.m.length - a.m.length);
+  const other = G.other, max = Math.max(1, ...list.map(x=>x.homes.size));
+  const top = list.filter(x=>x.homes.size >= 2).slice(0, 3);
+  document.getElementById('issuesTeaser').textContent = top.length ? '· ' + top.map(x=>x.g.n + ' (' + x.homes.size + ' homes)').join(' · ') : '';
+  tg.classList.toggle('open', issOpen);
+  wrap.style.display = issOpen ? 'block' : 'none';
+  if(!issOpen) return;
+  if(wrap.contains(document.activeElement) && document.activeElement.tagName === 'SELECT' && document.activeElement.dataset.issAdd) return;
+  const devs = [...new Set(requests.map(devOf).filter(Boolean))].sort();
+  const words = g=>g.re ? new RegExp(g.re.source, 'gi') : null;
+  const mark = (t, g)=>{ const re = words(g); const s = esc(t); if(!re) return s;
+    return esc(t).replace(new RegExp(g.re.source.replace(/\(\?<!.*?\)/g, ''), 'gi'), x=>'<mark>' + x + '</mark>'); };
+  const mention = (g, { r, p })=>{ const home = homeFor(r);
+    return `<div class="iss-m" data-open-req="${esc(r.id)}"><div class="w"><b>${esc(home ? homeLabel(home) : (r.name || 'Unknown'))}</b>${esc(issueWhen(r) ? new Date(issueWhen(r) + 'T12:00').toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) : '')}${r.status === 'sent' ? ' · done' : ''}</div>
+      <div class="t">${mark(p.text.length > 260 ? p.text.slice(0, 260) + '…' : p.text, g)}</div>
+      <div class="a">${g.id !== 'other' ? `<button type="button" data-iss-off="${esc(r.id)}|${esc(p.key)}|${g.id}" title="This one isn't a ${esc(g.n.toLowerCase())} problem">Not this</button>` : ''}
+        <select data-iss-add="${esc(r.id)}|${esc(p.key)}" title="Also count it under another group"><option value="">${g.id === 'other' ? 'Sort into…' : 'Also under…'}</option>${ISSUE_GROUPS.filter(x=>x.id !== g.id).map(x=>`<option value="${x.id}">${esc(x.n)}</option>`).join('')}</select></div></div>`; };
+  const row = x=>{ const open = issGroup === x.g.id, rep = x.homes.size >= 2;
+    return `<div class="iss-row ${open ? 'open' : ''}" data-iss-group="${x.g.id}"><div class="iss-name">${esc(x.g.n)}</div>
+      <div class="iss-bar">${x.g.id === 'other' ? '' : `<i style="width:${(x.homes.size / max * 100).toFixed(1)}%"></i>`}</div>
+      <div class="iss-n"><b class="${rep ? 'iss-rep' : ''}">${x.homes.size} home${x.homes.size === 1 ? '' : 's'}</b> · ${x.m.length} mention${x.m.length === 1 ? '' : 's'} · last ${esc(x.last ? new Date(x.last + 'T12:00').toLocaleDateString(undefined, { month:'short', day:'numeric' }) : '—')}</div>
+      ${open ? `<div class="iss-list">${x.m.slice().sort((a, b)=>issueWhen(b.r).localeCompare(issueWhen(a.r))).map(m=>mention(x.g, m)).join('')}</div>` : ''}</div>`; };
+  wrap.innerHTML = `<div class="iss-box"><div class="iss-top">
+      <select id="issRange"><option value="12">Last 12 months</option><option value="year">This year</option><option value="3">Last 3 months</option><option value="all">All time</option></select>
+      <select id="issDev"><option value="">Every development</option>${devs.map(d=>`<option ${d === issDev ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
+      <span>${reqs.length} request${reqs.length === 1 ? '' : 's'} · red = on 2 or more homes · click a group to see each one</span></div>
+    ${list.length ? list.map(row).join('') : '<div class="muted" style="padding:10px 4px;">No requests in this time.</div>'}
+    ${other.m.length ? row(other) : ''}
+    <div class="iss-note">Sorted by the words used, so a few can land in the wrong group — "Not this" takes one out, "Also under…" / "Sort into…" puts it where it belongs. A request split into items (in the request) is counted item by item.</div></div>`;
+  document.getElementById('issRange').value = issRange;
+}
+document.getElementById('issuesToggle').addEventListener('click', ()=>{ issOpen = !issOpen; try{ localStorage.setItem('svcIssuesOpen', issOpen ? '1' : '0'); }catch(e){} renderIssues(); });
+document.getElementById('issuesWrap').addEventListener('change', e=>{
+  if(e.target.id === 'issRange'){ issRange = e.target.value; renderIssues(); return; }
+  if(e.target.id === 'issDev'){ issDev = e.target.value; renderIssues(); return; }
+  const a = e.target.dataset.issAdd; if(!a || !e.target.value) return;
+  const [rid, key] = a.split('|'); issueTag(rid, key, e.target.value, 'add');
+});
+document.getElementById('issuesWrap').addEventListener('click', e=>{
+  if(e.target.closest('select')) return;
+  const off = e.target.closest('[data-iss-off]');
+  if(off){ const [rid, key, gid] = off.dataset.issOff.split('|'); issueTag(rid, key, gid, 'off'); return; }
+  const m = e.target.closest('[data-open-req]'); if(m){ openModal(m.dataset.openReq); return; }
+  const g = e.target.closest('[data-iss-group]'); if(g){ issGroup = issGroup === g.dataset.issGroup ? '' : g.dataset.issGroup; renderIssues(); }
+});
+async function issueTag(rid, key, gid, how){
+  const r = requests.find(x=>x.id === rid); if(!r) return;
+  const tags = JSON.parse(JSON.stringify(r.issueTags || {})), t = tags[key] || { add:[], off:[] };
+  t.add = (t.add || []).filter(x=>x !== gid); t.off = (t.off || []).filter(x=>x !== gid);
+  if(how === 'add') t.add.push(gid);
+  else t.off.push(gid);
+  tags[key] = t; r.issueTags = tags; renderIssues();
+  try{ await requestsCol.doc(rid).update({ ['issueTags.' + key]: t }); }
+  catch(err){ console.error(err); alert('Could not save — check your connection.'); }
+}
 </script>
 <script>
 if('serviceWorker' in navigator){
