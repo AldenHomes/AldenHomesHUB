@@ -23,11 +23,20 @@
        Berks County. Sewer (TTSS, no form), driveway, zoning, then the building permit (Commonwealth Code Inspection Service reviews). */
     MM: { borough: 'Tulpehocken Township', city: 'Myerstown PA', zip: '17067', subdivision: 'Mountain Meadows', zone: 'VC',
       forms: { drive: 'tulpe-drive', zoning: 'tulpe-zoning', building: 'tulpe-building' },
+      checks: [
+        { id: 'ttss', to: 'TTSS', amt: '$150 + tapping fee', what: 'Sewer: application + tapping fee — can be one check (Phase 2 was $4,571.55 total as of 7/18/23)' },
+        { id: 'drive', to: 'Tulpehocken Township', amt: '$75', what: 'Driveway permit' },
+        { id: 'zoning', to: 'Tulpehocken Township', amt: '$150', what: 'Zoning permit' },
+        { id: 'rec', to: 'Tulpehocken Township', amt: '$2,500', what: 'Recreation fee — its own separate check, due when applying for each new build' },
+      ],
+      bring: ['Driveway: a sketch of the driveway (lot lines, where it meets the street)', 'Zoning: copy of the deed + the plot plan',
+        'Building: 2 sets of plans + 2 sets of truss drawings and layout (paper preferred; can be emailed to tulpytwp@comcast.net)'],
+      note: 'Building permit: Commonwealth Code gives the cost once the plans are reviewed — paid when the permit is picked up. Commonwealth does the final inspection; the township mails the zoning use & occupancy certificate.',
       steps: [
-        { id: 'sewer', t: 'Sewer permit (TTSS)', hint: 'Application to connect. One check to TTSS: $150 application fee + the tapping fee (Phase 2 was $4,421.55 as of 7/18/23). No form in the hub.', no: true },
-        { id: 'drive', t: 'Driveway permit', hint: '$75 check to Tulpehocken Township. Attach a sketch of the driveway.', form: 'drive', no: true },
-        { id: 'zoning', t: 'Zoning permit', hint: '$150 check to Tulpehocken Township, plus the $2,500 recreation fee as a separate check to Tulpehocken Township. Attach the deed and plot plan.', form: 'zoning', no: true },
-        { id: 'building', t: 'Building permit', hint: 'Commonwealth Code reviews it; can be emailed to the township (tulpytwp@comcast.net), but they prefer 2 sets of plans + 2 sets of truss drawings and layout on paper. Fee given when the permit is ready.', form: 'building', no: true },
+        { id: 'sewer', t: 'Sewer permit (TTSS)', hint: 'Application to connect, sent to TTSS. No form in the hub — record the dates.', no: true },
+        { id: 'drive', t: 'Driveway permit', hint: 'To Tulpehocken Township, with a sketch of the driveway.', form: 'drive', no: true },
+        { id: 'zoning', t: 'Zoning permit', hint: 'To Tulpehocken Township, with the deed and plot plan (and the recreation fee check).', form: 'zoning', no: true },
+        { id: 'building', t: 'Building permit', hint: 'To the township; Commonwealth Code reviews the plans.', form: 'building', no: true },
       ] },
   };
   const stepsOf = dev=>dev ? (dev.steps || STEPS_FORMS) : OTHER_STEPS;
@@ -316,6 +325,14 @@
     .pm-row{grid-column:2; display:flex; gap:8px 14px; flex-wrap:wrap; align-items:flex-end; margin-top:8px; font-size:13px;}
     .pm-row label{display:flex; flex-direction:column; gap:3px; font-size:11px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; color:#777;}
     .pm-row input{padding:7px 8px; border:1px solid #d6d2c4; border-radius:6px; font-size:14px; font-family:inherit; text-transform:none; letter-spacing:0; font-weight:400; color:#222;}
+    .pm-wrap{display:flex; flex-wrap:wrap; gap:6px 22px; align-items:flex-start;} .pm-steps{flex:1 1 420px; min-width:0;}
+    .pm-side{flex:0 1 300px; min-width:240px; background:#faf8f1; border:1px solid #e6e1cf; border-radius:10px; padding:12px 14px; margin-top:10px; font-size:13px;}
+    .pm-side-t{font-size:11.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:#6b7355; display:flex; justify-content:space-between; gap:8px; margin-bottom:6px;}
+    .pm-side-t span{text-transform:none; letter-spacing:0; font-weight:700; color:#b3261e;}
+    .pm-chk{display:flex; gap:9px; align-items:flex-start; padding:7px 0; border-top:1px solid #ece7d6; cursor:pointer; line-height:1.35;}
+    .pm-chk input{margin-top:3px; width:16px; height:16px; flex:none;} .pm-chk small{display:block; color:#777; font-size:12px;}
+    .pm-chk.done b, .pm-chk.done > span{color:#8a8a8a;} .pm-chk.done b{text-decoration:line-through;}
+    .pm-bring{margin:0; padding-left:18px; color:#444; line-height:1.45;} .pm-side-n{margin-top:10px; font-size:12px; color:#777;}
     .pm-next{background:#f3f5ee; border:1px solid #dfe3d3; border-radius:8px; padding:9px 12px; font-size:14px; margin-bottom:6px;}
     #permitsCard.open .tl-arrow{transform:rotate(90deg);}
     .pm-btn{border:1px solid #d6d2c4; background:#fff; border-radius:8px; padding:8px 13px; font-size:13.5px; font-weight:700; font-family:inherit; cursor:pointer; color:#1f3550;}
@@ -412,21 +429,35 @@
     $('permitsBody').innerHTML = `<div class="pm-next"><b>${esc(next)}</b> <span style="color:#777">${doneIdx} of ${STEPS.length} approved${dev ? ' · ' + esc(dev.borough) : ''}</span></div>
       ${nothingYet ? `<div style="margin:8px 0 4px; padding:10px 12px; background:#f6f5f0; border-radius:8px; font-size:13px;">Not signed through Selections yet. Applying for permits early? <button type="button" class="pm-btn primary" data-pmstart="1" style="margin-left:6px;">Start permits for this home</button></div>`
         : p.start && !J().selectionSheet ? `<div style="margin:6px 0 2px; font-size:12.5px; color:#777;">Permits started ${esc(nice(p.start))} (before Selections). <a href="#" data-pmstop="1" style="color:#777;">Undo</a></div>` : ''}
+      <div class="pm-wrap"><div class="pm-steps">
       ${STEPS.map((s, i)=>{ const st = p[s.id] || {};
         return `<div class="pm-step ${st.ok ? 'ok' : i === nowIdx ? 'now' : ''}"><div class="pm-n">${st.ok ? '&#10003;' : i + 1}</div>
           <div><div class="pm-t">${esc(s.t)}</div><div class="pm-h">${esc(s.hint)}</div></div>
           <div class="pm-row">${s.form && dev && dev.forms[s.form] ? `<button type="button" class="pm-btn ${i === nowIdx && !st.sent ? 'primary' : ''}" data-fill="${s.form}">Fill out the form${s.form === 'ws' ? 's' : ''}${(()=>{ const n = missingFor(dev.forms[s.form]).length; return n ? ` · <span style="color:${i === nowIdx && !st.sent ? '#ffd6d2' : '#b3261e'}">${n} to fill in</span>` : ' · ready'; })()}</button>` : ''}
             <label>Submitted<input type="date" data-pm="${s.id}.sent" value="${esc(st.sent || '')}"></label>
             <label>Approved<input type="date" data-pm="${s.id}.ok" value="${esc(st.ok || '')}"></label>
-            ${s.no ? `<label>Permit #<input type="text" data-pm="${s.id}.no" value="${esc(st.no || '')}" style="width:130px"></label>` : ''}</div></div>`; }).join('')}`;
+            ${s.no ? `<label>Permit #<input type="text" data-pm="${s.id}.no" value="${esc(st.no || '')}" style="width:130px"></label>` : ''}</div></div>`; }).join('')}
+      </div>${dev && dev.checks ? sideBox(dev, p) : ''}</div>`;
     if(ed) renderEditor();
   };
+  /* CHECKS TO WRITE (owner, 2026-11-16: "what checks to fill out … show up when you click on a MM house as a reminder on the side"):
+     the office's permitting checklist beside the steps — each check (who to, how much, what for) with a "Written" tick saved on the
+     home as permits.checks[id] = date, and what has to go in with each application. */
+  function sideBox(dev, p){
+    const done = p.checks || {}, left = dev.checks.filter(c=>!done[c.id]).length;
+    return `<aside class="pm-side"><div class="pm-side-t">Checks to write <span>${left ? left + ' to go' : 'all written'}</span></div>
+      ${dev.checks.map(c=>`<label class="pm-chk ${done[c.id] ? 'done' : ''}"><input type="checkbox" data-pmcheck="${c.id}" ${done[c.id] ? 'checked' : ''}>
+        <span><b>${esc(c.amt)}</b> to ${esc(c.to)}<small>${esc(c.what)}${done[c.id] ? ' · written ' + esc(nice(done[c.id])) : ''}</small></span></label>`).join('')}
+      ${dev.bring ? `<div class="pm-side-t" style="margin-top:12px;">Send along</div><ul class="pm-bring">${dev.bring.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+      ${dev.note ? `<div class="pm-side-n">${esc(dev.note)}</div>` : ''}</aside>`;
+  }
   async function save(patch){
     try{ await db.collection('jobs').doc(J().id).set({ permits: patch }, { merge: true }); }
     catch(err){ console.error(err); alert('Could not save — check your connection.'); }
   }
   function onCardChange(e){
     const el = e.target;
+    if(el.dataset.pmcheck){ save({ checks: { [el.dataset.pmcheck]: el.checked ? today() : '' } }); return; }
     if(!el.dataset.pm) return;
     const [step, f] = el.dataset.pm.split('.');
     save({ [step]: { [f]: f === 'no' ? el.value.trim().slice(0, 40) : el.value } });
