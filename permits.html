@@ -394,7 +394,8 @@ function renderList(){
   fd.innerHTML = '<option value="">Every development</option>' + devs.map(d=>`<option value="${esc(d)}">${esc(d)}${Permits.DEVS[d] ? ' (forms ready)' : ''}</option>`).join('');
   fd.value = devs.includes(keep) ? keep : '';
   const dev = fd.value, st = $('fState').value, q = $('fFind').value.trim().toLowerCase();
-  const rows = jobs.filter(active).map(j=>({ j, s: Permits.status(j) }));
+  // homes marked "already has its permits" are left off the list (owner, 2026-11-16)
+  const rows = jobs.filter(active).map(j=>({ j, s: Permits.status(j) })).filter(r=>r.s.state !== 'had');
   $('statTodo').textContent = rows.filter(r=>r.s.state === 'todo').length;
   $('statWait').textContent = rows.filter(r=>r.s.state === 'waiting').length;
   const shown = rows.filter(r=>(!dev || r.j.community === dev) && (st === 'all' || (st === 'open' ? r.s.state !== 'done' : r.s.state === st))
@@ -549,7 +550,7 @@ firebase.auth().onAuthStateChanged(user=>{
   } else showLoginGate();
 });
 </script>
-<script src="permits.js?v=10"></script>
+<script src="permits.js?v=11"></script>
 <script src="moneyfmt.js"></script>
 <script src="sorttables.js"></script>
 <script src="hubsearch.js"></script>

@@ -412,6 +412,18 @@
     const c = card(); if(!c) return;
     c.style.display = '';
     const p = P();
+    /* ALREADY PERMITTED (owner, 2026-11-16: "houses already in the hub — being built or built — already have their permits, they can be
+       taken off the list"): permits.had = date marked. Off the Permits list, no red banner; the card just says so, with Undo. Every home
+       active on 2026-11-16 was marked; a later home can be marked with "This home already has its permits". */
+    if(p.had){
+      banner(dev, STEPS, { ...p, ...Object.fromEntries(STEPS.map(s=>[s.id, { ok: 'x' }])) });
+      const tg0 = $('permitsToggle');
+      if(tg0){ c.classList.toggle('open', pOpen); tg0.setAttribute('aria-expanded', String(pOpen)); $('permitsHint').textContent = pOpen ? 'Hide' : 'Already has its permits'; $('permitsBody').style.display = pOpen ? 'block' : 'none'; }
+      $('permitsBody').innerHTML = `<div class="pm-next"><b>This home already has its permits.</b> <span style="color:#777">Handled before the hub — not on the Permits list.</span></div>
+        <div style="font-size:13px; color:#777; margin-top:6px;">Need to track them here after all? <a href="#" data-pmhad="0" style="color:#1f3550; font-weight:700;">Put it back on the Permits list</a></div>`;
+      if(ed) renderEditor();
+      return;
+    }
     banner(dev, STEPS, p);
     const doneIdx = STEPS.filter(s=>(p[s.id] || {}).ok).length;
     const nowIdx = STEPS.findIndex(s=>!(p[s.id] || {}).ok);
@@ -426,7 +438,7 @@
     }
     const nothingYet = !begun(J()) && !STEPS.some(s=>p[s.id] && (p[s.id].sent || p[s.id].ok));
     $('permitsBody').innerHTML = `<div class="pm-next"><b>${esc(next)}</b> <span style="color:#777">${doneIdx} of ${STEPS.length} approved${dev ? ' · ' + esc(dev.borough) : ''}</span></div>
-      ${nothingYet ? `<div style="margin:8px 0 4px; padding:10px 12px; background:#f6f5f0; border-radius:8px; font-size:13px;">Not signed through Selections yet. Applying for permits early? <button type="button" class="pm-btn primary" data-pmstart="1" style="margin-left:6px;">Start permits for this home</button></div>`
+      ${nothingYet ? `<div style="margin:8px 0 4px; padding:10px 12px; background:#f6f5f0; border-radius:8px; font-size:13px;">Not signed through Selections yet. Applying for permits early? <button type="button" class="pm-btn primary" data-pmstart="1" style="margin-left:6px;">Start permits for this home</button> <button type="button" class="pm-btn" data-pmhad="1" style="margin-left:4px;">This home already has its permits</button></div>`
         : p.start && !J().selectionSheet ? `<div style="margin:6px 0 2px; font-size:12.5px; color:#777;">Permits started ${esc(nice(p.start))} (before Selections). <a href="#" data-pmstop="1" style="color:#777;">Undo</a></div>` : ''}
       <div class="pm-wrap"><div class="pm-steps">
       ${STEPS.map((s, i)=>{ const st = p[s.id] || {};
@@ -465,6 +477,8 @@
     if(e.target.closest('#permitsToggle')){ setOpen(!pOpen); return; }
     if(e.target.closest('[data-pmstart]')){ const d = new Date(); save({ start: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }); return; }
     if(e.target.closest('[data-pmstop]')){ e.preventDefault(); save({ start: '' }); return; }
+    const hd = e.target.closest('[data-pmhad]');
+    if(hd){ e.preventDefault(); const v = hd.dataset.pmhad === '1' ? today() : ''; J().permits = { ...(J().permits || {}), had: v }; save({ had: v }); renderPermits(); return; }
     const b = e.target.closest('[data-fill]'); if(!b) return;
     const dev = PERMIT_DEVS[J().community];
     ed = { step: b.dataset.fill, form: dev.forms[b.dataset.fill] };
@@ -725,6 +739,7 @@
     stepsFor: job=>stepsOf(PERMIT_DEVS[job.community]),
     status(job){
       const steps = this.stepsFor(job), p = job.permits || {};
+      if(p.had) return { state: 'had', label: 'Already has its permits', done: steps.length, of: steps.length };
       const i = steps.findIndex(s=>!(p[s.id] || {}).ok), st = i < 0 ? null : steps[i];
       if(!st) return { state: 'done', label: 'All approved', done: steps.length, of: steps.length };
       const sent = (p[st.id] || {}).sent;
