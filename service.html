@@ -132,6 +132,8 @@
   .iss-m button, .iss-m select{font-size:11.5px; padding:3px 7px; border:1px solid var(--steel-line); border-radius:var(--radius); background:#fff; cursor:pointer; color:var(--ink-soft); font-family:inherit;}
   .iss-m button:hover{color:var(--navy); border-color:var(--navy);}
   .iss-note{font-size:12px; color:var(--ink-soft); margin-top:8px;}
+  .iss-ai{display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; background:#fff; border:1px solid #ece8dd; border-radius:var(--radius); padding:8px 10px; margin:2px 0 8px; font-size:13px; color:var(--ink-soft);}
+  .iss-ai b{color:var(--ink);} .iss-ai b.iss-wait{color:#a0721c;} .iss-ai .btn{padding:7px 12px; font-size:13px;} .iss-ai .btn:disabled{opacity:.5; cursor:default;}
   @media (max-width:640px){ .iss-row{grid-template-columns:1fr auto;} .iss-bar{display:none;} .iss-m{flex-wrap:wrap;} .iss-m .w{flex-basis:100%;} }
   .done-toggle .n{font-family:"Courier New",monospace; font-weight:400; font-size:12px; background:#ece8dd; border-radius:20px; padding:1px 9px; color:var(--ink-soft);}
 
@@ -1321,10 +1323,20 @@ const ISSUE_GROUPS = [
   { id:'yard', n:'Yard, trees & grading', re:/\btree|lawn|grass|seed|grading|\byard\b|mulch|landscap|erosion|wash(ed)? out|channel in the ground/i },
 ];
 const ISS_OTHER = { id:'other', n:'Not sorted yet' };
-let issOpen = false, issGroup = '', issRange = '12', issDev = '';
+let issOpen = false, issGroup = '', issRange = '12', issDev = '', issRun = null, issBusy = false;
+/* AI SORTING (owner, 2026-11-16: "a button that has AI scan and sort them … once a month"): the server (issuesApi / issuesMonthly in
+   functions/index.js) has Claude split each request into problems and group them, saved as r.aiIssues { src, at, items:[{ t, g }] }.
+   A request whose text still matches aiIssues.src uses the AI's problems and groups; one not sorted yet (new or edited) falls back to
+   the word matching below until the next run. issueSrc must stay the same as the server's. */
+const ISS_API = 'https://us-central1-alden-homes-hub.cloudfunctions.net/issuesApi';
+const issueSrc = r=>(Array.isArray(r.items) && r.items.some(i=>i && i.text))
+  ? r.items.filter(i=>i && i.text).map(i=>String(i.text).trim()).join(String.fromCharCode(10)) : String(r.description || '').trim();
+const issueAi = r=>!!(r.aiIssues && Array.isArray(r.aiIssues.items) && r.aiIssues.src === issueSrc(r));
+let issRunSub = null;
 try{ issOpen = localStorage.getItem('svcIssuesOpen') === '1'; }catch(e){}
 // a request's separate problems: { key, text }
 function issuePieces(r){
+  if(issueAi(r)) return r.aiIssues.items.map((x, i)=>({ key:'a' + i, text:String(x.t || ''), ai:(x.g || []).slice() }));
   if(Array.isArray(r.items) && r.items.length) return r.items.filter(i=>i && i.text).map(i=>({ key:'i_' + i.id, text:String(i.text) }));
   const out = [];
   String(r.description || '').split(/\r?\n|•|(?:^|\s)-(?=[A-Za-z])|(?:^|\s)\d{1,2}[.)]\s+(?=[A-Za-z])/).map(s=>s.trim()).filter(s=>s.length > 2)
@@ -1333,13 +1345,16 @@ function issuePieces(r){
 }
 function issueGroupsOf(r, p){
   const tag = (r.issueTags || {})[p.key] || {}, off = tag.off || [], add = tag.add || [];
-  const hit = ISSUE_GROUPS.filter(g=>g.re.test(p.text)), drop = new Set(hit.flatMap(g=>g.over || []));
-  const ids = hit.filter(g=>!drop.has(g.id) && !off.includes(g.id)).map(g=>g.id);
+  let ids;
+  if(p.ai) ids = p.ai.filter(g=>g !== 'other' && ISSUE_GROUPS.some(x=>x.id === g) && !off.includes(g));
+  else { const hit = ISSUE_GROUPS.filter(g=>g.re.test(p.text)), drop = new Set(hit.flatMap(g=>g.over || []));
+    ids = hit.filter(g=>!drop.has(g.id) && !off.includes(g.id)).map(g=>g.id); }
   add.forEach(a=>{ if(!ids.includes(a) && ISSUE_GROUPS.some(g=>g.id === a)) ids.push(a); });
   return ids.length ? ids : ['other'];
 }
 function issueWhen(r){ return String(r.submittedAt || '').slice(0, 10); }
 function renderIssues(){
+  if(!issRunSub && typeof db !== 'undefined' && db && firebase.auth().currentUser){ issRunSub = db.collection('settings').doc('service-issues').onSnapshot(d=>{ issRun = d.exists ? d.data() : null; renderIssues(); }, ()=>{}); }
   const wrap = document.getElementById('issuesWrap'), tg = document.getElementById('issuesToggle'); if(!wrap || !tg) return;
   const cut = issRange === 'all' ? '' : issRange === 'year' ? new Date().getFullYear() + '-01-01'
     : new Date(Date.now() - Number(issRange) * 30.44 * 864e5).toISOString().slice(0, 10);
@@ -1378,9 +1393,12 @@ function renderIssues(){
       <select id="issRange"><option value="12">Last 12 months</option><option value="year">This year</option><option value="3">Last 3 months</option><option value="all">All time</option></select>
       <select id="issDev"><option value="">Every development</option>${devs.map(d=>`<option ${d === issDev ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
       <span>${reqs.length} request${reqs.length === 1 ? '' : 's'} · red = on 2 or more homes · click a group to see each one</span></div>
+    <div class="iss-ai">${(()=>{ const all = requests.filter(r=>issueSrc(r)), done = all.filter(issueAi).length, wait = all.length - done;
+      return `<span>✨ <b>${done} of ${all.length}</b> requests sorted by AI${wait ? ` · <b class="iss-wait">${wait} waiting</b> (sorted by key words for now)` : ' · all sorted'}${issRun && issRun.at ? ' · last run ' + esc(new Date(issRun.at).toLocaleDateString(undefined, { month:'short', day:'numeric' })) + (issRun.by ? ' by ' + esc(issRun.by) : '') : ''} · runs by itself on the 1st of each month</span>
+        <button type="button" class="btn btn-ghost" id="issSort" ${issBusy || !wait ? 'disabled' : ''}>${issBusy ? 'Sorting…' : 'Sort the new ones with AI'}</button>`; })()}</div>
     ${list.length ? list.map(row).join('') : '<div class="muted" style="padding:10px 4px;">No requests in this time.</div>'}
     ${other.m.length ? row(other) : ''}
-    <div class="iss-note">Sorted by the words used, so a few can land in the wrong group — "Not this" takes one out, "Also under…" / "Sort into…" puts it where it belongs. A request split into items (in the request) is counted item by item.</div></div>`;
+    <div class="iss-note">Still wrong somewhere? "Not this" takes a problem out of a group, "Also under…" / "Sort into…" puts it where it belongs — that sticks even after the AI runs again. A request edited after it was sorted is sorted again on the next run.</div></div>`;
   document.getElementById('issRange').value = issRange;
 }
 document.getElementById('issuesToggle').addEventListener('click', ()=>{ issOpen = !issOpen; try{ localStorage.setItem('svcIssuesOpen', issOpen ? '1' : '0'); }catch(e){} renderIssues(); });
@@ -1390,8 +1408,17 @@ document.getElementById('issuesWrap').addEventListener('change', e=>{
   const a = e.target.dataset.issAdd; if(!a || !e.target.value) return;
   const [rid, key] = a.split('|'); issueTag(rid, key, e.target.value, 'add');
 });
-document.getElementById('issuesWrap').addEventListener('click', e=>{
+document.getElementById('issuesWrap').addEventListener('click', async e=>{
   if(e.target.closest('select')) return;
+  if(e.target.closest('#issSort')){
+    issBusy = true; renderIssues();
+    try{
+      const token = await firebase.auth().currentUser.getIdToken();
+      const res = await fetch(ISS_API, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body: JSON.stringify({ action:'sort' }) });
+      if(!res.ok) throw new Error('issuesApi ' + res.status + ' ' + (await res.text()).slice(0, 200));
+    } catch(err){ console.error(err); alert('The AI sort did not finish — try again in a minute. (' + String(err.message || err).slice(0, 120) + ')'); }
+    issBusy = false; renderIssues(); return;
+  }
   const off = e.target.closest('[data-iss-off]');
   if(off){ const [rid, key, gid] = off.dataset.issOff.split('|'); issueTag(rid, key, gid, 'off'); return; }
   const m = e.target.closest('[data-open-req]'); if(m){ openModal(m.dataset.openReq); return; }

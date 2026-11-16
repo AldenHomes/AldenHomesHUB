@@ -3028,3 +3028,95 @@ if(PUSH_ON) exports.pushApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 5
     res.status(500).json({ error: 'server' });
   }
 });
+
+/* ============================================================
+   REPEAT ISSUES, SORTED BY AI (owner, 2026-11-16: "a button that has AI scan and sort them … once a month … just sort the newest ones
+   that haven't been sorted, so it's more accurate than just key words").
+   Each service request's text (its items, else its description — `issueSrc`, the SAME rule as service.html) is cut into separate
+   problems by Claude and each problem gets one or more groups from ISSUE_AI_GROUPS (same ids as ISSUE_GROUPS in service.html).
+   Saved on the request as aiIssues = { src, at, items:[{ t, g:[ids] }] }. A request is sorted again only when its text changed
+   (src differs), so a run only sends the new / edited ones. Runs from the "Sort with AI" button (issuesApi, staff token) and by
+   itself at 6:00 on the 1st of every month (issuesMonthly). Last run → settings/service-issues { at, by, sorted }.
+   ============================================================ */
+const ISSUE_AI_GROUPS = [
+  ['gutter', 'Gutters & downspouts', 'gutters, downspouts, water missing or getting behind gutters, drain extensions'],
+  ['water', 'Water getting in / pooling', 'water leaking in, pooling, puddles, wet areas, poor pitch causing standing water'],
+  ['drywall', 'Drywall cracks & nail pops', 'drywall/ceiling/wall cracks, nail or screw pops, seams, bubbles in drywall'],
+  ['doors', 'Doors sticking / need adjusting', 'interior/exterior people doors: sticking, alignment, hinges, locks, knobs, weatherstripping'],
+  ['windows', 'Windows, drafts & latches', 'windows, latches, drafts, cold air'],
+  ['concrete', 'Concrete & foundation cracks', 'foundation, slabs, porch/garage concrete, cement cracks or chips'],
+  ['caulk', 'Caulk & sealing', 'missing or failed caulk or sealant'],
+  ['cabinets', 'Cabinets & countertops', 'cabinets, drawers, cabinet doors, countertops, shelving'],
+  ['siding', 'Siding & exterior trim', 'siding, soffit, fascia, exterior trim, stone veneer outside'],
+  ['roof', 'Roof & flashing', 'roof, shingles, flashing, attic sheathing'],
+  ['plumbing', 'Plumbing & faucets', 'faucets, hose bibs, toilets, showers, tubs, sinks, drains, water heater'],
+  ['electric', 'Lights, outlets & detectors', 'lights, outlets, switches, fans, smoke/CO detectors, electrical'],
+  ['appliance', 'Appliances', 'microwave, range, dishwasher, refrigerator, washer/dryer'],
+  ['hvac', 'Heating & cooling', 'furnace, heat pump, AC, ducts, thermostat, vents'],
+  ['deck', 'Deck, porch & railings', 'decks, porches, patios, railings, deck boards, steps outside'],
+  ['trim', 'Stairs, trim & baseboard', 'interior stairs, treads, nosing, baseboard, casing, molding, banisters'],
+  ['paint', 'Paint & touch-ups', 'paint, stain, scratches, touch-ups, construction glue/mess to clean'],
+  ['floor', 'Flooring', 'flooring, carpet, tile, LVP, grout'],
+  ['garage', 'Garage door', 'overhead garage door and opener'],
+  ['yard', 'Yard, trees & grading', 'trees, lawn, seeding, grading, erosion, landscaping'],
+  ['other', 'Other', 'none of the above (e.g. questions, fireplace, attic, mirrors)'],
+];
+const issueSrc = r=>(Array.isArray(r.items) && r.items.some(i=>i && i.text))
+  ? r.items.filter(i=>i && i.text).map(i=>String(i.text).trim()).join('\n') : String(r.description || '').trim();
+const ISSUE_SCHEMA = { type: 'object', additionalProperties: false, required: ['requests'], properties: { requests: { type: 'array', items: {
+  type: 'object', additionalProperties: false, required: ['id', 'problems'], properties: {
+    id: { type: 'string' },
+    problems: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['text', 'groups'], properties: {
+      text: { type: 'string' }, groups: { type: 'array', items: { type: 'string', enum: ISSUE_AI_GROUPS.map(g=>g[0]) } } } } } } } } } };
+async function issueSortRun(by){
+  const snap = await db.collection('service-requests').get();
+  const todo = snap.docs.map(d=>({ id: d.id, ref: d.ref, r: d.data() })).map(x=>({ ...x, src: issueSrc(x.r) }))
+    .filter(x=>x.src && !(x.r.aiIssues && x.r.aiIssues.src === x.src));
+  let sorted = 0;
+  if(todo.length){
+    const sdk = require('@anthropic-ai/sdk');
+    const Anthropic = sdk.Anthropic || sdk.default || sdk;
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value().trim() });
+    const system = 'You sort homeowner service requests for Alden Homes, a home builder, so the office can see problems that keep coming back across homes.\n'
+      + 'For each request: split its text into the separate problems it reports (one per item / sentence / bullet; keep one problem whole - don\'t split "door sticks and needs adjusting").\n'
+      + 'For each problem give "text" = the homeowner\'s own words for that one problem (copy, don\'t rewrite; drop list markers like "-" or "Interior:"), and "groups" = the group(s) the PROBLEM is about.\n'
+      + 'Group by what is actually wrong, not by where it is: "drywall crack above the storage room door" is drywall only; "paint touch-ups behind the kitchen faucet" is paint only; "water pours between the gutter and the house" is gutter AND water.\n'
+      + 'Usually one group; two only when the problem truly is both. Use "other" when nothing fits. Skip greetings, sign-offs, contact details and lines that report no problem.\n'
+      + 'Groups (id - name - what belongs):\n' + ISSUE_AI_GROUPS.map(g=>g.join(' - ')).join('\n');
+    const ok = new Set(ISSUE_AI_GROUPS.map(g=>g[0]));
+    for(let i = 0; i < todo.length; i += 20){
+      const part = todo.slice(i, i + 20);
+      const msg = await client.messages.stream({ model: INV_MODEL, max_tokens: 16000,
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: ISSUE_SCHEMA } },
+        system, messages: [{ role: 'user', content: part.map(x=>'<request id="' + x.id + '">\n' + x.src.slice(0, 6000) + '\n</request>').join('\n\n') }] }).finalMessage();
+      if(msg.stop_reason === 'refusal' || msg.stop_reason === 'max_tokens') throw new Error('issues: ' + msg.stop_reason);
+      const out = JSON.parse(msg.content.filter(b=>b.type === 'text').map(b=>b.text).join(''));
+      const at = new Date().toISOString(), batch = db.batch();
+      (out.requests || []).forEach(o=>{ const x = part.find(p=>p.id === o.id); if(!x) return;
+        const items = (o.problems || []).slice(0, 80).map(p=>({ t: String(p.text || '').trim().slice(0, 600), g: [...new Set((p.groups || []).filter(g=>ok.has(g)))].slice(0, 3) }))
+          .filter(p=>p.t).map(p=>({ ...p, g: p.g.length ? p.g : ['other'] }));
+        batch.update(x.ref, { aiIssues: { src: x.src, at, items } }); sorted++; });
+      await batch.commit();
+    }
+  }
+  await db.collection('settings').doc('service-issues').set({ at: new Date().toISOString(), by, sorted, waiting: todo.length - sorted }, { merge: true });
+  return { sorted, of: todo.length };
+}
+if(ASSISTANT_ON){
+  exports.issuesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 3, timeoutSeconds: 300, memory: '512MiB', secrets: [ANTHROPIC_API_KEY] }, async (req, res)=>{
+    if(req.method !== 'POST'){ res.status(405).json({ error: 'method' }); return; }
+    try{
+      const who = await staffFromRequest(req);
+      if(!who){ res.status(401).json({ error: 'sign-in' }); return; }
+      if((req.body || {}).action === 'sort'){ res.json(await issueSortRun(String(who.name || String(who.email || '').split('@')[0] || 'Someone').slice(0, 60))); return; }
+      res.status(400).json({ error: 'action' });
+    } catch(err){
+      logger.error('issuesApi', { error: String(err) });
+      res.status(500).json({ error: 'server', detail: String(err.message || err).slice(0, 200) });
+    }
+  });
+  exports.issuesMonthly = onSchedule({ schedule: '0 6 1 * *', timeZone: TIME_ZONE, timeoutSeconds: 540, secrets: [ANTHROPIC_API_KEY] }, async ()=>{
+    try{ const r = await issueSortRun('Monthly'); logger.info('issuesMonthly', r); }
+    catch(err){ logger.error('issuesMonthly', { error: String(err) }); }
+  });
+}
