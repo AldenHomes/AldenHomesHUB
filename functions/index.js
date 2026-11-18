@@ -2205,8 +2205,8 @@ const INV_SCHEMA = {
       continuesPrevious: { type: 'boolean' }, isInvoice: { type: 'boolean' },
       vendor: { type: 'string' }, invoiceNumber: { type: 'string' }, invoiceDate: { type: 'string' }, total: { type: 'number' },
       poJob: { type: 'string' }, shipTo: { type: 'string' },
-      splits: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['homeId', 'code', 'labor', 'amount', 'why'],
-        properties: { homeId: { type: 'string' }, code: { type: 'integer' }, labor: { type: 'boolean' }, amount: { type: 'number' }, why: { type: 'string' } } } },
+      splits: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['homeId', 'homeLabel', 'code', 'labor', 'amount', 'why'],
+        properties: { homeId: { type: 'string' }, homeLabel: { type: 'string' }, code: { type: 'integer' }, labor: { type: 'boolean' }, amount: { type: 'number' }, why: { type: 'string' } } } },
       lines: INV_LINES_SCHEMA,
       sure: { type: 'boolean' }, questions: { type: 'array', items: { type: 'string' } },
     } } } },
@@ -2224,7 +2224,17 @@ const INV_RULES = `You read scanned invoices for Alden Homes, a home builder in 
   street address, or the buyer's name. code MUST be one of the cost code numbers listed. labor = true for a subcontractor's work /
   installation, false for materials and supplies. Usually one split for the whole total. Split only when the invoice clearly covers more
   than one home or clearly different cost codes; the split amounts must add up to the total (put tax, fuel and delivery charges with
-  the main item). why = a few words on how you decided.
+  the main item). why = a few words on how you decided. homeLabel = '' when homeId is set; when homeId is '' because the job is a
+  worker's own house or a job not in the homes list, homeLabel = the name written on the invoice for it ("Zook", "Louie's son").
+- SIGNATURE CUSTOM CABINETRY sends a plain list with NO letterhead: columns Inv. Date | Invoice | Description | Due Date | Disc. Date |
+  Disc. | Amount, invoice numbers like 75886.01.00-IN, descriptions like "CL 113: KITCHEN UPPERS" (development + lot, then the room).
+  That page IS invoices (isInvoice true), vendor "Signature Custom Cabinetry". Group the rows by the number before the first dot
+  (75886.01, 75886.02 … = invoice 75886) and return ONE entry per group, all with this page as firstPage / lastPage:
+  invoiceNumber = that number (75886), invoiceDate = the rows' Inv. Date, total = the sum of the group's Amount column (ignore the
+  discount columns), lines = one line per row (item = the description after the colon, sku = the row's full number, amount), one split
+  for the home in the description, code 70, labor false. A row naming a person instead of a development + lot ("Zook: UPSTAIRS BATH",
+  "OS 150 LOUIE'S SON: KITCHEN") is a worker's own house: homeId '', homeLabel = that name, code 90 (Miscellaneous). Handwriting,
+  circles and check marks on the page don't change anything.
 - sure: true only when you are confident about every home and cost code. Otherwise false, and questions = short plain questions for
   the office ("Which lot is this for? No lot or address on it.", "Lumber or Trim?").
 ${INV_LINES_RULE}
@@ -2313,13 +2323,16 @@ async function invProcessBatch(batchId){
     const now = new Date().toISOString();
     let made = 0, review = 0, skipped = 0;
     for(const x of found){
-      if(!x.isInvoice){ skipped++; continue; }
+      // a page the reader thinks isn't an invoice is NOT dropped any more (owner, 2026-11-18: Signature's list page vanished): it
+      // comes in as "To review" so a person decides (fill it in, or Remove it)
+      if(!x.isInvoice){ skipped++; x.splits = []; x.sure = false; x.lines = x.lines || [];
+        x.questions = ['The reader didn\'t think this page is an invoice (a statement, cover sheet or blank page?). If it is one, fill it in; if not, press Remove.']; }
       const one = await PDFDocument.create();
       (await one.copyPages(src, Array.from({ length: x.lastPage - x.firstPage + 1 }, (_, i)=>x.firstPage - 1 + i))).forEach(p=>one.addPage(p));
       const docRef = db.collection('invoices').doc();
       const path = `invoices/${docRef.id}.pdf`, token = crypto.randomUUID();
       await bucket.file(path).save(Buffer.from(await one.save()), { resumable: false, metadata: { contentType: 'application/pdf', metadata: { firebaseStorageDownloadTokens: token } } });
-      const splits = (x.splits || []).map(s=>({ houseId: jobs[s.homeId] ? s.homeId : '', houseLabel: jobs[s.homeId] ? invHomeLabel(jobs[s.homeId]) : '',
+      const splits = (x.splits || []).map(s=>({ houseId: jobs[s.homeId] ? s.homeId : '', houseLabel: jobs[s.homeId] ? invHomeLabel(jobs[s.homeId]) : String(s.homeLabel || '').trim().slice(0, 80),
         code: INV_CODES[s.code] ? s.code : 0, labor: !!s.labor, amount: Math.round((Number(s.amount) || 0) * 100) / 100, why: String(s.why || '').slice(0, 200) }));
       const inv = { batchId, pages: [x.firstPage, x.lastPage], path, url: fileUrl(path, token),
         vendor: String(x.vendor || '').slice(0, 120), number: String(x.invoiceNumber || '').slice(0, 60),
@@ -2381,6 +2394,24 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
       const nb = db.collection('invoice-batches').doc();
       await nb.set({ ...d.data(), status: 'waiting', error: '', progress: 0, at: now, by, retryOf: ref.id });
       await ref.update({ status: 'retried' });
+      res.json({ id: nb.id });
+      return;
+    }
+    if(b.action === 'rereadPages'){
+      // some pages of an earlier scan read again as their own small scan (2026-11-18: a page that was dropped as "not an invoice")
+      if(!ASSISTANT_ON){ res.status(503).json({ error: 'reader-off' }); return; }
+      const d = await db.collection('invoice-batches').doc(String(b.id || '-')).get();
+      const want = (Array.isArray(b.pages) ? b.pages : []).map(Number).filter(n=>Number.isInteger(n) && n > 0).slice(0, 40);
+      if(!d.exists || !d.data().path || !want.length){ res.status(400).json({ error: 'batch' }); return; }
+      const { PDFDocument } = require('pdf-lib');
+      const [bytes] = await admin.storage().bucket().file(d.data().path).download();
+      const src = await PDFDocument.load(bytes), count = src.getPageCount(), keep = want.filter(n=>n <= count);
+      if(!keep.length){ res.status(400).json({ error: 'pages' }); return; }
+      const part = await PDFDocument.create();
+      (await part.copyPages(src, keep.map(n=>n - 1))).forEach(p=>part.addPage(p));
+      const nb = db.collection('invoice-batches').doc(), path = `invoices/scans/${nb.id}.pdf`, out = Buffer.from(await part.save());
+      await admin.storage().bucket().file(path).save(out, { resumable: false, metadata: { contentType: 'application/pdf' } });
+      await nb.set({ name: `${d.data().name || 'Scan'} p. ${keep.join(', ')}`.slice(0, 120), path, size: out.length, status: 'waiting', at: now, by, fromBatch: d.id, fromPages: keep });
       res.json({ id: nb.id });
       return;
     }
