@@ -191,6 +191,15 @@ html, body{max-width:100%; overflow-x:clip;}
   table.iv td{padding:8px; border-bottom:1px solid #f1ede3; vertical-align:top;}
   table.iv tr.row{cursor:pointer;} table.iv tr.row:hover td{background:#faf8f2;}
   table.iv .num{text-align:right; font-family:"Courier New",monospace; white-space:nowrap;}
+  .chiplot{display:inline-block; font-size:11.5px; font-weight:700; border-radius:10px; padding:1px 8px; margin-top:3px; background:#f5e7e3; color:var(--danger);}
+  .lotbox{margin-top:10px; padding:9px 12px; border:1.5px solid var(--danger); border-radius:8px; background:#fbf1ee; color:var(--ink); font-size:14px;}
+  .lotbox b:first-child{color:var(--danger);} .lotbox s{color:var(--ink-soft);}
+  .lotpop{position:fixed; inset:0; z-index:500; background:rgba(30,32,34,.35); display:flex; align-items:center; justify-content:center; padding:16px;}
+  .lotpop-box{background:#fff; border-radius:14px; border-top:6px solid var(--danger); box-shadow:0 20px 60px rgba(0,0,0,.3); padding:22px 26px; width:min(440px,100%); text-align:center;}
+  .lotpop-t{font-size:22px; font-weight:800; color:var(--danger); margin-bottom:12px;}
+  .lotpop-row{display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:8px 0; border-top:1px solid #eee; font-size:15px;}
+  .lotpop-row span{color:var(--ink-soft);} .lotpop-row b{font-size:20px;} .lotpop-row .was{color:var(--ink-soft); text-decoration:line-through;} .lotpop-row .now{color:var(--ink);}
+  .lotpop-box .btn2{margin-top:16px; min-width:140px; font-size:15px; padding:10px 18px;}
   .chipq{display:inline-block; font-size:12px; border-radius:10px; padding:1px 8px; margin:2px 4px 0 0; background:#fdf3e2; color:#8a5d14;}
   .chipok{display:inline-block; font-size:12px; border-radius:10px; padding:1px 8px; background:#eaf1ec; color:#27573a;}
   .batch{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:8px 0; border-top:1px solid #f1ede3; font-size:14px;}
@@ -469,7 +478,7 @@ function render(){
       const b = batches.find(z=>z.id === x.batchId), head = many && (!ri || (rows[ri - 1].batchId || rows[ri - 1].id) !== k)
         ? `<tr class="scanhead"><td colspan="${tab === 'ready' ? 9 : 8}">Scan${b && b.name ? ' “' + esc(b.name) + '”' : ''} · uploaded ${esc(niceDate(b ? b.at : x.createdAt))}</td></tr>` : '';
       return head + `<tr class="row" data-open="${esc(x.id)}">${tab === 'ready' ? `<td><input type="checkbox" class="tick" data-tick="${esc(x.id)}"></td>` : ''}<td class="muted" style="white-space:nowrap" data-sort-value="${esc((x.createdAt || '') + String((x.pages || [0])[0]).padStart(4, '0'))}">${esc(pageText(x))}</td><td>${esc(niceDate(x.date) || '—')}</td><td>${esc(x.vendor || '?')}</td><td>${esc(x.number || '')}</td>
-        <td>${sp.length ? sp.map(s=>esc(s.houseLabel || '?')).join('<br>') : '<span class="muted">?</span>'}</td><td>${sp.length ? sp.map(s=>esc(codeName(s.code) || '?') + (s.labor ? ' <span class="muted">labor</span>' : '')).join('<br>') : '<span class="muted">?</span>'}</td>
+        <td>${sp.length ? sp.map(s=>esc(s.houseLabel || '?')).join('<br>') : '<span class="muted">?</span>'}${lotFlag(x) ? '<br><span class="chiplot" title="The lot was changed from what the invoice / reader had">Lot changed</span>' : ''}</td><td>${sp.length ? sp.map(s=>esc(codeName(s.code) || '?') + (s.labor ? ' <span class="muted">labor</span>' : '')).join('<br>') : '<span class="muted">?</span>'}</td>
         <td class="num">${money2(x.total)}</td>
         <td>${x.status === 'review' ? (x.reasons || []).slice(0, 3).map(r=>`<span class="chipq">${esc(r)}</span>`).join('') : x.status === 'entered' ? `<span class="chipok">Entered${x.enteredBy ? ' by ' + esc(x.enteredBy) : ''}</span>` : '<span class="chipok">Ready</span>'}</td></tr>`; }).join('')}</tbody></table>`
     : `<p class="muted" style="margin-top:12px;">${invoices.length ? 'Nothing here.' : 'No invoices yet. Upload a scan above.'}</p>`;
@@ -486,7 +495,43 @@ function scanOrder(a, b){
   const ka = a.batchId || a.id, kb = b.batchId || b.id;
   return ka === kb ? ((a.pages || [0])[0] - (b.pages || [0])[0]) : String(at[kb]).localeCompare(String(at[ka])) || ka.localeCompare(kb);
 }
-const pageText = x=>x.pages && x.pages.length ? 'p. ' + (x.pages[0] === x.pages[x.pages.length - 1] ? x.pages[0] : x.pages[0] + '–' + x.pages[x.pages.length - 1]) : '';
+/* LOT CHANGED (owner, 2026-11-18: the accountant "would love it to show up in the middle of the page … so she doesn't miss it when she's in a
+   groove entering cost codes"). Two signs: (1) homeChanged from the server — someone changed the home(s) after the reader picked them;
+   (2) the PO / job line printed on the invoice names a lot ("AP#283", "CLIFFS 98", "Lot: CL-98") that isn't one of the homes it goes to
+   (catches invoices reviewed before (1) existed). Shown as a red "Lot changed" tag in the list, a red box in the panel, and a pop-up in the
+   middle of the screen the first time each such invoice is opened this visit. */
+const DEV_WORDS = { AP:'AP', ALDEN:'AP', CL:'CL', CLIFFS:'CL', CLIFF:'CL', MM:'MM', ML:'ML', ET:'ET', OS:'OS', NG:'NG', IM:'IM' };
+function printedLots(t){
+  const out = [], re = /\b(AP|CL|MM|ML|ET|OS|NG|IM|ALDEN|CLIFFS?)(?![a-z])\s*(?:PLACE\s*)?[-#:]?\s*(?:LOT\s*)?#?\s*(\d{1,4})\b|\bLOT\s*[:#]?\s*(?:(AP|CL|MM|ML|ET|OS|NG|IM)\s*[-#]?\s*)?(\d{1,4})\b/gi;
+  let m; while((m = re.exec(String(t || '')))) out.push({ dev: DEV_WORDS[String(m[1] || m[3] || '').toUpperCase()] || '', lot: String(Number(m[2] || m[4])) });
+  return out;
+}
+function lotFlag(x){
+  const sp = x.splits || [], here = sp.map(s=>{ const j = jobs.find(h=>h.id === s.houseId);
+    return j ? { dev:String(j.community || '').toUpperCase(), lot:String(Number(j.lot)), label:[j.community, j.lot].filter(Boolean).join(' ') } : { dev:'', lot:String(Number(((s.houseLabel || '').match(/\d+/) || [''])[0])), label:s.houseLabel || '' }; });
+  if(x.homeChanged && x.homeChanged.to) return { from:x.homeChanged.from, to:x.homeChanged.to, by:x.homeChanged.by, at:x.homeChanged.at, how:'changed' };
+  const said = printedLots(x.poJob);
+  if(!said.length || !here.length || here.every(h=>!h.lot || h.lot === 'NaN')) return null;
+  if(said.some(p=>here.some(h=>h.lot === p.lot && (!p.dev || !h.dev || p.dev === h.dev)))) return null;
+  return { from:x.poJob, to:here.map(h=>h.label).filter(Boolean).join(', '), by:x.checkedBy || '', how:'printed' };
+}
+const lotSeen = new Set();
+function lotPopup(x, f){
+  if(lotSeen.has(x.id)) return; lotSeen.add(x.id);
+  const d = document.createElement('div'); d.className = 'lotpop';
+  d.innerHTML = `<div class="lotpop-box" role="alertdialog" aria-label="Lot changed"><div class="lotpop-t">Lot changed</div>
+    <div class="lotpop-row"><span>${f.how === 'changed' ? 'The reader had' : 'The invoice says'}</span><b class="was">${esc(f.from)}</b></div>
+    <div class="lotpop-row"><span>Enter it under</span><b class="now">${esc(f.to)}</b></div>
+    <div class="muted" style="font-size:13px; margin-top:8px;">${esc(x.vendor || '')}${x.number ? ' #' + esc(x.number) : ''}${f.by ? (f.how === 'changed' ? ' · changed by ' : ' · checked by ') + esc(f.by) : ''}${f.at ? ' ' + esc(niceDate(f.at)) : ''}</div>
+    <button type="button" class="btn2 primary" id="lotOk">Got it</button></div>`;
+  document.body.appendChild(d);
+  const close = ()=>{ d.remove(); document.removeEventListener('keydown', key, true); };
+  const key = e=>{ if(e.key === 'Enter' || e.key === 'Escape' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); close(); } else if(e.key === 'ArrowRight' || e.key === 'ArrowLeft'){ e.stopPropagation(); } };
+  document.addEventListener('keydown', key, true);
+  d.addEventListener('click', e=>{ if(e.target === d || e.target.id === 'lotOk') close(); });
+  setTimeout(()=>{ const b = d.querySelector('#lotOk'); if(b) b.focus(); }, 30);
+}
+const pageText = x=>x.pages && x.pages.length ?'p. ' + (x.pages[0] === x.pages[x.pages.length - 1] ? x.pages[0] : x.pages[0] + '–' + x.pages[x.pages.length - 1]) : '';
 function openInvoice(id){
   const x = invoices.find(i=>i.id === id); if(!x) return;
   openId = id;
@@ -505,6 +550,8 @@ function openInvoice(id){
   showPdf(x);
   $('ov').classList.add('show');
   renderSide();
+  const lf = x.status !== 'review' ? lotFlag(x) : null;
+  if(lf) lotPopup(x, lf);
 }
 let navIds = [];
 let byLines = false;   // the "split by item lines" list is open
@@ -610,6 +657,7 @@ function renderSide(){
       <div><label class="f2">Invoice #</label><input type="text" data-d="number" value="${esc(draft.number)}" ${ro ? 'disabled' : ''}></div>
       <div><label class="f2">Date</label><input type="date" data-d="date" value="${esc(draft.date)}" ${ro ? 'disabled' : ''}></div>
       <div><label class="f2">Total</label><input type="text" data-money data-d="total" value="${draft.total}" ${ro ? 'disabled' : ''}></div></div>
+    ${(()=>{ const f = x.status !== 'review' ? lotFlag(x) : null; return f ? `<div class="lotbox"><b>Lot changed</b> — ${f.how === 'changed' ? 'the reader had' : 'the invoice says'} <s>${esc(f.from)}</s> → enter it under <b>${esc(f.to)}</b>${f.by ? ' <span class="muted">(' + esc(f.by) + ')</span>' : ''}</div>` : ''; })()}
     ${x.poJob || x.shipTo ? `<div class="muted" style="font-size:12.5px; margin-top:8px;">${x.poJob ? 'PO / job: <b>' + esc(x.poJob) + '</b>' : ''}${x.poJob && x.shipTo ? ' · ' : ''}${x.shipTo ? 'Ship to: ' + esc(x.shipTo) : ''}</div>` : ''}
     <label class="f2">What it's for</label>
     ${draft.splits.map((s, i)=>`<div class="split">${draft.splits.length > 1 ? `<span class="pn">PART ${i + 1}</span>` : ''}<div class="r"><input type="text" list="homeDL" data-s="${i}" data-k="home" value="${esc(homeVal(s))}" placeholder="Which home? Pick one, or type the lot if it's not in the hub" class="${s.houseId || s.houseLabel || Number(s.code) === PERSONAL ? '' : 'bad'}" autocomplete="off" ${ro ? 'disabled' : ''}>

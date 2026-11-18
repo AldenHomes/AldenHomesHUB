@@ -2369,6 +2369,16 @@ exports.invoicesApi = onRequest({ cors: ALLOWED_ORIGINS, maxInstances: 10, timeo
         // which item lines this part was split by (indexes into the invoice's lines), when split by lines
         lines: Array.isArray(s.lines) ? s.lines.filter(n=>Number.isInteger(n) && n >= 0 && n < 200).slice(0, 200) : [] }));
       if(Array.isArray(b.reviewers)) up.reviewers = b.reviewers.filter(x=>typeof x === 'string').slice(0, 10);
+      /* LOT CHANGED (owner, 2026-11-18: the accountant "would love it to show up in the middle of the page … so she doesn't miss it when
+         she's in a groove entering cost codes"): when a save changes which home(s) the invoice goes to, keep homeChanged = { from (what
+         the reader / first save had), to, by, at }; changed back to where it started → cleared. */
+      if(up.splits){
+        const homesOf = sp=>[...new Set((sp || []).map(s=>(s.houseId && jobs[s.houseId] ? [jobs[s.houseId].community, jobs[s.houseId].lot].filter(Boolean).join(' ') : String(s.houseLabel || '').trim())).filter(Boolean))].sort().join(', ');
+        const before = homesOf(old.splits), after = homesOf(up.splits), from = old.homeChanged ? old.homeChanged.from : before;
+        if(after !== before && before){
+          up.homeChanged = after === from ? admin.firestore.FieldValue.delete() : { from, to: after, by, at: now };
+        }
+      }
       const merged = { ...old, ...up };
       if(b.status === 'ready'){
         const why = invCheck(merged, jobs);
