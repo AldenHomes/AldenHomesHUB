@@ -2126,7 +2126,8 @@ async function invStamp(id, inv, jobsById){
     let s2 = 40; while(s2 > 14 && font.widthOfTextAtSize(lotNow, s2) > W - 80) s2 -= 1;
     const lw = Math.max(font.widthOfTextAtSize(t1, s1), font.widthOfTextAtSize(lotNow, s2)) + 50, lh2 = s1 + s2 + 34;
     const lx = (W - lw) / 2, ly = (H - lh2) / 2, lc = map(lx, ly);
-    page.drawRectangle({ x: lc.x, y: lc.y, width: lw, height: lh2, rotate: degrees(rot), color: rgb(1, 1, 1), opacity: 0.92, borderColor: red, borderWidth: 3 });
+    // see-through (red outline + red letters only) so the invoice's own numbers under it still show
+    page.drawRectangle({ x: lc.x, y: lc.y, width: lw, height: lh2, rotate: degrees(rot), borderColor: red, borderWidth: 3 });
     [[t1, s1, ly + lh2 - 12 - s1 * 0.8], [lotNow, s2, ly + 12 + s2 * 0.2]].forEach(([t, s, y])=>{
       const p = map((W - font.widthOfTextAtSize(t, s)) / 2, y); page.drawText(t, { x: p.x, y: p.y, size: s, font, color: red, rotate: degrees(rot) }); });
   }
