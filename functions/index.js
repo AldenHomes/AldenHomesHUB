@@ -2118,6 +2118,18 @@ async function invStamp(id, inv, jobsById){
     const tw = font.widthOfTextAtSize(t, size), p = map((W - tw) / 2, top - 7 - (i + 1) * lh + size * 0.25);
     page.drawText(t, { x: p.x, y: p.y, size, font, color: rgb(0.8, 0.07, 0.07), rotate: degrees(rot) });
   });
+  /* LOT CHANGED (owner, 2026-11-18: "she just wants the lot to show down in the center in a red box so if she prints the pdf it's
+     down where it catches her eye … say lot changed then the new lot number"): a red box in the middle of page 1. */
+  const lotNow = invLotChanged(inv, jobsById);
+  if(lotNow){
+    const red = rgb(0.8, 0.07, 0.07), s1 = 22, t1 = 'LOT CHANGED';
+    let s2 = 40; while(s2 > 14 && font.widthOfTextAtSize(lotNow, s2) > W - 80) s2 -= 1;
+    const lw = Math.max(font.widthOfTextAtSize(t1, s1), font.widthOfTextAtSize(lotNow, s2)) + 50, lh2 = s1 + s2 + 34;
+    const lx = (W - lw) / 2, ly = (H - lh2) / 2, lc = map(lx, ly);
+    page.drawRectangle({ x: lc.x, y: lc.y, width: lw, height: lh2, rotate: degrees(rot), color: rgb(1, 1, 1), opacity: 0.92, borderColor: red, borderWidth: 3 });
+    [[t1, s1, ly + lh2 - 12 - s1 * 0.8], [lotNow, s2, ly + 12 + s2 * 0.2]].forEach(([t, s, y])=>{
+      const p = map((W - font.widthOfTextAtSize(t, s)) / 2, y); page.drawText(t, { x: p.x, y: p.y, size: s, font, color: red, rotate: degrees(rot) }); });
+  }
   // the invoice's note (owner, 2026-10-29): red text in a red-outlined box just under the stamp
   const note = invNoteText(inv.note);
   if(note){
@@ -2144,7 +2156,25 @@ async function invStamp(id, inv, jobsById){
 const invNoteText = v=>String(v || '').replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/[\u2013\u2014]/g, '-')
   .replace(/\r/g, '').replace(/[^\x20-\x7e\n]/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
 // what's on the stamp (a change re-stamps the PDF)
-const invStampKey = (inv, jobsById)=>invStampLines(inv, jobsById).join(' / ') + (invNoteText(inv.note) ? ' | NOTE: ' + invNoteText(inv.note) : '');
+const invStampKey = (inv, jobsById)=>invStampLines(inv, jobsById).join(' / ') + (invNoteText(inv.note) ? ' | NOTE: ' + invNoteText(inv.note) : '')
+  + (invLotChanged(inv, jobsById) ? ' | LOT CHANGED: ' + invLotChanged(inv, jobsById) : '');
+/* Has the lot been changed? (1) homeChanged, set by a save that changed the invoice's home(s); (2) the PO / job line printed on the invoice
+   names a lot ("AP#283", "JOB: CLIFFS 78", "Lot: CL-98", "AP67") that isn't one of its homes. Returns the new home(s) ("CL 28") or ''.
+   Same reading as printedLots() in invoices.html. */
+const INV_DEV_WORDS = { AP: 'AP', ALDEN: 'AP', CL: 'CL', CLIFFS: 'CL', CLIFF: 'CL', MM: 'MM', ML: 'ML', ET: 'ET', OS: 'OS', NG: 'NG', IM: 'IM' };
+function invLotChanged(inv, jobsById){
+  const sp = inv.splits || [];
+  const here = sp.map(s=>{ const j = jobsById[s.houseId];
+    return j ? { dev: String(j.community || '').toUpperCase(), lot: String(Number(j.lot)), label: invShortHome(j) } : { dev: '', lot: String(Number((String(s.houseLabel || '').match(/\d+/) || [''])[0])), label: String(s.houseLabel || '').trim() }; })
+    .filter(h=>h.label);
+  const labels = [...new Set(here.map(h=>h.label))].join(', ').replace(/[^\x20-\x7e]/g, ' ').slice(0, 60);
+  if(!labels || sp.some(s=>s.code === INV_PERSONAL)) return '';
+  if(inv.homeChanged && typeof inv.homeChanged === 'object' && inv.homeChanged.to) return labels;
+  const said = [], re = /\b(AP|CL|MM|ML|ET|OS|NG|IM|ALDEN|CLIFFS?)(?![a-z])\s*(?:PLACE\s*)?[-#:]?\s*(?:LOT\s*)?#?\s*(\d{1,4})\b|\bLOT\s*[:#]?\s*(?:(AP|CL|MM|ML|ET|OS|NG|IM)\s*[-#]?\s*)?(\d{1,4})\b/gi;
+  let m; while((m = re.exec(String(inv.poJob || '')))) said.push({ dev: INV_DEV_WORDS[String(m[1] || m[3] || '').toUpperCase()] || '', lot: String(Number(m[2] || m[4])) });
+  if(!said.length || here.every(h=>!h.lot || h.lot === 'NaN')) return '';
+  return said.some(p=>here.some(h=>h.lot === p.lot && (!p.dev || !h.dev || p.dev === h.dev))) ? '' : labels;
+}
 async function invSettings(){ const d = await db.collection('settings').doc('invoices').get(); return d.exists ? d.data() : {}; }
 // is an invoice complete enough to go straight to the accountant?
 function invCheck(inv, jobsById){
