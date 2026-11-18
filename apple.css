@@ -358,8 +358,8 @@ html.apple.pg-packets .qr-box img{border-radius:12px;}
 
 /* ---- Service Center on phones: a request opens as its own full screen with "‹ Back"; "+ New request" floats at the bottom ---- */
 @media (max-width:760px){
-  html.apple.pg-service .overlay{padding:0; align-items:stretch; background:#F2F2F7;}
-  html.apple.pg-service .overlay .modal{max-width:none; width:100%; min-height:100%; border-radius:0; box-shadow:none; background:#F2F2F7;}
+  html.apple.pg-service .overlay{padding:0; align-items:flex-start; background:#F2F2F7;}  /* flex-start: stretch held the request screen to the phone height and cut off the rest (owner, 2026-11-18: "you cant scroll down") */
+  html.apple.pg-service .overlay .modal{max-width:none; width:100%; min-height:100%; border-radius:0; box-shadow:none; background:#F2F2F7; overflow:visible;}
   html.apple.pg-service .overlay .modal-head{position:sticky; top:0; z-index:5; background:rgba(249,249,251,.96); border-bottom:0.5px solid #D1D1D6;
     gap:6px; padding:12px 14px; -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);}
   html.apple.pg-service .overlay .modal-head .head-actions{display:contents;}
