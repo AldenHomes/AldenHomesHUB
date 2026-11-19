@@ -37,6 +37,9 @@
   .viewsw button.on{background:var(--navy);color:#fff}
   .viewsw button.on.staff{background:var(--staff)}
   .titlebar-account{display:flex;align-items:center;gap:10px}
+  .set-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--line);color:var(--ink-soft,#6b6f72);height:30px;padding:0 10px;border-radius:var(--radius,3px);cursor:pointer;font-size:11.5px;font-family:inherit}
+  .set-btn:hover{background:#f3f1ea;color:var(--navy)}
+  body.custview #styleSetup{display:none}
   .qnote{margin-top:14px} .qnote textarea{width:100%;min-height:54px;resize:vertical;margin-top:4px}
   .verlist{margin-top:10px} .verrow{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line-soft);font-size:14px}
   .verrow:first-child{border-top:none} .verrow .grow{flex:1}
@@ -497,7 +500,7 @@
     <button type="button" data-view="customer">Customer view</button>
     <button type="button" data-view="staff" class="staff">Office view</button>
   </div>
-  <div class="titlebar-account staffonly" id="acct"><span id="currentUserEmail" class="muted" style="font-size:12px"></span><button type="button" class="btn sm" id="signOutBtn">Sign out</button></div>
+  <div class="titlebar-account staffonly" id="acct"><button type="button" class="set-btn" id="styleSetup" title="Home styles and prices"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Settings</span></button><span id="currentUserEmail" class="muted" style="font-size:12px"></span><button type="button" class="btn sm" id="signOutBtn">Sign out</button></div>
 </div></div>
 
 <div class="wrap" id="root"></div>
@@ -1843,6 +1846,7 @@ function shareSheetCard(L){
 function render(){
   if(QUOTE){ document.body.classList.add('quote'); cur = QUOTE; view = 'customer'; $('totalbar').style.display = 'none'; $('root').innerHTML = quoteScreen(); return; }
   document.body.classList.toggle('printdoc', tab === 'quote' || tab === 'summary');
+  document.body.classList.toggle('custview', view === 'customer');
   if(SHOW){ document.body.classList.add('show'); cur = SHOW; $('totalbar').style.display = 'none'; $('root').innerHTML = showScreen(); return; }
   document.querySelectorAll('#viewSw button').forEach(b=>b.classList.toggle('on', b.dataset.view === view));
   document.body.classList.toggle('present', !!PRESENT);
@@ -2118,9 +2122,6 @@ function leadsScreen(){
       <div style="flex:1 1 260px"><h2>Join as customer screen</h2><p class="muted" style="font-size:14px;margin-top:4px">For the TV or the customer's iPad. Type the code shown on the rep's device.</p></div>
       <input type="tel" inputmode="numeric" id="joinCode" placeholder="000000" maxlength="6" autocomplete="off" style="width:170px;font-family:'Courier New',monospace;font-size:22px;letter-spacing:4px;text-align:center">
       <button type="button" class="btn primary" id="joinBtn">Join</button></div>
-    <div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <div style="flex:1 1 260px"><h2>Home style pricing sheets</h2><p class="muted" style="font-size:14px;margin-top:4px">Office setup: choose which lines each home style's pricing sheet shows, and what comes included at no charge (like a Percy's basement).</p></div>
-      <button type="button" class="btn" id="styleSetup">Set up home styles</button></div>
 `;
 }
 
@@ -2760,7 +2761,7 @@ document.addEventListener('click', async e=>{
   const da = t.closest('[data-doorc-add]'), dd = t.closest('[data-doorc-del]');
   if(da || dd){ if(da) DOOR_CFG.push({ name:'', num:'', hex:'#5a6470' }); else DOOR_CFG.splice(Number(dd.dataset.doorcDel), 1); const dq = qById('fdcolor'); if(dq) dq.c = paintChoices(); const y = window.scrollY; render(); window.scrollTo(0, y); if(dd) styleSave(); return; }
   const oc = t.closest('[data-overclear]'); if(oc){ delete PRICE_OVER[oc.dataset.overclear]; applyOver(); styleSave(); const y = window.scrollY; render(); window.scrollTo(0, y); toast('Back to BuilderTrend\'s price'); return; }
-  if(t.closest('#styleSetup')){ styleEdit = true; cur = null; render(); window.scrollTo(0, 0); return; }
+  if(t.closest('#styleSetup')){ if(cur) flushId = cur; styleEdit = true; cur = null; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#styBack')){ e.preventDefault(); styleEdit = false; render(); window.scrollTo(0, 0); return; }
   const sb = t.closest('[data-sty]'); if(sb){ styleSet(sb.dataset.sty, sb.dataset.st); return; }
   if(t.closest('#styCopy')){
