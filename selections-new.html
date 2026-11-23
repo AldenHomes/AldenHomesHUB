@@ -487,6 +487,8 @@
   @media print{ body.printdoc #root > :not(.docwrap){display:none!important} body.printdoc .doc, body.quote .doc{box-shadow:none;max-width:none;margin:0;padding:10mm 12mm} body.quote{background:#fff} }
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
   /* new layout */
+  .nr-gal{display:grid;gap:8px;margin-bottom:16px}.nr-gal.n1{grid-template-columns:minmax(0,620px)}.nr-gal.n2{grid-template-columns:repeat(2,minmax(0,1fr))}.nr-gal.n3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .nr-gal figure{margin:0;position:relative;overflow:hidden;border-radius:var(--radius);background:var(--paper)}.nr-gal img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}.nr-gal figcaption{padding:6px 8px;font-size:13px;font-weight:700;color:var(--navy);background:#fff;border:1px solid var(--line-soft);border-top:0}
   .nr-main .cho-img{width:132px;height:92px;border-radius:var(--radius)}
   @media (max-width:560px){ .nr-main .cho-img{width:96px;height:72px} }
   .nr-head{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-top:14px}
@@ -1410,7 +1412,7 @@ function floorRows(q, L, lock){
     <button type="button" class="tog" data-floor-add="${esc(q.id)}">Add</button></div>`;
 }
 function stdRow(q, L, std, active, lock){
-  const sc = q.c.find(c=>c.t === std.label && c.img), sk = sc ? q.id + '#' + q.c.indexOf(sc) : '', sp = sc ? '' : nrStdPic(q, std.label);
+  const sc = q.c.find(c=>c.t === std.label && c.img), sk = sc ? q.id + '#' + q.c.indexOf(sc) : '', sp = sc || q.nrGallery ? '' : nrStdPic(q, std.label);
   return `<div class="cho std ${active ? 'on' : ''}">${sc ? `<button type="button" class="cho-img" data-photo-view="${esc(sk)}" title="See it bigger"><img src="${esc(sc.img)}" alt="${esc(pn(std.label))}" loading="lazy"></button>` : sp ? `<span class="cho-img" style="cursor:default"><img src="${esc(sp)}" alt="${esc(pn(std.label))}" loading="lazy"></span>` : ''}<span class="ct">${esc(pn(std.label))}${sc && sc.spec ? `<small class="cho-spec">${esc(pn(sc.spec))}</small>` : ''}</span><span class="nochg">No charge</span>
     ${active ? '<span class="stdmark">&#10003; Standard</span>' : `<button type="button" class="tog" data-std="${esc(q.id)}" ${lock ? 'disabled' : ''}>Use standard</button>`}</div>`;
 }
@@ -2183,9 +2185,14 @@ const NR_PICS = [
 ];
 const nrHit = (keys, q)=>keys.split(' ').some(k=>k === 'ANY' || (k.endsWith('*') ? String(q.id).startsWith(k.slice(0, -1)) : k === String(q.bt) || k === q.id));
 const nrStdPic = (q, label)=>{ const r = NR_PICS.find(([k, re])=>nrHit(k, q) && re.test(String(label))); return r ? 'selection-photos/options/' + r[2] + '.jpg' : ''; };
+const NR_CAPTION = { 'ceiling-vault':'Vaulted', 'ceiling-cathedral':'Cathedral', 'ceiling-tray':'Tray', 'basement-roughin':'Rough-in', 'basement-bath':'Finished bath', 'fp-linear':'Electric', 'fp-shiplap':'Gas or propane', 'patio':'Patio', 'deck-wood':'Pressure treated', 'deck-composite':'Composite', 'barn-single':'Single', 'barn-double':'Double', 'stairs-open':'Open', 'stairs-closed':'Closed', 'counter-granite':'Granite', 'counter-quartz':'Quartz', 'painted-cabinets':'Painted cabinets', 'shower-tile':'Frameless', 'shower-framed':'Framed', 'stairs-wood':'Oak', 'stairs-carpet':'Carpet' };
+const nrGalleryHtml = q=>!q || !q.nrGallery ? '' : `<div class="nr-gal n${Math.min(q.nrGallery.length, 3)}">${q.nrGallery.map(f=>{ const cap = q.nrGallery.length > 1 ? NR_CAPTION[f.split('/').pop().replace('.jpg', '')] || '' : ''; return `<figure><img src="${esc(f)}" alt="${esc(cap || qTitle(q))}" loading="lazy">${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`; }).join('')}</div>`;
 function nrPictures(){
   const hit = nrHit;
   ALL_QS.forEach(q=>{ q.c.forEach(c=>{ if(c.img) return; const name = String(c.show || c.t), r = NR_PICS.find(([k, re])=>hit(k, q) && re.test(name)); if(r){ c.img = 'selection-photos/options/' + r[2] + '.jpg'; c.nrPic = true; } });
+    const nrc = q.c.filter(c=>c.nrPic), pics = nrc.map(c=>c.img); let stdPic = '';
+    try{ const so = stdOf(q, { answers:{}, custom:[], model:'', line:'', id:'' }); if(so && !q.c.some(c=>c.t === so.label)) stdPic = nrStdPic(q, so.label); } catch(e){}
+    const stdFile = stdPic; if(new Set(pics).size < pics.length || (stdFile && pics.includes(stdFile))){ q.nrGallery = [...new Set([...(stdFile ? [stdFile] : []), ...pics])]; nrc.forEach(c=>{ c.nrThumb = c.img; delete c.img; delete c.nrPic; }); }
     if(!q.photo && q.one && q.c.length && q.bt !== '790' && !q.ceil && q.c.every(c=>c.img && !c.unit && !c.rate && !c.typed && !isAllow(q, c))) q.photo = true; });
 }
 const nrOpen = L=>locked(L) || L.stage === 'v2' || !!L.quoteOk;
@@ -2207,7 +2214,7 @@ function nrSide(L, k){
   const list = nrList(L, k), ls = nrLines(L, k), cu = nrCustom(L, k);
   const group = fn=>list.map(x=>{ const rows = ls.filter(l=>l.q.room.id === x.id).map(l=>fn(l)).concat(cu.filter(c=>c.room === x.id).map(c=>fn(null, c))).join(''); return rows ? `<div class="nr-gh">${esc(x.name)}</div>${rows}` : ''; }).join('');
   if(custView()){
-    const row = (l, c)=>{ let img = ''; if(l){ try{ img = linePhoto(l, L) || ''; } catch(e){} } const name = l ? noPart(l.label) : c.desc, sub = l ? qTitle(l.q) : 'Custom item';
+    const row = (l, c)=>{ let img = ''; if(l){ try{ img = linePhoto(l, L) || ((l.q.c[Number(String(l.key).split('#')[1])] || {}).nrThumb) || ''; } catch(e){} } const name = l ? noPart(l.label) : c.desc, sub = l ? qTitle(l.q) : 'Custom item';
       return `<div class="nr-ch">${img ? `<img src="${esc(img)}" alt="">` : '<i></i>'}<span>${esc(name)}<small>${esc(sub)}</small></span></div>`; };
     return `<aside class="nr-side"><div class="nr-sh"><b>Your choices</b></div><div class="nr-lines">${group(row) || '<p class="muted" style="padding:8px 6px;font-size:14px">Your choices will show here.</p>'}</div></aside>`;
   }
@@ -2434,7 +2441,7 @@ function sheetView(L, kind){
     const fwd = !atEnd ? qTitle(nq) : next ? next.name : 'Check the sheet';
     body = `<div class="guide">
       <div class="g-top"><span>Question ${qs.length ? gIdx + 1 : 0} of ${qs.length}</span><div class="bar"><span style="width:${qs.length ? (gIdx + 1) / qs.length * 100 : 0}%"></span></div></div>
-      <div class="q">${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
+      <div class="q">${nrGalleryHtml(q)}${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
         ${q && !picked && !lock && !stdOf(q, L) && !isIncl(q, L) ? '<div class="g-std">Nothing picked means this stays standard.</div>' : ''}
         ${q ? customBlock(L, r, q) : ''}
         ${q && !PRESENT && !custView() ? (n=>`<div class="qnote noprint"><label class="f">Note for this question</label><textarea data-note="${esc(qNoteKey(q))}" maxlength="600" placeholder="Anything to remember about ${esc(q.t)}" ${lock ? 'disabled' : ''}>${esc(n ? n.label : '')}</textarea></div>`)(L.answers[qNoteKey(q)]) : ''}</div>
