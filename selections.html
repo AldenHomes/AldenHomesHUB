@@ -2166,10 +2166,10 @@ const NR_PICS = [
   ['126', /./, 'basement-unfinished'], ['128', /./, 'basement-unfinished'], ['134', /egress/i, 'basement-egress'], ['136', /./, 'basement-finished'],
   ['138', /rough|RI with pit/i, 'basement-roughin'], ['138', /^finish/i, 'basement-bath'], ['140', /./, 'sump-pump'],
   ['bstairs', /open|railing/i, 'stairs-open'], ['bstairs', /closed/i, 'stairs-closed'],
-  ['153', /./, 'car-charger'], ['154', /3rd car/i, 'garage-3car'], ['170', /stone/i, 'stone-front'], ['175', /hose/i, 'hose-bib'],
+  ['153', /./, 'car-charger'], ['154', /3rd car/i, 'garage-3car'], ['170', /stone/i, 'stone-closeup'], ['170', /wood/i, 'wood-closeup'], ['156', /rough/i, 'laundry-roughin'], ['gdglass', /double pane/i, 'garage-double-pane'], ['175', /hose/i, 'hose-bib'],
   ['180 182', /./, 'front-porch'], ['181', /./, 'walkway'], ['184', /./, 'porch-metal-roof'],
   ['193', /./, 'laundry-counter'], ['194', /bench/i, 'mudroom-bench'], ['194', /hanging/i, 'hanging-rod'],
-  ['206', /^(std\.? style single|8' single)/i, 'pocket-door'], ['208', /^std\.? style single/i, 'barn-single'], ['208', /^std\.? style double/i, 'barn-double'],
+  ['206', /^(std\.? style single|8' single)/i, 'pocket-door'], ['208', /^std\.? style single/i, 'barn-single'], ['208', /^std\.? style double/i, 'barn-double'], ['208', /^clear glass single/i, 'barn-clear-single'], ['208', /^obscure single/i, 'barn-frosted-single'], ['208', /^clear glass double/i, 'barn-clear-double'], ['208', /^obscure double/i, 'barn-frosted-double'], ['208', /^live edge/i, 'barn-live-edge'], ['210', /hidden/i, 'barn-hidden-track'],
   ['224', /./, 'desk'], ['236', /^storm door/i, 'storm-door'], ['ceil', /add a foot/i, 'ceiling-tall'],
   ['246', /vault/i, 'ceiling-vault'], ['246', /cathedral/i, 'ceiling-cathedral'], ['246', /tray/i, 'ceiling-tray'],
   ['256 300 340', /tile shower/i, 'shower-tile'], ['door_*', /^framed/i, 'shower-framed'], ['door_*', /^frameless/i, 'shower-tile'],
@@ -2185,10 +2185,11 @@ const NR_PICS = [
 ];
 const nrHit = (keys, q)=>keys.split(' ').some(k=>k === 'ANY' || (k.endsWith('*') ? String(q.id).startsWith(k.slice(0, -1)) : k === String(q.bt) || k === q.id));
 const nrStdPic = (q, label)=>{ const r = NR_PICS.find(([k, re])=>nrHit(k, q) && re.test(String(label))); return r ? 'selection-photos/options/' + r[2] + '.jpg' : ''; };
-const NR_CAPTION = { 'ceiling-vault':'Vaulted', 'ceiling-cathedral':'Cathedral', 'ceiling-tray':'Tray', 'basement-roughin':'Rough-in', 'basement-bath':'Finished bath', 'fp-linear':'Electric', 'fp-shiplap':'Gas or propane', 'patio':'Patio', 'deck-wood':'Pressure treated', 'deck-composite':'Composite', 'barn-single':'Single', 'barn-double':'Double', 'stairs-open':'Open', 'stairs-closed':'Closed', 'counter-granite':'Granite', 'counter-quartz':'Quartz', 'painted-cabinets':'Painted cabinets', 'shower-tile':'Frameless', 'shower-framed':'Framed', 'stairs-wood':'Oak', 'stairs-carpet':'Carpet' };
+const NR_CAPTION = { 'ceiling-vault':'Vaulted', 'ceiling-cathedral':'Cathedral', 'ceiling-tray':'Tray', 'basement-roughin':'Rough-in', 'basement-bath':'Finished bath', 'fp-linear':'Electric', 'fp-shiplap':'Gas or propane', 'patio':'Patio', 'deck-wood':'Pressure treated', 'deck-composite':'Composite', 'barn-single':'Single', 'barn-double':'Double', 'stairs-open':'Open', 'stairs-closed':'Closed', 'counter-granite':'Granite', 'counter-quartz':'Quartz', 'painted-cabinets':'Painted cabinets', 'shower-tile':'Frameless', 'shower-framed':'Framed', 'stairs-wood':'Oak', 'stairs-carpet':'Carpet', 'garage-step':'With a step', 'garage-zero-entry':'Zero entry (no step)' };
 const nrGalleryHtml = q=>!q || !q.nrGallery ? '' : `<div class="nr-gal n${Math.min(q.nrGallery.length, 3)}">${q.nrGallery.map(f=>{ const cap = q.nrGallery.length > 1 ? NR_CAPTION[f.split('/').pop().replace('.jpg', '')] || '' : ''; return `<figure><img src="${esc(f)}" alt="${esc(cap || qTitle(q))}" loading="lazy">${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`; }).join('')}</div>`;
 function nrPictures(){
   const hit = nrHit;
+  ALL_QS.filter(q=>String(q.bt) === '164').forEach(q=>{ q.nrGallery = ['selection-photos/options/garage-step.jpg', 'selection-photos/options/garage-zero-entry.jpg']; const z = q.c.find(c=>/zero entry/i.test(c.t)); if(z) z.nrThumb = q.nrGallery[1]; });
   ALL_QS.forEach(q=>{ q.c.forEach(c=>{ if(c.img) return; const name = String(c.show || c.t), r = NR_PICS.find(([k, re])=>hit(k, q) && re.test(name)); if(r){ c.img = 'selection-photos/options/' + r[2] + '.jpg'; c.nrPic = true; } });
     const nrc = q.c.filter(c=>c.nrPic), pics = nrc.map(c=>c.img); let stdPic = '';
     try{ const so = stdOf(q, { answers:{}, custom:[], model:'', line:'', id:'' }); if(so && !q.c.some(c=>c.t === so.label)) stdPic = nrStdPic(q, so.label); } catch(e){}
