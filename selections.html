@@ -90,6 +90,14 @@
   .lead:first-child{border-top:none}
   .lead .who{flex:1 1 240px;min-width:0}
   .lead .who strong{font-size:16px;color:var(--navy)}
+  .dj-wrap{display:inline-flex;align-items:center;gap:8px;font-weight:inherit}
+  .doc-jump{width:26px;height:26px;flex:none;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--navy);border-radius:50%;background:#fff;color:var(--navy);font:700 15px/1 system-ui,sans-serif;cursor:pointer}
+  .doc-jump:hover,.doc-jump:focus-visible{background:var(--navy);color:#fff}
+  .lead-fam{border-top:1px solid var(--line-soft);padding:14px 0 4px}.lead-fam:first-child{border-top:none}
+  .fam-h{display:flex;gap:4px 12px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}.fam-h strong{font-size:16px;color:var(--navy)}
+  .lead-fam .lead,.lead-fam .lead:first-child{margin-left:4px;padding:10px 0 10px 14px;border-top:1px solid var(--line-soft);border-left:3px solid var(--sage)}
+  .lead-fam .lead .who strong{font-size:15px}
+  .lead-link{background:none;border:0;padding:0;margin-top:5px;color:var(--navy);font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline}
   .lead .amt{font-family:inherit;font-variant-numeric:tabular-nums;font-weight:700;color:var(--navy);min-width:110px;text-align:right}
 
   /* tabs */
@@ -2126,46 +2134,76 @@ function styleSet(id, st){
   const y = window.scrollY; render(); window.scrollTo(0, y); styleSave();
 }
 
+/* MORE THAN ONE HOME + CONTACTS (owner, 2026-11-23). A second home is its own full sheet with `family` = the first sheet's id (set when the sheet is
+   created, so the server keeps it without being in SEL_FIELDS); the leads list groups them under the customer. A contact is a sheet with
+   stage 'contact' (no home yet), listed in its own card below; "Start pricing" turns that same sheet into a normal lead. */
+let leadForm = null;   // the lead form's job: null = new lead; { mode:'contact', id? } | { mode:'start', id } | { mode:'home', id }
+const isContact = L=>L.stage === 'contact';
+const familyOf = L=>L.family || L.id;
+const buyerNames = L=>esc(L.name) + (L.name2 ? ' &amp; ' + esc(L.name2) : '');
 function leadsScreen(){
   const dueRank = L=>{ const f = followInfo(L); return f && f.days <= 0 ? 0 : 1; };
-  const dueCount = leads.filter(L=>dueRank(L) === 0).length;
-  const rows = leads.slice().sort((a,b)=>dueRank(a) - dueRank(b) || (b.updated || '').localeCompare(a.updated || '')).map(L=>`
+  const priced = leads.filter(L=>!isContact(L)), contacts = leads.filter(isContact).sort((a,b)=>(b.updated || '').localeCompare(a.updated || ''));
+  const dueCount = priced.filter(L=>dueRank(L) === 0).length;
+  const contactLine = L=>[L.phone, L.email].filter(Boolean).map(esc).join(' · ');
+  const leadRow = (L, homeNo)=>`
     <div class="lead">
-      <div class="who"><strong>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</strong>
+      <div class="who"><strong>${homeNo ? 'Home ' + homeNo : buyerNames(L)}</strong>
         <div class="muted" style="font-size:13.5px;margin-top:2px">${esc(homeLabel(L))}</div>
-        <div class="muted" style="font-size:12.5px;margin-top:2px">${[L.phone, L.email].filter(Boolean).map(esc).join(' · ')}</div>
+        ${homeNo ? '' : `<div class="muted" style="font-size:12.5px;margin-top:2px">${contactLine(L)}</div>`}
         ${(f=>f ? `<div style="margin-top:6px"><span class="chip ${f.cls}">${esc(f.when)}</span>${f.what ? ` <span class="muted" style="font-size:13px">${esc(f.what)}</span>` : ''}</div>` : '')(followInfo(L))}
         ${noteList(L).length ? `<div class="muted" style="font-size:13px;margin-top:5px;font-style:italic">Last note, ${esc(ago(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].at))}: ${esc(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].text.slice(0, 110))}</div>` : ''}</div>
       <div>${stageChip(L)}${L.houseId && JOBS[L.houseId] && jobMissing(JOBS[L.houseId]).length ? ` <span class="chip soon">home details to fill in</span>` : ''}${waiting(L).length ? ` <span class="chip soon">${waiting(L).length} to price</span>` : ''}<div class="muted" style="font-size:12.5px;margin-top:4px">Last in ${esc(ago(L.updated))}${drift(L).some(d=>d.diff) ? ' · <span style="color:#8a5d14">prices have changed</span>' : ''}</div></div>
       <div class="amt">${money(total(L))}<div class="muted" style="font-size:11.5px;font-family:inherit;font-weight:400">${L.stage === 'signed' ? 'contract' : 'so far'}</div></div>
       <div style="display:flex;flex-direction:column;gap:6px">${L.quoteOk ? `<button type="button" class="btn sm primary" data-open-quote="${L.id}" style="white-space:nowrap">Pricing sheet</button>` : ''}<button type="button" class="btn sm" data-open="${L.id}">Open</button></div>
-    </div>`).join('');
+      ${homeNo ? '' : `<div style="flex-basis:100%;margin-top:-8px"><button type="button" class="lead-link" data-add-home="${L.id}">+ Price another home</button></div>`}
+    </div>`;
+  const sorted = priced.slice().sort((a,b)=>dueRank(a) - dueRank(b) || (b.updated || '').localeCompare(a.updated || ''));
+  const seen = new Set();
+  const rows = sorted.map(L=>{ const fam = familyOf(L); if(seen.has(fam)) return ''; seen.add(fam);
+    const homes = priced.filter(x=>familyOf(x) === fam).sort((a,b)=>(a.created || '').localeCompare(b.created || ''));
+    if(homes.length < 2) return leadRow(L);
+    const h = homes[0];
+    return `<div class="lead-fam"><div class="fam-h"><strong>${buyerNames(h)}</strong><span class="chip plain">${homes.length} homes</span><span class="muted" style="font-size:12.5px">${contactLine(h)}</span><button type="button" class="lead-link" style="margin-top:0" data-add-home="${h.id}">+ Price another home</button></div>${homes.map((x, i)=>leadRow(x, i + 1)).join('')}</div>`;
+  }).join('');
+  const contactRows = contacts.map(L=>{ const n = noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0];
+    return `<div class="lead"><div class="who"><strong>${buyerNames(L)}</strong>
+      <div class="muted" style="font-size:13px;margin-top:2px">${contactLine(L) || 'No phone or email yet'}</div>
+      ${L.address ? `<div class="muted" style="font-size:12.5px;margin-top:2px">${esc(L.address)}</div>` : ''}
+      ${n ? `<div class="muted" style="font-size:13px;margin-top:5px;font-style:italic">${esc(n.text.slice(0, 140))}</div>` : ''}</div>
+      <div class="muted" style="font-size:12.5px">Added ${esc(ago(L.created || L.updated))}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn sm primary" data-contact-start="${L.id}">Start pricing</button><button type="button" class="btn sm" data-contact-edit="${L.id}">Edit</button><button type="button" class="btn sm" data-contact-del="${L.id}">Remove</button></div></div>`; }).join('');
+  const lf = leadForm, lfFrom = lf && lf.id ? leads.find(x=>x.id === lf.id) : null, contactOnly = !!lf && lf.mode === 'contact';
+  const formTitle = !lf ? '' : lf.mode === 'home' ? 'Another home for ' + buyerNames(lfFrom || {}) : lf.mode === 'start' ? 'Start pricing for ' + buyerNames(lfFrom || {}) : lfFrom ? 'Edit contact' : 'New contact';
   const devOpts = DEVS.map(d=>`<option value="${d.code}">${d.code} — ${d.name}</option>`).join('');
   return `
     <div style="margin-top:22px"><div class="eyebrow">Selections</div><h1>Leads &amp; selection sheets</h1>
       <p class="lede">Everyone who sits down for a pricing meeting is saved here, whether or not they come back. Open one to pick up exactly where it was left, even months later.</p></div>
     <div class="card">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2>${leads.length} on file${dueCount ? ` <span class="chip due" style="margin-left:8px;vertical-align:middle">${dueCount} to follow up</span>` : ''}</h2><div class="grow"></div>
-        <button type="button" class="btn primary" id="newLeadBtn">${newOpen ? 'Cancel' : '+ New lead'}</button></div>
-      ${newOpen ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft)">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2>${priced.length} on file${dueCount ? ` <span class="chip due" style="margin-left:8px;vertical-align:middle">${dueCount} to follow up</span>` : ''}</h2><div class="grow"></div>
+        <button type="button" class="btn" id="newContactBtn">+ Add a contact</button><button type="button" class="btn primary" id="newLeadBtn">+ New lead</button></div>
+      ${newOpen ? `<div id="leadFormBox" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft)">
+        ${formTitle ? `<h3 style="margin:0 0 10px;color:var(--navy)">${formTitle}</h3>` : ''}
         <div class="grid">
           <div><label class="f">Buyer's name</label><input type="text" id="nName" placeholder="First and last name"></div>
           <div><label class="f">Second buyer (optional)</label><input type="text" id="nName2"></div>
           <div><label class="f">Phone</label><input type="tel" id="nPhone"></div>
           <div><label class="f">Email</label><input type="email" id="nEmail"></div>
-          <div><label class="f">Development</label><select id="nDev"><option value="">Not sure yet</option>${devOpts}</select></div>
+          ${contactOnly ? `<div style="grid-column:1/-1"><label class="f">Street address (optional)</label><input type="text" id="nAddr"></div>
+          <div style="grid-column:1/-1"><label class="f">Note (optional)</label><input type="text" id="nNote" placeholder="What they're looking for, how they found us"></div>` : `<div><label class="f">Development</label><select id="nDev"><option value="">Not sure yet</option>${devOpts}</select></div>
           <div><label class="f">Lot</label><select id="nLot"><option value="">Not chosen yet</option></select></div>
           <div style="grid-column:1/-1"><label class="f">Street address (optional)</label><input type="text" id="nAddr"></div>
           <div><label class="f">Collection</label><select id="nLine">${Object.keys(LINE_NAMES).map(k=>`<option value="${k}">${LINE_NAMES[k]}</option>`).join('')}</select></div>
           <div><label class="f">Home style</label><select id="nModel">${STYLES.ALDEN.map(m=>`<option>${m}</option>`).join('')}</select></div>
           <div><label class="f">House price ($)</label><input type="number" id="nBase" min="0" step="100" placeholder="from the home style"></div>
           <div><label class="f">Lot price ($)</label><input type="number" id="nLotPrice" min="0" step="100" placeholder="type the lot price"></div>
-          <div class="muted" id="nBaseSum" style="grid-column:1/-1;font-size:13.5px"></div>
+          <div class="muted" id="nBaseSum" style="grid-column:1/-1;font-size:13.5px"></div>`}
         </div>
-        <div style="margin-top:12px"><button type="button" class="btn good" id="nStart">Save lead &amp; start pricing</button></div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">${contactOnly ? '<button type="button" class="btn good" id="nContactSave">Save contact</button>' : '<button type="button" class="btn good" id="nStart">Save lead &amp; start pricing</button>'}<button type="button" class="btn" id="nCancel">Cancel</button></div>
       </div>` : ''}
       <div style="margin-top:8px">${rows || '<p class="muted" style="padding:14px 0">No leads yet.</p>'}</div>
     </div>
+    ${contacts.length ? `<div class="card noprint"><h2>Contacts · not priced yet (${contacts.length})</h2><div style="margin-top:8px">${contactRows}</div></div>` : ''}
     <div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <div style="flex:1 1 260px"><h2>Join as customer screen</h2><p class="muted" style="font-size:14px;margin-top:4px">For the TV or the customer's iPad. Type the code shown on the rep's device.</p></div>
       <input type="tel" inputmode="numeric" id="joinCode" placeholder="000000" maxlength="6" autocomplete="off" style="width:170px;font-family:'Courier New',monospace;font-size:22px;letter-spacing:4px;text-align:center">
@@ -2271,7 +2309,7 @@ function nrHome(L){
     ${card(1, 'Pricing', pSub, lock || ok, `<button type="button" class="btn primary" data-nr-enter="v1">${lock || ok ? 'Open again' : n('v1') ? 'Keep going' : 'Start'} &rarr;</button>`, open && !ok && !lock)}
     ${card(2, 'Selections', sSub, lock, open ? `<button type="button" class="btn primary" data-nr-enter="full">${lock ? 'Open again' : n('full') ? 'Keep going' : 'Start'} &rarr;</button>` : '<button type="button" class="btn" disabled>Finish Pricing first</button>')}
     ${card(3, 'Sign', lock ? 'Signed ' + nice(L.signedOn) : canSign ? 'Ready when they are' : 'Opens once the sheet is confirmed', lock, canSign ? `<button type="button" class="btn ${lock ? '' : 'good'}" data-tab="sign">${lock ? 'Signed copy' : 'Review and sign'}</button>` : '<button type="button" class="btn" disabled>Not ready yet</button>')}
-    </div>${view === 'staff' ? `<div class="nr-tools"><span>Office:</span><button type="button" class="btn sm" data-tab="quote">Pricing sheet</button><button type="button" class="btn sm" data-tab="summary">Summary</button><button type="button" class="btn sm" data-tab="vendors">For vendors</button><button type="button" class="btn sm" data-tab="codes">By cost code</button></div>` : ''}</div>`;
+    </div>${view === 'staff' ? `<div class="nr-tools"><span>Office:</span><button type="button" class="btn sm" data-add-home="${L.id}">+ Price another home</button><button type="button" class="btn sm" data-tab="quote">Pricing sheet</button><button type="button" class="btn sm" data-tab="summary">Summary</button><button type="button" class="btn sm" data-tab="vendors">For vendors</button><button type="button" class="btn sm" data-tab="codes">By cost code</button></div>` : ''}</div>`;
 }
 function nrDoc(L){
   const body = tab === 'quote' ? quoteTab(L) : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
@@ -2575,7 +2613,10 @@ function quoteDoc(L, forCustomer, opts){
     cu.forEach(c=>rows.push(`<tr>${ph ? '<td class="dph"></td>' : ''}<td>Custom item</td><td>${esc(c.desc)}</td><td class="num">${c.pending ? '<em>price to come</em>' : plus(c.price)}</td>${staff ? `<td class="num st">${c.pending ? '' : money(c.cost)}</td><td class="num st">${c.pending ? '' : money(c.price - c.cost)}</td>` : ''}</tr>`));
     if(!rows.join('')) return '';
     const sub = mine.reduce((s,l)=>s+l.price,0) + cu.reduce((s,c)=>s+c.price,0);
-    return `<h3>${esc(r.name)}<span>${sub ? plus(sub) : ''}</span></h3><table class="${ph ? 'withph' : ''}"><tbody>${rows.join('')}</tbody></table>`;
+    /* Office copy on screen: an arrow on each section jumps to it to change something (owner, 2026-11-23). Not on customer copies, signed
+       sheets or earlier versions; .noprint keeps it off paper and the PDF. */
+    const jumpTo = office && !PRESENT && !QUOTE && !SHOW && viewVer < 0 && !locked(L) ? (selDoc ? ['full', 'v1'] : ['v1', 'full']).find(k=>(k === 'v1' || nrOpen(L)) && nrList(L, k).some(x=>x.id === r.id)) : '';
+    return `<h3><b class="dj-wrap">${esc(r.name)}${jumpTo ? `<button type="button" class="doc-jump noprint" data-doc-jump="${jumpTo}|${esc(r.id)}" title="Go to ${esc(r.name)} to change it" aria-label="Go to ${esc(r.name)} to change it">&rarr;</button>` : ''}</b><span>${sub ? plus(sub) : ''}</span></h3><table class="${ph ? 'withph' : ''}"><tbody>${rows.join('')}</tbody></table>`;
   }).join('');
   const up = upgrades(L), co = coTotal(L), wait = waiting(L).length;
   return `<div class="doc" id="quoteDoc">
@@ -2938,12 +2979,37 @@ document.addEventListener('click', async e=>{
   if(t.closest('#styClear')){ if(!confirm('Show every line on ' + styName + '\'s sheet again?')) return; const keepCeil = (STYLE_CFG[styName] || {}).ceil; if(keepCeil) STYLE_CFG[styName] = { skip:[], incl:[], ceil:keepCeil }; else delete STYLE_CFG[styName]; render(); styleSave(); return; }
   if(t.closest('#signOutBtn')){ if(pending() && !confirm('Changes are still saving. Sign out anyway?')) return; firebase.auth().signOut().then(()=>location.reload()); return; }
   if(t.closest('#loginGo')){ doLogin(); return; }
-  if(t.closest('#newLeadBtn')){ newOpen = !newOpen; render(); if(newOpen){ $('nBase').value = BASE_CFG[$('nModel').value] || ''; baseSum(); $('nName').focus(); } return; }
+  if(t.closest('#newLeadBtn')){ if(newOpen && !leadForm){ newOpen = false; render(); } else openLeadForm(null); return; }
+  if(t.closest('#newContactBtn')){ if(newOpen && leadForm && leadForm.mode === 'contact' && !leadForm.id){ newOpen = false; leadForm = null; render(); } else openLeadForm({ mode:'contact' }); return; }
+  if(t.closest('#nCancel')){ newOpen = false; leadForm = null; render(); return; }
+  const addHome = t.closest('[data-add-home]');
+  if(addHome){ const id = addHome.dataset.addHome; if(cur){ flushId = cur; cur = null; await flush(); } tab = 'home'; openLeadForm({ mode:'home', id }); return; }
+  const cStart = t.closest('[data-contact-start]'); if(cStart){ openLeadForm({ mode:'start', id:cStart.dataset.contactStart }); return; }
+  const cEdit = t.closest('[data-contact-edit]'); if(cEdit){ openLeadForm({ mode:'contact', id:cEdit.dataset.contactEdit }); return; }
+  const cDel = t.closest('[data-contact-del]');
+  if(cDel){ const C = leads.find(x=>x.id === cDel.dataset.contactDel); if(!C || !isContact(C) || !confirm('Remove ' + C.name + ' from your contacts? This can\'t be undone.')) return;
+    try{ await selApi({ action:'remove', id:C.id }); leads = leads.filter(x=>x.id !== C.id); delete REMOTE[C.id]; if(leadForm && leadForm.id === C.id){ leadForm = null; newOpen = false; } render(); toast('Contact removed'); }
+    catch(err){ toast('Couldn\'t remove it. Check the connection and try again.'); } return; }
+  if(t.closest('#nContactSave')){
+    const name = $('nName').value.trim(); if(!name){ toast('Add the name first'); return; }
+    if(flushId) await flush();
+    const at = iso(new Date()), note = $('nNote').value.trim(), vals = { name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), address:$('nAddr').value.trim(), updated:at };
+    let C = leadForm && leadForm.id ? leads.find(x=>x.id === leadForm.id) : null;
+    if(C) Object.assign(C, vals);
+    else { C = { id:'L'+Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6), ...vals, dev:'', lot:'', model:'', line:'', housePrice:0, lotPrice:0, basePrice:0, stage:'contact', created:at, v1Date:'', pricedOn:at, answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null }; leads.push(C); }
+    if(note) C.notes = [...noteList(C), { text:note, at }];
+    flushId = C.id; newOpen = false; leadForm = null; render();
+    const ok = await flush(); toast(ok ? 'Contact saved' : 'Saved on this device. Still sending it to the hub.'); return;
+  }
   if(t.closest('#nStart')){
     const name = $('nName').value.trim(); if(!name){ toast('Add the buyer\'s name first'); return; }
     const n = { id:'L'+Math.random().toString(36).slice(2,8)+Math.random().toString(36).slice(2,6), name, name2:$('nName2').value.trim(), phone:$('nPhone').value.trim(), email:$('nEmail').value.trim(), address:$('nAddr').value.trim(), dev:$('nDev').value, lot:$('nLot').value, model:$('nModel').value, line:$('nLine').value, housePrice:Math.round(Number($('nBase').value) || 0), lotPrice:Math.round(Number($('nLotPrice').value) || 0), basePrice:Math.round(Number($('nBase').value) || 0) + Math.round(Number($('nLotPrice').value) || 0),
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
-    leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
+    const lf = leadForm, from = lf && lf.id ? leads.find(x=>x.id === lf.id) : null;
+    if(lf && lf.mode === 'start' && from){ Object.assign(from, n, { id:from.id, created:from.created, notes:from.notes, follow:from.follow }); n.id = from.id; }
+    else { if(lf && lf.mode === 'home' && from) n.family = familyOf(from); leads.push(n); }
+    leadForm = null;
+    cur = n.id; tab = 'v1'; roomId = 'lot'; gIdx = 0; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
   // a lead whose pricing is confirmed: straight to its pricing sheet from the leads list (owner, 2026-11-23)
   const oq = t.closest('[data-open-quote]'); if(oq){ if(flushId) await flush(); baseEdit = false; infoEdit = false; viewVer = -1; cur = oq.dataset.openQuote; tab = 'quote'; roomId = 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
@@ -3016,7 +3082,14 @@ document.addEventListener('click', async e=>{
     L.name = name; L.name2 = $('eName2').value.trim(); L.phone = $('ePhone').value.trim(); L.email = $('eEmail').value.trim();
     L.dev = $('eDev').value; L.lot = $('eLot').value.trim(); L.address = $('eAddr').value.trim();
     L.updated = iso(new Date());   // saved by the sync like any change; pricing stays confirmed
-    infoEdit = false; render(); toast('Details saved'); return;
+    infoEdit = false; render(); toast('Details saved');
+    const who = { name:L.name, name2:L.name2, phone:L.phone, email:L.email };
+    for(const x of leads.filter(x=>x.id !== L.id && familyOf(x) === familyOf(L) && x.stage !== 'signed' && !same({ name:x.name, name2:x.name2, phone:x.phone, email:x.email }, who))){
+      Object.assign(x, who, { updated:iso(new Date()) });
+      try{ const r = await selApi({ action:'patch', id:x.id, top:{ ...who, updated:x.updated } }); if(r && r.sheet) REMOTE[x.id] = { ...(REMOTE[x.id] || {}), rev:r.rev, sheet:r.sheet }; }
+      catch(err){ toast('Couldn\'t update their other home. Open it and check the details.'); }
+    }
+    return;
   }
   if(t.closest('#baseChange')){ baseEdit = true; render(); const b = $('baseIn'); if(b){ b.focus(); b.select(); } return; }
   if(t.closest('#baseCancel')){ baseEdit = false; render(); return; }
@@ -3030,6 +3103,7 @@ document.addEventListener('click', async e=>{
   if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); flushId = cur; cur = null; render(); syncTick(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
   const ne = t.closest('[data-nr-enter]'); if(ne){ const k = ne.dataset.nrEnter; if(k === 'full' && !nrOpen(L)) return; viewVer = -1; tab = k; const l0 = nrList(L, k); roomId = l0[0] ? l0[0].id : roomId; gIdx = 0; render(); window.scrollTo(0, 0); return; }
+  const dj = t.closest('[data-doc-jump]'); if(dj){ const [k, rid] = dj.dataset.docJump.split('|'); viewVer = -1; tab = k; roomId = rid; gIdx = 0; render(); window.scrollTo(0, 0); return; }
   const nj = t.closest('[data-nr-jump]'); if(nj){ const [rid, qid] = nj.dataset.nrJump.split('|'), r = nrList(L, tab).find(x=>x.id === rid); if(r){ roomId = rid; const qs = r.qs.filter(q=>shownFor(q, L, tab === 'full')), i = qid ? qs.findIndex(q=>q.id === qid) : 0; gIdx = Math.max(0, i); render(); window.scrollTo(0, 0); } return; }
   const nl = t.closest('[data-nr-leave]'); if(nl){ if(nl.dataset.nrLeave === '1' && tab === 'v1' && L.quoteOk && !locked(L)){ if(!L.v1Snap) L.v1Snap = snapAll(L); if(L.stage !== 'v2'){ L.stage = 'v2'; L.updated = iso(new Date()); } } tab = 'home'; viewVer = -1; render(); syncTick(); window.scrollTo(0, 0); return; }
   const tb = t.closest('[data-tab]'); if(tb){ viewVer = -1; tab = tb.dataset.tab; if(tab === 'v1' && !PRICING.some(x=>x.id === roomId)) roomId = PRICING[0].id; if(tab === 'full' && !ROOMS.some(x=>x.id === roomId)) roomId = ROOMS[0].id; render(); window.scrollTo(0, 0); return; }
@@ -3181,6 +3255,15 @@ document.addEventListener('click', async e=>{
 document.addEventListener('keydown', e=>{ if(e.key === 'Enter' && (e.target.id === 'baseIn' || e.target.id === 'lotIn')) $('baseSave').click(); if(e.key === 'Escape' && (e.target.id === 'baseIn' || e.target.id === 'lotIn')) $('baseCancel').click();
   if(e.key === 'Enter' && e.target.id === 'joinCode') $('joinBtn').click(); if(e.key === 'Enter' && (e.target.id === 'loginPass' || e.target.id === 'loginEmail')) doLogin(); });
 // the new lead form says what the base price will be
+function openLeadForm(form){
+  newOpen = true; leadForm = form; render();
+  const S = form && form.id ? leads.find(x=>x.id === form.id) : null, set = (id, v)=>{ const el = $(id); if(el) el.value = v == null ? '' : v; };
+  if(S){ set('nName', S.name); set('nName2', S.name2); set('nPhone', S.phone); set('nEmail', S.email); if(form.mode !== 'home') set('nAddr', S.address); }
+  if(S && form.mode === 'home'){ if($('nLine') && S.line){ $('nLine').value = S.line; $('nLine').dispatchEvent(new Event('change', { bubbles:true })); } if($('nDev') && S.dev){ $('nDev').value = S.dev; $('nDev').dispatchEvent(new Event('change', { bubbles:true })); } }
+  if($('nBase')){ $('nBase').value = BASE_CFG[$('nModel').value] || ''; baseSum(); }
+  const box = $('leadFormBox'); if(box && form) box.scrollIntoView({ block:'center' });
+  const first = form && form.mode !== 'contact' ? $('nModel') : $('nName'); if(first) first.focus();
+}
 function baseSum(){ const el = $('nBaseSum'); if(!el) return; const h = Number($('nBase').value) || 0, l = Number($('nLotPrice').value) || 0;
   el.textContent = h || l ? 'Base price the customer sees: ' + money(h + l) + ' (house ' + money(h) + ' + lot ' + money(l) + ')' : ''; }
 document.addEventListener('input', e=>{ if(e.target.id === 'nBase' || e.target.id === 'nLotPrice') baseSum(); if(e.target.id === 'eLot') fillAddr($('eAddr'), ($('eDev') || {}).value, e.target.value); });
