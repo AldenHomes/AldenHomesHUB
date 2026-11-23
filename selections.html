@@ -356,7 +356,7 @@
   .ph-name{display:block; padding:8px 10px; font-size:14px; font-weight:700; color:var(--ink,#222);}
   .ph-tile.on .ph-pick{border-color:var(--good,#2e6b34); box-shadow:0 0 0 2px var(--good,#2e6b34);}
   .ph-tile.on .ph-name{background:var(--good-soft,#eaf4ea); color:#1f4d2a;}
-  .ph-tile.stdon .ph-name::before{content:'\2713  Standard \00b7  no charge' !important;}
+  .ph-tile.stdon .ph-name::before{content:'\2713  Default \00b7  no charge' !important;}
   .ph-price{display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-top:3px} .ph-price.tbd{font-weight:400;color:#8a5d14}
   .ph-tile.on .ph-name::before{content:'\2713  Chosen'; display:block; font-size:11px; letter-spacing:.5px; text-transform:uppercase; color:var(--good,#2e6b34); margin-bottom:2px; white-space:pre;}
   .ph-pick{transition:box-shadow .15s, border-color .15s, transform .15s;}
@@ -694,7 +694,8 @@ const setBase = (L, house, lot)=>{ L.housePrice = Math.round(house); L.lotPrice 
 const overKey = (q, c)=>q.id + '|' + c.t;
 const overOn = c=>!c.k && !c.rate && !c.h && !c.ceilAdd;              // choices priced elsewhere: back-end option prices, typed tile, ceiling moves
 const OPT_BASE = {};                                    // no prices in this file: they come from the server
-const optPrice = k=>OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k]
+// the regular (not touchless) Sleek, Arbor and Align kitchen faucets are no charge in every finish (owner, 2026-11-23)
+const optPrice = k=>/^kf-(5925|7594|7565)(-|$)/.test(k) ? 0 : OPT_PRICES[k] != null ? OPT_PRICES[k] : OPT_BASE[k] != null ? OPT_BASE[k]
   : /^fin-.*-[mp]$/.test(k) ? optPrice(k.slice(0, -2)) : null;   // a master bath / powder room finish price not set yet = the main bath's price
 const DOOR_CHOICES = [{ t:'Framed shower door', k:'door-framed' }, { t:'Frameless shower door', k:'door-frameless' }, { t:'Semi-frameless shower door', k:'door-semi' }];
 const FIN_CHOICES = [{ t:'Brushed nickel', k:'fin-bn' }, { t:'Brushed brass', k:'fin-brass' }, { t:'Black', k:'fin-black' }, { t:'Oil rubbed bronze', k:'fin-orb', baths:true }];
@@ -903,6 +904,9 @@ const floorPrice = (c, L)=>{ const p = optPrice(c.k); if(p == null || !floorL10(
 let CAT_RAW = [];
 const rawPrice = (bt, re)=>{ const s = CAT_RAW.find(x=>x.bt === bt); const c = s && s.c.find(x=>re.test(x.t)); return c ? c.p : null; };
 function patioChoices(bt, list){
+  /* BASEMENT DEFAULT (owner, 2026-11-23): every home style can take a no-charge basement. Added at the END so the style prices keep their
+     indexes (sheets use them); choicesOf always shows it beside the home's own priced basement. */
+  if(bt === '126') return [...list, { t:'Default basement (no charge)', p:0, unit:'' }];
   /* COUNTERTOPS (owner, 2026-11-11): "an option for upgrade from granite to quartz" — a flat price set in Home styles → Every price /
      Other option prices (k 'counter-quartz'; $2,575 on the server). Added at the END so the allowances keep their indexes (sheets use them).
      TYPED PRICE (owner, 2026-11-16: "for this one they need to type in a price"): no longer a set price — `typed:true` makes isAllow treat
@@ -1306,6 +1310,7 @@ function buildCatalog(cat){
   { const sec = SECTIONS.find(r=>r.id === 'stairs'); if(sec) sec.qs.forEach(q=>{ q.one = false; q.multi = true; }); }
   // foundation wall height is one choice: 8' standard, or 9' or 10'
   { const q = SECTIONS.flatMap(r=>r.qs).find(q=>q.bt === '128'); if(q) q.one = true; }
+  SECTIONS.flatMap(r=>r.qs).filter(q=>q.bt === '126').forEach(q=>{ q.one = true; }); // the priced basement or the no-charge one, never both
   { const sec = SECTIONS.find(r=>r.id === 'doors'), at = sec ? sec.qs.findIndex(q=>q.bt === '200') : -1;
     if(at >= 0) sec.qs.splice(at + 1, 0,
       { id:'dhstyle', bt:'', num:200, t:'Door Hardware Style (Schlage)', cc:58, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, hwq:true,
@@ -1364,7 +1369,10 @@ const money2 = n=>Number.isInteger(n) ? money(n) : (n < 0 ? '-$' : '$') + Math.a
 /* Standards shown as a choice (owner, 2026-10-14: "show it like the other options, just preset to it and marked no charge"):
    the toilet's "Standard toilet", the finish's chrome, the home's standard ceiling height. The standard is "picked" while nothing else
    is; it isn't stored as an answer (it adds nothing). idx = its place in q.c when it is one of the choices (the toilet). */
-const stdOf = (q, L)=>q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:0, order:true }
+/* MOUNTAIN MEADOWS PORCH (owner, 2026-11-23): at MM, L10 composite on the front porch (BT 182) is the no-charge default, so it prints on the
+   sheet / vendor list, the lower composite and the L10 upgrade aren't offered, and the TimberTech colour is always asked. */
+const mmPorch = (q, L)=>q.bt === '182' && !!L && L.dev === 'MM';
+const stdOf = (q, L)=>mmPorch(q, L) ? { label:'L10 composite front porch', idx: q.c.findIndex(c=>/l10/i.test(c.t)), order:true, orderLabel:'L10 composite front porch (Mountain Meadows standard)' } : q.bt === '152' ? { label:'Therma-Tru S6021 man door', idx:0, order:true }
   : q.bt === '256' ? { label:'Standard shower', idx: q.c.findIndex(c=>c.t === 'Standard shower'), order:true }
   : ['300', '340'].includes(q.bt) ? { label:'Standard tub/shower', idx: q.c.findIndex(c=>c.t === 'Standard tub/shower'), order:true } : q.id === 'gdstyle' ? { label:q.c[0].t, idx:0, order:true } : q.ceil ? { label: ceilStd(L) + "' ceilings (standard height)", idx: q.c.findIndex(c=>c.h === ceilStd(L)) } : q.fin ? { label:'Chrome' }
   : q.one && /toilet/i.test(q.t) ? { label:'Standard toilet', idx: q.c.findIndex(c=>c.t === 'Standard toilet') }
@@ -1412,9 +1420,9 @@ function floorRows(q, L, lock){
     <button type="button" class="tog" data-floor-add="${esc(q.id)}">Add</button></div>`;
 }
 function stdRow(q, L, std, active, lock){
-  const sc = q.c.find(c=>c.t === std.label && c.img), sk = sc ? q.id + '#' + q.c.indexOf(sc) : '', sp = sc || q.nrGallery ? '' : nrStdPic(q, std.label);
-  return `<div class="cho std ${active ? 'on' : ''}">${sc ? `<button type="button" class="cho-img" data-photo-view="${esc(sk)}" title="See it bigger"><img src="${esc(sc.img)}" alt="${esc(pn(std.label))}" loading="lazy"></button>` : sp ? `<span class="cho-img" style="cursor:default"><img src="${esc(sp)}" alt="${esc(pn(std.label))}" loading="lazy"></span>` : ''}<span class="ct">${esc(pn(std.label))}${sc && sc.spec ? `<small class="cho-spec">${esc(pn(sc.spec))}</small>` : ''}</span><span class="nochg">No charge</span>
-    ${active ? '<span class="stdmark">&#10003; Standard</span>' : `<button type="button" class="tog" data-std="${esc(q.id)}" ${lock ? 'disabled' : ''}>Use standard</button>`}</div>`;
+  const sc = q.c.find(c=>c.t === std.label && c.img), sk = sc ? q.id + '#' + q.c.indexOf(sc) : '', sp = sc || q.nrGallery || std.plain ? '' : nrStdPic(q, std.label);
+  return `<div class="cho std ${active ? 'on' : ''}">${sc ? `<button type="button" class="cho-img" data-photo-view="${esc(sk)}" title="See it bigger"><img src="${esc(sc.img)}" alt="${esc(pn(std.label))}" loading="lazy"></button>` : sp ? `<span class="cho-img" style="cursor:default"><img src="${esc(sp)}" alt="${esc(pn(std.label))}" loading="lazy"></span>` : ''}<span class="ct"><b>Default:</b> ${esc(pn(std.label))}${sc && sc.spec ? `<small class="cho-spec">${esc(pn(sc.spec))}</small>` : ''}</span><span class="nochg">No charge</span>
+    ${active ? '<span class="stdmark">&#10003; Default</span>' : `<button type="button" class="tog" data-std="${esc(q.id)}" ${lock ? 'disabled' : ''}>Use default</button>`}</div>`;
 }
 // a selection that belongs to the other collection isn't asked
 const isLotPrem = q=>!q.num && /lot premium/i.test(q.t);
@@ -1428,7 +1436,7 @@ const asked = (q, L)=>{
   if(isSkip(q, L)) return false;
   // a home with a basement doesn't need the slab foundation line (owner, 2026-10-27)
   if(q.bt === '122' && hasFeat(L, FEATURES.find(f=>f.id === 'bsmt'))) return false;
-  if(q.after && !q.after.some(id=>{ const p = qById(id); return p && p.c.some((c, i)=>(L.answers[id + '#' + i] || {}).qty && (!q.afterRe || q.afterRe.test(c.t))); })) return false;
+  if(q.after && !q.after.some(id=>{ const p = qById(id); return p && (mmPorch(p, L) || p.c.some((c, i)=>(L.answers[id + '#' + i] || {}).qty && (!q.afterRe || q.afterRe.test(c.t)))); })) return false;
   const f = featOf(q);
   return !f || hasFeat(L, f);
 };
@@ -1444,8 +1452,9 @@ const choicesOf = (q, L)=>{ if(q.id === 'dhfin' && L){ const st = hwStyleOf(L), 
     return q.mix && mixOpen[q.id] ? mine.concat(all.filter(c=>!mine.includes(c))) : mine; }
   if(q.ceil) return q.c.map((c, i)=>({ ...c, i, t: c.ceilAdd ? 'Add a foot of ceiling height' : c.h + "' ceilings (standard height)", p: c.ceilAdd ? ceilFt() : 0 }));
   const all = q.c.map((c, i)=>({ ...c, i, ...(c.k ? { p: q.bt === '790' ? floorPrice(c, L) : optPrice(c.k) } : {}), ...(c.kf && L ? { p:optPrice(headPriceKey(c, L, q)) } : {}) }));
+  if(mmPorch(q, L)) return all.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty);
   if(q.bt === '642'){ const cov = ALL_QS.find(x=>x.bt === '640'); const got = cov ? cov.c.map((c, i)=>(L.answers[cov.id + '#' + i] || {}).qty ? c.t : '').filter(Boolean).join(' ') : '';
-    if(/patio/i.test(got) || /deck/i.test(got)) return all.filter(c=>/patio/i.test(got) ? /patio/i.test(c.t) : /deck/i.test(c.t)); } if(q.bt !== '126' || !L.model) return all; const mine = all.filter(c=>c.t.toLowerCase().replace(/ basement$/, '') === L.model.toLowerCase()); return mine.length ? mine : all; };
+    if(/patio/i.test(got) || /deck/i.test(got)) return all.filter(c=>/patio/i.test(got) ? /patio/i.test(c.t) : /deck/i.test(c.t)); } if(q.bt !== '126' || !L.model) return all; const mine = all.filter(c=>c.t.toLowerCase().replace(/ basement$/, '') === L.model.toLowerCase()); return mine.length ? [...mine, ...all.filter(c=>/^default basement/i.test(c.t))] : all; };
 const missing = ()=>[];                       // nothing on either sheet has to be answered: untouched = standard
 const todo = ()=>[];
 const keysOf = q=>q.c.map((c, i)=>q.id + '#' + i);
@@ -1481,7 +1490,7 @@ function lines(L){
       const so = stdOf(q, L);
       if(so && so.order && so.idx >= 0 && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty)){
         const c = q.c[so.idx];
-        out.push({ key:q.id + '#' + so.idx, q, where:'', label:(c.show || c.t) + (c.spec ? ' — ' + c.spec : ''), price:0, cost:0, std:true, count:1 });
+        out.push({ key:q.id + '#' + so.idx, q, where:'', label:so.orderLabel || (c.show || c.t) + (c.spec ? ' — ' + c.spec : ''), price:0, cost:0, std:true, count:1 });
       }
       if(q.want && (L.answers['want:' + q.id] || {}).label && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty))
         out.push({ key:'want:' + q.id, q, where:'', label:'Wanted — style still to pick', price:0, cost:0, std:false, typed:true });
@@ -1584,11 +1593,16 @@ function prow(q, L, force){
   const stdNote = q.fin && q.id !== 'fin_kit' ? '<div class="q-sub">The finish covers the shower door, faucets and hardware in this bathroom.</div>' : '';
   const autoNow = q.tw && !L.answers['own:' + q.id] && shown.some(c=>(L.answers[q.id + '#' + c.i] || {}).auto);
   const got = shown.filter(c=>(L.answers[q.id + '#' + c.i] || {}).qty), sum = got.reduce((t, c)=>{ const a = L.answers[q.id + '#' + c.i]; return t + a.price * a.qty; }, 0);
-  const picked = std && stdActive && !got.length ? `<span class="picked">Standard: ${esc(pn(std.label))}</span>` : got.length ? `<span class="picked">${got.length === 1 ? esc(pn(got[0].t).length > 34 ? pn(got[0].t).slice(0, 32) + '…' : pn(got[0].t)) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
+  /* DEFAULT LINE (owner, 2026-11-23: "all standards show on the pricing question as a line that says default"): a pricing question with no
+     named standard gets "Default: As per plan" (stores nothing). Questions with their own Default / Standard choice don't get a second one. */
+  const plainStd = q.v1 && !std && !q.gdoor && !q.door && !['126', '231', '724'].includes(q.bt) ? { label:'As per plan', plain:true } : null;
+  const plainRow = plainStd ? stdRow(q, L, plainStd, !choicesOf(q, L).some(c=>!c.side && (L.answers[q.id + '#' + c.i] || {}).qty), lock)
+    : q.v1 && q.photo && std && !String(rows).includes('stdon') ? stdRow(q, L, std, stdActive, lock) : '';   // e.g. shower faucet before a collection is picked
+  const picked = std && stdActive && !got.length ? `<span class="picked">Default: ${esc(pn(std.label))}</span>` : got.length ? `<span class="picked">${got.length === 1 ? esc(pn(got[0].t).length > 34 ? pn(got[0].t).slice(0, 32) + '…' : pn(got[0].t)) : got.length + ' chosen'}${sum && view !== 'customer' ? ' · ' + plus(sum) : ''}</span>` : '';
   return `<div class="sel ${isOpen ? 'open' : ''}" id="q-${q.id}"><button type="button" class="sel-h" ${force ? '' : `data-sel="${esc(q.id)}"`} aria-expanded="${isOpen}"><b>${esc(qTitle(q))}</b>${autoNow ? '<span class="chip plain">same as master bath</span>' : ''}${q.line && LINE_NAMES[q.line] ? '' : (q.line ? `<span class="chip plain">${esc(q.line)}</span>` : '')}${isOpen ? '' : picked}${changed}
       ${staff ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}${isOpen || got.length || std ? '' : `<span class="cnt">${shown.length} choice${shown.length === 1 ? '' : 's'}</span>`}
       <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
-    ${isOpen ? stdNote + (rows || '<div class="q-sub">No choices are set up for this one yet.</div>') : ''}</div>`;
+    ${isOpen ? stdNote + plainRow + (rows ||'<div class="q-sub">No choices are set up for this one yet.</div>') : ''}</div>`;
 }
 
 // follow-up: how soon, in words and colour
@@ -2960,7 +2974,7 @@ document.addEventListener('click', async e=>{
       if(gIdx > 0) gIdx--;
       else if(list[i - 1]){ roomId = list[i - 1].id; gIdx = list[i - 1].qs.filter(q=>askedFor(q, L, tab === 'full')).length - 1; }
     }
-    const y = window.scrollY; render(); window.scrollTo(0, y); return;   // stay where they're scrolled (owner, 2026-10-19)
+    render(); window.scrollTo(0, 0); return;   // each new question starts at the top (owner, 2026-11-23; replaces "keep the scroll position")
   }
   const hb = t.closest('[data-has]');
   if(hb && !locked(L)){
