@@ -486,6 +486,32 @@
   body.present .guide .cho .ct{font-size:20px}
   @media print{ body.printdoc #root > :not(.docwrap){display:none!important} body.printdoc .doc, body.quote .doc{box-shadow:none;max-width:none;margin:0;padding:10mm 12mm} body.quote{background:#fff} }
   @media print{ .top,.tabs,.totalbar,.noprint{display:none!important} body{background:#fff;padding:0} .card{box-shadow:none;border:1px solid #ccc} }
+  /* new layout */
+  .nr-gal{display:grid;gap:8px;margin-bottom:16px}.nr-gal.n1{grid-template-columns:minmax(0,620px)}.nr-gal.n2{grid-template-columns:repeat(2,minmax(0,1fr))}.nr-gal.n3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .nr-gal figure{margin:0;position:relative;overflow:hidden;border-radius:var(--radius);background:var(--paper)}.nr-gal img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}.nr-gal figcaption{padding:6px 8px;font-size:13px;font-weight:700;color:var(--navy);background:#fff;border:1px solid var(--line-soft);border-top:0}
+  .nr-main .cho-img{width:132px;height:92px;border-radius:var(--radius)}
+  @media (max-width:560px){ .nr-main .cho-img{width:96px;height:72px} }
+  .nr-head{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-top:14px}
+  .nr-who{flex:1 1 0;min-width:0}.nr-who b{display:block;font-size:16px;color:var(--navy)}.nr-who span{font-size:12.5px;color:var(--ink-soft)}
+  .nr-title{flex:1 1 0;text-align:center;font-size:19px;font-weight:700;color:var(--navy)}.nr-act{flex:1 1 0;text-align:right}
+  .nr-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;align-items:start;margin-top:4px}
+  .nr-main .modesw{display:none}.nr-main .rooms{grid-template-columns:200px minmax(0,1fr)}
+  .nr-side{position:sticky;top:12px;margin-top:16px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;max-height:calc(100vh - 28px);overflow:hidden}
+  .nr-sh{display:flex;justify-content:space-between;align-items:baseline;padding:11px 13px 8px;border-bottom:1px solid var(--line-soft)}.nr-sh b{font-size:15px;color:var(--navy)}.nr-sh span{font-size:11.5px;font-weight:700;color:var(--staff)}
+  .nr-lines{flex:1 1 auto;min-height:90px;overflow:auto;padding:3px 7px}.nr-gh{font-size:11.5px;font-weight:700;color:var(--ink-soft);padding:9px 6px 2px}
+  .nr-ln{display:flex;gap:8px;width:100%;border:0;background:none;text-align:left;padding:6px;border-radius:var(--radius);font:inherit;font-size:13px;color:var(--ink);cursor:pointer}.nr-ln.plain{cursor:default}.nr-ln:not(.plain):hover{background:var(--paper)}
+  .nr-ln span{flex:1;min-width:0;overflow-wrap:anywhere}.nr-ln small{display:block;color:var(--ink-soft);font-size:11.5px}.nr-ln em{font-style:normal;white-space:nowrap;font-variant-numeric:tabular-nums}.nr-ln.warn em{color:var(--amber);font-weight:700}
+  .nr-tot{display:flex;justify-content:space-between;padding:9px 13px;border-top:1px solid var(--line);font-size:18px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+  .nr-fin{padding:0 10px 10px}.nr-fin h4{margin:6px 3px 5px;font-size:13px}.nr-iss{display:block;width:100%;border:1px solid var(--line);background:var(--paper);color:var(--ink);text-align:left;border-radius:var(--radius);padding:6px 8px;margin-bottom:4px;font:inherit;font-size:12.5px;cursor:pointer}.nr-iss.must{border-color:#ecd9b4;background:var(--amber-soft);color:#71490c;font-weight:600}
+  .nr-more{font-size:12.5px;color:var(--ink-soft);margin:0 3px 6px}.nr-ok{background:var(--good-soft);color:var(--good);border-radius:var(--radius);padding:7px 9px;font-size:13px;font-weight:700;margin-bottom:6px}.nr-wide{width:100%;margin-top:5px}.nr-wide:disabled{opacity:.5;cursor:not-allowed}
+  .nr-ch{display:flex;gap:8px;align-items:center;padding:6px;border-top:1px solid var(--line-soft);font-size:13px}.nr-ch img,.nr-ch i{width:42px;height:42px;object-fit:cover;background:var(--paper);border-radius:var(--radius);flex:none}.nr-ch span{min-width:0}.nr-ch small{display:block;color:var(--ink-soft);font-size:11.5px}
+  .nr-home{margin-top:18px}.nr-home h2{font-size:22px;margin-bottom:12px}.nr-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .nr-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:200px}.nr-card.done{border-color:var(--good)}.nr-card h3{margin:6px 0 0;font-size:20px;color:var(--navy)}.nr-card p{margin:0 0 auto;font-size:13.5px;color:var(--ink-soft)}.nr-card p.warn{color:var(--amber);font-weight:700}.nr-card .btn:disabled{opacity:.55;cursor:not-allowed}
+  .nr-n{width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:700}.nr-card.done .nr-n{background:var(--good)}
+  .nr-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px;font-size:13px;color:var(--ink-soft)}
+  .nr-welcome{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.nr-welcome h2{font-size:32px}.nr-welcome p{color:var(--ink-soft);margin-top:6px}
+  @media (max-width:1180px){ .nr-grid{grid-template-columns:1fr}.nr-side{position:static;max-height:none}.nr-lines{max-height:320px} }
+  @media (max-width:820px){ .nr-main .rooms{grid-template-columns:1fr}.nr-who{display:none}.nr-title{text-align:left} }
 </style>
 <link rel="stylesheet" href="apple.css?v=32">
 <script src="apple.js?v=11"></script>
@@ -1293,6 +1319,7 @@ function buildCatalog(cat){
   PRICING = SECTIONS.map(r=>({ id:r.id, name:r.name, qs:r.qs.filter(q=>q.v1) })).filter(r=>r.qs.length);
   ALL_QS = SECTIONS.flatMap(r=>r.qs);
   applyOver();
+  nrPictures();
   CAT_READY = true;
 }
 
@@ -1385,8 +1412,8 @@ function floorRows(q, L, lock){
     <button type="button" class="tog" data-floor-add="${esc(q.id)}">Add</button></div>`;
 }
 function stdRow(q, L, std, active, lock){
-  const sc = q.c.find(c=>c.t === std.label && c.img), sk = sc ? q.id + '#' + q.c.indexOf(sc) : '';
-  return `<div class="cho std ${active ? 'on' : ''}">${sc ? `<button type="button" class="cho-img" data-photo-view="${esc(sk)}" title="See it bigger"><img src="${esc(sc.img)}" alt="${esc(pn(std.label))}" loading="lazy"></button>` : ''}<span class="ct">${esc(pn(std.label))}${sc && sc.spec ? `<small class="cho-spec">${esc(pn(sc.spec))}</small>` : ''}</span><span class="nochg">No charge</span>
+  const sc = q.c.find(c=>c.t === std.label && c.img), sk = sc ? q.id + '#' + q.c.indexOf(sc) : '', sp = sc || q.nrGallery ? '' : nrStdPic(q, std.label);
+  return `<div class="cho std ${active ? 'on' : ''}">${sc ? `<button type="button" class="cho-img" data-photo-view="${esc(sk)}" title="See it bigger"><img src="${esc(sc.img)}" alt="${esc(pn(std.label))}" loading="lazy"></button>` : sp ? `<span class="cho-img" style="cursor:default"><img src="${esc(sp)}" alt="${esc(pn(std.label))}" loading="lazy"></span>` : ''}<span class="ct">${esc(pn(std.label))}${sc && sc.spec ? `<small class="cho-spec">${esc(pn(sc.spec))}</small>` : ''}</span><span class="nochg">No charge</span>
     ${active ? '<span class="stdmark">&#10003; Standard</span>' : `<button type="button" class="tog" data-std="${esc(q.id)}" ${lock ? 'disabled' : ''}>Use standard</button>`}</div>`;
 }
 // a selection that belongs to the other collection isn't asked
@@ -1523,7 +1550,7 @@ function prow(q, L, force){
   }
   if(isIncl(q, L)){                               // comes with this home style: nothing to choose, nothing to pay
     return `<div class="sel open" id="q-${q.id}"><div class="sel-h" style="cursor:default"><b>${esc(q.t)}</b>${view === 'staff' ? `<span class="staffline" style="display:inline-block">BT ${esc(q.bt || '—')} · code ${q.cc}</span>` : ''}</div>
-      <div class="cho std on"><span class="ct">${esc((choicesOf(q, L)[0] || {}).t || q.t)}</span><span class="nochg">No charge</span><span class="stdmark">&#10003; Included</span></div>
+      <div class="cho std on">${(choicesOf(q, L)[0] || {}).img ? `<span class="cho-img" style="cursor:default"><img src="${esc(choicesOf(q, L)[0].img)}" alt="" loading="lazy"></span>` : ''}<span class="ct">${esc((choicesOf(q, L)[0] || {}).t || q.t)}</span><span class="nochg">No charge</span><span class="stdmark">&#10003; Included</span></div>
       <div class="q-sub">Comes with the ${esc(L.model)}.</div></div>`;
   }
   const staff = view === 'staff', lock = locked(L);
@@ -1536,7 +1563,8 @@ function prow(q, L, force){
     const price = view === 'customer' ? '' : c.p == null && !a ? '<span class="cp tbd">price to come</span>' : `<span class="cp">${p ? (p < 0 ? '− ' + money2(-p) + ' credit' : '+ ' + money2(p)) : 'no charge'}${c.unit ? ' / ' + c.unit : ''}</span>`;
     if(isAllow(q, c)){
       const amt = n ? p : allowDefault(q, c.i);
-      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}"><span class="ct">${esc(pn(c.t))}${/allowance/i.test(c.t) || c.typed ? '' : ' — allowance'}</span>
+      if(custView()) return `<div class="cho ${n ? 'on' : ''}">${c.img ? `<button type="button" class="cho-img" data-photo-view="${esc(k)}" title="See it bigger"><img src="${esc(c.img)}" alt="${esc(pn(c.t))}" loading="lazy"></button>` : ''}<span class="ct">${esc(pn(c.t).replace(/\s*allowance\s*$/i, ''))}</span><span class="muted" style="font-size:13px">${n ? '&#10003; Added' : 'Ask your Alden Homes rep'}</span></div>`;   // the buyer never sees an amount (owner, 2026-11-23)
+      return `<div class="cho ${n ? 'on' : ''} ${flashKey === k ? 'flash' : ''}">${c.img ? `<button type="button" class="cho-img" data-photo-view="${esc(k)}" title="See it bigger"><img src="${esc(c.img)}" alt="${esc(pn(c.t))}" loading="lazy"></button>` : ''}<span class="ct">${esc(pn(c.t))}${/allowance/i.test(c.t) || c.typed ? '' : ' — allowance'}</span>
         <span class="muted">$</span><input type="number" min="0" step="1" data-allow="${esc(k)}" value="${amt}" style="width:110px" aria-label="${c.typed ? 'Price' : 'Allowance amount'}" ${lock ? 'disabled' : ''}><span class="muted" style="font-size:13px">${c.typed ? 'price' : 'allowance'}</span>
         <button type="button" class="tog" data-bt-tog="${esc(k)}" ${lock ? 'disabled' : ''}>${n ? '&#10003; Added' : 'Add'}</button></div>`;
     }
@@ -1861,9 +1889,9 @@ function render(){
   }
   if(styleEdit){ $('totalbar').style.display = 'none'; $('root').innerHTML = stylesScreen(); return; }
   tellNav();
-  $('totalbar').style.display = L ? '' : 'none';
+  $('totalbar').style.display = L && !['home', 'v1', 'full'].includes(tab) ? '' : 'none';
   $('root').innerHTML = L ? leadScreen(L) : leadsScreen();
-  if(L) $('totalIn').innerHTML = totalBar(L);
+  if(L && !['home', 'v1', 'full'].includes(tab)) $('totalIn').innerHTML = totalBar(L);
   save();
 }
 
@@ -2125,13 +2153,129 @@ function leadsScreen(){
 `;
 }
 
+/* ---------- NEW LAYOUT (owner, 2026-11-23) ----------
+   Opening a buyer shows one page with Pricing / Selections / Sign cards. You enter one, see only that, and leave when it's complete.
+   Rep's screen: sections, one question, and the live sheet with "Before you finish". The buyer's iPad (?present=) never shows a price or
+   a total until the sheet is confirmed. Selections stays locked until Pricing has been confirmed once (stage v2). All answers, prices,
+   syncing and signing are the existing code, so a sheet opened here is the same sheet as on selections.html. */
+/* PICTURES (owner, 2026-11-23: "every choice needs to feel complete"). selection-photos/options/. A real photo already on a choice is NEVER
+   replaced (only choices with no picture get one). Rule = [BT numbers or question ids ('door_*' = starts with; 'ANY' = every question), wording, file].
+   A wrong picture is worse than none, so a rule only covers what the photo truly shows (no oak photo on maple stairs). A question becomes photo
+   tiles only when it's pick-one and every choice has a plain picture; anything with a count, sq ft or typed amount stays a row with a larger photo. */
+const NR_PICS = [
+  ['126', /./, 'basement-unfinished'], ['128', /./, 'basement-unfinished'], ['134', /egress/i, 'basement-egress'], ['136', /./, 'basement-finished'],
+  ['138', /rough|RI with pit/i, 'basement-roughin'], ['138', /^finish/i, 'basement-bath'], ['140', /./, 'sump-pump'],
+  ['bstairs', /open|railing/i, 'stairs-open'], ['bstairs', /closed/i, 'stairs-closed'],
+  ['153', /./, 'car-charger'], ['154', /3rd car/i, 'garage-3car'], ['170', /stone/i, 'stone-front'], ['175', /hose/i, 'hose-bib'],
+  ['180 182', /./, 'front-porch'], ['181', /./, 'walkway'], ['184', /./, 'porch-metal-roof'],
+  ['193', /./, 'laundry-counter'], ['194', /bench/i, 'mudroom-bench'], ['194', /hanging/i, 'hanging-rod'],
+  ['206', /^(std\.? style single|8' single)/i, 'pocket-door'], ['208', /^std\.? style single/i, 'barn-single'], ['208', /^std\.? style double/i, 'barn-double'],
+  ['224', /./, 'desk'], ['236', /^storm door/i, 'storm-door'], ['ceil', /add a foot/i, 'ceiling-tall'],
+  ['246', /vault/i, 'ceiling-vault'], ['246', /cathedral/i, 'ceiling-cathedral'], ['246', /tray/i, 'ceiling-tray'],
+  ['256 300 340', /tile shower/i, 'shower-tile'], ['door_*', /^framed/i, 'shower-framed'], ['door_*', /^frameless/i, 'shower-tile'],
+  ['420', /flat ceiling/i, 'recessed'], ['446', /20 ?kw/i, 'generator'],
+  ['500', /granite countertop/i, 'counter-granite'], ['500', /quartz/i, 'counter-quartz'], ['500', /painted/i, 'painted-cabinets'],
+  ['514', /LED rope/i, 'undercabinet'], ['516', /./, 'gas-range'], ['518', /melamine|added shelves/i, 'pantry'], ['523', /./, 'backsplash'],
+  ['550', /electric/i, 'fp-linear'], ['550', /gas|propane/i, 'fp-shiplap'], ['552', /./, 'fp-builtins'], ['553', /./, 'fp-shiplap'], ['556', /./, 'fp-stone'],
+  ['600', /patio/i, 'patio'], ['600', /deck/i, 'deck-wood'], ['608 612', /composite/i, 'deck-composite'], ['608 612', /pressure/i, 'deck-wood'],
+  ['610', /black spindle/i, 'deck-composite'], ['610', /railing/i, 'deck-wood'], ['616', /double hinged/i, 'patio-doors'], ['640', /patio/i, 'patio-covered'],
+  ['660', /./, 'screened'], ['672', /./, 'sunroom'], ['684', /./, 'three-season'], ['700', /transom/i, 'transoms'], ['701', /black exterior/i, 'black-windows'],
+  ['ANY', /skylight/i, 'skylight'], ['720', /^oak stairs/i, 'stairs-wood'], ['720', /carpet/i, 'stairs-carpet'],
+  ['740', /finished space/i, 'bonus-room'], ['764 768', /finished/i, 'bonus-room']
+];
+const nrHit = (keys, q)=>keys.split(' ').some(k=>k === 'ANY' || (k.endsWith('*') ? String(q.id).startsWith(k.slice(0, -1)) : k === String(q.bt) || k === q.id));
+const nrStdPic = (q, label)=>{ const r = NR_PICS.find(([k, re])=>nrHit(k, q) && re.test(String(label))); return r ? 'selection-photos/options/' + r[2] + '.jpg' : ''; };
+const NR_CAPTION = { 'ceiling-vault':'Vaulted', 'ceiling-cathedral':'Cathedral', 'ceiling-tray':'Tray', 'basement-roughin':'Rough-in', 'basement-bath':'Finished bath', 'fp-linear':'Electric', 'fp-shiplap':'Gas or propane', 'patio':'Patio', 'deck-wood':'Pressure treated', 'deck-composite':'Composite', 'barn-single':'Single', 'barn-double':'Double', 'stairs-open':'Open', 'stairs-closed':'Closed', 'counter-granite':'Granite', 'counter-quartz':'Quartz', 'painted-cabinets':'Painted cabinets', 'shower-tile':'Frameless', 'shower-framed':'Framed', 'stairs-wood':'Oak', 'stairs-carpet':'Carpet' };
+const nrGalleryHtml = q=>!q || !q.nrGallery ? '' : `<div class="nr-gal n${Math.min(q.nrGallery.length, 3)}">${q.nrGallery.map(f=>{ const cap = q.nrGallery.length > 1 ? NR_CAPTION[f.split('/').pop().replace('.jpg', '')] || '' : ''; return `<figure><img src="${esc(f)}" alt="${esc(cap || qTitle(q))}" loading="lazy">${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`; }).join('')}</div>`;
+function nrPictures(){
+  const hit = nrHit;
+  ALL_QS.forEach(q=>{ q.c.forEach(c=>{ if(c.img) return; const name = String(c.show || c.t), r = NR_PICS.find(([k, re])=>hit(k, q) && re.test(name)); if(r){ c.img = 'selection-photos/options/' + r[2] + '.jpg'; c.nrPic = true; } });
+    const nrc = q.c.filter(c=>c.nrPic), pics = nrc.map(c=>c.img); let stdPic = '';
+    try{ const so = stdOf(q, { answers:{}, custom:[], model:'', line:'', id:'' }); if(so && !q.c.some(c=>c.t === so.label)) stdPic = nrStdPic(q, so.label); } catch(e){}
+    const stdFile = stdPic; if(new Set(pics).size < pics.length || (stdFile && pics.includes(stdFile))){ q.nrGallery = [...new Set([...(stdFile ? [stdFile] : []), ...pics])]; nrc.forEach(c=>{ c.nrThumb = c.img; delete c.img; delete c.nrPic; }); }
+    if(!q.photo && q.one && q.c.length && q.bt !== '790' && !q.ceil && q.c.every(c=>c.img && !c.unit && !c.rate && !c.typed && !isAllow(q, c))) q.photo = true; });
+}
+const nrOpen = L=>locked(L) || L.stage === 'v2' || !!L.quoteOk;
+const nrList = (L, k)=>(k === 'v1' ? PRICING : ROOMS).filter(x=>x.qs.some(q=>shownFor(q, L, k === 'full')));
+const nrSeenKey = (L, k)=>'nrSeen:' + L.id + ':' + k;
+function nrSeen(L, k){ try{ return JSON.parse(localStorage.getItem(nrSeenKey(L, k)) || '[]'); } catch(e){ return []; } }
+function nrMark(L, k, id){ const s = nrSeen(L, k); if(!s.includes(id)){ s.push(id); try{ localStorage.setItem(nrSeenKey(L, k), JSON.stringify(s)); } catch(e){} } }
+const nrLines = (L, k)=>{ const ids = new Set(nrList(L, k).map(x=>x.id)); return lines(L).filter(l=>ids.has(l.q.room.id) && (k === 'full' || l.q.v1) && !l.std && !/^q?note:/.test(l.key)); };
+const nrCustom = (L, k)=>{ const ids = new Set(nrList(L, k).map(x=>x.id)); return L.custom.filter(c=>ids.has(c.room)); };
+// what still needs a look: `must` stops Confirm, `soft` is a reminder only (untouched = standard)
+function nrChecks(L, k){
+  const must = [], soft = [];
+  nrCustom(L, k).filter(c=>c.pending).forEach(c=>must.push({ t:c.desc + ' needs a price', room:c.room, q:c.q || '' }));
+  nrLines(L, k).forEach(l=>{ if(l.tbd) must.push({ t:qTitle(l.q) + ': price to come', room:l.q.room.id, q:l.q.id }); else if(String(l.key).startsWith('want:')) must.push({ t:qTitle(l.q) + ': style still to pick', room:l.q.room.id, q:l.q.id }); });
+  const seen = nrSeen(L, k); nrList(L, k).forEach(x=>{ if(!seen.includes(x.id)) soft.push({ t:x.name + ' not looked at yet', room:x.id, q:'' }); });
+  return { must, soft };
+}
+function nrSide(L, k){
+  const list = nrList(L, k), ls = nrLines(L, k), cu = nrCustom(L, k);
+  const group = fn=>list.map(x=>{ const rows = ls.filter(l=>l.q.room.id === x.id).map(l=>fn(l)).concat(cu.filter(c=>c.room === x.id).map(c=>fn(null, c))).join(''); return rows ? `<div class="nr-gh">${esc(x.name)}</div>${rows}` : ''; }).join('');
+  if(custView()){
+    const row = (l, c)=>{ let img = ''; if(l){ try{ img = linePhoto(l, L) || ((l.q.c[Number(String(l.key).split('#')[1])] || {}).nrThumb) || ''; } catch(e){} } const name = l ? noPart(l.label) : c.desc, sub = l ? qTitle(l.q) : 'Custom item';
+      return `<div class="nr-ch">${img ? `<img src="${esc(img)}" alt="">` : '<i></i>'}<span>${esc(name)}<small>${esc(sub)}</small></span></div>`; };
+    return `<aside class="nr-side"><div class="nr-sh"><b>Your choices</b></div><div class="nr-lines">${group(row) || '<p class="muted" style="padding:8px 6px;font-size:14px">Your choices will show here.</p>'}</div></aside>`;
+  }
+  const row = (l, c)=>{ const r = l ? l.q.room.id : c.room, q = l ? l.q.id : c.q || '', warn = l ? l.tbd : c.pending, price = l ? (l.tbd ? 'price to come' : l.price ? (l.price < 0 ? '− ' + money(-l.price) : '+ ' + money(l.price)) : '$0') : c.pending ? 'needs a price' : '+ ' + money(c.price);
+    return `<button type="button" class="nr-ln ${warn ? 'warn' : ''}" data-nr-jump="${esc(r)}|${esc(q)}"><span>${esc(l ? l.label : c.desc)}<small>${esc(l ? qTitle(l.q) : 'Custom item')}</small></span><em>${esc(price)}</em></button>`; };
+  const ck = nrChecks(L, k), lock = locked(L), done = !!L.quoteOk;
+  const items = [...ck.must, ...ck.soft], shown = items.slice(0, 4);
+  const issue = (x, i)=>`<button type="button" class="nr-iss ${i < ck.must.length ? 'must' : ''}" data-nr-jump="${esc(x.room)}|${esc(x.q)}">${esc(x.t)}</button>`;
+  return `<aside class="nr-side" id="nrFinish"><div class="nr-sh"><b>${k === 'v1' ? 'Pricing sheet' : 'Selection sheet'}</b><span>Only you see prices</span></div>
+    <div class="nr-lines"><div class="nr-ln plain"><span>Base price<small>${esc(L.model || '')}</small></span><em>${money(base(L))}</em></div>${group(row)}</div>
+    <div class="nr-tot"><span>Total</span><span>${money(total(L))}</span></div>
+    ${lock ? '<div class="nr-fin"><div class="nr-ok">Signed and locked</div></div>' : `<div class="nr-fin"><h4>Before you finish${items.length ? ' (' + items.length + ')' : ''}</h4>
+      ${items.length ? shown.map(issue).join('') + (items.length > shown.length ? `<div class="nr-more">and ${items.length - shown.length} more</div>` : '') : '<div class="nr-ok">Everything has been looked at</div>'}
+      ${done ? `<div class="nr-ok">Confirmed ${esc(nice(L.quoteOk))}</div><button type="button" class="btn nr-wide" data-tab="quote">Show the pricing sheet</button><button type="button" class="btn good nr-wide" data-nr-leave="1">Finish and leave</button>`
+        : `<button type="button" class="btn good nr-wide" id="quoteConfirm" ${ck.must.length ? 'disabled' : ''}>${k === 'v1' ? 'Confirm pricing' : 'Confirm selections'}</button>`}</div>`}
+  </aside>`;
+}
+function nrHead(L, title, btn){
+  return `<div class="nr-head noprint"><div class="nr-who"><b>${esc(L.name)}${L.name2 ? ' &amp; ' + esc(L.name2) : ''}</b><span>${esc(homeLabel(L))}</span></div><div class="nr-title">${esc(title)}</div><div class="nr-act">${btn}</div></div>`;
+}
+function nrRoom(L, k){
+  const sv = sheetView(L, k); if(!PRESENT) nrMark(L, k, roomId);
+  const head = PRESENT ? `<div class="nr-head noprint"><div class="nr-title" style="text-align:left">${k === 'v1' ? 'Your home' : 'Your selections'}</div></div>` : nrHead(L, k === 'v1' ? 'Pricing' : 'Selections', '<button type="button" class="btn sm" data-nr-leave="0">Save &amp; leave</button>');
+  return `${head}<div class="nr-grid"><div class="nr-main">${sv}</div>${nrSide(L, k)}</div>`;
+}
+function nrHome(L){
+  const n = k=>nrLines(L, k).length, lock = locked(L), open = nrOpen(L), ok = !!L.quoteOk;
+  const card = (num, name, sub, isDone, btn, warn)=>`<div class="nr-card ${isDone ? 'done' : ''}"><span class="nr-n">${isDone ? '&#10003;' : num}</span><h3>${name}</h3><p class="${warn ? 'warn' : ''}">${esc(sub)}</p>${btn}</div>`;
+  const pSub = lock ? 'Signed' : ok ? 'Confirmed ' + nice(L.quoteOk) : open ? 'Changed since it was confirmed' : n('v1') ? n('v1') + ' chosen so far' : 'Not started';
+  const sSub = lock ? 'Signed' : !open ? 'Opens once Pricing is confirmed' : n('full') + ' chosen so far';
+  const canSign = lock || (open && ok);
+  return `<div class="nr-home noprint"><h2>Where are we with this home?</h2><div class="nr-cards">
+    ${card(1, 'Pricing', pSub, lock || ok, `<button type="button" class="btn primary" data-nr-enter="v1">${lock || ok ? 'Open again' : n('v1') ? 'Keep going' : 'Start'} &rarr;</button>`, open && !ok && !lock)}
+    ${card(2, 'Selections', sSub, lock, open ? `<button type="button" class="btn primary" data-nr-enter="full">${lock ? 'Open again' : n('full') ? 'Keep going' : 'Start'} &rarr;</button>` : '<button type="button" class="btn" disabled>Finish Pricing first</button>')}
+    ${card(3, 'Sign', lock ? 'Signed ' + nice(L.signedOn) : canSign ? 'Ready when they are' : 'Opens once the sheet is confirmed', lock, canSign ? `<button type="button" class="btn ${lock ? '' : 'good'}" data-tab="sign">${lock ? 'Signed copy' : 'Review and sign'}</button>` : '<button type="button" class="btn" disabled>Not ready yet</button>')}
+    </div>${view === 'staff' ? `<div class="nr-tools"><span>Office:</span><button type="button" class="btn sm" data-tab="quote">Pricing sheet</button><button type="button" class="btn sm" data-tab="summary">Summary</button><button type="button" class="btn sm" data-tab="vendors">For vendors</button><button type="button" class="btn sm" data-tab="codes">By cost code</button></div>` : ''}</div>`;
+}
+function nrDoc(L){
+  const body = tab === 'quote' ? quoteTab(L) : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
+  const title = { quote:'Pricing sheet', summary:'Summary', sign:locked(L) ? 'Signed copy' : 'Sign', vendors:'For vendors', codes:'By cost code' }[tab] || '';
+  return (PRESENT ? '' : nrHead(L, title, '<button type="button" class="btn sm" data-tab="home">&larr; Back to this home</button>')) + body;
+}
 function leadScreen(L){
+  if(PRESENT){
+    if(tab === 'v1' || tab === 'full') return nrRoom(L, tab);
+    if(tab === 'home') return `<div class="nr-welcome"><h2>Welcome, ${esc(L.name)}</h2><p>Let's make this home yours.</p></div>`;
+    if(!L.quoteOk && !locked(L)) return '<div class="nr-welcome"><h2>Your sheet is being reviewed</h2><p>Your Alden Homes rep will show it to you in just a moment.</p></div>';
+    return nrDoc(L);
+  }
+  if(tab === 'home') return leadScreenOld(L);
+  if(tab === 'v1' || tab === 'full') return nrRoom(L, tab);
+  return nrDoc(L);
+}
+
+function leadScreenOld(L){
   const left = todo(L).length, staff = view === 'staff';
   const d = drift(L).filter(x=>x.diff), dSum = d.reduce((s,x)=>s+x.diff,0);
   const tabs = [['v1','Pricing'],['quote','Pricing sheet'],['full','Selections'],['summary','Summary'],['sign', locked(L) ? 'Signed copy' : 'Sign']]
     .map(([id, label])=>`<button type="button" class="tab ${tab===id?'on':''}" data-tab="${id}">${label}${id==='full' && left && !locked(L) ? `<span class="n">${left} to choose</span>` : ''}${id==='quote' && waiting(L).length ? `<span class="n">${waiting(L).length} to price</span>` : ''}</button>`).join('')
     + (staff ? [['vendors','For vendors'],['codes','By cost code']].map(([id,label])=>`<button type="button" class="tab staff ${tab===id?'on':''}" data-tab="${id}">${label}</button>`).join('') : '');
-  const body = tab === 'v1' ? sheetView(L, 'v1') : tab === 'full' ? sheetView(L, 'full') : tab === 'quote' ? quoteTab(L) : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
+  const body = tab === 'home' ? nrHome(L) : tab === 'v1' ? sheetView(L, 'v1') : tab === 'full' ? sheetView(L, 'full') : tab === 'quote' ? quoteTab(L) : tab === 'summary' ? summary(L) : tab === 'sign' ? sign(L) : tab === 'vendors' ? vendors(L) : codes(L);
   return `
     <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="flex:1 1 320px">${PRESENT ? '<div class="eyebrow">Your selections</div>' : '<a href="#" id="backLeads" class="muted noprint" style="font-size:13px;text-decoration:none">&larr; All leads</a>'}
@@ -2162,7 +2306,7 @@ function leadScreen(L){
         <button type="button" class="btn sm" id="repriceBtn">Update to today's prices</button></div>` : ''}
     ${locked(L) ? `<div class="banner good"><p><strong>Signed on ${esc(nice(L.signedOn))}.</strong> These choices and their prices are locked for good. Anything new is a change order.</p></div>` : ''}
     ${staff && !PRESENT ? officeCard(L) : (!PRESENT && followInfo(L) && followInfo(L).days <= 0 ? `<div class="banner staff noprint"><p><strong>${esc(followInfo(L).when)}.</strong> ${esc(followInfo(L).what)} <span class="muted">Switch to Office view for notes.</span></p></div>` : '')}
-    <div class="tabs noprint">${tabs}</div>
+    
     ${body}`;
 }
 
@@ -2261,7 +2405,7 @@ const sectionsFor = (L, list)=>list.filter(r=>r.qs.some(q=>askedFor(q, L, list =
 /* ---------- one at a time, or the whole section ---------- */
 let gIdx = 0, followGuide = null;
 const modes = { v1:'list', full:'guide' };          // pricing is a quick pass down a list; selections is talked through item by item
-try{ Object.assign(modes, JSON.parse(localStorage.getItem('aldenSelModes') || '{}')); } catch(e){}
+modes.v1 = 'guide'; modes.full = 'guide';
 const modeOf = ()=>PRESENT && followGuide !== null ? (followGuide ? 'guide' : 'list') : (modes[tab] || 'list');
 // where the office is, for the customer's screen to follow: the section, and in one-at-a-time view which selection
 const navRoom = ()=>roomId + ((tab === 'v1' || tab === 'full') && modeOf() === 'guide' ? '~' + gIdx : '');
@@ -2284,7 +2428,7 @@ function sheetView(L, kind){
       return `<button type="button" class="${on ? 'on' : ''}" data-has="${f.id}" ${lock ? 'disabled' : ''} title="${on ? 'Its selections are on the sheet' : 'Its selections are left off the sheet'}">${on ? '&#10003; ' : ''}${esc(f.name)}${n ? ' · ' + n : ''}</button>`; }).join('')}
       <div class="grow"></div><div class="modesw"><button type="button" class="${guide ? 'on' : ''}" data-mode="guide">One at a time</button><button type="button" class="${guide ? '' : 'on'}" data-mode="list">Whole section</button></div></div>`;
   const notes = custView() ? '' : `<div class="sel"><div class="sel-h" style="cursor:default"><b style="font-size:15.5px;font-family:inherit">Notes for ${esc(r.name)}</b></div><textarea data-note="${esc(nk)}" maxlength="600" style="margin-top:8px;min-height:54px;resize:vertical" ${lock ? 'disabled' : ''}>${esc(note ? note.label : '')}</textarea></div>`;
-  const finish = pricing && !next && !lock ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+  const finish = false ? `<div class="card noprint" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <p style="flex:1 1 260px"><strong>That's the whole pricing sheet.</strong> Anything left untouched stays at standard. It's saved as a lead either way, and everything picked here is already on the selections sheet for the next meeting.</p>
       ${PRESENT ? '' : '<button type="button" class="btn" id="saveClose">Save &amp; close</button>'}
       <button type="button" class="btn primary" id="toFull">Carry on to selections</button></div>` : '';
@@ -2294,10 +2438,10 @@ function sheetView(L, kind){
     const q = qs[gIdx], atEnd = gIdx >= qs.length - 1;
     const picked = q ? choicesOf(q, L).some(c=>(L.answers[q.id + '#' + c.i] || {}).qty) || L.custom.some(c=>c.q === q.id) : false;
     const nq = qs[gIdx + 1], fwdTop = !atEnd ? (picked ? 'Next' : 'Skip for now · next') : next ? 'Next section' : '';
-    const fwd = !atEnd ? qTitle(nq) : next ? next.name : pricing ? 'Finish pricing' : 'See the summary';
+    const fwd = !atEnd ? qTitle(nq) : next ? next.name : 'Check the sheet';
     body = `<div class="guide">
       <div class="g-top"><span>Question ${qs.length ? gIdx + 1 : 0} of ${qs.length}</span><div class="bar"><span style="width:${qs.length ? (gIdx + 1) / qs.length * 100 : 0}%"></span></div></div>
-      <div class="q">${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
+      <div class="q">${nrGalleryHtml(q)}${q ? prow(q, L, true) : '<p class="muted">Nothing to choose here for this home.</p>'}
         ${q && !picked && !lock && !stdOf(q, L) && !isIncl(q, L) ? '<div class="g-std">Nothing picked means this stays standard.</div>' : ''}
         ${q ? customBlock(L, r, q) : ''}
         ${q && !PRESENT && !custView() ? (n=>`<div class="qnote noprint"><label class="f">Note for this question</label><textarea data-note="${esc(qNoteKey(q))}" maxlength="600" placeholder="Anything to remember about ${esc(q.t)}" ${lock ? 'disabled' : ''}>${esc(n ? n.label : '')}</textarea></div>`)(L.answers[qNoteKey(q)]) : ''}</div>
@@ -2780,7 +2924,7 @@ document.addEventListener('click', async e=>{
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
     leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
-  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); baseEdit = false; infoEdit = false; viewVer = -1; cur = open.dataset.open; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
+  const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); baseEdit = false; infoEdit = false; viewVer = -1; cur = open.dataset.open; tab = 'home'; roomId = 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
   if(!PRESENT){
     const setFollow = date=>{ L.follow = { date, what: ($('followWhat').value || '').trim() || (L.follow && L.follow.what) || '' }; render(); toast('Follow-up set for ' + nice(date)); };
@@ -2810,8 +2954,7 @@ document.addEventListener('click', async e=>{
     if(d > 0){
       if(gIdx < qs.length - 1) gIdx++;
       else if(list[i + 1]){ roomId = list[i + 1].id; gIdx = 0; }
-      else if(tab === 'full'){ tab = 'summary'; }
-      else { const fin = document.getElementById('toFull'); if(fin){ fin.scrollIntoView({ block:'center' }); return; } }
+      else { const fin = document.getElementById('nrFinish'); if(fin) fin.scrollIntoView({ block:'center', behavior:'smooth' }); return; }
     } else {
       if(gIdx > 0) gIdx--;
       else if(list[i - 1]){ roomId = list[i - 1].id; gIdx = list[i - 1].qs.filter(q=>askedFor(q, L, tab === 'full')).length - 1; }
@@ -2863,6 +3006,9 @@ document.addEventListener('click', async e=>{
   if(t.closest('#shareCopy')){ navigator.clipboard.writeText(presentUrl(L)).then(()=>toast('Link copied'), ()=>toast('Select the link and copy it')); return; }
   if(t.closest('#shareOpenBtn')){ window.open(presentUrl(L), 'aldenCustomerScreen', 'width=1000,height=800'); return; }
   if(t.closest('#backLeads') || t.closest('#saveClose') || t.closest('#saveClose2')){ e.preventDefault(); flushId = cur; cur = null; render(); syncTick(); window.scrollTo(0, 0); if(!locked(L)) toast('Saved. It\'s on file whenever they come back.'); return; }
+  const ne = t.closest('[data-nr-enter]'); if(ne){ const k = ne.dataset.nrEnter; if(k === 'full' && !nrOpen(L)) return; viewVer = -1; tab = k; const l0 = nrList(L, k); roomId = l0[0] ? l0[0].id : roomId; gIdx = 0; render(); window.scrollTo(0, 0); return; }
+  const nj = t.closest('[data-nr-jump]'); if(nj){ const [rid, qid] = nj.dataset.nrJump.split('|'), r = nrList(L, tab).find(x=>x.id === rid); if(r){ roomId = rid; const qs = r.qs.filter(q=>shownFor(q, L, tab === 'full')), i = qid ? qs.findIndex(q=>q.id === qid) : 0; gIdx = Math.max(0, i); render(); window.scrollTo(0, 0); } return; }
+  const nl = t.closest('[data-nr-leave]'); if(nl){ if(nl.dataset.nrLeave === '1' && tab === 'v1' && L.quoteOk && !locked(L)){ if(!L.v1Snap) L.v1Snap = snapAll(L); if(L.stage !== 'v2'){ L.stage = 'v2'; L.updated = iso(new Date()); } } tab = 'home'; viewVer = -1; render(); syncTick(); window.scrollTo(0, 0); return; }
   const tb = t.closest('[data-tab]'); if(tb){ viewVer = -1; tab = tb.dataset.tab; if(tab === 'v1' && !PRICING.some(x=>x.id === roomId)) roomId = PRICING[0].id; if(tab === 'full' && !ROOMS.some(x=>x.id === roomId)) roomId = ROOMS[0].id; render(); window.scrollTo(0, 0); return; }
   const rm = t.closest('[data-room]'); if(rm){ gIdx = 0; roomId = rm.dataset.room; if(tab !== 'v1' && tab !== 'full') tab = 'full'; render(); window.scrollTo(0, 0); return; }
   const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
@@ -3225,7 +3371,7 @@ async function bootOffice(){
   // only when they arrived late: draw once more so lot addresses / home details show (not while someone is typing)
   if(timedOut) extras.then(()=>{ const a = document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; const y = window.scrollY; render(); window.scrollTo(0, y); }).catch(()=>{});
   const want = new URLSearchParams(location.search).get('open');
-  if(want && leads.some(l=>l.id === want)){ cur = want; const o = lead(); tab = o.stage === 'v1' ? 'v1' : o.stage === 'signed' ? 'sign' : 'full'; roomId = tab === 'full' ? ROOMS[0].id : 'lot'; }
+  if(want && leads.some(l=>l.id === want)){ cur = want; tab = 'home'; roomId = 'lot'; }
   start();
   // the hub's search button and voice assistant, as on every staff page
   ['hubsearch.js', 'chat.js', 'assistant.js'].forEach(f=>{ const sc = document.createElement('script'); sc.src = f; document.body.appendChild(sc); });
