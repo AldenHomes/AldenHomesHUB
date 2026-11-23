@@ -2132,7 +2132,7 @@ function leadsScreen(){
         ${noteList(L).length ? `<div class="muted" style="font-size:13px;margin-top:5px;font-style:italic">Last note, ${esc(ago(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].at))}: ${esc(noteList(L).slice().sort((a,b)=>b.at.localeCompare(a.at))[0].text.slice(0, 110))}</div>` : ''}</div>
       <div>${stageChip(L)}${L.houseId && JOBS[L.houseId] && jobMissing(JOBS[L.houseId]).length ? ` <span class="chip soon">home details to fill in</span>` : ''}${waiting(L).length ? ` <span class="chip soon">${waiting(L).length} to price</span>` : ''}<div class="muted" style="font-size:12.5px;margin-top:4px">Last in ${esc(ago(L.updated))}${drift(L).some(d=>d.diff) ? ' · <span style="color:#8a5d14">prices have changed</span>' : ''}</div></div>
       <div class="amt">${money(total(L))}<div class="muted" style="font-size:11.5px;font-family:inherit;font-weight:400">${L.stage === 'signed' ? 'contract' : 'so far'}</div></div>
-      <button type="button" class="btn sm" data-open="${L.id}">Open</button>
+      <div style="display:flex;flex-direction:column;gap:6px">${L.quoteOk ? `<button type="button" class="btn sm primary" data-open-quote="${L.id}" style="white-space:nowrap">Pricing sheet</button>` : ''}<button type="button" class="btn sm" data-open="${L.id}">Open</button></div>
     </div>`).join('');
   const devOpts = DEVS.map(d=>`<option value="${d.code}">${d.code} — ${d.name}</option>`).join('');
   return `
@@ -2939,6 +2939,8 @@ document.addEventListener('click', async e=>{
       stage:'v1', created:iso(new Date()), v1Date:iso(new Date()), updated:iso(new Date()), pricedOn:iso(new Date()), answers:{}, v1Snap:null, custom:[], favs:{}, cos:[], signedOn:'', notes:[], follow:null };
     leads.push(n); cur = n.id; tab = 'v1'; roomId = 'lot'; newOpen = false; render(); window.scrollTo(0, 0); toast('Lead saved'); return;
   }
+  // a lead whose pricing is confirmed: straight to its pricing sheet from the leads list (owner, 2026-11-23)
+  const oq = t.closest('[data-open-quote]'); if(oq){ if(flushId) await flush(); baseEdit = false; infoEdit = false; viewVer = -1; cur = oq.dataset.openQuote; tab = 'quote'; roomId = 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
   const open = t.closest('[data-open]'); if(open){ if(flushId) await flush(); baseEdit = false; infoEdit = false; viewVer = -1; cur = open.dataset.open; tab = 'home'; roomId = 'lot'; gIdx = 0; render(); window.scrollTo(0, 0); return; }
   if(!L) return;
   if(!PRESENT){
