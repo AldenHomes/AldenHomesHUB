@@ -1311,6 +1311,10 @@ function buildCatalog(cat){
   // foundation wall height is one choice: 8' standard, or 9' or 10'
   { const q = SECTIONS.flatMap(r=>r.qs).find(q=>q.bt === '128'); if(q) q.one = true; }
   SECTIONS.flatMap(r=>r.qs).filter(q=>q.bt === '126').forEach(q=>{ q.one = true; }); // the priced basement or the no-charge one, never both
+  /* COMPOSITE DECK (owner, 2026-11-23): BT 608 is its own clear question, right after Patio/Deck, and only for a deck (see `asked`).
+     The price stays BuilderTrend's per sq ft price / Every price. */
+  SECTIONS.forEach(r=>{ const a = r.qs.findIndex(q=>q.bt === '600'), b = r.qs.findIndex(q=>q.bt === '608'); if(a < 0 || b < 0) return;
+    const [q] = r.qs.splice(b, 1); q.t = 'Upgrade Deck to Composite'; q.c.forEach(c=>{ if(/^composite deck flooring/i.test(c.t)) c.t = 'Upgrade to composite decking'; }); r.qs.splice(r.qs.findIndex(x=>x.bt === '600') + 1, 0, q); });
   { const sec = SECTIONS.find(r=>r.id === 'doors'), at = sec ? sec.qs.findIndex(q=>q.bt === '200') : -1;
     if(at >= 0) sec.qs.splice(at + 1, 0,
       { id:'dhstyle', bt:'', num:200, t:'Door Hardware Style (Schlage)', cc:58, line:'', room:sec, opt:1, type:'bt', v1:0, one:true, photo:true, hwq:true,
@@ -1436,6 +1440,8 @@ const asked = (q, L)=>{
   if(isSkip(q, L)) return false;
   // a home with a basement doesn't need the slab foundation line (owner, 2026-10-27)
   if(q.bt === '122' && hasFeat(L, FEATURES.find(f=>f.id === 'bsmt'))) return false;
+  // composite decking is only asked for a deck: a patio-only home doesn't see it
+  if(q.bt === '608' && !q.c.some((c, i)=>(L.answers[q.id + '#' + i] || {}).qty)){ const pick = bt=>{ const p = ALL_QS.find(x=>x.bt === bt); return p ? p.c.filter((c, i)=>(L.answers[p.id + '#' + i] || {}).qty).map(c=>c.t).join(' ') : ''; }, got = pick('600') + ' ' + pick('640'); if(/patio/i.test(got) && !/deck/i.test(got)) return false; }
   if(q.after && !q.after.some(id=>{ const p = qById(id); return p && (mmPorch(p, L) || p.c.some((c, i)=>(L.answers[id + '#' + i] || {}).qty && (!q.afterRe || q.afterRe.test(c.t)))); })) return false;
   const f = featOf(q);
   return !f || hasFeat(L, f);
