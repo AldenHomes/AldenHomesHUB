@@ -2669,6 +2669,13 @@ function quoteTab(L){
     <div class="docwrap">${quoteDoc(L, false)}</div>
     ${PRESENT ? '' : versionsCard(L)}`;
 }
+/* PDF names (owner, 2026-11-23): "Robert Pitrovich - Avonlea - Pricing Sheet.pdf". The browser's Print → Save as PDF uses the same name. */
+const docFileBase = (L, kind, extra)=>[L.name, L.model, kind, extra].filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+const docFileName = (L, kind, extra)=>docFileBase(L, kind, extra) + '.pdf';
+const docFileNow = L=>{ const v = viewVer >= 0 && (L.versions || [])[viewVer]; return tab === 'summary' ? docFileBase(L, 'Selection Sheet' + (sumPhotos ? ' with photos' : '')) : docFileBase(L, 'Pricing Sheet', v ? v.at.slice(0, 10) : ''); };
+let titleBeforePrint = '';
+window.addEventListener('beforeprint', ()=>{ const L = lead(); if(!L || !(QUOTE || tab === 'quote' || tab === 'summary')) return; titleBeforePrint = document.title; document.title = docFileNow(L); });
+window.addEventListener('afterprint', ()=>{ if(titleBeforePrint){ document.title = titleBeforePrint; titleBeforePrint = ''; } });
 async function docPdf(btn, name){
   btn.disabled = true; const was = btn.textContent; btn.textContent = 'Making the PDF…';
   try{
@@ -2944,7 +2951,7 @@ document.addEventListener('click', async e=>{
     const y = window.scrollY; render(); window.scrollTo(0, y); toast('Photo removed'); return;
   }
   const sw = t.closest('#viewSw button'); if(sw){ view = sw.dataset.view; if(view !== 'staff' && ['vendors','codes'].includes(tab)) tab = 'summary'; render(); return; }
-  if(QUOTE){ if(t.closest('#docPrint')) window.print(); else if(t.closest('#docPdf') && L) docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + '.pdf'); return; }
+  if(QUOTE){ if(t.closest('#docPrint')) window.print(); else if(t.closest('#docPdf') && L) docPdf(t.closest('#docPdf'), docFileName(L, 'Pricing Sheet')); return; }
   if(t.closest('#shPdf')){ showPdf(t.closest('#shPdf')); return; }
   if(t.closest('#shShare')){
     const url = location.href, title = document.title;
@@ -3111,8 +3118,7 @@ document.addEventListener('click', async e=>{
   const jump = t.closest('[data-jump]'); if(jump){ e.preventDefault(); roomId = jump.dataset.jump; tab = 'full'; render(); window.scrollTo(0, 0); return; }
   if(t.closest('#printBtn')){ window.print(); return; }
   if(t.closest('#docPrint')){ window.print(); return; }
-  if(t.closest('#docPdf')){ if(tab === 'summary'){ docPdf(t.closest('#docPdf'), 'Alden Homes selection sheet' + (sumPhotos ? ' with photos' : '') + ' - ' + L.name + '.pdf'); return; }
-    const v = viewVer >= 0 && (L.versions || [])[viewVer]; docPdf(t.closest('#docPdf'), 'Alden Homes pricing sheet - ' + L.name + (v ? ' - ' + v.at.slice(0, 10) : '') + '.pdf'); return; }
+  if(t.closest('#docPdf')){ docPdf(t.closest('#docPdf'), docFileNow(L) + '.pdf'); return; }
   const sp = t.closest('[data-sumph]'); if(sp){ sumPhotos = sp.dataset.sumph === '1'; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   if(t.closest('#quoteConfirm')){
     // confirming also puts the sheet on the hub's server, so the customer's link works
