@@ -2277,7 +2277,7 @@ function nrSide(L, k){
       return `<div class="nr-ch">${img ? `<img src="${esc(img)}" alt="">` : '<i></i>'}<span>${esc(name)}<small>${esc(sub)}</small></span></div>`; };
     return `<aside class="nr-side"><div class="nr-sh"><b>Your choices</b></div><div class="nr-lines">${group(row) || '<p class="muted" style="padding:8px 6px;font-size:14px">Your choices will show here.</p>'}</div></aside>`;
   }
-  const row = (l, c)=>{ const r = l ? l.q.room.id : c.room, q = l ? l.q.id : c.q || '', warn = l ? l.tbd : c.pending, price = l ? (l.tbd ? 'price to come' : l.price ? (l.price < 0 ? '− ' + money(-l.price) : '+ ' + money(l.price)) : '$0') : c.pending ? 'needs a price' : '+ ' + money(c.price);
+  const row = (l, c)=>{ const r = l ? l.q.room.id : c.room, q = l ? l.q.id : c.q || '', warn = l ? l.tbd : c.pending, price = l ? (l.tbd ? 'price to come' : l.price ? (l.price < 0 ? '− ' + money(-l.price) : '+ ' + money(l.price)) : '$0') : c.pending ? 'needs a price' : c.price < 0 ? '− ' + money(-c.price) : '+ ' + money(c.price);
     return `<button type="button" class="nr-ln ${warn ? 'warn' : ''}" data-nr-jump="${esc(r)}|${esc(q)}"><span>${esc(l ? l.label : c.desc)}<small>${esc(l ? qTitle(l.q) : 'Custom item')}</small></span><em>${esc(price)}</em></button>`; };
   const ck = nrChecks(L, k), lock = locked(L), done = !!L.quoteOk;
   const items = [...ck.must, ...ck.soft], shown = items.slice(0, 4);
@@ -2543,7 +2543,7 @@ function customBlock(L, r, q, loose){
   const staff = view === 'staff', lock = locked(L), forId = q ? q.id : r.id;
   const mine = L.custom.map((c, ci)=>({ c, ci })).filter(x=>x.c.room === r.id && (q ? x.c.q === q.id : loose ? !x.c.q : true));
   const items = mine.map(({ c, ci })=>`<div class="custom ${c.pending ? 'wait' : ''}">
-      <div class="q-head"><h3 style="font-size:16px;color:var(--navy)">${esc(c.desc)}</h3><span class="chip plain">custom item</span>${c.pending ? `<span class="chip soon">price to come${c.ask ? ' · asked ' + esc(c.ask) : ''}</span>` : ''}</div>
+      <div class="q-head"><h3 style="font-size:16px;color:var(--navy)">${esc(c.desc)}</h3><span class="chip plain">${c.price < 0 ? 'credit' : 'custom item'}</span>${c.pending ? `<span class="chip soon">price to come${c.ask ? ' · asked ' + esc(c.ask) : ''}</span>` : ''}</div>
       ${c.pending ? (PRESENT ? '<div class="q-sub">We\'re getting a price on this for you.</div>'
           : `<div class="row2 noprint"><span class="muted">$</span><input type="number" min="0" step="1" placeholder="Price" data-cuprice="${ci}">${staff ? `<input type="number" min="0" step="1" placeholder="Our cost" data-cucost="${ci}">` : ''}<button type="button" class="btn sm primary" data-cuset="${ci}">Set price</button>${lock ? '' : `<button type="button" class="btn sm" data-delcustom="${ci}">Remove</button>`}</div>`)
         : `<div class="row2">${view === 'customer' ? '' : `<span class="mono" style="font-weight:700;color:var(--navy)">${plus(c.price)}</span>`}${staff ? `<span class="staffline">our cost ${money(c.cost)} · margin ${money(c.price - c.cost)} · code ${c.cc}</span>` : ''}${!lock && !PRESENT && !custView() ? `<button type="button" class="btn sm noprint" data-delcustom="${ci}">Remove</button>` : ''}</div>`}
@@ -2551,10 +2551,10 @@ function customBlock(L, r, q, loose){
   if(lock || PRESENT || loose || custView()) return items;
   const form = cuOpen === forId ? `<div class="custom" style="border-left-color:var(--navy)"><div class="q-head"><h3 style="font-size:16px;color:var(--navy)">Add a custom item to ${esc(q ? q.t : r.name)}</h3></div>
       <div style="margin-top:10px"><label class="f">What is it</label><input type="text" id="cuDesc" maxlength="200" placeholder="e.g. Built-in bench with cubbies"></div>
-      <div class="radio2"><label><input type="radio" name="cuMode" value="now" ${cuMode === 'now' ? 'checked' : ''}> I have a price</label><label><input type="radio" name="cuMode" value="ask" ${cuMode === 'ask' ? 'checked' : ''}> It needs a price</label></div>
-      ${cuMode === 'now' ? `<div class="grid" style="margin-top:10px">
-          <div><label class="f">Customer price ($)</label><input type="number" id="cuPrice" min="0" step="1"></div>
-          ${staff ? `<div><label class="f">Our cost ($)</label><input type="number" id="cuCost" min="0" step="1"></div>
+      <div class="radio2"><label><input type="radio" name="cuMode" value="now" ${cuMode === 'now' ? 'checked' : ''}> I have a price</label><label><input type="radio" name="cuMode" value="ask" ${cuMode === 'ask' ? 'checked' : ''}> It needs a price</label><label><input type="radio" name="cuMode" value="credit" ${cuMode === 'credit' ? 'checked' : ''}> It's a credit</label></div>
+      ${cuMode !== 'ask' ? `<div class="grid" style="margin-top:10px">
+          <div><label class="f">${cuMode === 'credit' ? 'Credit amount ($), comes off the price' : 'Customer price ($)'}</label><input type="number" id="cuPrice" min="0" step="1"></div>
+          ${staff ? `${cuMode === 'credit' ? '' : `<div><label class="f">Our cost ($)</label><input type="number" id="cuCost" min="0" step="1"></div>`}
           <div><label class="f">Cost code</label><select id="cuCode">${Object.entries(CODE_NAMES).map(([c,n])=>`<option value="${c}">${c} — ${n}</option>`).join('')}</select></div>` : ''}</div>`
         : `<div style="margin-top:10px;max-width:320px"><label class="f">Who should price it</label><select id="cuAsk">${TEAM.map(p=>`<option value="${esc(p.uid)}">${esc(p.name)}</option>`).join('')}</select>
            <div class="q-sub">They get a notice on their hub bell that this item needs a price. The sheet can't be confirmed until it has one.</div></div>`}
@@ -3227,10 +3227,12 @@ document.addEventListener('click', async e=>{
       L.custom.push({ desc, price:0, cost:0, cc:90, room:roomId, ...(qById(cuOpen) ? { q:cuOpen } : {}), pending:true, ask:who, askUid:uid, at:iso(new Date()) });
       cuOpen = ''; touch(L); render(); toast(who + ' will get a notice that this needs a price'); return;
     }
-    const price = Number($('cuPrice').value);
-    if($('cuPrice').value === '' || !(price >= 0)){ toast('Type the price, or choose "It needs a price"'); return; }
+    const isCredit = cuMode === 'credit', typedPrice = Number($('cuPrice').value);
+    if(isCredit && !(Math.abs(typedPrice) > 0)){ toast('Type the credit amount'); return; }
+    if(!isCredit && ($('cuPrice').value === '' || !(typedPrice >= 0))){ toast('Type the price, or choose "It needs a price"'); return; }
+    const price = isCredit ? -Math.abs(typedPrice) : typedPrice;   // a credit is a custom item with a minus price, so every total already takes it off
     const costEl = $('cuCost'), codeEl = $('cuCode');
-    L.custom.push({ desc, price, cost: costEl && costEl.value !== '' ? Number(costEl.value) || 0 : Math.round(price * 0.72), cc: codeEl ? Number(codeEl.value) : 90, room:roomId, ...(qById(cuOpen) ? { q:cuOpen } : {}) });
+    L.custom.push({ desc, price, cost: isCredit ? 0 : costEl && costEl.value !== '' ? Number(costEl.value) || 0 : Math.round(price * 0.72), cc: codeEl ? Number(codeEl.value) : 90, room:roomId, ...(qById(cuOpen) ? { q:cuOpen } : {}) });
     cuOpen = ''; touch(L); render(); toast('Added to the sheet'); return;
   }
   const cs = t.closest('[data-cuset]');
