@@ -2456,6 +2456,15 @@ const askedFor = (q, L, sel)=>FAUCET_KIND[q.bt] !== 'spa' && asked(q, L) && (!se
    sheet's status chip) — Office view shows everything. Question titles drop the repeated room name (`qTitle`); the section list shows
    how far along each section is; Next names the question it goes to. Order of sections and questions is unchanged. */
 const custView = ()=>view === 'customer';
+// no lot premium typed -> the office presses OK on a box saying they know (once per sheet per visit to the page)
+const premOk = new Set();
+function premCheck(L){
+  if(!L || custView() || premOk.has(L.id)) return true;
+  const qs = ALL_QS.filter(x=>isLotPrem(x) && askedFor(x, L, false));
+  if(!qs.length || qs.some(x=>Number((L.answers[x.id + '#0'] || {}).price) > 0)) return true;
+  if(!confirm('No lot premium has been entered for this home.\n\nPress OK to confirm you are aware there is no lot premium.')) return false;
+  premOk.add(L.id); return true;
+}
 const shownFor = (q, L, sel)=>askedFor(q, L, sel) && !(custView() && isLotPrem(q));
 const reEsc = t=>String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const qTitle = q=>q.room && q.room.name ? q.t.replace(new RegExp('\\s*-\\s*' + reEsc(q.room.name) + '\\s*$', 'i'), '') || q.t : q.t;
@@ -3048,6 +3057,7 @@ document.addEventListener('click', async e=>{
     const list = sectionsFor(L, tab === 'v1' ? PRICING : ROOMS), i = Math.max(0, list.findIndex(x=>x.id === roomId)), qs = list[i] ? list[i].qs.filter(q=>askedFor(q, L, tab === 'full')) : [];
     const d = Number(gb.dataset.g);
     if(d > 0){
+      if(tab === 'v1' && qs[gIdx] && isLotPrem(qs[gIdx]) && !premCheck(L)) return;
       if(gIdx < qs.length - 1) gIdx++;
       else if(list[i + 1]){ roomId = list[i + 1].id; gIdx = 0; }
       else { const fin = document.getElementById('nrFinish'); if(fin) fin.scrollIntoView({ block:'center', behavior:'smooth' }); return; }
@@ -3122,6 +3132,7 @@ document.addEventListener('click', async e=>{
   const sp = t.closest('[data-sumph]'); if(sp){ sumPhotos = sp.dataset.sumph === '1'; const y = window.scrollY; render(); window.scrollTo(0, y); return; }
   if(t.closest('#quoteConfirm')){
     // confirming also puts the sheet on the hub's server, so the customer's link works
+    if(!premCheck(L)) return;
     L.quoteOk = iso(new Date()); keepVersion(L, 'confirmed');
     syncTick(); render(); toast('Pricing confirmed. It can go to the customer now.'); return;
   }
